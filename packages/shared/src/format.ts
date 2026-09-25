@@ -25,7 +25,13 @@ function toIntlValue(value: NumericValue): IntlNumeric | null {
 function format(value: NumericValue, locale: Locale, options: Intl.NumberFormatOptions): string {
   const intlValue = toIntlValue(value);
   if (intlValue === null) return MISSING_VALUE;
-  return new Intl.NumberFormat(locale, options).format(intlValue);
+  try {
+    // `negative`: Werte, die auf 0 gerundet werden, erscheinen ohne Minuszeichen („-0,00 €“).
+    return new Intl.NumberFormat(locale, { ...options, signDisplay: 'negative' }).format(intlValue);
+  } catch {
+    // z. B. unbekannter Währungscode: ein Widget soll daran nicht scheitern.
+    return MISSING_VALUE;
+  }
 }
 
 export interface NumberFormatOptions {

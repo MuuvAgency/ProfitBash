@@ -45,6 +45,7 @@ async function retry() {
     >
       <BrandMark class="text-ink" />
       <h1 class="text-headline-md text-ink">{{ t('shell.loadErrorTitle') }}</h1>
+      <p class="text-body-md text-ink-secondary">{{ t('shell.loadErrorText') }}</p>
       <InlineError
         :message="t(errorMessageKey(session.loadError?.code ?? 'UNKNOWN'))"
         retryable
@@ -63,6 +64,7 @@ async function retry() {
       ]"
     >
       <SidebarPanel
+        id-prefix="desktop"
         :collapsed="collapsed"
         collapsible
         @toggle-collapsed="toggle"
@@ -92,7 +94,13 @@ async function retry() {
       class="w-72! border-0! bg-panel!"
       :pt="{ content: { class: 'p-0! h-full' }, header: { class: 'hidden' } }"
     >
-      <SidebarPanel @navigate="mobileNavOpen = false" @show-shortcuts="shortcutsOpen = true" />
+      <SidebarPanel
+        id-prefix="mobile"
+        closable
+        @close="mobileNavOpen = false"
+        @navigate="mobileNavOpen = false"
+        @show-shortcuts="shortcutsOpen = true"
+      />
     </Drawer>
 
     <main
@@ -110,7 +118,8 @@ async function retry() {
           <Suspense>
             <component :is="Component" />
             <template #fallback>
-              <div class="flex flex-col gap-space-lg" :aria-label="t('common.loading')">
+              <div class="flex flex-col gap-space-lg" role="status" aria-busy="true">
+                <span class="sr-only">{{ t('common.loading') }}</span>
                 <SkeletonBlock width="16rem" height="2rem" />
                 <SkeletonBlock shape="tile" height="12rem" />
               </div>

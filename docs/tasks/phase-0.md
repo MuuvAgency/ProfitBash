@@ -15,8 +15,8 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] `pnpm dev` startet api, worker und web lokal (lokales Postgres 17 über Homebrew); `pnpm test`, `pnpm typecheck` und `pnpm lint` sind grün.
 - [ ] CI (GitHub Actions) läuft bei jedem Push auf `main` und bei Pull Requests: Schema-/Migrations-Check, typecheck, lint, test, build.
 - [ ] Railway-Service `app` (API + Web auf einer Origin, `WORKER_MODE=inline`, `NODE_ENV=production`) ist erreichbar und nutzt Railway-Postgres mit Backups.
-- [ ] Login mit E-Mail/Passwort. Der Seed legt einen Admin an (Org-Admin von „Muuv" und Plattform-Superadmin). Öffentliche Registrierung ist deaktiviert.
-- [ ] Die App-Shell zeigt die komplette Sidebar aus `docs/plan.md` §3. Menüpunkte späterer Phasen öffnen eine Platzhalterseite „Kommt in Phase N".
+- [x] Login mit E-Mail/Passwort. Der Seed legt einen Admin an (Org-Admin von „Muuv" und Plattform-Superadmin). Öffentliche Registrierung ist deaktiviert.
+- [x] Die App-Shell zeigt die komplette Sidebar aus `docs/plan.md` §3. Menüpunkte späterer Phasen öffnen eine Platzhalterseite „Kommt in Phase N".
 - [ ] Unter *Admin → Clients & Connections* lässt sich ein Amazon-Ads-Account verbinden (OAuth, Region EU). Bis zur API-Freigabe mit dem Mock-Anbieter (`AMAZON_ADS_USE_MOCK=true`), danach einmal echt.
   - Die Profile erscheinen mit Land, Währung, Zeitzone und Typ.
   - Jedem Profil lässt sich ein **Client** zuordnen (auswählen oder neu anlegen).
@@ -25,7 +25,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] Die Jobs `token-refresh` und `profiles-sync` laufen über pg-boss, schreiben `job_runs` und pingen Healthchecks.io.
 - [ ] *Betrieb → Sync-Status* zeigt die letzten Jobläufe mit Status und Fehlertext.
 - [ ] Die Settings-Seite speichert Locale (Zahlenformat) und Theme serverseitig.
-- [ ] Die UI nutzt die Design-Tokens aus `design/theme.js` (Login und Shell im Kinetic-Bento-Look).
+- [x] Die UI nutzt die Design-Tokens aus `design/theme.js` (Login und Shell im Kinetic-Bento-Look).
 - [ ] ADRs `docs/decisions/001-stack.md` und `002-tenancy.md` sind aktuell.
 
 ## Voraussetzungen (manuell, Dominik)
@@ -221,24 +221,41 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] Graceful Shutdown.
 
 ### 0.8 Frontend-Grundgerüst (`apps/web`)
-- [ ] Vue 3 + Vite + PrimeVue (Styled Mode, eigenes Preset in `src/theme/` aus `design/theme.js`, Light/Dark), Tailwind v4 für Layout,
+
+Aufgeteilt: **Teil 1** (Login + Shell) ist erledigt. **Teil 2** (Clients & Connections, Sync-Status, Settings) folgt nach 0.5–0.7;
+bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
+
+- [x] Vue 3 + Vite + PrimeVue (Styled Mode, eigenes Preset in `src/theme/` aus `design/theme.js`, Light/Dark), Tailwind v4 für Layout,
   Pinia, Vue Router, TanStack Query, vue-i18n (Default `de`), generierter API-Client aus `/api/openapi.json`.
-- [ ] Das Web importiert aus `@profitbash/shared` nur die browserfähige Wurzel und `/access-control`, nie `/env` oder `/crypto`.
-- [ ] Fonts self-hosted (Space Grotesk, JetBrains Mono für alle Zahlen), keine Google-Fonts-Links.
-- [ ] Visuelle Referenz: `design/PROFITBASH-claude-design.html` (Screens `login`, Sidebar/Shell). Nur als Vorlage, kein Copy-Paste des Stitch-HTML.
-- [ ] Login-Seite; Router-Guards für `requiresAuth`, `feature`, `requiresOrgAdmin`, `requiresSuperadmin`.
-- [ ] App-Shell:
+- [x] Das Web importiert aus `@profitbash/shared` nur die browserfähige Wurzel und `/access-control`, nie `/env` oder `/crypto`.
+- [x] Fonts self-hosted (Space Grotesk, JetBrains Mono für alle Zahlen), keine Google-Fonts-Links.
+- [x] Visuelle Referenz: `design/PROFITBASH-claude-design.html` (Screens `login`, Sidebar/Shell). Nur als Vorlage, kein Copy-Paste des Stitch-HTML.
+- [x] Login-Seite; Router-Guards für `requiresAuth`, `feature`, `requiresOrgAdmin`, `requiresSuperadmin`.
+- [x] App-Shell:
   - einklappbare Sidebar mit der Menüstruktur aus `docs/plan.md` §3 (Sichtbarkeit über `features`)
   - Account-Menü: Dark Mode, Settings, Shortcuts, Logout
   - Quick-Tools-Popover (nur Platzhalter)
-- [ ] Platzhalterseite je späterem Menüpunkt mit Phasenhinweis.
+- [x] Platzhalterseite je späterem Menüpunkt mit Phasenhinweis.
 - [ ] **Clients & Connections:**
   - Button „Amazon-Account verbinden", Liste der Connections mit Status (inkl. „Neu verbinden" bei `reauth_required`)
   - Profiltabelle (AG Grid Community): Flagge, Land, Account-Name, Typ, Währung, Zeitzone, Client (Auswahl oder neu anlegen), Ausblenden-Toggle, Filter „entfernte anzeigen"
   - Button „Jetzt synchronisieren"
 - [ ] **Sync-Status:** letzte 100 `job_runs`, filterbar nach Job und Status, Fehlertext aufklappbar.
 - [ ] **Settings:** Locale mit Formatvorschau (Zahl, Währung, Prozent), Theme.
-- [ ] Gemeinsame Komponenten: `EmptyState`, `InlineError`, `PageHeader`, `SkeletonBlock`; Formatierungs-Helper (Zahl, Währung, Prozent) aus `packages/shared`.
+- [x] Gemeinsame Komponenten: `EmptyState`, `InlineError`, `PageHeader`, `SkeletonBlock`; Formatierungs-Helper (Zahl, Währung, Prozent) aus `packages/shared`.
+- [x] Umsetzung Teil 1 (Stand für Teil 2):
+  - **PrimeVue 4.x (MIT)**, nicht 5.x: Ab 5.x kommerzielle Lizenz, siehe ADR 001.
+  - Tokens: `src/theme/tokens.ts` (Spiegel von `design/theme.js`, per Test geprüft; Dark-Werte dort abgeleitet) → Preset
+    `src/theme/preset.ts` (`extend.pb` → CSS-Variablen `--p-pb-*`, Light an `:root`, Dark unter `.dark`) → Tailwind-Namen in
+    `src/styles/main.css` (`bg-canvas`, `text-ink`, `p-gutter`, `text-data-md` …). Tailwinds Standardfarben sind abgeschaltet.
+    Zahlen mit der Utility `font-data` (JetBrains Mono, tabellarisch).
+  - API-Client: `apps/api/openapi.json` ist eingecheckt, `pnpm api:generate` erzeugt ihn neu und daraus `src/api/schema.gen.ts`.
+    Zwei Tests schlagen an, wenn eins davon veraltet ist. Neue Endpunkte → `pnpm api:generate`, dann Methode in `src/api/client.ts`.
+  - Navigation und Rechte: `src/navigation/navigation.ts` ist die einzige Quelle für Sidebar und Routen-Meta.
+    Aus einem Platzhalter wird eine echte Seite, indem die Route in `src/router/index.ts` eine eigene Komponente bekommt.
+  - Session: Pinia-Store `src/stores/session.ts` (`/api/me`), `src/router/session-sync.ts` (401 → Login mit Rücksprung,
+    Guards erneut nach „Erneut versuchen“). Sidebar-Einklappen im UI-State `shell/sidebar`.
+  - Tests im Web: Komponenten- und Router-Tests mit `mountWithApp()` und `stubFetch()` aus `src/test/`.
 
 ### 0.9 Deployment
 - [ ] Produktionsfähige Einstiegspunkte mit tsup bündeln: `apps/api` (Server), `migrate` und `seed` als eigene Bundles.
@@ -274,6 +291,6 @@ Die Datei `.env.example` im Repo-Root ist die Quelle. Neue Variablen in den Aufg
 
 ## Reihenfolge für Claude Code
 
-0.1 → 0.2 → 0.3 → 0.4 → 0.8 (Login + Shell) → 0.5 → 0.6 → 0.7 → 0.8 (Connections, Sync-Status, Settings) → 0.9.
+0.1 → 0.2 → 0.3 → 0.4 → 0.8 (Login + Shell) ✓ → 0.5 → 0.6 → 0.7 → 0.8 (Connections, Sync-Status, Settings) → 0.9.
 
 Nach jedem Schritt: Tests grün, kurzer Commit, Häkchen in dieser Datei setzen.

@@ -123,6 +123,15 @@ export const shadows = {
 } as const;
 
 /** Radien aus DESIGN.md §4 (Kacheln 1.5rem, Hero-Kacheln 2rem, Buttons und Felder 0.75rem). */
+/** Eigene Layout-Abstände, die design/theme.js nicht kennt. */
+export const layoutSpacing = {
+  /** Innenabstand großer Hero-Flächen (Login-Karte ab Desktop). */
+  hero: '3.5rem',
+} as const;
+
+/** Innenabstand von Eingabefeldern (Login-Felder nutzen die große Variante von PrimeVue). */
+export const controlPadding = { x: '0.875rem', y: '0.625rem' } as const;
+
 export const radii = {
   control: '0.75rem',
   tile: '1.5rem',

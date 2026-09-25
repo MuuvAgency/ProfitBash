@@ -12,8 +12,10 @@ import { resolveGuard } from './guard';
 
 declare module 'vue-router' {
   interface RouteMeta {
-    /** Menüeintrag der Seite (Titel, Phase, aktiver Zustand in der Sidebar). */
+    /** Menüeintrag der Seite (aktiver Zustand in der Sidebar). */
     navItemId?: string;
+    /** i18n-Key des Seitentitels (Browser-Tab). */
+    titleKey?: string;
   }
 }
 
@@ -35,7 +37,7 @@ function placeholderRoute(item: NavItem): RouteRecordRaw {
     name: item.id,
     component: PlaceholderPage,
     props: { itemId: item.id, phase: item.phase },
-    meta: { ...accessMeta(item.access), navItemId: item.id },
+    meta: { ...accessMeta(item.access), navItemId: item.id, titleKey: item.labelKey },
   };
 }
 
@@ -44,7 +46,7 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: () => import('../pages/LoginPage.vue'),
-    meta: { guestOnly: true },
+    meta: { guestOnly: true, titleKey: 'login.pageTitle' },
   },
   {
     path: '/',
@@ -60,16 +62,19 @@ const routes: RouteRecordRaw[] = [
         name: 'settings',
         component: PlaceholderPage,
         props: { itemId: 'settings', phase: 0 },
+        meta: { titleKey: 'nav.settings' },
       },
       {
         path: 'forbidden',
         name: 'forbidden',
         component: () => import('../pages/ForbiddenPage.vue'),
+        meta: { titleKey: 'forbidden.title' },
       },
       {
         path: ':pathMatch(.*)*',
         name: 'not-found',
         component: () => import('../pages/NotFoundPage.vue'),
+        meta: { titleKey: 'notFound.title' },
       },
     ],
   },

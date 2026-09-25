@@ -51,14 +51,14 @@ async function submit() {
 
 <template>
   <main
-    class="flex min-h-dvh items-center justify-center bg-canvas p-margin-mobile sm:p-margin lg:p-12"
+    class="flex min-h-dvh items-center justify-center bg-canvas p-margin-mobile sm:p-margin lg:p-space-xl"
   >
     <div
-      class="grid w-full max-w-6xl overflow-hidden rounded-hero bg-tile shadow-raised lg:min-h-176 lg:grid-cols-[46fr_54fr]"
+      class="grid w-full max-w-6xl overflow-hidden rounded-hero bg-tile shadow-raised lg:grid-cols-[46fr_54fr]"
     >
       <!-- Markenfläche -->
       <section
-        class="relative flex flex-col justify-between gap-space-xl overflow-hidden bg-panel p-space-xl text-on-panel sm:p-10 lg:p-14"
+        class="relative flex flex-col justify-between gap-space-xl overflow-hidden bg-panel p-space-xl text-on-panel lg:p-hero"
       >
         <BrandMark size="lg" />
 
@@ -95,7 +95,7 @@ async function submit() {
       </section>
 
       <!-- Formular -->
-      <section class="flex flex-col justify-center p-space-xl sm:p-12 lg:p-16">
+      <section class="flex flex-col justify-center p-space-xl lg:p-hero">
         <div class="mx-auto flex w-full max-w-md flex-col gap-space-xl">
           <div class="flex flex-col gap-space-xs">
             <h1 class="text-headline-lg text-ink">{{ t('login.heading') }}</h1>

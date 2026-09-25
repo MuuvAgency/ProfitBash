@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/vue-query';
 import Menu from 'primevue/menu';
 import type { MenuItem } from 'primevue/menuitem';
 import { useToast } from 'primevue/usetoast';
-import { computed, useTemplateRef } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { SETTINGS_PATH } from '../../navigation/navigation';
@@ -11,7 +11,7 @@ import { useSessionStore } from '../../stores/session';
 import { toggledTheme } from '../../theme/mode';
 import { useColorScheme } from '../../theme/useColorScheme';
 
-defineProps<{ collapsed?: boolean }>();
+const props = defineProps<{ idPrefix: string; collapsed?: boolean }>();
 const emit = defineEmits<{ showShortcuts: [] }>();
 
 const { t } = useI18n();
@@ -21,6 +21,8 @@ const queryClient = useQueryClient();
 const session = useSessionStore();
 const scheme = useColorScheme();
 const menu = useTemplateRef<InstanceType<typeof Menu>>('menu');
+const menuId = computed(() => `${props.idPrefix}-account-menu`);
+const open = ref(false);
 
 const me = computed(() => session.me);
 const activeOrganization = computed(() =>
@@ -114,7 +116,8 @@ const items = computed<MenuItem[]>(() => {
       type="button"
       :aria-label="t('account.menu')"
       aria-haspopup="menu"
-      aria-controls="account-menu"
+      :aria-controls="menuId"
+      :aria-expanded="open"
       :class="[
         'flex w-full items-center gap-space-sm rounded-control p-space-sm text-left outline-none transition-colors',
         'hover:bg-on-panel/10 focus-visible:ring-2 focus-visible:ring-violet',
@@ -123,7 +126,7 @@ const items = computed<MenuItem[]>(() => {
       @click="menu?.toggle($event)"
     >
       <span
-        class="flex size-9 shrink-0 items-center justify-center rounded-full bg-violet text-body-sm font-semibold text-on-panel"
+        class="flex size-9 shrink-0 items-center justify-center rounded-full bg-violet text-body-sm font-semibold text-on-violet"
         aria-hidden="true"
         >{{ initials }}</span
       >
@@ -138,6 +141,6 @@ const items = computed<MenuItem[]>(() => {
       </span>
       <i v-if="!collapsed" class="pi pi-angle-up shrink-0 text-on-panel-muted" aria-hidden="true" />
     </button>
-    <Menu id="account-menu" ref="menu" :model="items" popup />
+    <Menu :id="menuId" ref="menu" :model="items" popup @show="open = true" @hide="open = false" />
   </div>
 </template>

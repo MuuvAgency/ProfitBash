@@ -45,10 +45,9 @@ async function unwrap<T>(
   } catch (cause) {
     throw cause instanceof ApiError ? cause : ApiError.network(cause);
   }
-  if (!result.response.ok || result.data === undefined) {
-    throw toApiError(result.response.status, result.error ?? null);
-  }
-  return result.data;
+  if (!result.response.ok) throw toApiError(result.response.status, result.error ?? null);
+  // Ohne Body (z. B. 204) liefert openapi-fetch `undefined`; das ist ein Erfolg.
+  return result.data as T;
 }
 
 export function createApi(options: ApiOptions = {}) {

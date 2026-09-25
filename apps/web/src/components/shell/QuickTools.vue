@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import Popover from 'primevue/popover';
-import { useTemplateRef } from 'vue';
+import { ref, useTemplateRef } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 defineProps<{ collapsed?: boolean; variant?: 'panel' | 'bar' }>();
 
 const { t } = useI18n();
 const popover = useTemplateRef<InstanceType<typeof Popover>>('popover');
+const open = ref(false);
 </script>
 
 <template>
@@ -16,6 +17,7 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover');
       type="button"
       :aria-label="t('quickTools.button')"
       aria-haspopup="dialog"
+      :aria-expanded="open"
       :class="[
         'flex items-center gap-space-sm rounded-control p-space-sm text-body-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-violet',
         variant === 'bar'
@@ -28,7 +30,12 @@ const popover = useTemplateRef<InstanceType<typeof Popover>>('popover');
       <i class="pi pi-briefcase shrink-0 text-body-lg" aria-hidden="true" />
       <span v-if="!collapsed && variant !== 'bar'">{{ t('quickTools.button') }}</span>
     </button>
-    <Popover ref="popover" :aria-label="t('quickTools.title')">
+    <Popover
+      ref="popover"
+      :aria-label="t('quickTools.title')"
+      @show="open = true"
+      @hide="open = false"
+    >
       <div class="flex max-w-xs flex-col gap-space-xs p-space-xs">
         <h2 class="text-headline-sm text-ink">{{ t('quickTools.title') }}</h2>
         <p class="text-body-sm text-ink-secondary">{{ t('quickTools.empty') }}</p>

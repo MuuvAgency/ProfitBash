@@ -12,7 +12,7 @@ defineProps<{
     <div class="flex min-w-0 flex-col gap-space-xs">
       <p v-if="eyebrow" class="text-label-eyebrow uppercase text-ink-tertiary">{{ eyebrow }}</p>
       <h1 class="text-headline-md text-ink sm:text-headline-lg">{{ title }}</h1>
-      <p v-if="description" class="max-w-[65ch] text-body-md text-ink-secondary">
+      <p v-if="description" class="max-w-prose text-body-md text-ink-secondary">
         {{ description }}
       </p>
     </div>

@@ -9,11 +9,15 @@ import QuickTools from './QuickTools.vue';
 import SidebarNav from './SidebarNav.vue';
 
 const props = defineProps<{
+  /** Präfix für IDs; Desktop-Sidebar und mobile Schublade existieren gleichzeitig. */
+  idPrefix: string;
   collapsed?: boolean;
   /** Auf dem Desktop einklappbar; in der mobilen Schublade nicht. */
   collapsible?: boolean;
+  /** Schließen-Button (mobile Schublade). */
+  closable?: boolean;
 }>();
-const emit = defineEmits<{ toggleCollapsed: []; navigate: []; showShortcuts: [] }>();
+const emit = defineEmits<{ toggleCollapsed: []; navigate: []; showShortcuts: []; close: [] }>();
 
 const { t } = useI18n();
 const session = useSessionStore();
@@ -52,15 +56,33 @@ const toggleLabel = computed(() =>
           aria-hidden="true"
         />
       </button>
+      <button
+        v-if="closable"
+        type="button"
+        :aria-label="t('common.close')"
+        class="flex size-9 items-center justify-center rounded-control text-on-panel-muted outline-none transition-colors hover:bg-on-panel/10 hover:text-on-panel focus-visible:ring-2 focus-visible:ring-violet"
+        @click="emit('close')"
+      >
+        <i class="pi pi-times" aria-hidden="true" />
+      </button>
     </div>
 
     <div class="-mx-space-xs min-h-0 flex-1 overflow-y-auto px-space-xs">
-      <SidebarNav :groups="groups" :collapsed="collapsed" @navigate="emit('navigate')" />
+      <SidebarNav
+        :id-prefix="idPrefix"
+        :groups="groups"
+        :collapsed="collapsed"
+        @navigate="emit('navigate')"
+      />
     </div>
 
     <div class="flex flex-col gap-space-xs">
       <QuickTools :collapsed="collapsed" />
-      <AccountMenu :collapsed="collapsed" @show-shortcuts="emit('showShortcuts')" />
+      <AccountMenu
+        :id-prefix="idPrefix"
+        :collapsed="collapsed"
+        @show-shortcuts="emit('showShortcuts')"
+      />
     </div>
   </div>
 </template>

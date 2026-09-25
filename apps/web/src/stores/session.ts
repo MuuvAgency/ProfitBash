@@ -17,6 +17,11 @@ export const useSessionStore = defineStore('session', () => {
   const loadError = shallowRef<ApiError | null>(null);
   const cachedTheme = ref<Theme>(readCachedTheme());
   let pending: Promise<void> | null = null;
+  /**
+   * Zählt Zustandswechsel (Abmelden, Anmelden, Org-Wechsel). Antworten von `/api/me`, die zu einer
+   * älteren Generation gehören, werden verworfen, damit sie keinen neueren Zustand überschreiben.
+   */
+  let generation = 0;
 
   const preferences = computed<Settings>(
     () => me.value?.preferences ?? { ...DEFAULT_SETTINGS, theme: cachedTheme.value },
@@ -28,22 +33,31 @@ export const useSessionStore = defineStore('session', () => {
       : { status: status.value === 'error' ? 'error' : 'anonymous' },
   );
 
-  function markSignedOut() {
+  function resetState() {
     me.value = null;
     loadError.value = null;
     status.value = 'anonymous';
   }
 
-  async function fetchMe() {
+  function markSignedOut() {
+    generation += 1;
+    pending = null;
+    resetState();
+  }
+
+  async function fetchMe(requestGeneration: number) {
     try {
-      me.value = await api.me();
+      const result = await api.me();
+      if (requestGeneration !== generation) return;
+      me.value = result;
       loadError.value = null;
       status.value = 'authenticated';
-      cachedTheme.value = me.value.preferences.theme;
+      cachedTheme.value = result.preferences.theme;
       writeCachedTheme(cachedTheme.value);
     } catch (error) {
+      if (requestGeneration !== generation) return;
       if (error instanceof ApiError && error.status === 401) {
-        markSignedOut();
+        resetState();
         return;
       }
       me.value = null;
@@ -52,12 +66,23 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
+  function startFetch(): Promise<void> {
+    const request: Promise<void> = fetchMe(generation).finally(() => {
+      if (pending === request) pending = null;
+    });
+    pending = request;
+    return request;
+  }
+
   /** Lädt `/api/me` neu. Gleichzeitige Aufrufe teilen sich einen Request. */
   function load(): Promise<void> {
-    pending ??= fetchMe().finally(() => {
-      pending = null;
-    });
-    return pending;
+    return pending ?? startFetch();
+  }
+
+  /** Nach einem Zustandswechsel: neue Generation, ältere Anfragen zählen nicht mehr. */
+  function reload(): Promise<void> {
+    generation += 1;
+    return startFetch();
   }
 
   /** Lädt nur, wenn noch nichts geladen ist (Router-Guard beim Start). */
@@ -67,7 +92,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function signIn(input: SignInInput) {
     await api.auth.signIn(input);
-    await load();
+    await reload();
   }
 
   async function signOut() {
@@ -82,7 +107,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function switchOrganization(organizationId: string) {
     await api.auth.setActiveOrganization(organizationId);
-    await load();
+    await reload();
   }
 
   /** Setzt das Theme sofort und speichert es; scheitert das Speichern, gilt wieder der alte Wert. */
@@ -96,11 +121,13 @@ export const useSessionStore = defineStore('session', () => {
     const before = current.preferences;
     const next = { ...before, theme };
     current.preferences = next;
+    cachedTheme.value = theme;
     writeCachedTheme(theme);
     try {
       await api.updateSettings(next);
     } catch (error) {
       current.preferences = before;
+      cachedTheme.value = before.theme;
       writeCachedTheme(before.theme);
       throw error;
     }

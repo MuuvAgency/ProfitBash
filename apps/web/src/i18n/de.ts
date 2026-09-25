@@ -2,7 +2,6 @@
 export const de = {
   app: {
     name: 'ProfitBash',
-    tagline: 'Amazon Ads Cockpit',
   },
   common: {
     retry: 'Erneut versuchen',
@@ -70,7 +69,6 @@ export const de = {
   },
   account: {
     menu: 'Konto-Menü',
-    organization: 'Organisation',
     switchOrganization: 'Organisation wechseln',
     darkMode: 'Dunkles Design',
     lightMode: 'Helles Design',
@@ -134,6 +132,10 @@ export const de = {
   },
   errors: {
     INVALID_EMAIL_OR_PASSWORD: 'E-Mail-Adresse oder Passwort ist falsch.',
+    FORBIDDEN: 'Dafür fehlen dir die Rechte.',
+    NOT_FOUND: 'Der Eintrag wurde nicht gefunden. Vielleicht wurde er inzwischen gelöscht.',
+    VALIDATION_ERROR: 'Die Eingaben sind unvollständig oder ungültig.',
+    NO_ACTIVE_ORGANIZATION: 'Keine Organisation ausgewählt. Bitte wähle eine Organisation.',
     TOO_MANY_REQUESTS: 'Zu viele Versuche. Bitte warte kurz und versuche es dann erneut.',
     NETWORK_ERROR: 'Der Server ist nicht erreichbar. Prüfe deine Verbindung.',
     SERVER: 'Auf dem Server ist ein Fehler aufgetreten. Bitte versuche es später erneut.',

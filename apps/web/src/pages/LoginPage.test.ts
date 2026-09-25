@@ -2,14 +2,14 @@ import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch } from '../test/fetch-stub';
 import { meFixture } from '../test/fixtures';
-import { mountWithApp } from '../test/mount';
+import { cleanupMounted, mountWithApp } from '../test/mount';
 import LoginPage from './LoginPage.vue';
 
 const unauthorized = () => json({ error: { code: 'UNAUTHORIZED', message: 'x' } }, 401);
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  document.body.innerHTML = '';
+  cleanupMounted();
 });
 
 async function fillAndSubmit(

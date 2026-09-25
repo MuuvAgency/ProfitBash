@@ -29,4 +29,10 @@ describe('i18n', () => {
   it('nennt die Phase auf Platzhalterseiten', () => {
     expect(t('placeholder.title', { phase: 5 })).toBe('Kommt in Phase 5');
   });
+
+  it('hat eigene Texte für die Fehlercodes der API', () => {
+    for (const code of ['FORBIDDEN', 'VALIDATION_ERROR', 'NOT_FOUND', 'NO_ACTIVE_ORGANIZATION']) {
+      expect(errorMessageKey(code)).toBe(`errors.${code}`);
+    }
+  });
 });

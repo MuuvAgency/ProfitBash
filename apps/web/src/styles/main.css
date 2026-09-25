@@ -58,6 +58,7 @@
   --spacing-gutter-mobile: var(--p-pb-spacing-gutter-mobile);
   --spacing-margin: var(--p-pb-spacing-margin);
   --spacing-margin-mobile: var(--p-pb-spacing-margin-mobile);
+  --spacing-hero: var(--p-pb-spacing-hero);
 
   --text-display: var(--p-pb-text-display-size);
   --text-display--line-height: var(--p-pb-text-display-line-height);

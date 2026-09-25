@@ -10,10 +10,11 @@ import ToastService from 'primevue/toastservice';
 import Tooltip from 'primevue/tooltip';
 import { createApp } from 'vue';
 import App from './App.vue';
-import { ApiError, onUnauthorized } from './api';
+import { ApiError } from './api';
 import { i18n } from './i18n';
-import { NAVIGATION } from './navigation/navigation';
 import { createAppRouter, installGuards } from './router';
+import { installSessionSync } from './router/session-sync';
+import { pageTitleKey } from './router/title';
 import { useSessionStore } from './stores/session';
 import { applyColorScheme, readCachedTheme, resolveColorScheme } from './theme/mode';
 import { preset } from './theme/preset';
@@ -64,23 +65,12 @@ app.use(VueQueryPlugin, { queryClient });
 const session = useSessionStore(pinia);
 installGuards(router, session);
 
-// Session abgelaufen oder widerrufen: abmelden und nach dem Login an dieselbe Stelle zurück.
-onUnauthorized(() => {
-  if (session.status !== 'authenticated') return;
-  session.markSignedOut();
-  queryClient.clear();
-  const { fullPath } = router.currentRoute.value;
-  void router.push({ name: 'login', query: { redirect: fullPath, reason: 'expired' } });
-});
+installSessionSync(router, session, queryClient);
 
-const navLabels = new Map(
-  NAVIGATION.flatMap((group) => group.items).map((item) => [item.id, item.labelKey]),
-);
 router.afterEach((to) => {
   const { t } = i18n.global;
-  const labelKey =
-    to.name === 'login' ? 'login.pageTitle' : navLabels.get(to.meta.navItemId ?? String(to.name));
-  document.title = labelKey ? `${t(labelKey)} · ${t('app.name')}` : t('app.name');
+  const titleKey = pageTitleKey(to);
+  document.title = titleKey ? `${t(titleKey)} · ${t('app.name')}` : t('app.name');
 });
 
 app.use(router);

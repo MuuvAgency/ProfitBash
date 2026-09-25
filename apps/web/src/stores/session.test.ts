@@ -164,4 +164,64 @@ describe('session store', () => {
     expect(session.status).toBe('anonymous');
     expect(session.me).toBeNull();
   });
+
+  it('verwirft eine ältere /api/me-Antwort, die nach dem Abmelden eintrifft', async () => {
+    let release: (() => void) | undefined;
+    stubFetch({
+      'GET /api/me': () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(json(meFixture()));
+        }),
+      'POST /api/auth/sign-out': json({ success: true }),
+    });
+    const session = useSessionStore();
+    const loading = session.load();
+    await vi.waitFor(() => expect(release).toBeDefined());
+    await session.signOut();
+    release?.();
+    await loading;
+    expect(session.status).toBe('anonymous');
+    expect(session.me).toBeNull();
+  });
+
+  it('lädt nach einem Org-Wechsel frisch, statt eine ältere Anfrage wiederzuverwenden', async () => {
+    let active = 'org-1';
+    let releaseFirst: (() => void) | undefined;
+    const meFor = (org: string) => ({ ...meFixture(), activeOrganizationId: org });
+    stubFetch({
+      'GET /api/me': () => {
+        const org = active;
+        if (!releaseFirst) {
+          return new Promise<Response>((resolve) => {
+            releaseFirst = () => resolve(json(meFor(org)));
+          });
+        }
+        return json(meFor(org));
+      },
+      'POST /api/auth/organization/set-active': ({ body }) => {
+        active = (body as { organizationId: string }).organizationId;
+        return json({ id: active });
+      },
+    });
+    const session = useSessionStore();
+    const initial = session.load();
+    await vi.waitFor(() => expect(releaseFirst).toBeDefined());
+    await session.switchOrganization('org-2');
+    releaseFirst?.();
+    await initial;
+    expect(session.me?.activeOrganizationId).toBe('org-2');
+  });
+
+  it('behält das zuletzt gewählte Theme auch nach dem Abmelden', async () => {
+    stubFetch({
+      'GET /api/me': json(meFixture()),
+      'PUT /api/settings': ({ body }) => json(body),
+      'POST /api/auth/sign-out': json({ success: true }),
+    });
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    await session.setTheme('dark');
+    await session.signOut();
+    expect(session.preferences.theme).toBe('dark');
+  });
 });

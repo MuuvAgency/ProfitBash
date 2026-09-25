@@ -3,12 +3,12 @@ import { h } from 'vue';
 import { visibleNavigation } from '../../navigation/navigation';
 import { json, stubFetch } from '../../test/fetch-stub';
 import { meFixture } from '../../test/fixtures';
-import { mountWithApp } from '../../test/mount';
+import { cleanupMounted, mountWithApp } from '../../test/mount';
 import SidebarNav from './SidebarNav.vue';
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  document.body.innerHTML = '';
+  cleanupMounted();
 });
 
 async function mountNav(options: {

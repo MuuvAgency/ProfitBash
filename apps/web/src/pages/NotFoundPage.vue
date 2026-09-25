@@ -7,7 +7,12 @@ const { t } = useI18n();
 </script>
 
 <template>
-  <EmptyState icon="compass" :title="t('notFound.title')" :text="t('notFound.text')">
+  <EmptyState
+    heading-level="h1"
+    icon="compass"
+    :title="t('notFound.title')"
+    :text="t('notFound.text')"
+  >
     <RouterLink v-slot="{ navigate }" :to="{ name: 'home' }" custom>
       <Button
         :label="t('common.backHome')"

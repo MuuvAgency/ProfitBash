@@ -65,3 +65,16 @@ describe('formatPercent', () => {
     expect(formatPercent(undefined, 'de-DE')).toBe(MISSING_VALUE);
   });
 });
+
+describe('Randfälle', () => {
+  it('zeigt auf null gerundete negative Werte ohne Minuszeichen', () => {
+    expect(formatNumber('-0.001', 'de-DE')).toBe('0');
+    expect(formatCurrency('-0.001', 'EUR', 'de-DE')).toBe(`0,00${nbsp}€`);
+    expect(formatPercent('-0.00001', 'de-DE')).toBe(`0,0${nbsp}%`);
+    expect(formatNumber('-1.5', 'de-DE')).toBe('-1,5');
+  });
+
+  it('zeigt bei ungültigem Währungscode den Platzhalter statt einen Fehler zu werfen', () => {
+    expect(formatCurrency('1', 'EURO', 'de-DE')).toBe(MISSING_VALUE);
+  });
+});

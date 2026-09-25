@@ -2,9 +2,11 @@ import { definePreset } from '@primeuix/themes';
 import Aura from '@primeuix/themes/aura';
 import {
   colorRoles,
+  controlPadding,
   designFontSizes,
   designSpacing,
   fonts,
+  layoutSpacing,
   neutralScale,
   radii,
   shadows,
@@ -74,7 +76,7 @@ export const preset = definePreset(Aura, {
   extend: {
     pb: {
       font: fonts,
-      spacing: designSpacing,
+      spacing: { ...designSpacing, ...layoutSpacing },
       radius: radii,
       text: mapValues(designFontSizes, ([size, { lineHeight, letterSpacing, fontWeight }]) => ({
         size,
@@ -89,8 +91,8 @@ export const preset = definePreset(Aura, {
     primary: violetScale,
     focusRing: { width: '2px', style: 'solid', color: '{primary.color}', offset: '2px' },
     formField: {
-      paddingX: '0.875rem',
-      paddingY: '0.625rem',
+      paddingX: controlPadding.x,
+      paddingY: controlPadding.y,
       borderRadius: radii.control,
     },
     colorScheme: { light: semanticScheme('light'), dark: semanticScheme('dark') },

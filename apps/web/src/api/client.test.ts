@@ -86,4 +86,13 @@ describe('createApi', () => {
     await api.putUiState('shell', 'sidebar', { collapsed: false });
     expect(requests[1]?.body).toEqual({ value: { collapsed: false } });
   });
+
+  it('behandelt erfolgreiche Antworten ohne Body als Erfolg', async () => {
+    stubFetch({
+      'PUT /api/settings/ui-state/shell/sidebar': new Response(null, { status: 204 }),
+    });
+    await expect(
+      createApi().putUiState('shell', 'sidebar', { collapsed: true }),
+    ).resolves.toBeUndefined();
+  });
 });

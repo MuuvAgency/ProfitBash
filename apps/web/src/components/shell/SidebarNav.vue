@@ -3,11 +3,16 @@ import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import type { NavGroup } from '../../navigation/navigation';
 
-defineProps<{
-  groups: NavGroup[];
-  /** Nur Icons; Beschriftung per `aria-label` und Tooltip. */
-  collapsed?: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    /** Präfix für IDs, falls die Navigation mehrfach auf der Seite ist. */
+    idPrefix?: string;
+    groups: NavGroup[];
+    /** Nur Icons; Beschriftung per `aria-label` und Tooltip. */
+    collapsed?: boolean;
+  }>(),
+  { idPrefix: 'nav', collapsed: false },
+);
 
 const emit = defineEmits<{ navigate: [] }>();
 const { t } = useI18n();
@@ -20,10 +25,10 @@ const route = useRoute();
       v-for="group in groups"
       :key="group.id"
       class="flex flex-col gap-space-xs"
-      :aria-labelledby="`nav-group-${group.id}`"
+      :aria-labelledby="`${idPrefix}-group-${group.id}`"
     >
       <h2
-        :id="`nav-group-${group.id}`"
+        :id="`${idPrefix}-group-${group.id}`"
         :class="[
           'px-space-md text-label-eyebrow uppercase text-on-panel-muted',
           collapsed ? 'sr-only' : '',
@@ -43,7 +48,7 @@ const route = useRoute();
               'focus-visible:ring-2 focus-visible:ring-violet',
               collapsed ? 'justify-center px-space-sm' : 'px-space-md',
               route.meta.navItemId === item.id
-                ? 'bg-violet font-semibold text-on-panel shadow-active'
+                ? 'bg-violet font-semibold text-on-violet shadow-active'
                 : 'text-on-panel/70 hover:bg-on-panel/10 hover:text-on-panel',
             ]"
             @click="emit('navigate')"
