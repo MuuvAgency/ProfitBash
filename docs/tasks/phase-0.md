@@ -29,7 +29,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 
 ## Voraussetzungen (manuell, Dominik)
 
-- [ ] **0.0a Projektordner umbenennen.** Der aktuelle Pfad enthält Doppelpunkte (`Profit Dash Amazon : Otto : etc`).
+- [x] **0.0a Projektordner umbenennen.** Der aktuelle Pfad enthält Doppelpunkte (`Profit Dash Amazon : Otto : etc`).
   Doppelpunkte sind das Trennzeichen in `PATH`, dadurch finden pnpm-Skripte ihre Tools (`tsc`, `vitest` …) nicht.
   Vorschlag: `~/Projects/profitbash`.
 - [ ] **0.0b Amazon Developer / LWA Security Profile anlegen**
