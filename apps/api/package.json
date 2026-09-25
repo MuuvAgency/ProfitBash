@@ -13,13 +13,16 @@
     "seed": "tsx src/seed-cli.ts"
   },
   "dependencies": {
+    "@better-auth/core": "1.7.5",
     "@hono/node-server": "^2.1.1",
+    "@hono/zod-openapi": "^1.6.3",
     "@profitbash/db": "workspace:*",
     "@profitbash/shared": "workspace:*",
     "better-auth": "1.7.5",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.9",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "auth": "1.7.5",

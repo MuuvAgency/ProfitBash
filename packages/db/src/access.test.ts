@@ -1,13 +1,23 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   AccessDeniedError,
   canSeeProfile,
   getOrgRole,
+  listEnabledFeatures,
+  listMemberships,
   visibleProfileIds,
   visibleProfilesScope,
 } from './access';
-import { amazonAdsProfiles, clients, connections, members, organizations, users } from './schema';
+import {
+  amazonAdsProfiles,
+  clients,
+  connections,
+  members,
+  orgEntitlements,
+  organizations,
+  users,
+} from './schema';
 import { createTestDatabase, type TestDatabase } from './testing';
 
 let testDb: TestDatabase;
@@ -131,6 +141,53 @@ describe('getOrgRole', () => {
     expect(await getOrgRole(testDb.db, ids.admin, ids.muuv)).toBe('admin');
     expect(await getOrgRole(testDb.db, ids.viewer, ids.muuv)).toBe('viewer');
     expect(await getOrgRole(testDb.db, ids.outsider, ids.muuv)).toBeNull();
+  });
+});
+
+describe('listMemberships', () => {
+  it('liefert alle Organisationen des Nutzers mit Rolle, älteste Mitgliedschaft zuerst', async () => {
+    // Der Admin tritt zusätzlich (später) der anderen Organisation als Editor bei.
+    await testDb.db.insert(members).values({
+      organizationId: ids.other,
+      userId: ids.admin,
+      role: 'editor',
+      createdAt: new Date(Date.now() + 60_000),
+    });
+
+    expect(await listMemberships(testDb.db, ids.admin)).toEqual([
+      { organizationId: ids.muuv, name: 'Muuv', slug: 'muuv', type: 'internal', role: 'admin' },
+      {
+        organizationId: ids.other,
+        name: 'Andere Agentur',
+        slug: 'andere',
+        type: 'client',
+        role: 'editor',
+      },
+    ]);
+
+    await testDb.db
+      .delete(members)
+      .where(and(eq(members.organizationId, ids.other), eq(members.userId, ids.admin)));
+  });
+
+  it('liefert eine leere Liste für Nutzer ohne Mitgliedschaft', async () => {
+    const [loner] = await testDb.db
+      .insert(users)
+      .values({ name: 'Lea Lonely', email: 'lonely@muuv.test' })
+      .returning({ id: users.id });
+    expect(await listMemberships(testDb.db, loner!.id)).toEqual([]);
+  });
+});
+
+describe('listEnabledFeatures', () => {
+  it('liefert nur die aktivierten Features genau dieser Organisation', async () => {
+    await testDb.db.insert(orgEntitlements).values([
+      { organizationId: ids.muuv, feature: 'dashboard', enabled: true },
+      { organizationId: ids.muuv, feature: 'profit', enabled: false },
+      { organizationId: ids.other, feature: 'goals', enabled: true },
+    ]);
+
+    expect(await listEnabledFeatures(testDb.db, ids.muuv)).toEqual(['dashboard']);
   });
 });
 

@@ -90,4 +90,5 @@ auf einen anderen Postgres-Anbieter.
 - Code bleibt anbieterneutral. Hosting- und DB-Wechsel sind Konfiguration.
 - Grids ohne Enterprise-Features: Gruppierungen und Aggregationen macht der Server.
 - Das better-auth-Schema wird mit dem better-auth-CLI (`auth generate`) aus der Auth-Konfiguration erzeugt, nicht von Hand gepflegt.
+- `apps/api` führt `@better-auth/core` als direkte Abhängigkeit, immer in exakt derselben Version wie `better-auth`. Die Audit-Hooks lesen daraus den handelnden Nutzer der laufenden Anfrage (Endpoint-Kontext).
 - `packages/db` führt `kysely` als Dev-Abhängigkeit. Das ist nötig, damit pnpm in Entwicklung und Tests dieselbe drizzle-orm-Kopie wie better-auth nutzt (better-auth bringt kysely mit).

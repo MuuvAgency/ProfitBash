@@ -25,6 +25,24 @@ export default defineConfig([
     },
   },
   {
+    // Typisierte Regeln: nicht abgewartete Promises sind in Job- und Request-Code fast immer Fehler.
+    files: ['**/*.{ts,vue}'],
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          // Konfigurationsdateien außerhalb der tsconfig-Projekte
+          allowDefaultProject: ['*.ts', 'packages/db/drizzle.config.ts'],
+        },
+        tsconfigRootDir: import.meta.dirname,
+        extraFileExtensions: ['.vue'],
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+    },
+  },
+  {
     files: ['apps/web/src/**'],
     languageOptions: { globals: globals.browser },
   },

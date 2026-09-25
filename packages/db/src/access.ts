@@ -1,7 +1,7 @@
 import { isOrgRole, type OrgRole } from '@profitbash/shared';
-import { and, eq, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, eq, isNull, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
-import { amazonAdsProfiles, members } from './schema';
+import { amazonAdsProfiles, members, orgEntitlements, organizations } from './schema';
 
 /**
  * Zentraler Access-Layer. ALLE Profil-Abfragen laufen hierüber (siehe CLAUDE.md).
@@ -34,6 +34,44 @@ export async function getOrgRole(db: Db, userId: string, orgId: string): Promise
     .limit(1);
   if (!membership) return null;
   return isOrgRole(membership.role) ? membership.role : null;
+}
+
+export interface Membership {
+  organizationId: string;
+  name: string;
+  slug: string;
+  type: string;
+  role: OrgRole;
+}
+
+/**
+ * Alle Organisationen, in denen der Nutzer Mitglied ist, älteste Mitgliedschaft zuerst.
+ * Mitgliedschaften mit unbekannter Rolle werden ausgelassen (die DB lässt keine zu).
+ */
+export async function listMemberships(db: Db, userId: string): Promise<Membership[]> {
+  const rows = await db
+    .select({
+      organizationId: organizations.id,
+      name: organizations.name,
+      slug: organizations.slug,
+      type: organizations.type,
+      role: members.role,
+    })
+    .from(members)
+    .innerJoin(organizations, eq(organizations.id, members.organizationId))
+    .where(eq(members.userId, userId))
+    .orderBy(asc(members.createdAt), asc(organizations.id));
+  return rows.filter((row): row is Membership => isOrgRole(row.role));
+}
+
+/** Feature-Keys, die die Organisation gebucht und aktiviert hat (`org_entitlements.enabled`). */
+export async function listEnabledFeatures(db: Db, orgId: string): Promise<string[]> {
+  const rows = await db
+    .select({ feature: orgEntitlements.feature })
+    .from(orgEntitlements)
+    .where(and(eq(orgEntitlements.organizationId, orgId), eq(orgEntitlements.enabled, true)))
+    .orderBy(asc(orgEntitlements.feature));
+  return rows.map((row) => row.feature);
 }
 
 /**

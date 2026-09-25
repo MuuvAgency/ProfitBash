@@ -120,18 +120,46 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] Einbindung in die Env-Validierung der Apps mit dem ersten Nutzer (0.6: Connection anlegen).
 
 ### 0.4 Auth & `/api/me` (`apps/api`)
-- [ ] Hono-Server, better-auth gemountet unter `/api/auth/*`, E-Mail/Passwort, Organization-Plugin mit eigenen Rollen, Admin-Plugin, Signup deaktiviert, `trustedOrigins` = `APP_URL`.
-- [ ] Middleware: Session prüfen, aktive Org setzen, `requireRole('admin')`, `requireSuperadmin()`.
-- [ ] CSRF-Schutz für eigene schreibende Endpunkte (Hono `csrf()` mit `APP_URL` als Origin), zusätzlich zu SameSite-Cookies.
-- [ ] Audit: Schreibvorgänge über better-auth (Mitglieder, Rollen, Organisation) erzeugen über better-auth-Hooks ebenfalls `audit_events`.
-- [ ] `GET /api/me`: User, Orgs, aktive Org, `features` (`{view, write, entitled}` je Feature-Key), Preferences.
+- [x] Hono-Server, better-auth gemountet unter `/api/auth/*`, E-Mail/Passwort, Organization-Plugin mit eigenen Rollen, Admin-Plugin, Signup deaktiviert, `trustedOrigins` = `APP_URL`.
+  - `createApp({ db, auth, appUrl, version, logger })` bekommt alle Abhängigkeiten übergeben (Tests ohne Port und ohne globale Imports).
+  - Neue Sessions starten in der ältesten Organisation des Nutzers (`databaseHooks.session.create`).
+  - **better-auth per HTTP nur über eine Allowlist:** `/sign-in/email`, `/sign-out`, `/get-session`, `/ok`, `/error`, `/organization/*`.
+    Alles andere (Admin-Plugin, Passwort ändern, Profil, Sessions widerrufen) liefert `404`, bis es mit Audit und UI gebraucht wird
+    (Plattform-Admin in Phase 6). Serverseitige Aufrufe (`auth.api.*`, z. B. im Seed) sind nicht betroffen.
+  - `/api/auth/*` antwortet im Fehlerformat von better-auth (`{ code, message }`), die eigenen Endpunkte mit `{ error: { code, message } }`.
+  - Request-Bodies über 64 KB: `413 PAYLOAD_TOO_LARGE` (vor dem Parsen).
+- [x] Middleware: Session prüfen, aktive Org setzen, `requireRole('admin')`, `requireSuperadmin()`.
+  - `requireSession` liest Rolle und Mitgliedschaften bei jeder Anfrage frisch aus der DB (entzogene Rechte gelten sofort).
+    Aktive Org = Org aus der Session, falls der Nutzer dort noch Mitglied ist, sonst die älteste Mitgliedschaft.
+    Der Fallback wird in die Session zurückgeschrieben, damit better-auth-Endpunkte dieselbe Org verwenden.
+  - Verlängert better-auth die Session beim Prüfen, reicht die Middleware den neuen Cookie an den Browser weiter.
+  - `requireRole(min)` mit Rangfolge `admin` ⊃ `editor` ⊃ `viewer`; ohne aktive Org `403 NO_ACTIVE_ORGANIZATION`.
+- [x] CSRF-Schutz für eigene schreibende Endpunkte (Hono `csrf()` mit `APP_URL` als Origin), zusätzlich zu SameSite-Cookies.
+  Hono prüft nur formularartige Requests; JSON-Requests fremder Origins scheitern am CORS-Preflight (die API erlaubt kein CORS).
+  `/api/auth/*` nutzt die Origin-Prüfung von better-auth.
+- [x] Audit: Schreibvorgänge über better-auth (Mitglieder, Rollen, Organisation) erzeugen über better-auth-Hooks ebenfalls `audit_events`.
+  - `organizationHooks` für Organisation anlegen/ändern, Mitglied hinzufügen/entfernen, Rollenwechsel (mit vorheriger Rolle), Einladungen.
+    Der Handelnde kommt aus dem better-auth-Endpoint-Kontext (`@better-auth/core/context`, gleiche Version wie better-auth), `null` bei Server-Aufrufen wie dem Seed.
+  - `/organization/leave` löst keinen Organization-Hook aus und wird über `hooks.after` erfasst.
+  - Org-Admins können ihre Organisation nicht löschen (Rolle `admin` hat kein `organization:delete`, per Test abgesichert).
+  - Die Hooks laufen nach der Änderung, nicht in derselben Transaktion. Scheitert das Audit-Insert, bleibt die Änderung
+    bestehen und die Anfrage endet mit 500 (bewusst akzeptiert).
+  - Offen für Phase 6 (Plattform-Admin): Audit für Admin-Plugin-Aktionen, bevor diese Endpunkte freigegeben werden.
+- [x] `GET /api/me`: User, Orgs, aktive Org, `features` (`{view, write, entitled}` je Feature-Key), Preferences.
   - `entitled` aus `org_entitlements`, `view`/`write` aus der Org-Rolle (`viewer` = nur view).
-- [ ] `GET /api/settings` und `PUT /api/settings`; `GET` und `PUT /api/settings/ui-state/:scope/:key`.
-- [ ] `GET /api/health` (DB erreichbar, Version).
-- [ ] zod-Schemas in `packages/shared`; OpenAPI-Dokument unter `/api/openapi.json`.
-- [ ] Einheitliches Fehlerformat `{error: {code, message}}`; Logging mit Request-ID.
-- [ ] Listen-Endpunkte nehmen viele IDs nie im Query-String entgegen, sondern per POST-Body oder serverseitigem Default.
-- [ ] Typisierte ESLint-Regeln aktivieren (`@typescript-eslint/no-floating-promises`, `no-misused-promises`), bevor Job- und Request-Code wächst.
+  - Nicht gebuchte Features: `view = write = false` (`resolveFeatureAccess` in `packages/shared`).
+- [x] `GET /api/settings` und `PUT /api/settings`; `GET` und `PUT /api/settings/ui-state/:scope/:key`.
+  - `PUT /api/settings` ersetzt Theme, Locale (`de-DE`, `en-GB`, `en-US`) und Dichte vollständig und schreibt `settings.update`
+    (mit `before` und `after`) in derselben Transaktion ins Audit-Log.
+  - UI-State (max. 16 KB je Key) bewusst **ohne** Audit-Event: reiner Darstellungszustand des eigenen Nutzers, sehr häufige Writes.
+- [x] `GET /api/health` (DB erreichbar, Version). `503`, wenn die DB nicht oder nicht binnen 3 s antwortet. Version = `RAILWAY_GIT_COMMIT_SHA` (gekürzt) oder `dev`.
+- [x] zod-Schemas in `packages/shared`; OpenAPI-Dokument unter `/api/openapi.json`.
+  JSON-Werte als `z.unknown()`: Das rekursive `z.json()` lässt sich nicht nach OpenAPI übersetzen.
+- [x] Einheitliches Fehlerformat `{error: {code, message}}`; Logging mit Request-ID.
+  JSON-Zeilen mit `requestId`, Methode, Pfad (ohne Query-String), Status, Dauer; Header `X-Request-Id`. Unerwartete Fehler: `500 INTERNAL_ERROR` ohne interne Details.
+- [x] Listen-Endpunkte nehmen viele IDs nie im Query-String entgegen, sondern per POST-Body oder serverseitigem Default.
+  (Regel steht; in 0.4 gibt es noch keine Listen-Endpunkte. Gilt ab 0.6.)
+- [x] Typisierte ESLint-Regeln aktivieren (`@typescript-eslint/no-floating-promises`, `no-misused-promises`), bevor Job- und Request-Code wächst.
 
 ### 0.5 Amazon-Client (`packages/amazon-ads`)
 - [ ] Konfiguration je Region als Konstanten mit Quellen-Kommentar (gegen die aktuelle Amazon-Ads-Doku verifizieren):
