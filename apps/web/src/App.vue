@@ -1,23 +1,29 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import Toast from 'primevue/toast';
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import SkeletonBlock from './components/common/SkeletonBlock.vue';
+import { useColorSchemeSync } from './theme/useColorScheme';
 
-// Platzhalter bis Aufgabe 0.8 (Login, App-Shell, Design-Tokens, i18n).
-// Prüft, dass der Vite-Proxy /api an die lokale API weiterleitet.
-const apiStatus = ref<'prüfe …' | 'erreichbar' | 'nicht erreichbar'>('prüfe …');
+useColorSchemeSync();
 
-onMounted(async () => {
-  try {
-    const res = await fetch('/api/health');
-    apiStatus.value = res.ok ? 'erreichbar' : 'nicht erreichbar';
-  } catch {
-    apiStatus.value = 'nicht erreichbar';
-  }
-});
+// Bis die erste Navigation (inkl. /api/me) entschieden ist: Skelett in Form der Shell.
+const ready = ref(false);
+void useRouter()
+  .isReady()
+  .finally(() => {
+    ready.value = true;
+  });
 </script>
 
 <template>
-  <main>
-    <h1>ProfitBash</h1>
-    <p>API: {{ apiStatus }}</p>
-  </main>
+  <Toast position="bottom-right" />
+  <RouterView v-if="ready" />
+  <div v-else class="flex min-h-dvh bg-canvas" aria-busy="true">
+    <div class="hidden w-64 shrink-0 bg-panel lg:block" />
+    <div class="flex flex-1 flex-col gap-space-lg p-margin">
+      <SkeletonBlock width="16rem" height="2rem" />
+      <SkeletonBlock shape="tile" height="12rem" />
+    </div>
+  </div>
 </template>

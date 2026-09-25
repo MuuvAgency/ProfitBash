@@ -1,0 +1,32 @@
+import { describe, expect, it } from 'vitest';
+import { NAVIGATION } from '../navigation/navigation';
+import { errorMessageKey, i18n } from './index';
+
+const { te, t } = i18n.global;
+
+describe('i18n', () => {
+  it('ist Deutsch als Standard', () => {
+    expect(i18n.global.locale.value).toBe('de');
+  });
+
+  it('hat Texte für alle Menügruppen und -einträge', () => {
+    const keys = NAVIGATION.flatMap((group) => [
+      group.labelKey,
+      ...group.items.map((i) => i.labelKey),
+    ]);
+    expect(keys.filter((key) => !te(key))).toEqual([]);
+  });
+
+  it('übersetzt bekannte Fehlercodes und fällt sonst auf einen allgemeinen Text zurück', () => {
+    expect(t(errorMessageKey('INVALID_EMAIL_OR_PASSWORD'))).toBe(
+      'E-Mail-Adresse oder Passwort ist falsch.',
+    );
+    expect(errorMessageKey('NETWORK_ERROR')).toBe('errors.NETWORK_ERROR');
+    expect(errorMessageKey('IRGENDWAS_NEUES')).toBe('errors.UNKNOWN');
+    expect(te(errorMessageKey('IRGENDWAS_NEUES'))).toBe(true);
+  });
+
+  it('nennt die Phase auf Platzhalterseiten', () => {
+    expect(t('placeholder.title', { phase: 5 })).toBe('Kommt in Phase 5');
+  });
+});

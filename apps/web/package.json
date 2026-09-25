@@ -8,13 +8,30 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "api:generate": "openapi-typescript ../api/openapi.json -o src/api/schema.gen.ts"
   },
   "dependencies": {
-    "vue": "^3.5.43"
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@primeuix/themes": "^2.0.3",
+    "@profitbash/shared": "workspace:*",
+    "@tanstack/vue-query": "^5.103.2",
+    "openapi-fetch": "^0.17.0",
+    "pinia": "^4.0.3",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.5",
+    "vue": "^3.5.43",
+    "vue-i18n": "^11.4.12",
+    "vue-router": "^5.3.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-vue": "^6.0.9",
+    "@vue/test-utils": "^2.5.1",
+    "happy-dom": "^20.14.5",
+    "openapi-typescript": "^7.13.0",
+    "tailwindcss": "^4.3.3",
     "vite": "^8.3.0",
     "vue-tsc": "^3.3.11"
   }

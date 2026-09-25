@@ -1,4 +1,6 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import { defineConfig, loadEnv } from 'vite';
 
@@ -10,8 +12,11 @@ export default defineConfig(({ mode }) => {
   const apiPort = env.API_PORT ?? '8787';
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), tailwindcss()],
     envDir: repoRoot,
+    resolve: {
+      alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    },
     server: {
       port: 5173,
       strictPort: true,
@@ -19,6 +24,9 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': { target: `http://localhost:${apiPort}` },
       },
+    },
+    test: {
+      environment: 'happy-dom',
     },
   };
 });

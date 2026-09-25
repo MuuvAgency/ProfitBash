@@ -3,3 +3,5 @@ packages:
   - packages/*
 allowBuilds:
   esbuild: true
+  # Das Postinstall-Skript schaltet nur zwischen Vue 2 und 3 um; ausgeliefert ist bereits die Vue-3-Variante.
+  vue-demi: false

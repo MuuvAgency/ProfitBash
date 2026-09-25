@@ -1,0 +1,673 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ProfitBash API",
+    "version": "0.0.0"
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ]
+          },
+          "db": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "db",
+          "version"
+        ]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "user",
+                  "superadmin"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "name",
+              "role"
+            ]
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "admin",
+                    "editor",
+                    "viewer"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "slug",
+                "type",
+                "role"
+              ]
+            }
+          },
+          "activeOrganizationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "features": {
+            "type": "object",
+            "properties": {
+              "dashboard": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "sp-explorer": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "changes": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "tags": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "budgets": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "automations": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "goals": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "profit": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              },
+              "dsp-explorer": {
+                "type": "object",
+                "properties": {
+                  "view": {
+                    "type": "boolean"
+                  },
+                  "write": {
+                    "type": "boolean"
+                  },
+                  "entitled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "view",
+                  "write",
+                  "entitled"
+                ]
+              }
+            },
+            "required": [
+              "dashboard",
+              "sp-explorer",
+              "changes",
+              "tags",
+              "tools",
+              "budgets",
+              "automations",
+              "goals",
+              "profit",
+              "dsp-explorer"
+            ]
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/Settings"
+          }
+        },
+        "required": [
+          "user",
+          "organizations",
+          "activeOrganizationId",
+          "features",
+          "preferences"
+        ]
+      },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string",
+            "enum": [
+              "system",
+              "light",
+              "dark"
+            ]
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "de-DE",
+              "en-GB",
+              "en-US"
+            ]
+          },
+          "density": {
+            "type": "string",
+            "enum": [
+              "comfortable",
+              "compact"
+            ]
+          }
+        },
+        "required": [
+          "theme",
+          "locale",
+          "density"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "UiState": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "description": "Beliebiger JSON-Wert"
+          }
+        }
+      },
+      "UiStatePut": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "description": "Beliebiger JSON-Wert"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Betrieb"
+        ],
+        "summary": "Erreichbarkeit von API und Datenbank",
+        "responses": {
+          "200": {
+            "description": "API und Datenbank sind erreichbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Die Datenbank ist nicht erreichbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "Konto"
+        ],
+        "summary": "Angemeldeter Nutzer mit Organisationen, Rechten und Einstellungen",
+        "responses": {
+          "200": {
+            "description": "Nutzerkontext für die App-Shell.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "Einstellungen"
+        ],
+        "summary": "Einstellungen des angemeldeten Nutzers",
+        "responses": {
+          "200": {
+            "description": "Einstellungen (Defaults, falls nichts gespeichert ist).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Einstellungen"
+        ],
+        "summary": "Einstellungen vollständig ersetzen",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Settings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeicherte Einstellungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/ui-state/{scope}/{key}": {
+      "get": {
+        "tags": [
+          "Einstellungen"
+        ],
+        "summary": "Gespeicherten UI-Zustand lesen",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            },
+            "required": true,
+            "name": "scope",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            },
+            "required": true,
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gespeicherter Wert oder `null`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Einstellungen"
+        ],
+        "summary": "UI-Zustand speichern (kein Audit-Event: reiner Darstellungszustand)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            },
+            "required": true,
+            "name": "scope",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            },
+            "required": true,
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiStatePut"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeicherter Wert.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

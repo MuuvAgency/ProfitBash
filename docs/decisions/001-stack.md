@@ -22,7 +22,7 @@ und um weitere Marktplätze erweiterbar.
 | Auth | better-auth: E-Mail/Passwort, Organization-Plugin (eigene Rollen admin/editor/viewer), Admin-Plugin (Superadmin) |
 | DB | Postgres + Drizzle ORM/drizzle-kit, Treiber `postgres` (postgres.js) in allen Umgebungen |
 | Jobs | pg-boss (Queue und Cron in Postgres, kein Redis) |
-| Web | Vue 3 + Vite, PrimeVue (Styled Mode, eigenes Preset aus `design/theme.js`), Tailwind v4 für Layout, Pinia, Vue Router, TanStack Query, vue-i18n |
+| Web | Vue 3 + Vite, **PrimeVue 4.x** (MIT, Styled Mode, eigenes Preset aus `design/theme.js`) mit `@primeuix/themes` 2.x und PrimeIcons 7, Tailwind v4 für Layout, Pinia, Vue Router, TanStack Query, vue-i18n. API-Client: `openapi-fetch` mit Typen aus `openapi-typescript` (generiert aus `/api/openapi.json`). Fonts selbst gehostet über `@fontsource-variable` |
 | Tabellen / Charts | AG Grid **Community**, AG Charts Community |
 | Build | Apps `api`/`worker` mit tsup (bündelt die Workspace-Pakete, die TS-Quellcode exportieren); Web mit Vite. Dev: `tsx watch` |
 | Tests | Vitest, HTTP-Mocks mit msw |
@@ -85,6 +85,12 @@ auf einen anderen Postgres-Anbieter.
 - **Next.js/React:** Der Vue-Stack mit PrimeVue und Grids ist für dichte Admin-Oberflächen erprobt.
 
 ## Konsequenzen
+
+- **PrimeVue bleibt auf 4.x (Stand 09/2026: 4.5.5).** Ab PrimeVue 5, `@primeuix/themes` 3 und PrimeIcons 8 gilt die kommerzielle
+  „PrimeUI License“: Lizenzschlüssel Pflicht (ohne Schlüssel erscheint ein Lizenz-Banner), kostenlose Community-Lizenz nur für
+  kleine Organisationen (< 1 Mio. $ Umsatz, < 5 Entwickler, < 10 Mitarbeitende, jährliche Bestätigung), sonst 599–799 $ je Entwickler.
+  4.x ist MIT und deckt alles ab, was die App braucht (Tabellen kommen aus AG Grid). Nachteil: 4.x bekommt keine neuen Features mehr.
+  Ein Umstieg auf 5 ist eine eigene Entscheidung (Lizenz + Anpassung des Presets). Entschieden am 2026-09-25.
 
 - Nur ein Datenbanktyp (Postgres) für Daten, Jobs und Sessions.
 - Code bleibt anbieterneutral. Hosting- und DB-Wechsel sind Konfiguration.

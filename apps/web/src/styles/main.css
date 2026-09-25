@@ -1,0 +1,134 @@
+/*
+ * Reihenfolge der Layer: PrimeVue liegt zwischen Tailwind-Basis und -Utilities,
+ * damit Utility-Klassen PrimeVue-Styles überschreiben können.
+ */
+@layer theme, base, primevue, components, utilities;
+
+@import 'tailwindcss';
+
+/* Dark Mode über die Klasse `.dark` am <html> (dieselbe, die PrimeVue nutzt). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tailwind-Tokens. Die Werte stehen in src/theme/tokens.ts und kommen als CSS-Variablen aus dem
+ * PrimeVue-Preset (`--p-pb-*`). Tailwinds Standardfarben sind abgeschaltet: nur Design-Tokens.
+ */
+@theme inline {
+  --color-*: initial;
+  --color-canvas: var(--p-pb-color-canvas);
+  --color-tile: var(--p-pb-color-tile);
+  --color-tile-peak: var(--p-pb-color-tile-peak);
+  --color-well: var(--p-pb-color-well);
+  --color-panel: var(--p-pb-color-panel);
+  --color-on-panel: var(--p-pb-color-on-panel);
+  --color-on-panel-muted: var(--p-pb-color-on-panel-muted);
+  --color-ink: var(--p-pb-color-ink);
+  --color-ink-secondary: var(--p-pb-color-ink-secondary);
+  --color-ink-tertiary: var(--p-pb-color-ink-tertiary);
+  --color-violet: var(--p-pb-color-violet);
+  --color-violet-press: var(--p-pb-color-violet-press);
+  --color-violet-wash: var(--p-pb-color-violet-wash);
+  --color-on-violet: var(--p-pb-color-on-violet);
+  --color-lime: var(--p-pb-color-lime);
+  --color-lime-deep: var(--p-pb-color-lime-deep);
+  --color-loss: var(--p-pb-color-loss);
+  --color-loss-wash: var(--p-pb-color-loss-wash);
+  --color-on-loss-wash: var(--p-pb-color-on-loss-wash);
+  --color-warn: var(--p-pb-color-warn);
+  --color-line: var(--p-pb-color-line);
+  --color-outline: var(--p-pb-color-outline);
+
+  --font-sans: var(--p-pb-font-sans);
+  --font-mono: var(--p-pb-font-mono);
+
+  --shadow-tile: var(--p-pb-shadow-tile);
+  --shadow-raised: var(--p-pb-shadow-raised);
+  --shadow-active: var(--p-pb-shadow-active);
+
+  --radius-control: var(--p-pb-radius-control);
+  --radius-tile: var(--p-pb-radius-tile);
+  --radius-hero: var(--p-pb-radius-hero);
+
+  --spacing-space-xs: var(--p-pb-spacing-space-xs);
+  --spacing-space-sm: var(--p-pb-spacing-space-sm);
+  --spacing-space-md: var(--p-pb-spacing-space-md);
+  --spacing-space-lg: var(--p-pb-spacing-space-lg);
+  --spacing-space-xl: var(--p-pb-spacing-space-xl);
+  --spacing-gutter: var(--p-pb-spacing-gutter);
+  --spacing-gutter-mobile: var(--p-pb-spacing-gutter-mobile);
+  --spacing-margin: var(--p-pb-spacing-margin);
+  --spacing-margin-mobile: var(--p-pb-spacing-margin-mobile);
+
+  --text-display: var(--p-pb-text-display-size);
+  --text-display--line-height: var(--p-pb-text-display-line-height);
+  --text-display--letter-spacing: var(--p-pb-text-display-letter-spacing);
+  --text-display--font-weight: var(--p-pb-text-display-font-weight);
+  --text-headline-lg: var(--p-pb-text-headline-lg-size);
+  --text-headline-lg--line-height: var(--p-pb-text-headline-lg-line-height);
+  --text-headline-lg--letter-spacing: var(--p-pb-text-headline-lg-letter-spacing);
+  --text-headline-lg--font-weight: var(--p-pb-text-headline-lg-font-weight);
+  --text-headline-md: var(--p-pb-text-headline-md-size);
+  --text-headline-md--line-height: var(--p-pb-text-headline-md-line-height);
+  --text-headline-md--letter-spacing: var(--p-pb-text-headline-md-letter-spacing);
+  --text-headline-md--font-weight: var(--p-pb-text-headline-md-font-weight);
+  --text-headline-sm: var(--p-pb-text-headline-sm-size);
+  --text-headline-sm--line-height: var(--p-pb-text-headline-sm-line-height);
+  --text-headline-sm--letter-spacing: var(--p-pb-text-headline-sm-letter-spacing);
+  --text-headline-sm--font-weight: var(--p-pb-text-headline-sm-font-weight);
+  --text-body-lg: var(--p-pb-text-body-lg-size);
+  --text-body-lg--line-height: var(--p-pb-text-body-lg-line-height);
+  --text-body-md: var(--p-pb-text-body-md-size);
+  --text-body-md--line-height: var(--p-pb-text-body-md-line-height);
+  --text-body-sm: var(--p-pb-text-body-sm-size);
+  --text-body-sm--line-height: var(--p-pb-text-body-sm-line-height);
+  --text-label-eyebrow: var(--p-pb-text-label-eyebrow-size);
+  --text-label-eyebrow--line-height: var(--p-pb-text-label-eyebrow-line-height);
+  --text-label-eyebrow--letter-spacing: var(--p-pb-text-label-eyebrow-letter-spacing);
+  --text-label-eyebrow--font-weight: var(--p-pb-text-label-eyebrow-font-weight);
+  --text-data-hero: var(--p-pb-text-data-hero-size);
+  --text-data-hero--line-height: var(--p-pb-text-data-hero-line-height);
+  --text-data-hero--letter-spacing: var(--p-pb-text-data-hero-letter-spacing);
+  --text-data-hero--font-weight: var(--p-pb-text-data-hero-font-weight);
+  --text-data-lg: var(--p-pb-text-data-lg-size);
+  --text-data-lg--line-height: var(--p-pb-text-data-lg-line-height);
+  --text-data-lg--font-weight: var(--p-pb-text-data-lg-font-weight);
+  --text-data-md: var(--p-pb-text-data-md-size);
+  --text-data-md--line-height: var(--p-pb-text-data-md-line-height);
+  --text-data-md--font-weight: var(--p-pb-text-data-md-font-weight);
+  --text-data-sm: var(--p-pb-text-data-sm-size);
+  --text-data-sm--line-height: var(--p-pb-text-data-sm-line-height);
+  --text-data-sm--font-weight: var(--p-pb-text-data-sm-font-weight);
+}
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body-md);
+    line-height: var(--text-body-md--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Zahlen immer in JetBrains Mono mit tabellarischen Ziffern (DESIGN.md §3). */
+@utility font-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

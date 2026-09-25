@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FEATURE_KEYS } from './features';
+import { FEATURE_KEYS, type FeatureKey } from './features';
 import { ORG_ROLES, PLATFORM_ROLES } from './roles';
 
 /**
@@ -113,6 +113,18 @@ const featureAccessSchema = z.object({
   entitled: z.boolean(),
 });
 
+/**
+ * Alle Feature-Keys als Pflichtfelder. Bewusst `z.object` statt `z.record(z.enum(…))`:
+ * Die Record-Variante verliert bei der Übersetzung nach OpenAPI die Pflichtangabe, und der
+ * generierte Client müsste jeden Key als optional behandeln.
+ */
+const featuresSchema = z.object(
+  Object.fromEntries(FEATURE_KEYS.map((key) => [key, featureAccessSchema])) as Record<
+    FeatureKey,
+    typeof featureAccessSchema
+  >,
+);
+
 export const meResponseSchema = z
   .object({
     user: z.object({
@@ -134,7 +146,7 @@ export const meResponseSchema = z
     /** `null`, wenn der Nutzer keiner Organisation angehört. */
     activeOrganizationId: z.string().nullable(),
     /** Rechte je Feature-Key in der aktiven Organisation. */
-    features: z.record(z.enum(FEATURE_KEYS), featureAccessSchema),
+    features: featuresSchema,
     preferences: settingsSchema,
   })
   .meta({ id: 'Me' });

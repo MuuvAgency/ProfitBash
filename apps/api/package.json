@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "auth:schema": "auth generate --config src/auth-cli.ts --output ../../packages/db/src/schema/auth.ts --yes && prettier --write ../../packages/db/src/schema/auth.ts",
-    "seed": "tsx src/seed-cli.ts"
+    "seed": "tsx src/seed-cli.ts",
+    "openapi": "tsx src/openapi-cli.ts"
   },
   "dependencies": {
     "@better-auth/core": "1.7.5",
