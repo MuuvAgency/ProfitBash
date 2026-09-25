@@ -23,6 +23,16 @@ const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
 export const databaseUrlSchema = z.object({ DATABASE_URL: postgresUrl });
 export const databaseDirectUrlSchema = z.object({ DATABASE_URL_DIRECT: postgresUrl });
+export const databaseTestUrlSchema = z.object({ DATABASE_URL_TEST: postgresUrl });
+
+export const authSecretSchema = z.object({
+  BETTER_AUTH_SECRET: z.string().min(32, 'mindestens 32 Zeichen (openssl rand -base64 32)'),
+});
+
+export const seedAdminSchema = z.object({
+  SEED_ADMIN_EMAIL: z.email(),
+  SEED_ADMIN_PASSWORD: z.string().min(12, 'mindestens 12 Zeichen'),
+});
 
 export class EnvValidationError extends Error {
   constructor(public readonly issues: string[]) {

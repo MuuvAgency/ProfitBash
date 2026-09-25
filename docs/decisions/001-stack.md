@@ -89,3 +89,5 @@ auf einen anderen Postgres-Anbieter.
 - Nur ein Datenbanktyp (Postgres) für Daten, Jobs und Sessions.
 - Code bleibt anbieterneutral. Hosting- und DB-Wechsel sind Konfiguration.
 - Grids ohne Enterprise-Features: Gruppierungen und Aggregationen macht der Server.
+- Das better-auth-Schema wird mit dem better-auth-CLI (`auth generate`) aus der Auth-Konfiguration erzeugt, nicht von Hand gepflegt.
+- `packages/db` führt `kysely` als Dev-Abhängigkeit. Das ist nötig, damit pnpm in Entwicklung und Tests dieselbe drizzle-orm-Kopie wie better-auth nutzt (better-auth bringt kysely mit).

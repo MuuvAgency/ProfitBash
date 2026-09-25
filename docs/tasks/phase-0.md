@@ -59,13 +59,14 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] Vite-Dev-Server leitet `/api` an `http://localhost:8787` weiter. So laufen alle Browser-Requests über eine Origin.
 
 ### 0.2 Datenbank-Basis (`packages/db`)
-- [ ] Drizzle + drizzle-kit, Migrationsordner, Treiber `postgres` (postgres.js) für App und Migrationen.
+- [x] Drizzle + drizzle-kit, Migrationsordner `packages/db/drizzle`, Treiber `postgres` (postgres.js) für App und Migrationen.
   pg-boss nutzt `DATABASE_URL_DIRECT` (nie einen Transaction-Pooler).
-- [ ] better-auth-Tabellen:
-  - `user` (inkl. `role` aus dem Admin-Plugin: `user` | `superadmin`), `session`, `account`, `verification`
-  - Organization-Plugin: `organization` (Zusatzfeld `type`: `internal` | `client`), `member` (Rolle `admin` | `editor` | `viewer`), `invitation`
-  - **Keine** eigenen `organizations`-/`memberships`-Tabellen. Die Plugin-Tabellen sind die einzige Quelle.
-- [ ] Eigene Tabellen (alle mit `id` uuid, `created_at`, `updated_at`):
+- [x] better-auth-Tabellen (Plural, UUID-IDs), **erzeugt mit dem better-auth-CLI** aus `apps/api/src/auth.ts`
+  (`pnpm --filter @profitbash/api auth:schema`, danach `pnpm db:generate`):
+  - `users` (inkl. `role` aus dem Admin-Plugin: `user` | `superadmin`), `sessions`, `accounts`, `verifications`
+  - Organization-Plugin: `organizations` (Zusatzfeld `type`: `internal` | `client`), `members` (Rolle `admin` | `editor` | `viewer`), `invitations`
+  - **Keine** eigenen Organisations-/Mitgliedschafts-Tabellen. Die Plugin-Tabellen sind die einzige Quelle.
+- [x] Eigene Tabellen (alle mit `id` uuid, `created_at`, `updated_at`, Zeitstempel mit Zeitzone):
   - `org_entitlements`: `organization_id`, `feature` (text, Keys aus `docs/plan.md` §3), `enabled`; unique (`organization_id`, `feature`)
   - `clients`: `organization_id`, `name`, `slug`; unique (`organization_id`, `slug`)
   - `connections`:
@@ -76,16 +77,20 @@ Ein deploytes Grundgerüst mit folgendem Stand:
     - `profile_id` (text), `account_name`, `country_code`, `currency_code`, `timezone`, `marketplace_id`, `account_type` (`seller` | `vendor` | `agency`)
     - `is_hidden` (vom Nutzer ausgeblendet), `removed_at` (Amazon liefert das Profil nicht mehr), `synced_at`
     - unique (`connection_id`, `profile_id`)
-  - `job_runs`: `job`, `scope`, `status` (`running` | `success` | `failed`), `started_at`, `finished_at`, `error`, `counters` (jsonb)
+  - `job_runs`: `organization_id` (null = plattformweit), `job`, `scope`, `status` (`running` | `success` | `failed`), `started_at`, `finished_at`, `error`, `counters` (jsonb)
   - `audit_events`: `organization_id`, `actor_user_id`, `action`, `target` (jsonb), `created_at`
-  - `user_preferences`: `user_id`, `theme`, `locale`, `density`
+  - `user_preferences`: `user_id` (unique), `theme`, `locale`, `density`
   - `ui_state`: `user_id`, `scope`, `key`, `value` (jsonb); unique (`user_id`, `scope`, `key`)
-- [ ] Access-Layer `access.ts`: `visibleProfileIds({ userId, orgId, includeHidden? })`. Alle Profil-Queries laufen darüber.
-  - Regel Phase 0: alle Profile der Org mit `removed_at IS NULL`, ausgeblendete nur mit `includeHidden` (nur für Admins).
-  - Profil-Freigaben pro Mitglied kommen in Phase 6 hinzu, ohne die Signatur zu ändern.
-- [ ] Seed (idempotent): Org „Muuv" (`type = internal`), Admin-User aus `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
+- [x] Access-Layer `packages/db/src/access.ts`. Alle Profil-Queries laufen darüber:
+  - `visibleProfileIds(db, { userId, orgId, includeHidden? })` (Liste), `visibleProfilesScope(...)` (Unterabfrage für große Mengen), `canSeeProfile(...)`, `getOrgRole(...)`
+  - Regel Phase 0: alle Profile der Org mit `removed_at IS NULL`, ausgeblendete nur mit `includeHidden` (nur für Admins, sonst `AccessDeniedError`). Nicht-Mitglieder sehen nichts.
+  - Profil-Freigaben pro Mitglied kommen in Phase 6 hinzu, ohne die Signaturen zu ändern.
+- [x] Seed (idempotent) in **`apps/api/src/seed.ts`** (braucht die Auth-Konfiguration der API), Aufruf `pnpm db:seed`:
+  Org „Muuv" (`type = internal`), Admin-User aus `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
   (serverseitig über die better-auth-API, nicht über den deaktivierten Signup), Rolle `admin` + Plattform-Rolle `superadmin`,
   alle Entitlements aktiv.
+- [x] Test-Datenbanken: Die globale Test-Einrichtung baut aus `DATABASE_URL_TEST` eine migrierte Template-DB,
+  jede Testdatei arbeitet auf einem eigenen Klon (`createTestDatabase()` aus `@profitbash/db/testing`).
 
 ### 0.3 Verschlüsselung (`packages/shared`)
 - [ ] `encrypt()` / `decrypt()` mit AES-256-GCM, Key aus `ENCRYPTION_KEY` (32 Byte, base64), Format `v1:<iv>:<tag>:<cipher>`.

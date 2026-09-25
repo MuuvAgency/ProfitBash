@@ -11,10 +11,10 @@ später ergänzt um Profitabilität (SP-API). Fokus jetzt: **nur Amazon Ads**.
 
 ## Struktur
 ```
-apps/api        Hono-API (+ liefert in Prod das Web aus)
+apps/api        Hono-API (+ liefert in Prod das Web aus), better-auth-Konfiguration, Seed
 apps/worker     pg-boss-Jobs (inline im API-Prozess oder separat, WORKER_MODE)
 apps/web        Vue 3 + PrimeVue + Tailwind
-packages/db     Drizzle-Schema, Migrationen, Seed, Access-Layer
+packages/db     Drizzle-Schema, Migrationen, Access-Layer, Test-Datenbanken
 packages/amazon-ads  Amazon-Ads-API-Client (je externe API ein eigenes Paket)
 packages/engine Fachlogik ohne I/O (Regeln, Pacing, Berechnungen)
 packages/shared zod-Schemas, Feature-Keys, Formatierung, Verschlüsselung
@@ -25,11 +25,15 @@ docs/           Plan, Phasen-Aufgaben, ADRs
 ## Befehle
 `pnpm dev` · `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:seed`
 Lokale DB: Postgres 17 über Homebrew (`brew services start postgresql@17`), Datenbanken `profitbash` und `profitbash_test`.
+Auth-Schema neu erzeugen (nach Änderungen an `apps/api/src/auth.ts`): `pnpm --filter @profitbash/api auth:schema`, dann `pnpm db:generate`.
+Migrationen nie von Hand schreiben oder nachträglich ändern, sondern mit `pnpm db:generate` erzeugen.
 
 ## Arbeitsweise
 - Aufgaben in der Reihenfolge der Phasen-Datei abarbeiten. Nach jedem Schritt: Tests grün, kleiner Commit, Häkchen setzen.
 - Unklarheiten oder Abweichungen vom Plan: nachfragen oder als offenen Punkt in der Phasen-Datei notieren, nicht raten.
 - Neue Abhängigkeiten nur, wenn nötig; größere Entscheidungen als ADR in `docs/decisions/` festhalten.
+- pnpm installiert nur Versionen, die lange genug veröffentlicht sind (Schutz vor Supply-Chain-Angriffen).
+  Ist die neueste Version zu frisch, die vorherige nehmen. Keine `minimumReleaseAgeExclude`-Ausnahmen eintragen.
 - Kein Scope aus späteren Phasen vorziehen.
 
 ## Regeln im Code
@@ -43,6 +47,7 @@ Lokale DB: Postgres 17 über Homebrew (`brew services start postgresql@17`), Dat
 - Jede schreibende Aktion erzeugt ein `audit_event`. Hintergrundarbeit läuft über `runJob()` und schreibt `job_runs`.
 - Fehlerformat der API: `{ error: { code, message } }`.
 - Externe APIs in Tests mit msw mocken. Kein Test spricht mit echten Amazon-Endpunkten.
+- DB-Tests nutzen `createTestDatabase()` aus `@profitbash/db/testing` (eigene Datenbank je Testdatei, parallel sicher).
 
 ## Frontend
 - UI-Sprache Deutsch, alle Texte über vue-i18n-Keys.

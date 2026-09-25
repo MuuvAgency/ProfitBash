@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "zod-Schemas, Feature-Keys, Formatierung, Verschlüsselung, Env-Validierung",
+  "description": "zod-Schemas, Feature-Keys, Formatierung, Verschl\u00fcsselung, Env-Validierung",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "better-auth": "^1.7.5",
     "zod": "^4.6.5"
   }
 }

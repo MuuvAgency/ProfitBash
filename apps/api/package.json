@@ -8,14 +8,21 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsup",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "auth:schema": "auth generate --config src/auth-cli.ts --output ../../packages/db/src/schema/auth.ts --yes && prettier --write ../../packages/db/src/schema/auth.ts",
+    "seed": "tsx src/seed-cli.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
+    "@profitbash/db": "workspace:*",
     "@profitbash/shared": "workspace:*",
-    "hono": "^4.13.9"
+    "better-auth": "^1.7.5",
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.9",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "auth": "1.7.5",
     "tsup": "^8.5.1",
     "tsx": "^4.23.15"
   }

@@ -16,6 +16,13 @@ export default defineConfig([
   },
   {
     languageOptions: { globals: globals.node },
+    rules: {
+      // Bewusst ungenutzte Werte mit `_` kennzeichnen, z. B. beim Weglassen von Feldern per Destructuring.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
+      ],
+    },
   },
   {
     files: ['apps/web/src/**'],

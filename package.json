@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "db:generate": "pnpm --filter @profitbash/db run generate",
     "db:migrate": "pnpm --filter @profitbash/db run migrate",
-    "db:seed": "pnpm --filter @profitbash/db run seed"
+    "db:seed": "pnpm --filter @profitbash/api run seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

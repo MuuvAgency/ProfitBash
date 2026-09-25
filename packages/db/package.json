@@ -3,14 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Drizzle-Schema, Migrationen, Seed, Access-Layer",
+  "description": "Drizzle-Schema, Migrationen, Access-Layer",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "generate": "node -e \"console.log('db:generate wird in Aufgabe 0.2 eingerichtet')\"",
-    "migrate": "node -e \"console.log('db:migrate wird in Aufgabe 0.2 eingerichtet')\"",
-    "seed": "node -e \"console.log('db:seed wird in Aufgabe 0.2 eingerichtet')\""
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate-cli.ts",
+    "studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@profitbash/shared": "workspace:*",
+    "drizzle-orm": "^0.45.3",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11",
+    "kysely": "0.29.6",
+    "tsx": "^4.23.15"
   }
 }
