@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tile-peak": "#FFFFFF",
+          "ink-on-dark": "#EDECF3",
+          "surface-dim": "#ddd8e4",
+          "on-tertiary": "#ffffff",
+          "on-error-container": "#93000a",
+          "primary": "#4227b1",
+          "on-surface-variant": "#484554",
+          "surface": "#fdf8ff",
+          "warn-amber": "#E0A233",
+          "tertiary": "#6e3300",
+          "inverse-on-surface": "#f4effa",
+          "secondary-container": "#c4ef3e",
+          "ink-secondary": "#63607A",
+          "well-sunken": "#E6E4EC",
+          "on-primary-container": "#d6ceff",
+          "on-error": "#ffffff",
+          "surface-container": "#f1ecf8",
+          "on-tertiary-fixed-variant": "#733600",
+          "on-secondary-fixed": "#161f00",
+          "on-primary": "#ffffff",
+          "inverse-surface": "#312f38",
+          "lime-deep": "#7E9E12",
+          "tertiary-container": "#924600",
+          "violet-press": "#4835A6",
+          "surface-tint": "#5d47cc",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-highest": "#e5e0ec",
+          "surface-container-low": "#f7f1fd",
+          "inverse-primary": "#c8bfff",
+          "background": "#fdf8ff",
+          "outline": "#787585",
+          "ink-primary": "#1B1826",
+          "outline-variant": "#c9c4d6",
+          "on-surface": "#1c1b23",
+          "primary-fixed": "#e5deff",
+          "tile-raise": "#FAFAFC",
+          "on-background": "#1c1b23",
+          "on-tertiary-container": "#ffc8a7",
+          "ink-panel": "#1B1826",
+          "on-secondary-container": "#546b00",
+          "error": "#ba1a1a",
+          "secondary": "#506600",
+          "surface-bright": "#fdf8ff",
+          "primary-fixed-dim": "#c8bfff",
+          "secondary-fixed-dim": "#acd522",
+          "primary-container": "#5a44c9",
+          "on-secondary-fixed-variant": "#3c4d00",
+          "on-primary-fixed-variant": "#452bb3",
+          "surface-variant": "#e5e0ec",
+          "violet-wash": "#ECE8FA",
+          "on-secondary": "#ffffff",
+          "tertiary-fixed": "#ffdbc7",
+          "canvas-mist": "#EEEDF3",
+          "ink-tertiary": "#9C99AD",
+          "on-tertiary-fixed": "#311300",
+          "on-primary-fixed": "#1a0064",
+          "whisper-line": "rgba(27,24,38,0.06)",
+          "error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb688",
+          "surface-container-high": "#ebe6f2",
+          "secondary-fixed": "#c7f241",
+          "loss-red": "#D6524B"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-lg": "1.25rem",
+          "space-xl": "1.75rem",
+          "gutter": "1.25rem",
+          "space-xs": "0.25rem",
+          "gutter-mobile": "0.75rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "headline-lg-mobile": [
+            "Space Grotesk"
+          ],
+          "body-lg": [
+            "Space Grotesk"
+          ],
+          "headline-lg": [
+            "Space Grotesk"
+          ],
+          "label-eyebrow": [
+            "Space Grotesk"
+          ],
+          "display": [
+            "Space Grotesk"
+          ],
+          "data-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Space Grotesk"
+          ],
+          "data-sm": [
+            "JetBrains Mono"
+          ],
+          "body-md": [
+            "Space Grotesk"
+          ],
+          "data-hero-mobile": [
+            "JetBrains Mono"
+          ],
+          "display-mobile": [
+            "Space Grotesk"
+          ],
+          "body-sm": [
+            "Space Grotesk"
+          ],
+          "headline-sm": [
+            "Space Grotesk"
+          ],
+          "data-md": [
+            "JetBrains Mono"
+          ],
+          "data-hero": [
+            "JetBrains Mono"
+          ]
+        },
+        "fontSize": {
+          "headline-lg-mobile": [
+            "22px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "30px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-eyebrow": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "700"
+            }
+          ],
+          "display": [
+            "52px",
+            {
+              "lineHeight": "52px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "data-lg": [
+            "22px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "21px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "data-hero-mobile": [
+            "26px",
+            {
+              "lineHeight": "30px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-mobile": [
+            "32px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-sm": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "18px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "data-hero": [
+            "42px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist text-ink-primary antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-ink-panel z-50 flex flex-col justify-between p-margin shadow-[0_10px_30px_rgba(48,38,92,0.12)]"><div class="flex flex-col gap-space-lg"><div class="flex items-center gap-space-xs px-space-sm py-space-xs"><span class="font-headline-lg text-headline-lg tracking-tight text-ink-on-dark uppercase">ProfitBash</span><span class="h-2 w-2 rounded-full bg-secondary-fixed mb-1"></span></div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]"><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-body-md text-body-md">Dashboard</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="verkaufsanalyse" href="#"><span class="material-symbols-outlined text-[20px]">query_stats</span><span class="font-body-md text-body-md">Verkaufsanalyse</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="profitabilitat" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-body-md text-body-md">Profitabilität</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="marken-produkte" href="#"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-body-md text-body-md">Marken &amp; Produkte</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="retouren" href="#"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="font-body-md text-body-md">Retouren</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-body-md text-body-md">Bestellungen</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="amazon-ads" href="#"><span class="material-symbols-outlined text-[20px]">campaign</span><span class="font-body-md text-body-md">Amazon Ads</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[20px]">tune</span><span class="font-body-md text-body-md">Einstellungen</span></a></nav></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-xl bg-ink-on-dark/5"><div class="flex items-center gap-space-xs"><span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span><span class="font-data-sm text-data-sm text-ink-on-dark/80 uppercase">Channels Live</span></div><span class="font-data-sm text-data-sm text-ink-tertiary">v2.4</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-canvas-mist/85 backdrop-blur-xl z-40 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-headline-sm text-headline-sm text-ink-primary">Guten Morgen, Dominik</span><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="h-2 w-2 rounded-full bg-lime-deep"></span><span class="font-data-sm text-data-sm text-ink-secondary">Amazon, eBay, Otto, Shopify</span><span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">Synced</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="material-symbols-outlined text-ink-secondary text-[18px]">calendar_today</span><span class="font-data-sm text-data-sm text-ink-primary font-semibold">Sept 2026</span></div><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="font-body-sm text-body-sm font-semibold">Export</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative pt-16 bg-canvas-mist min-h-screen"><div class="flex flex-col w-full">
+<!-- Dynamic Interior Canvas -->
+<div class="w-full max-w-[1440px] mx-auto px-margin-mobile lg:px-margin pb-16 flex flex-col gap-space-lg">
+<!-- Screen Header & Context Bar -->
+<header class="pt-6 pb-2 flex flex-col lg:flex-row lg:items-end justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Marketing &amp; Werbung</span>
+<span class="text-ink-tertiary text-[11px] font-bold">/</span>
+<span class="font-label-eyebrow text-label-eyebrow text-primary font-bold uppercase tracking-wider">Werbekosten (PPC)</span>
+<span class="mx-1 h-1 w-1 rounded-full bg-ink-tertiary"></span>
+<div class="flex items-center gap-1.5 px-space-xs py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep animate-pulse"></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Echtzeit-Attribution aktiv · Sept 2026</span>
+</div>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-ink-primary font-bold tracking-tight">Werbekosten &amp; PPC-Performance</h1>
+<p class="font-body-md text-body-md text-ink-secondary max-w-2xl">
+          Kanalübergreifende Werbeausgaben, aggregierter ROI/ROAS und Deckungsbeitrags-Attribution über alle Marktplätze.
+        </p>
+</div>
+<!-- Header Action Cluster -->
+<div class="flex items-center gap-space-sm self-start lg:self-end">
+<button class="group flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-tile-peak hover:bg-violet-wash text-primary font-body-sm text-body-sm font-semibold transition-all duration-200 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)] active:translate-y-px" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary group-hover:scale-110 transition-transform">receipt_long</span>
+<span>Bericht exportieren (CSV)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-primary-container text-on-primary font-body-sm text-body-sm font-semibold hover:bg-violet-press transition-all duration-200 shadow-[0_4px_12px_rgba(90,68,201,0.25)] active:translate-y-px" type="button">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+<span>Budget-Regeln anpassen</span>
+</button>
+</div>
+</header>
+<!-- SECTION 1: Top Asymmetric KPI Bento Grid -->
+<section aria-label="Aggregierte PPC-Kennzahlen" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-space-md">
+<!-- Tile 1: Ad Spend gesamt -->
+<div class="lg:col-span-3 rounded-[1.5rem] bg-tile-raise p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between transition-transform duration-200 hover:-translate-y-0.5">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Aggregiertes Budget</span>
+<span class="material-symbols-outlined text-ink-secondary text-[20px]">payments</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-ink-secondary mt-1">Ad Spend gesamt</span>
+<div class="font-data-hero text-data-hero text-ink-primary tabular-nums tracking-tight mt-1">
+            € 14.870<span class="text-data-lg text-ink-secondary">,00</span>
+</div>
+</div>
+<div class="mt-space-md flex items-center justify-between pt-space-xs">
+<div class="inline-flex items-center gap-1.5 px-space-xs py-0.5 rounded-full bg-warn-amber/15 text-warn-amber">
+<span class="material-symbols-outlined text-[14px]">arrow_outward</span>
+<span class="font-data-sm text-data-sm font-semibold">+6,8 % vs. Vormonat</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">Deckung: 100%</span>
+</div>
+</div>
+<!-- Tile 2: Return on Investment -->
+<div class="lg:col-span-3 rounded-[1.5rem] bg-tile-raise p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between transition-transform duration-200 hover:-translate-y-0.5">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Effizienz-Faktor</span>
+<span class="material-symbols-outlined text-lime-deep text-[20px]">trending_up</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-ink-secondary mt-1">ROI (Blended)</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-data-hero text-data-hero text-ink-primary tabular-nums tracking-tight">3,9</span>
+<span class="font-data-lg text-data-lg text-ink-secondary">×</span>
+</div>
+</div>
+<div class="mt-space-md flex items-center justify-between pt-space-xs">
+<div class="inline-flex items-center gap-1 px-space-xs py-0.5 rounded-full bg-secondary-fixed/40 text-lime-deep">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span class="font-data-sm text-data-sm font-semibold">+0,4× vs. Benchmark 3,5×</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">Top 12%</span>
+</div>
+</div>
+<!-- Tile 3: ACOS gesamt -->
+<div class="lg:col-span-3 rounded-[1.5rem] bg-tile-raise p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between transition-transform duration-200 hover:-translate-y-0.5">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Kosten-Umsatz-Relation</span>
+<span class="material-symbols-outlined text-warn-amber text-[20px]">warning</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-ink-secondary mt-1">ACOS gesamt</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-data-hero text-data-hero text-ink-primary tabular-nums tracking-tight">24,1</span>
+<span class="font-data-lg text-data-lg text-ink-secondary">%</span>
+</div>
+</div>
+<div class="mt-space-md flex items-center justify-between pt-space-xs">
+<div class="inline-flex items-center gap-1 px-space-xs py-0.5 rounded-full bg-warn-amber/15 text-warn-amber">
+<span class="material-symbols-outlined text-[14px]">priority_high</span>
+<span class="font-data-sm text-data-sm font-semibold">Ziel: 22,0% (+2,1 pp)</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">3 Tage über Guardrail</span>
+</div>
+</div>
+<!-- Tile 4: Inverted Command Panel #1B1826 -->
+<div class="lg:col-span-3 rounded-[1.5rem] bg-ink-panel p-space-lg shadow-[0_10px_30px_rgba(27,24,38,0.25)] text-ink-on-dark flex flex-col justify-between relative overflow-hidden transition-transform duration-200 hover:-translate-y-0.5">
+<div class="absolute -right-6 -bottom-6 w-32 h-32 bg-primary-container/20 rounded-full blur-2xl pointer-events-none"></div>
+<div class="flex flex-col gap-space-xs relative z-10">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-secondary-fixed uppercase tracking-wider">Attributierte Performance</span>
+<span class="h-2 w-2 rounded-full bg-secondary-fixed animate-ping"></span>
+</div>
+<span class="font-headline-sm text-headline-sm text-ink-on-dark/80 mt-1">Attribuierter Werbeumsatz</span>
+<div class="font-data-hero text-data-hero text-tile-peak tabular-nums tracking-tight mt-1">
+            € 57.993<span class="text-data-lg text-secondary-fixed">,00</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs flex flex-col gap-space-xs relative z-10">
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="text-ink-on-dark/70">Deckungsbeitrag n. PPC:</span>
+<span class="font-data-md text-data-md text-secondary-fixed font-bold tabular-nums">€ 19.420,00</span>
+</div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="text-ink-on-dark/70">TACoS Gesamtsortiment:</span>
+<span class="font-data-sm text-data-sm text-tile-peak font-semibold tabular-nums">6,92 %</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 2: Middle Bento Analytics (7/12 & 5/12 Asymmetry) -->
+<section aria-label="Visualisierte PPC Trends und Guardrails" class="grid grid-cols-1 lg:grid-cols-12 gap-space-md">
+<!-- Left 7/12: Main Spend vs Profit Trend Chart -->
+<div class="lg:col-span-7 rounded-[1.5rem] bg-tile-peak p-space-lg lg:p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between">
+<!-- Tile Header with Filter Switchers -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Multi-Channel Korrelation</span>
+<h2 class="font-headline-md text-headline-md text-ink-primary font-bold">Ad Spend Trend &amp; Deckungsbeitrag</h2>
+</div>
+<div class="flex items-center gap-1 p-1 bg-well-sunken rounded-xl self-start sm:self-auto">
+<button class="px-space-sm py-0.5 rounded-lg bg-tile-peak text-ink-primary font-data-sm text-data-sm font-semibold shadow-sm" type="button">30 Tage</button>
+<button class="px-space-sm py-0.5 rounded-lg text-ink-secondary hover:text-ink-primary font-data-sm text-data-sm transition-colors" type="button">90 Tage</button>
+<button class="px-space-sm py-0.5 rounded-lg text-ink-secondary hover:text-ink-primary font-data-sm text-data-sm transition-colors" type="button">YTD</button>
+</div>
+</div>
+<!-- Legend Pills -->
+<div class="flex items-center gap-space-md mt-space-sm flex-wrap">
+<div class="flex items-center gap-1.5">
+<span class="h-2.5 w-2.5 rounded-full bg-primary"></span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Ad Spend (€ 14.870)</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="h-2.5 w-2.5 rounded-full bg-lime-deep"></span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Attribuierter Gewinn / Profit (€ 19.420)</span>
+</div>
+<div class="ml-auto hidden sm:flex items-center gap-1 text-ink-tertiary font-data-sm text-data-sm">
+<span class="material-symbols-outlined text-[15px]">auto_graph</span>
+<span>Tagesschnitt: € 495,66 Spend</span>
+</div>
+</div>
+<!-- High-Fidelity Responsive SVG Dual Curve Chart -->
+<div class="relative w-full h-72 sm:h-80 my-space-sm">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 720 280">
+<defs>
+<lineargradient id="spendGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#5A44C9" stop-opacity="0.16"></stop>
+<stop offset="100%" stop-color="#5A44C9" stop-opacity="0.00"></stop>
+</lineargradient>
+<lineargradient id="profitGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#7E9E12" stop-opacity="0.22"></stop>
+<stop offset="100%" stop-color="#7E9E12" stop-opacity="0.01"></stop>
+</lineargradient>
+</defs>
+<!-- Recessed Grid Guidelines -->
+<line stroke="rgba(27,24,38,0.05)" stroke-dasharray="4 4" stroke-width="1" x1="0" x2="720" y1="40" y2="40"></line>
+<line stroke="rgba(27,24,38,0.05)" stroke-dasharray="4 4" stroke-width="1" x1="0" x2="720" y1="110" y2="110"></line>
+<line stroke="rgba(27,24,38,0.05)" stroke-dasharray="4 4" stroke-width="1" x1="0" x2="720" y1="180" y2="180"></line>
+<line stroke="rgba(27,24,38,0.08)" stroke-width="1" x1="0" x2="720" y1="240" y2="240"></line>
+<!-- Profit Area Fill & Path (Ascending with peaks) -->
+<path d="M0,210 C45,200 90,185 140,170 C190,155 240,165 290,135 C340,105 385,130 435,90 C485,55 540,65 590,50 C640,40 680,35 720,30 L720,240 L0,240 Z" fill="url(#profitGradient)"></path>
+<path d="M0,210 C45,200 90,185 140,170 C190,155 240,165 290,135 C340,105 385,130 435,90 C485,55 540,65 590,50 C640,40 680,35 720,30" fill="none" stroke="#7E9E12" stroke-linecap="round" stroke-width="3"></path>
+<!-- Ad Spend Area Fill & Path (Controlled baseline band) -->
+<path d="M0,195 C60,190 120,185 180,190 C240,195 300,180 360,185 C420,190 480,175 540,170 C600,168 660,172 720,165 L720,240 L0,240 Z" fill="url(#spendGradient)"></path>
+<path d="M0,195 C60,190 120,185 180,190 C240,195 300,180 360,185 C420,190 480,175 540,170 C600,168 660,172 720,165" fill="none" stroke="#5A44C9" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Peak Marker Line & Indicator Dot (18. Sept: x=435) -->
+<line stroke="#1B1826" stroke-dasharray="3 3" stroke-opacity="0.25" stroke-width="1.5" x1="435" x2="435" y1="40" y2="240"></line>
+<!-- Spend dot -->
+<circle cx="435" cy="180" fill="#FFFFFF" r="4.5" stroke="#5A44C9" stroke-width="3"></circle>
+<!-- Profit dot -->
+<circle cx="435" cy="90" fill="#FFFFFF" r="5.5" stroke="#7E9E12" stroke-width="3.5"></circle>
+</svg>
+<!-- Precision Tooltip Floating at Day 18 Marker -->
+<div class="absolute left-[54%] sm:left-[57%] top-3 -translate-x-1/2 bg-ink-panel text-ink-on-dark rounded-xl px-space-md py-2 shadow-2xl z-20 pointer-events-none flex flex-col gap-1 w-52 sm:w-60">
+<div class="flex items-center justify-between border-b border-white/10 pb-1">
+<span class="font-data-sm text-data-sm font-bold text-secondary-fixed">18. Sept 2026</span>
+<span class="font-label-eyebrow text-label-eyebrow text-white/60">Peak ROI 4,04×</span>
+</div>
+<div class="flex items-center justify-between font-data-sm text-data-sm">
+<span class="text-ink-on-dark/70">Ad Spend:</span>
+<span class="font-mono text-white font-semibold">€ 540,00</span>
+</div>
+<div class="flex items-center justify-between font-data-sm text-data-sm">
+<span class="text-lime-deep">Attrib. Profit:</span>
+<span class="font-mono text-secondary-fixed font-bold">€ 2.180,00</span>
+</div>
+</div>
+</div>
+<!-- Chart Timeline Monospace Footnote -->
+<div class="flex items-center justify-between text-ink-tertiary font-data-sm text-data-sm px-1 border-t border-whisper-line pt-2">
+<span>01. Sept</span>
+<span class="hidden sm:inline">08. Sept</span>
+<span>15. Sept</span>
+<span class="hidden sm:inline">22. Sept</span>
+<span>30. Sept 2026</span>
+</div>
+</div>
+<!-- Right 5/12: ACOS-Verlauf & Schwellenwert-Guardrail -->
+<div class="lg:col-span-5 rounded-[1.5rem] bg-tile-raise p-space-lg lg:p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Guardrail Überwachung</span>
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warn-amber/15 text-warn-amber">
+<span class="h-1.5 w-1.5 rounded-full bg-warn-amber"></span>
+<span class="font-data-sm text-data-sm font-bold">3 Tage über Ziel</span>
+</div>
+</div>
+<h2 class="font-headline-md text-headline-md text-ink-primary font-bold">ACOS-Verlauf vs. Schwellenwert</h2>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+            Tagesgenaue Abweichung des aggregierten Kostenanteils vom Margen-Zielwert.
+          </p>
+</div>
+<!-- ACOS Guardrail SVG Chart -->
+<div class="relative w-full h-44 my-space-sm">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 420 160">
+<defs>
+<lineargradient id="acosGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#ba1a1a" stop-opacity="0.20"></stop>
+<stop offset="45%" stop-color="#5A44C9" stop-opacity="0.12"></stop>
+<stop offset="100%" stop-color="#5A44C9" stop-opacity="0.00"></stop>
+</lineargradient>
+</defs>
+<!-- Shaded Area above 22% limit (y: 60) -->
+<rect fill="rgba(224, 162, 51, 0.05)" height="60" width="420" x="0" y="0"></rect>
+<!-- Target Line: Dashed 22.0% -->
+<line stroke="#E0A233" stroke-dasharray="5 4" stroke-width="1.8" x1="0" x2="420" y1="60" y2="60"></line>
+<text fill="#E0A233" font-family="JetBrains Mono" font-size="11" font-weight="600" x="320" y="52">Ziel: 22,0% ACOS</text>
+<!-- Real ACOS Path (Rising past 22% near end to 24.1%) -->
+<path d="M0,110 C50,95 100,105 150,85 C200,65 250,70 300,55 C350,42 390,48 420,44 L420,150 L0,150 Z" fill="url(#acosGradient)"></path>
+<path d="M0,110 C50,95 100,105 150,85 C200,65 250,70 300,55 C350,42 390,48 420,44" fill="none" stroke="#5A44C9" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Active Endpoint Circle -->
+<circle cx="420" cy="44" fill="#FFFFFF" r="5" stroke="#ba1a1a" stroke-width="3"></circle>
+</svg>
+<div class="absolute right-0 top-3 font-data-sm text-data-sm text-loss-red font-bold">Aktuell: 24,1 %</div>
+</div>
+<!-- Integrated Guardrail Impact Stat Boxes -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-space-sm pt-space-xs">
+<div class="p-space-sm rounded-xl bg-well-sunken/60 flex flex-col gap-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-secondary uppercase">TACoS Verhältnis</span>
+<div class="flex items-baseline gap-1">
+<span class="font-data-md text-data-md text-ink-primary font-bold">6,9 %</span>
+<span class="font-data-sm text-data-sm text-lime-deep font-semibold">(Ziel &lt; 8%)</span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary text-[12px]">Organischer Hebel intakt</span>
+</div>
+<div class="p-space-sm rounded-xl bg-well-sunken/60 flex flex-col gap-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-secondary uppercase">Effizienz-Potenzial</span>
+<div class="flex items-baseline gap-1">
+<span class="font-data-md text-data-md text-loss-red font-bold">-€ 1.280</span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary text-[12px]">durch Gebotsschnitt (Meta/PMax)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: Bottom Bento - Multi-Channel Table & Channel Allocation -->
+<section aria-label="Kanal-Performance Aufschlüsselung" class="w-full rounded-[1.5rem] bg-tile-raise p-space-lg lg:p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-space-md">
+<!-- Table Section Header -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-xs">
+<div class="flex items-center gap-space-sm">
+<h2 class="font-headline-md text-headline-md text-ink-primary font-bold">Performance nach Werbekanälen</h2>
+<span class="px-space-xs py-0.5 rounded-full bg-violet-wash text-primary font-data-sm text-data-sm font-bold">4 Kanäle aktiv</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-2.5 text-[18px] text-ink-tertiary">search</span>
+<input class="w-56 sm:w-64 pl-8 pr-3 py-1.5 rounded-xl bg-tile-peak text-ink-primary font-body-sm text-body-sm placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-primary shadow-sm" placeholder="Kampagne / Kanal filtern..." type="text" aria-label="Kampagne / Kanal filtern"/>
+</div>
+</div>
+</div>
+<!-- High-Density Analytical Table Container with Self-Contained Scroll -->
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-whisper-line text-ink-tertiary font-label-eyebrow text-label-eyebrow uppercase tracking-wider">
+<th class="pb-3 pl-3" scope="col">Kanal &amp; Kampagnentyp</th>
+<th class="pb-3 text-right" scope="col">Kampagnen</th>
+<th class="pb-3 text-right" scope="col">Spend (€)</th>
+<th class="pb-3 text-right" scope="col">Attrib. Umsatz (€)</th>
+<th class="pb-3 text-right" scope="col">ROI / ROAS</th>
+<th class="pb-3 text-right" scope="col">ACOS (%)</th>
+<th class="pb-3 text-right pr-3" scope="col">Spend-Allokation</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-whisper-line font-body-md text-body-md text-ink-primary">
+<!-- ROW 1: Amazon Ads (Prime Engine) -->
+<tr class="group hover:bg-violet-wash/40 transition-colors">
+<td class="py-3.5 pl-3">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-xl bg-ink-panel text-secondary-fixed flex items-center justify-center font-bold text-xs shadow-sm">
+                    AZ
+                  </div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-ink-primary group-hover:text-primary transition-colors">Amazon Ads</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Sponsored Products, Brands, DSP</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 text-right font-data-md text-data-md text-ink-secondary tabular-nums">42 aktiv</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-bold text-ink-primary tabular-nums">€ 9.420,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-semibold text-ink-primary tabular-nums">€ 44.274,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-bold text-lime-deep tabular-nums">4,70×</td>
+<td class="py-3.5 text-right">
+<div class="inline-flex items-center justify-end gap-1 font-data-md text-data-md text-lime-deep font-bold tabular-nums">
+<span class="h-2 w-2 rounded-full bg-lime-deep"></span>
+<span>21,3 %</span>
+</div>
+</td>
+<td class="py-3.5 text-right pr-3">
+<div class="flex items-center justify-end gap-2">
+<div class="w-24 bg-well-sunken rounded-full h-2 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 63.3%;"></div>
+</div>
+<span class="font-data-sm text-data-sm text-ink-secondary tabular-nums w-10 text-right">63,3%</span>
+</div>
+</td>
+</tr>
+<!-- ROW 2: Google Ads (PMax & Shopping) -->
+<tr class="group hover:bg-violet-wash/40 transition-colors bg-well-sunken/30">
+<td class="py-3.5 pl-3">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-xl bg-tile-peak text-primary flex items-center justify-center font-bold text-xs shadow-sm">
+                    GG
+                  </div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-ink-primary group-hover:text-primary transition-colors">Google Ads</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Performance Max &amp; Shopping</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 text-right font-data-md text-data-md text-ink-secondary tabular-nums">14 aktiv</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-bold text-ink-primary tabular-nums">€ 3.250,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-semibold text-ink-primary tabular-nums">€ 9.425,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-semibold text-ink-primary tabular-nums">2,90×</td>
+<td class="py-3.5 text-right">
+<div class="inline-flex items-center justify-end gap-1 font-data-md text-data-md text-loss-red font-bold tabular-nums">
+<span class="h-2 w-2 rounded-full bg-loss-red"></span>
+<span>34,5 %</span>
+</div>
+</td>
+<td class="py-3.5 text-right pr-3">
+<div class="flex items-center justify-end gap-2">
+<div class="w-24 bg-well-sunken rounded-full h-2 overflow-hidden">
+<div class="bg-primary/70 h-full rounded-full" style="width: 21.9%;"></div>
+</div>
+<span class="font-data-sm text-data-sm text-ink-secondary tabular-nums w-10 text-right">21,9%</span>
+</div>
+</td>
+</tr>
+<!-- ROW 3: Meta Ads (Retargeting) -->
+<tr class="group hover:bg-violet-wash/40 transition-colors">
+<td class="py-3.5 pl-3">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-xl bg-violet-wash text-primary flex items-center justify-center font-bold text-xs shadow-sm">
+                    FB
+                  </div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-ink-primary group-hover:text-primary transition-colors">Meta Ads</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Instagram / Facebook Retargeting</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 text-right font-data-md text-data-md text-ink-secondary tabular-nums">8 aktiv</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-bold text-ink-primary tabular-nums">€ 1.680,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-semibold text-ink-primary tabular-nums">€ 3.192,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-semibold text-loss-red tabular-nums">1,90×</td>
+<td class="py-3.5 text-right">
+<div class="inline-flex items-center justify-end gap-1 font-data-md text-data-md text-loss-red font-bold tabular-nums">
+<span class="h-2 w-2 rounded-full bg-loss-red"></span>
+<span>52,6 %</span>
+</div>
+</td>
+<td class="py-3.5 text-right pr-3">
+<div class="flex items-center justify-end gap-2">
+<div class="w-24 bg-well-sunken rounded-full h-2 overflow-hidden">
+<div class="bg-primary/50 h-full rounded-full" style="width: 11.3%;"></div>
+</div>
+<span class="font-data-sm text-data-sm text-ink-secondary tabular-nums w-10 text-right">11,3%</span>
+</div>
+</td>
+</tr>
+<!-- ROW 4: Otto AdMedia -->
+<tr class="group hover:bg-violet-wash/40 transition-colors bg-well-sunken/30">
+<td class="py-3.5 pl-3">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-xl bg-tile-peak text-loss-red flex items-center justify-center font-bold text-xs shadow-sm">
+                    OT
+                  </div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-ink-primary group-hover:text-primary transition-colors">Otto AdMedia</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Plattform-Anzeigen &amp; Placement</span>
+</div>
+</div>
+</td>
+<td class="py-3.5 text-right font-data-md text-data-md text-ink-secondary tabular-nums">5 aktiv</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-bold text-ink-primary tabular-nums">€ 520,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-semibold text-ink-primary tabular-nums">€ 1.102,00</td>
+<td class="py-3.5 text-right font-data-md text-data-md font-semibold text-ink-secondary tabular-nums">2,12×</td>
+<td class="py-3.5 text-right">
+<div class="inline-flex items-center justify-end gap-1 font-data-md text-data-md text-warn-amber font-bold tabular-nums">
+<span class="h-2 w-2 rounded-full bg-warn-amber"></span>
+<span>47,2 %</span>
+</div>
+</td>
+<td class="py-3.5 text-right pr-3">
+<div class="flex items-center justify-end gap-2">
+<div class="w-24 bg-well-sunken rounded-full h-2 overflow-hidden">
+<div class="bg-primary/30 h-full rounded-full" style="width: 3.5%;"></div>
+</div>
+<span class="font-data-sm text-data-sm text-ink-secondary tabular-nums w-10 text-right">3,5%</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Bottom Integrated Smart Optimization Callout -->
+<div class="mt-space-xs rounded-xl bg-well-sunken p-space-md flex flex-col md:flex-row md:items-center justify-between gap-space-md shadow-sm">
+<div class="flex items-start sm:items-center gap-space-sm">
+<div class="w-9 h-9 rounded-xl bg-tile-peak flex items-center justify-center text-primary shadow-sm shrink-0">
+<span class="material-symbols-outlined text-[20px]">smart_toy</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary font-bold">Automatische MCP-Gebotsoptimierung empfohlen</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">
+              Für Meta &amp; Google Ads liegen die Akquisekosten über der Deckungsbeitragsgrenze. Eine Begrenzung kann bis zu <strong class="text-ink-primary font-mono">€ 840,00</strong> unrentablen Spend pro Monat einsparen.
+            </span>
+</div>
+</div>
+<button class="shrink-0 flex items-center gap-1.5 px-space-md py-2 rounded-xl bg-tile-peak hover:bg-violet-wash text-primary font-body-sm text-body-sm font-bold shadow-sm transition-all duration-150 active:translate-y-px" type="button">
+<span>Kanal-Regeln konfigurieren</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</section>
+</div>
+</div>
+<script>
+  // Simple micro-interaction for timeframe toggle buttons
+  document.addEventListener('DOMContentLoaded', () => {
+    const filterButtons = document.querySelectorAll('.grid button');
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        if (!this.parentElement.classList.contains('bg-well-sunken')) return;
+        const siblings = this.parentElement.querySelectorAll('button');
+        siblings.forEach(s => {
+          s.classList.remove('bg-tile-peak', 'text-ink-primary', 'shadow-sm', 'font-semibold');
+          s.classList.add('text-ink-secondary');
+        });
+        this.classList.add('bg-tile-peak', 'text-ink-primary', 'shadow-sm', 'font-semibold');
+        this.classList.remove('text-ink-secondary');
+      });
+    });
+  });
+</script></main></div></body></html>

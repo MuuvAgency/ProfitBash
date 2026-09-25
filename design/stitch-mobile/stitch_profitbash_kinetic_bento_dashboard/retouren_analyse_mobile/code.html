@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>ProfitBash Cockpit</title><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "secondary-container": "#c4ef3e",
+        "surface-container-high": "#ebe6f2",
+        "on-tertiary-container": "#ffc8a7",
+        "surface-bright": "#fdf8ff",
+        "inverse-surface": "#312f38",
+        "secondary-fixed": "#c7f241",
+        "on-primary-fixed": "#1a0064",
+        "outline-variant": "#c9c4d6",
+        "surface-container": "#f1ecf8",
+        "ink-secondary": "#63607A",
+        "canvas-mist": "#EEEDF3",
+        "on-tertiary": "#ffffff",
+        "inverse-on-surface": "#f4effa",
+        "ink-primary": "#1B1826",
+        "secondary-fixed-dim": "#acd522",
+        "violet-wash": "#ECE8FA",
+        "primary-container": "#5a44c9",
+        "warn-amber": "#E0A233",
+        "on-primary": "#ffffff",
+        "surface-tint": "#5d47cc",
+        "surface-container-lowest": "#ffffff",
+        "on-primary-fixed-variant": "#452bb3",
+        "on-error-container": "#93000a",
+        "tile-raise": "#FAFAFC",
+        "on-surface": "#1c1b23",
+        "ink-tertiary": "#9C99AD",
+        "loss-red": "#D6524B",
+        "surface-container-highest": "#e5e0ec",
+        "error": "#ba1a1a",
+        "surface": "#fdf8ff",
+        "whisper-line": "rgba(27,24,38,0.06)",
+        "on-surface-variant": "#484554",
+        "well-sunken": "#E6E4EC",
+        "secondary": "#506600",
+        "tile-peak": "#FFFFFF",
+        "background": "#fdf8ff",
+        "outline": "#787585",
+        "surface-container-low": "#f7f1fd",
+        "primary": "#4227b1",
+        "ink-on-dark": "#EDECF3",
+        "lime-deep": "#7E9E12",
+        "on-secondary-fixed-variant": "#3c4d00",
+        "violet-press": "#4835A6",
+        "on-tertiary-fixed-variant": "#733600",
+        "error-container": "#ffdad6",
+        "primary-fixed": "#e5deff",
+        "on-secondary": "#ffffff",
+        "tertiary-fixed": "#ffdbc7",
+        "surface-dim": "#ddd8e4",
+        "tertiary-container": "#924600",
+        "tertiary-fixed-dim": "#ffb688",
+        "inverse-primary": "#c8bfff",
+        "primary-fixed-dim": "#c8bfff",
+        "on-tertiary-fixed": "#311300",
+        "on-secondary-container": "#546b00",
+        "on-error": "#ffffff",
+        "ink-panel": "#1B1826",
+        "surface-variant": "#e5e0ec",
+        "tertiary": "#6e3300",
+        "on-background": "#1c1b23",
+        "on-primary-container": "#d6ceff",
+        "on-secondary-fixed": "#161f00"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "margin": "1.5rem",
+        "gutter-mobile": "0.75rem",
+        "space-lg": "1.25rem",
+        "margin-mobile": "1rem",
+        "space-xs": "0.25rem",
+        "space-xl": "1.75rem",
+        "space-md": "1rem",
+        "gutter": "1.25rem",
+        "space-sm": "0.5rem"
+      },
+      "fontFamily": {
+        "headline-sm": ["Space Grotesk"],
+        "display": ["Space Grotesk"],
+        "data-hero-mobile": ["JetBrains Mono"],
+        "headline-md": ["Space Grotesk"],
+        "data-hero": ["JetBrains Mono"],
+        "data-md": ["JetBrains Mono"],
+        "headline-lg": ["Space Grotesk"],
+        "body-sm": ["Space Grotesk"],
+        "headline-lg-mobile": ["Space Grotesk"],
+        "body-lg": ["Space Grotesk"],
+        "body-md": ["Space Grotesk"],
+        "display-mobile": ["Space Grotesk"],
+        "data-lg": ["JetBrains Mono"],
+        "label-eyebrow": ["Space Grotesk"],
+        "data-sm": ["JetBrains Mono"]
+      },
+      "fontSize": {
+        "headline-sm": ["16px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "display": ["48px", {"lineHeight": "52px", "letterSpacing": "-0.03em", "fontWeight": "700"}],
+        "data-hero-mobile": ["26px", {"lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "headline-md": ["20px", {"lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+        "data-hero": ["36px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "500"}],
+        "headline-lg": ["28px", {"lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "body-md": ["14px", {"lineHeight": "21px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "display-mobile": ["32px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-lg": ["20px", {"lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "label-eyebrow": ["11px", {"lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700"}],
+        "data-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "500"}]
+      }
+    }
+  }
+}</script><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;background-color:#EEEDF3;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 5rem);}.pt-safe{padding-top:env(safe-area-inset-top, 0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist font-body-md text-body-md text-ink-primary flex flex-col min-h-screen selection:bg-secondary-container selection:text-ink-panel"><header class="fixed top-0 w-full z-50 bg-canvas-mist/85 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(48,38,92,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="flex items-center gap-1.5 shrink-0"><span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span><span class="font-headline-sm text-headline-sm tracking-tight text-ink-primary">ProfitBash</span></div><div class="h-3.5 w-px bg-whisper-line shrink-0"></div><div class="flex items-center gap-1 min-w-0"><span class="font-label-eyebrow text-label-eyebrow text-ink-secondary truncate uppercase">Live SP-API</span><span class="px-1.5 py-0.5 rounded-full bg-well-sunken text-ink-primary font-data-sm text-data-sm font-semibold shrink-0">Sept '26</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button class="w-11 h-11 flex items-center justify-center text-ink-secondary hover:text-ink-primary active:scale-95 transition-transform"><span class="material-symbols-outlined text-[20px]">notifications</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-[0_2px_8px_rgba(66,39,177,0.25)] shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin-mobile pt-16 pb-safe bg-canvas-mist max-w-[390px] mx-auto"><div class="flex flex-col w-full gap-space-md">
+<!-- Header Cluster & Filter Chips -->
+<div class="flex flex-col gap-space-xs pt-1">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary tracking-widest uppercase">
+        RETOUREN-INTELLIGENCE · Sept '26
+      </span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high text-ink-secondary font-data-sm text-data-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+        Echtzeit
+      </span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-ink-primary tracking-tight">
+      Retouren-Analyse
+    </h1>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+      Margen-Erosion, Ursachen-Radar &amp; Schadensbegrenzung
+    </p>
+<!-- Filter Pills (Scrollable Row) -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 mt-1">
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-ink-panel text-ink-on-dark font-body-sm text-body-sm font-semibold shadow-[0_2px_8px_rgba(27,24,38,0.18)] active:scale-95 transition-transform">
+        Letzte 30 Tage
+      </button>
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-tile-raise text-ink-secondary font-body-sm text-body-sm hover:text-ink-primary shadow-[0_1px_4px_rgba(48,38,92,0.05)] active:scale-95 transition-transform">
+        Alle Marktplätze
+      </button>
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-tile-raise text-ink-secondary font-body-sm text-body-sm hover:text-ink-primary shadow-[0_1px_4px_rgba(48,38,92,0.05)] active:scale-95 transition-transform">
+        FBA &amp; FBM
+      </button>
+</div>
+</div>
+<!-- Bento Tile 1: Inverted Hero Tile (Ink Panel) -->
+<div class="rounded-xl bg-ink-panel p-space-lg text-ink-on-dark shadow-[0_10px_30px_rgba(27,24,38,0.22)] relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary tracking-wider uppercase">
+          RETOUREN-QUOTE (GESAMT)
+        </span>
+<div class="flex items-baseline gap-space-sm mt-1">
+<span class="font-data-hero text-data-hero text-secondary-container tracking-tight">
+            4,12 %
+          </span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/15 text-secondary-container font-data-sm text-data-sm font-semibold">
+            -1,48 % MoM
+          </span>
+</div>
+</div>
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary-container text-[22px]">assignment_return</span>
+</div>
+</div>
+<!-- Secondary Meta & Loss Pill -->
+<div class="mt-space-md pt-space-md border-t-0 flex flex-col gap-2">
+<div class="flex items-center justify-between font-body-sm text-body-sm text-ink-tertiary">
+<span>Fälle / Volumen</span>
+<span class="font-data-md text-data-md text-ink-on-dark font-medium">174 Retouren / 4.117 Best.</span>
+</div>
+<div class="flex items-center justify-between p-2.5 rounded-lg bg-surface-container-highest/10">
+<span class="font-body-sm text-body-sm text-ink-on-dark">Margenverlust realisiert</span>
+<span class="font-data-lg text-data-lg text-loss-red font-bold">-€ 4.890,00</span>
+</div>
+</div>
+<!-- Mini Trend Bar / Sparkline indicator -->
+<div class="mt-space-sm flex items-center justify-between text-ink-tertiary font-data-sm text-data-sm">
+<span>Vormonat: 5,60 %</span>
+<span class="text-secondary-container font-semibold">Zielkorridor &lt; 5,00 % stabil</span>
+</div>
+</div>
+<!-- Bento Tile 2: 2-Up KPI Mini-Grid -->
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- Mini Tile 1 -->
+<div class="rounded-xl bg-tile-peak p-space-md shadow-[0_2px_12px_rgba(48,38,92,0.06)] flex flex-col justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">
+          Ø Retouren-Kosten
+        </span>
+<div class="font-data-hero-mobile text-data-hero-mobile text-ink-primary mt-1 font-bold">
+          € 28,10
+        </div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary mt-2">
+        Porto, FBA &amp; Wiedereinlagerung pro Fall
+      </p>
+</div>
+<!-- Mini Tile 2 -->
+<div class="rounded-xl bg-tile-peak p-space-md shadow-[0_2px_12px_rgba(48,38,92,0.06)] flex flex-col justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">
+          Wiederverkauf
+        </span>
+<div class="font-data-hero-mobile text-data-hero-mobile text-lime-deep mt-1 font-bold">
+          78,5 %
+        </div>
+</div>
+<div class="mt-2 flex items-center justify-between font-body-sm text-body-sm text-ink-secondary">
+<span>A-Ware Restock</span>
+<span class="font-data-sm text-data-sm text-loss-red font-medium">21,5% Verlust</span>
+</div>
+</div>
+</div>
+<!-- Bento Tile 3: Retouren-Finanzimpact (Loss Anatomy / Waterfall) -->
+<div class="rounded-xl bg-well-sunken p-space-lg shadow-[inset_0_1px_3px_rgba(48,38,92,0.05)]">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-secondary tracking-wider uppercase">
+        Verlust-Anatomie
+      </span>
+<span class="font-data-sm text-data-sm text-ink-secondary font-medium">Gesamt € 4.890,00</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary mb-space-md">
+      Finanzielle Belastung nach Kostenarten
+    </h2>
+<!-- Segmented stacked horizontal progress bar -->
+<div class="w-full h-3 rounded-full bg-canvas-mist overflow-hidden flex mb-space-md">
+<div class="bg-loss-red" style="width: 49.3%" title="Wertverlust Ware"></div>
+<div class="bg-primary" style="width: 29.0%" title="Amazon Remission"></div>
+<div class="bg-warn-amber" style="width: 16.2%" title="Portokosten"></div>
+<div class="bg-ink-secondary" style="width: 5.5%" title="Support-Aufwand"></div>
+</div>
+<!-- Line items list -->
+<div class="flex flex-col gap-space-sm font-body-sm text-body-sm">
+<div class="flex items-center justify-between py-1 border-b border-whisper-line">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-loss-red shrink-0"></span>
+<span class="text-ink-primary">Unwiederbringlicher Wertverlust</span>
+</div>
+<div class="text-right">
+<span class="font-data-sm text-data-sm text-ink-primary font-bold">€ 2.410,00</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-1">(49,3%)</span>
+</div>
+</div>
+<div class="flex items-center justify-between py-1 border-b border-whisper-line">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-primary shrink-0"></span>
+<span class="text-ink-primary">Amazon Remissions- &amp; Gebühren</span>
+</div>
+<div class="text-right">
+<span class="font-data-sm text-data-sm text-ink-primary font-bold">€ 1.420,00</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-1">(29,0%)</span>
+</div>
+</div>
+<div class="flex items-center justify-between py-1 border-b border-whisper-line">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-warn-amber shrink-0"></span>
+<span class="text-ink-primary">Hin- &amp; Rücksendeporto (DHL)</span>
+</div>
+<div class="text-right">
+<span class="font-data-sm text-data-sm text-ink-primary font-bold">€ 790,00</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-1">(16,2%)</span>
+</div>
+</div>
+<div class="flex items-center justify-between py-1">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-ink-secondary shrink-0"></span>
+<span class="text-ink-primary">Support &amp; Reklamationsaufwand</span>
+</div>
+<div class="text-right">
+<span class="font-data-sm text-data-sm text-ink-primary font-bold">€ 270,00</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-1">(5,5%)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Tile 4: Ursachen-Radar -->
+<div class="rounded-xl bg-tile-raise p-space-lg shadow-[0_4px_16px_rgba(48,38,92,0.06)]">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary tracking-wider uppercase">
+        URSACHEN-RADAR
+      </span>
+<span class="font-data-sm text-data-sm text-ink-secondary font-medium">174 Rücksendungen</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary mb-space-md">
+      Top-Rücksendegründe
+    </h2>
+<div class="flex flex-col gap-space-md">
+<!-- Reason 1 -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-primary font-medium">Passt nicht / Falsche Größe</span>
+<span class="px-2 py-0.5 rounded-full bg-warn-amber/15 text-warn-amber font-data-sm text-data-sm font-bold">42,0 % (73 Fälle)</span>
+</div>
+<div class="w-full h-2 rounded-full bg-canvas-mist overflow-hidden">
+<div class="h-full bg-warn-amber rounded-full" style="width: 42%"></div>
+</div>
+</div>
+<!-- Reason 2 -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-primary font-medium">Gefällt nicht / Fehlkauf</span>
+<span class="px-2 py-0.5 rounded-full bg-violet-wash text-primary font-data-sm text-data-sm font-bold">28,0 % (49 Fälle)</span>
+</div>
+<div class="w-full h-2 rounded-full bg-canvas-mist overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 28%"></div>
+</div>
+</div>
+<!-- Reason 3 -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-primary font-medium">Defekt / Beschädigt</span>
+<span class="px-2 py-0.5 rounded-full bg-loss-red/15 text-loss-red font-data-sm text-data-sm font-bold">18,5 % (32 Fälle)</span>
+</div>
+<div class="w-full h-2 rounded-full bg-canvas-mist overflow-hidden">
+<div class="h-full bg-loss-red rounded-full" style="width: 18.5%"></div>
+</div>
+</div>
+<!-- Reason 4 -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-primary font-medium">Lieferverzögerung</span>
+<span class="px-2 py-0.5 rounded-full bg-canvas-mist text-ink-secondary font-data-sm text-data-sm font-bold">11,5 % (20 Fälle)</span>
+</div>
+<div class="w-full h-2 rounded-full bg-canvas-mist overflow-hidden">
+<div class="h-full bg-ink-tertiary rounded-full" style="width: 11.5%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Tile 5: Top-Retouren-SKUs (Problem-Produkte Leaderboard) -->
+<div class="rounded-xl bg-tile-raise p-space-lg shadow-[0_4px_16px_rgba(48,38,92,0.06)]">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary tracking-wider uppercase">
+        SKU-LEADERBOARD
+      </span>
+<span class="font-data-sm text-data-sm text-ink-secondary font-medium">Nach Verlust geordnet</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary mb-space-md">
+      Kritische SKUs mit höchster Quote
+    </h2>
+<div class="flex flex-col gap-space-sm">
+<!-- Item 1: Critical -->
+<div class="p-3 rounded-lg bg-tile-peak shadow-[0_1px_6px_rgba(48,38,92,0.04)] flex flex-col gap-2">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2">
+<span class="font-data-sm text-data-sm font-bold text-loss-red">#1</span>
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary leading-snug">Lumina Glow Mini</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">LH-GLOW-09</div>
+</div>
+</div>
+<div class="text-right">
+<div class="font-data-md text-data-md font-bold text-loss-red">11,4 %</div>
+<div class="font-data-sm text-data-sm text-ink-secondary">48 Retouren</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-whisper-line">
+<span class="px-2 py-0.5 rounded-full bg-loss-red/15 text-loss-red font-data-sm text-data-sm font-semibold">
+            Ursache: Verpackungsdefekt
+          </span>
+<span class="font-data-sm text-data-sm text-loss-red font-bold">Verlust: -€ 1.840</span>
+</div>
+</div>
+<!-- Item 2: Warning -->
+<div class="p-3 rounded-lg bg-tile-peak shadow-[0_1px_6px_rgba(48,38,92,0.04)] flex flex-col gap-2">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2">
+<span class="font-data-sm text-data-sm font-bold text-warn-amber">#2</span>
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary leading-snug">PulseFit Smart Band v2</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">FP-BAND-02</div>
+</div>
+</div>
+<div class="text-right">
+<div class="font-data-md text-data-md font-bold text-warn-amber">6,2 %</div>
+<div class="font-data-sm text-data-sm text-ink-secondary">38 Retouren</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-whisper-line">
+<span class="px-2 py-0.5 rounded-full bg-warn-amber/15 text-warn-amber font-data-sm text-data-sm font-semibold">
+            Ursache: Bluetooth Pairing
+          </span>
+<span class="font-data-sm text-data-sm text-ink-primary font-bold">Verlust: -€ 1.290</span>
+</div>
+</div>
+<!-- Item 3: Target -->
+<div class="p-3 rounded-lg bg-tile-peak shadow-[0_1px_6px_rgba(48,38,92,0.04)] flex flex-col gap-2">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-2">
+<span class="font-data-sm text-data-sm font-bold text-lime-deep">#3</span>
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary leading-snug">Aura Pro Wireless</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">AT-ANC-01</div>
+</div>
+</div>
+<div class="text-right">
+<div class="font-data-md text-data-md font-bold text-lime-deep">2,8 %</div>
+<div class="font-data-sm text-data-sm text-ink-secondary">24 Retouren</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1 border-t border-whisper-line">
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/20 text-lime-deep font-data-sm text-data-sm font-semibold">
+            Im Zielkorridor
+          </span>
+<span class="font-data-sm text-data-sm text-ink-primary font-bold">Verlust: -€ 820</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Tile 6: Margen-Schutz Sofortmaßnahmen (Action Bento Tile) -->
+<div class="rounded-xl bg-tile-peak p-space-lg shadow-[0_6px_20px_rgba(48,38,92,0.08)] flex flex-col gap-space-md mb-2">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary tracking-wider uppercase">
+        SCHADENSBEGRENZUNG
+      </span>
+<span class="inline-flex items-center gap-1 font-data-sm text-data-sm text-primary font-semibold">
+<span class="material-symbols-outlined text-[16px]">bolt</span>
+        Automatisierung aktiv
+      </span>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="font-headline-sm text-headline-sm text-ink-primary">
+        Sofort-Empfehlungen
+      </h3>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+        Ergreife maßgeschneiderte Listing- &amp; Fulfillment-Korrekturen, um weitere Margen-Erosion abzuwenden.
+      </p>
+</div>
+<!-- Suggested Action Card -->
+<div class="p-3 rounded-lg bg-well-sunken flex flex-col gap-2">
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-loss-red text-[20px] shrink-0 mt-0.5">warning</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary">Lumina Glow Mini</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Listing-Hinweis &amp; Verpackungsupgrade prüfen</span>
+</div>
+</div>
+<button class="w-full py-2 px-3 rounded-lg bg-tile-peak hover:bg-violet-wash text-primary font-body-sm text-body-sm font-bold text-center active:scale-[0.98] transition-all shadow-[0_1px_4px_rgba(48,38,92,0.04)]">
+        Maßnahme jetzt einleiten
+      </button>
+</div>
+<!-- Full-width Primary CTA Button -->
+<button class="w-full h-12 rounded-xl bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(66,39,177,0.3)] hover:bg-violet-press active:translate-y-px transition-all">
+<span class="material-symbols-outlined text-[20px]">download</span>
+<span>Retourenbericht als CSV exportieren</span>
+</button>
+</div>
+</div></main><nav class="fixed bottom-0 w-full z-50 pb-[env(safe-area-inset-bottom,0px)] bg-ink-panel/95 backdrop-blur-xl shadow-[0_-4px_24px_rgba(27,24,38,0.25)]" data-active-classes="text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2"><div class="flex justify-around items-center h-16 max-w-[390px] mx-auto px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 transition-all duration-150 text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2" data-path="analyse" href="#"><span class="material-symbols-outlined text-[22px]">insights</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Analyse</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[22px]">inventory_2</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Bestellungen</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="ads" href="#"><span class="material-symbols-outlined text-[22px]">campaign</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Ads</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Setup</span></a></div></nav></body></html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>ProfitBash Cockpit</title><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "secondary-container": "#c4ef3e",
+        "surface-container-high": "#ebe6f2",
+        "on-tertiary-container": "#ffc8a7",
+        "surface-bright": "#fdf8ff",
+        "inverse-surface": "#312f38",
+        "secondary-fixed": "#c7f241",
+        "on-primary-fixed": "#1a0064",
+        "outline-variant": "#c9c4d6",
+        "surface-container": "#f1ecf8",
+        "ink-secondary": "#63607A",
+        "canvas-mist": "#EEEDF3",
+        "on-tertiary": "#ffffff",
+        "inverse-on-surface": "#f4effa",
+        "ink-primary": "#1B1826",
+        "secondary-fixed-dim": "#acd522",
+        "violet-wash": "#ECE8FA",
+        "primary-container": "#5a44c9",
+        "warn-amber": "#E0A233",
+        "on-primary": "#ffffff",
+        "surface-tint": "#5d47cc",
+        "surface-container-lowest": "#ffffff",
+        "on-primary-fixed-variant": "#452bb3",
+        "on-error-container": "#93000a",
+        "tile-raise": "#FAFAFC",
+        "on-surface": "#1c1b23",
+        "ink-tertiary": "#9C99AD",
+        "loss-red": "#D6524B",
+        "surface-container-highest": "#e5e0ec",
+        "error": "#ba1a1a",
+        "surface": "#fdf8ff",
+        "whisper-line": "rgba(27,24,38,0.06)",
+        "on-surface-variant": "#484554",
+        "well-sunken": "#E6E4EC",
+        "secondary": "#506600",
+        "tile-peak": "#FFFFFF",
+        "background": "#fdf8ff",
+        "outline": "#787585",
+        "surface-container-low": "#f7f1fd",
+        "primary": "#4227b1",
+        "ink-on-dark": "#EDECF3",
+        "lime-deep": "#7E9E12",
+        "on-secondary-fixed-variant": "#3c4d00",
+        "violet-press": "#4835A6",
+        "on-tertiary-fixed-variant": "#733600",
+        "error-container": "#ffdad6",
+        "primary-fixed": "#e5deff",
+        "on-secondary": "#ffffff",
+        "tertiary-fixed": "#ffdbc7",
+        "surface-dim": "#ddd8e4",
+        "tertiary-container": "#924600",
+        "tertiary-fixed-dim": "#ffb688",
+        "inverse-primary": "#c8bfff",
+        "primary-fixed-dim": "#c8bfff",
+        "on-tertiary-fixed": "#311300",
+        "on-secondary-container": "#546b00",
+        "on-error": "#ffffff",
+        "ink-panel": "#1B1826",
+        "surface-variant": "#e5e0ec",
+        "tertiary": "#6e3300",
+        "on-background": "#1c1b23",
+        "on-primary-container": "#d6ceff",
+        "on-secondary-fixed": "#161f00"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "margin": "1.5rem",
+        "gutter-mobile": "0.75rem",
+        "space-lg": "1.25rem",
+        "margin-mobile": "1rem",
+        "space-xs": "0.25rem",
+        "space-xl": "1.75rem",
+        "space-md": "1rem",
+        "gutter": "1.25rem",
+        "space-sm": "0.5rem"
+      },
+      "fontFamily": {
+        "headline-sm": ["Space Grotesk"],
+        "display": ["Space Grotesk"],
+        "data-hero-mobile": ["JetBrains Mono"],
+        "headline-md": ["Space Grotesk"],
+        "data-hero": ["JetBrains Mono"],
+        "data-md": ["JetBrains Mono"],
+        "headline-lg": ["Space Grotesk"],
+        "body-sm": ["Space Grotesk"],
+        "headline-lg-mobile": ["Space Grotesk"],
+        "body-lg": ["Space Grotesk"],
+        "body-md": ["Space Grotesk"],
+        "display-mobile": ["Space Grotesk"],
+        "data-lg": ["JetBrains Mono"],
+        "label-eyebrow": ["Space Grotesk"],
+        "data-sm": ["JetBrains Mono"]
+      },
+      "fontSize": {
+        "headline-sm": ["16px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "display": ["48px", {"lineHeight": "52px", "letterSpacing": "-0.03em", "fontWeight": "700"}],
+        "data-hero-mobile": ["26px", {"lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "headline-md": ["20px", {"lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+        "data-hero": ["36px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "500"}],
+        "headline-lg": ["28px", {"lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "body-md": ["14px", {"lineHeight": "21px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "display-mobile": ["32px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-lg": ["20px", {"lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "label-eyebrow": ["11px", {"lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700"}],
+        "data-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "500"}]
+      }
+    }
+  }
+}</script><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;background-color:#EEEDF3;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 5rem);}.pt-safe{padding-top:env(safe-area-inset-top, 0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist font-body-md text-body-md text-ink-primary flex flex-col min-h-screen selection:bg-secondary-container selection:text-ink-panel"><header class="fixed top-0 w-full z-50 bg-canvas-mist/85 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(48,38,92,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="flex items-center gap-1.5 shrink-0"><span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span><span class="font-headline-sm text-headline-sm tracking-tight text-ink-primary">ProfitBash</span></div><div class="h-3.5 w-px bg-whisper-line shrink-0"></div><div class="flex items-center gap-1 min-w-0"><span class="font-label-eyebrow text-label-eyebrow text-ink-secondary truncate uppercase">Live SP-API</span><span class="px-1.5 py-0.5 rounded-full bg-well-sunken text-ink-primary font-data-sm text-data-sm font-semibold shrink-0">Sept '26</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button class="w-11 h-11 flex items-center justify-center text-ink-secondary hover:text-ink-primary active:scale-95 transition-transform"><span class="material-symbols-outlined text-[20px]">notifications</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-[0_2px_8px_rgba(66,39,177,0.25)] shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin-mobile pt-16 pb-safe bg-canvas-mist max-w-[390px] mx-auto"><div class="flex flex-col w-full gap-space-md">
+<!-- ZONE 1: HEADER & LIVE FEED BANNER -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary tracking-wider uppercase">
+        Multi-Channel Transaktionen · Live SP-API Feed
+      </span>
+</div>
+<div class="flex items-baseline justify-between">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-ink-primary tracking-tight">
+        Bestellungen
+      </h1>
+<span class="px-2 py-0.5 rounded-full bg-well-sunken text-ink-secondary font-data-sm text-data-sm font-semibold">
+        Sept '26
+      </span>
+</div>
+<div class="flex items-center gap-1.5 flex-wrap font-body-sm text-body-sm text-ink-secondary">
+<span>3.842 Orders</span>
+<span class="text-ink-tertiary">·</span>
+<span>Ø WK <span class="font-data-sm text-data-sm text-ink-primary font-semibold">€ 55,96</span></span>
+<span class="text-ink-tertiary">·</span>
+<span>Retouren <span class="font-data-sm text-data-sm text-loss-red font-semibold">4,12 %</span></span>
+</div>
+</div>
+<!-- SEARCH & COMPACT FILTER BAR -->
+<div class="flex items-center gap-space-xs">
+<div class="relative flex-1 flex items-center bg-tile-peak rounded-xl shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_16px_rgba(48,38,92,0.06)]">
+<span class="material-symbols-outlined text-ink-tertiary ml-3 text-[18px]">search</span>
+<input class="w-full bg-transparent px-2.5 py-2.5 text-body-sm text-ink-primary placeholder:text-ink-tertiary focus:outline-none" id="order-search-input" placeholder="Bestell-Nr., Kunde oder SKU..." type="text"/ aria-label="Bestell-Nr., Kunde oder SKU">
+<button class="hidden pr-3 text-ink-tertiary hover:text-ink-primary" id="clear-search">
+<span class="material-symbols-outlined text-[16px]">cancel</span>
+</button>
+</div>
+<button class="w-11 h-11 shrink-0 bg-tile-peak rounded-xl flex items-center justify-center text-ink-secondary hover:text-ink-primary shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_16px_rgba(48,38,92,0.06)] active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+</button>
+</div>
+<!-- HORIZONTAL CHANNEL PILLS (SCROLLABLE) -->
+<div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-margin-mobile px-margin-mobile py-0.5">
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-ink-panel text-tile-peak font-label-eyebrow text-label-eyebrow tracking-wide uppercase shadow-[0_2px_8px_rgba(27,24,38,0.25)]">
+      Alle Kanäle (3.842)
+    </button>
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-tile-peak text-ink-secondary font-label-eyebrow text-label-eyebrow tracking-wide uppercase shadow-[0_1px_4px_rgba(48,38,92,0.05)] hover:text-ink-primary active:scale-95">
+      Amazon DE (2.710)
+    </button>
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-tile-peak text-ink-secondary font-label-eyebrow text-label-eyebrow tracking-wide uppercase shadow-[0_1px_4px_rgba(48,38,92,0.05)] hover:text-ink-primary active:scale-95">
+      Otto Market (712)
+    </button>
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-tile-peak text-ink-secondary font-label-eyebrow text-label-eyebrow tracking-wide uppercase shadow-[0_1px_4px_rgba(48,38,92,0.05)] hover:text-ink-primary active:scale-95">
+      eBay DE (480)
+    </button>
+<button class="shrink-0 px-3 py-1.5 rounded-full bg-tile-peak text-ink-secondary font-label-eyebrow text-label-eyebrow tracking-wide uppercase shadow-[0_1px_4px_rgba(48,38,92,0.05)] hover:text-ink-primary active:scale-95">
+      Shopify (215)
+    </button>
+</div>
+<!-- HORIZONTAL STATUS PILLS -->
+<div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-margin-mobile px-margin-mobile">
+<button class="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-well-sunken text-ink-primary font-data-sm text-data-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>
+      Zugestellt (3.420)
+    </button>
+<button class="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tile-raise text-ink-secondary font-data-sm text-data-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-warn-amber"></span>
+      In Bearbeitung (312)
+    </button>
+<button class="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tile-raise text-ink-secondary font-data-sm text-data-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-loss-red"></span>
+      Storniert (110)
+    </button>
+</div>
+<!-- ZONE 2: 2-UP MINI-GRID KPI TILE -->
+<div class="grid grid-cols-2 gap-space-xs">
+<!-- Realisiert Heute -->
+<div class="bg-tile-raise rounded-xl p-space-sm flex flex-col justify-between shadow-[0_1px_2px_rgba(48,38,92,0.05),0_8px_20px_rgba(48,38,92,0.06)]">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">
+          Heute Realisiert
+        </span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold mt-0.5 tabular-nums">
+          € 8.420,10
+        </span>
+</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="font-data-sm text-data-sm text-ink-secondary tabular-nums font-medium">148 Orders</span>
+<span class="px-1.5 py-0.2 bg-secondary-container/20 text-lime-deep rounded-full font-data-sm text-[10px] font-bold">
+          +12,4%
+        </span>
+</div>
+</div>
+<!-- Deckungsbeitrag Heute -->
+<div class="bg-tile-raise rounded-xl p-space-sm flex flex-col justify-between shadow-[0_1px_2px_rgba(48,38,92,0.05),0_8px_20px_rgba(48,38,92,0.06)]">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">
+          Deckungsbeitrag DB3
+        </span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold mt-0.5 tabular-nums">
+          € 2.140,50
+        </span>
+</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="px-1.5 py-0.5 rounded-full bg-secondary-container text-ink-panel font-data-sm text-[11px] font-bold">
+          25,4 % Marge
+        </span>
+</div>
+</div>
+</div>
+<!-- ZONE 3: TRANSAKTIONS-FEED (BENTO CARDS) -->
+<div class="flex flex-col gap-space-sm mt-1">
+<!-- KARTE 1: ERWEITERTE FOKUS-BESTELLUNG (AMAZON FBA) -->
+<div class="bg-tile-raise rounded-xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_28px_rgba(48,38,92,0.08)] flex flex-col gap-space-sm transition-all">
+<!-- Order Header Row -->
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-data-sm text-data-sm font-bold text-ink-primary tabular-nums tracking-tight">
+              #AMZ-2026-98421
+            </span>
+<span class="font-data-sm text-data-sm text-ink-tertiary tabular-nums">
+              16:44 Uhr
+            </span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate mt-0.5">
+            M. Schneider · München, DE
+          </span>
+</div>
+<div class="flex flex-col items-end shrink-0 gap-1">
+<span class="px-2 py-0.5 rounded-full bg-violet-wash text-primary font-label-eyebrow text-[10px] font-bold uppercase tracking-wider">
+            Amazon FBA Prime
+          </span>
+<div class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>
+<span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">
+              Zugestellt
+            </span>
+</div>
+</div>
+</div>
+<!-- Item Thumbnail + Product Row -->
+<div class="flex items-center gap-space-sm p-space-xs rounded-lg bg-well-sunken/60">
+<img class="w-12 h-12 rounded-lg object-cover bg-tile-peak shrink-0" data-alt="Studio product shot of premium matte-black AuraTech Pro ANC wireless headphones on pure minimalist violet pedestal, high-cadence commercial lighting, razor-sharp detail" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCt0hXCSebRjZ11RcIHLGQKISKFqdSM-zenEO6SWOXxNR4BWz2YxGzzsrrQ7h0nWG3VYGzK8Xh4Og4cI1FiXi0g0czcGCOpJiuEJktVMdhswL7LOHbTt2U1XnNleNsUG9hsQ45QfdLLHO16X9Z7JlNc0jmVRWoUWPZG-ypFwvHAiF5sMc4aFPbfCLVOnTLJ85qXgmHDgW1ibJQT1_47LGmyrZBuAHQ2CZqOITy6fLrGnCmFIuVW1aaDVg"/>
+<div class="flex-1 min-w-0">
+<div class="font-headline-sm text-[13px] text-ink-primary truncate font-semibold">
+            AuraTech Pro ANC Wireless
+          </div>
+<div class="font-data-sm text-[11px] text-ink-tertiary">
+            1× SKU: <span class="text-ink-secondary font-medium">AT-902</span> · DHL 003404...019488
+          </div>
+</div>
+<div class="font-data-md text-data-md font-bold text-ink-primary tabular-nums shrink-0">
+          € 89,90
+        </div>
+</div>
+<!-- UNIT ECONOMICS CASCADE (INSPEKTOR) -->
+<div class="rounded-xl bg-well-sunken p-space-sm flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-secondary uppercase tracking-wide">
+            Unit Economics Kaskade
+          </span>
+<span class="font-data-sm text-[11px] text-ink-tertiary">Real-Time SP-API</span>
+</div>
+<div class="flex flex-col gap-1 pt-1 font-data-sm text-[11px]">
+<div class="flex justify-between items-center text-ink-secondary">
+<span>Brutto-Verkaufserlös</span>
+<span class="font-semibold text-ink-primary tabular-nums">€ 89,90</span>
+</div>
+<div class="flex justify-between items-center text-ink-secondary">
+<span>MwSt. (19%)</span>
+<span class="tabular-nums text-loss-red">-€ 14,35</span>
+</div>
+<div class="flex justify-between items-center text-ink-secondary">
+<span>COGS (Wareneinsatz ab Lager)</span>
+<span class="tabular-nums text-loss-red">-€ 24,50</span>
+</div>
+<div class="flex justify-between items-center text-ink-secondary">
+<span>Amazon FBA Pick &amp; Pack</span>
+<span class="tabular-nums text-loss-red">-€ 6,85</span>
+</div>
+<div class="flex justify-between items-center text-ink-secondary">
+<span>Marktplatzprovision (15%)</span>
+<span class="tabular-nums text-loss-red">-€ 13,49</span>
+</div>
+<div class="flex justify-between items-center text-ink-secondary">
+<span>Werbeanteil (PPC TACoS 8,2%)</span>
+<span class="tabular-nums text-loss-red">-€ 7,37</span>
+</div>
+<div class="flex justify-between items-center text-ink-secondary">
+<span>Versandlabel &amp; Handling</span>
+<span class="tabular-nums text-loss-red">-€ 1,20</span>
+</div>
+</div>
+<!-- Inverted Command Tier: Reiner Netto-Profit Block -->
+<div class="mt-1 rounded-lg bg-ink-panel p-space-sm flex items-center justify-between text-tile-peak shadow-[0_2px_10px_rgba(27,24,38,0.2)]">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-[10px] text-ink-tertiary uppercase tracking-wider">
+              Reiner Netto-Profit (DB3)
+            </span>
+<span class="font-data-hero-mobile text-data-hero-mobile text-secondary-container font-bold tabular-nums">
+              +€ 22,14
+            </span>
+</div>
+<div class="flex flex-col items-end">
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/20 text-secondary-container font-data-sm text-data-sm font-bold tabular-nums">
+              24,6 % DB3
+            </span>
+<span class="font-data-sm text-[10px] text-ink-tertiary mt-0.5">
+              Target &gt; 22%
+            </span>
+</div>
+</div>
+</div>
+<!-- Quick Aktionen -->
+<div class="grid grid-cols-2 gap-space-xs pt-0.5">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-tile-peak text-ink-primary font-headline-sm text-[13px] font-semibold shadow-[0_1px_4px_rgba(48,38,92,0.06)] active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[16px] text-primary">local_shipping</span>
+<span>Tracking &amp; Status</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-tile-peak text-ink-primary font-headline-sm text-[13px] font-semibold shadow-[0_1px_4px_rgba(48,38,92,0.06)] active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[16px] text-ink-secondary">receipt_long</span>
+<span>Beleg (PDF)</span>
+</button>
+</div>
+</div>
+<!-- KARTE 2: OTTO MARKET -->
+<div class="bg-tile-raise rounded-xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_28px_rgba(48,38,92,0.08)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-data-sm text-data-sm font-bold text-ink-primary tabular-nums tracking-tight">
+              #OTO-2026-44109
+            </span>
+<span class="font-data-sm text-data-sm text-ink-tertiary tabular-nums">
+              16:38 Uhr
+            </span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate">
+            L. Weber · Hamburg
+          </span>
+</div>
+<div class="flex flex-col items-end shrink-0 gap-1">
+<span class="px-2 py-0.5 rounded-full bg-violet-wash text-primary font-label-eyebrow text-[10px] font-bold uppercase tracking-wider">
+            Otto Market
+          </span>
+<div class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>
+<span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">
+              Geliefert
+            </span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm">
+<span class="text-ink-secondary truncate">2× SKU-NL-218 (Lumina Desk Lamp)</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary tabular-nums shrink-0 ml-2">€ 129,00</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-lg bg-well-sunken/70 mt-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-eyebrow text-[10px] text-ink-tertiary uppercase">Netto-Profit</span>
+<span class="font-data-md text-data-md font-bold text-lime-deep tabular-nums">+€ 31,40</span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-secondary-container/30 text-lime-deep font-data-sm text-[11px] font-bold tabular-nums">
+          24,3 % DB3
+        </span>
+</div>
+</div>
+<!-- KARTE 3: AMAZON FBA (IN BEARBEITUNG) -->
+<div class="bg-tile-raise rounded-xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_28px_rgba(48,38,92,0.08)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-data-sm text-data-sm font-bold text-ink-primary tabular-nums tracking-tight">
+              #AMZ-2026-98418
+            </span>
+<span class="font-data-sm text-data-sm text-ink-tertiary tabular-nums">
+              16:31 Uhr
+            </span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate">
+            K. Hartmann · Berlin
+          </span>
+</div>
+<div class="flex flex-col items-end shrink-0 gap-1">
+<span class="px-2 py-0.5 rounded-full bg-violet-wash text-primary font-label-eyebrow text-[10px] font-bold uppercase tracking-wider">
+            Amazon FBA
+          </span>
+<div class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-warn-amber"></span>
+<span class="font-label-eyebrow text-label-eyebrow text-warn-amber uppercase font-bold">
+              In Bearbeitung
+            </span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm">
+<span class="text-ink-secondary truncate">1× SKU-FL-004 (PulseFit Smart Band v2)</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary tabular-nums shrink-0 ml-2">€ 34,95</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-lg bg-well-sunken/70 mt-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-eyebrow text-[10px] text-ink-tertiary uppercase">Netto-Profit (est.)</span>
+<span class="font-data-md text-data-md font-bold text-lime-deep tabular-nums">+€ 8,20</span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-secondary-container/30 text-lime-deep font-data-sm text-[11px] font-bold tabular-nums">
+          23,5 % DB3
+        </span>
+</div>
+</div>
+<!-- KARTE 4: EBAY DE (STORNIERT / RETOURE) -->
+<div class="bg-tile-raise rounded-xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_28px_rgba(48,38,92,0.08)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-data-sm text-data-sm font-bold text-ink-primary tabular-nums tracking-tight">
+              #EBY-2026-10294
+            </span>
+<span class="font-data-sm text-data-sm text-ink-tertiary tabular-nums">
+              16:15 Uhr
+            </span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate">
+            F. Becker · Köln
+          </span>
+</div>
+<div class="flex flex-col items-end shrink-0 gap-1">
+<span class="px-2 py-0.5 rounded-full bg-violet-wash text-primary font-label-eyebrow text-[10px] font-bold uppercase tracking-wider">
+            eBay DE
+          </span>
+<div class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-loss-red"></span>
+<span class="font-label-eyebrow text-label-eyebrow text-loss-red uppercase font-bold">
+              Storniert / Retoure
+            </span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm">
+<span class="text-ink-secondary truncate">1× SKU-DR-512 (AeroMount Universal Pro)</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary tabular-nums shrink-0 ml-2">€ 49,00</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-lg bg-error-container/40 mt-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-eyebrow text-[10px] text-loss-red uppercase">Ertragsverlust</span>
+<span class="font-data-md text-data-md font-bold text-loss-red tabular-nums">-€ 12,80</span>
+</div>
+<span class="font-data-sm text-[11px] text-loss-red font-medium">
+          Gebühren &amp; Retourenporto
+        </span>
+</div>
+</div>
+<!-- KARTE 5: SHOPIFY DIRECT (HIGH MARGIN) -->
+<div class="bg-tile-raise rounded-xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_28px_rgba(48,38,92,0.08)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-data-sm text-data-sm font-bold text-ink-primary tabular-nums tracking-tight">
+              #SHO-2026-08112
+            </span>
+<span class="font-data-sm text-data-sm text-ink-tertiary tabular-nums">
+              16:02 Uhr
+            </span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate">
+            C. Brandstetter · Stuttgart
+          </span>
+</div>
+<div class="flex flex-col items-end shrink-0 gap-1">
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/30 text-lime-deep font-label-eyebrow text-[10px] font-bold uppercase tracking-wider">
+            Shopify Direct
+          </span>
+<div class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>
+<span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">
+              Zugestellt
+            </span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm">
+<span class="text-ink-secondary truncate">3× SKU-AC-109 (NanoShield Displayschutz)</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary tabular-nums shrink-0 ml-2">€ 147,00</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-lg bg-well-sunken/70 mt-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-eyebrow text-[10px] text-ink-tertiary uppercase">Netto-Profit</span>
+<span class="font-data-md text-data-md font-bold text-lime-deep tabular-nums">+€ 44,10</span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-secondary-container text-ink-panel font-data-sm text-[11px] font-bold tabular-nums">
+          30,0 % Top-Marge
+        </span>
+</div>
+</div>
+</div>
+<!-- ZONE 4: MOBILE PAGINATION & EXPORT ACTION -->
+<div class="flex flex-col gap-space-sm pt-2">
+<!-- Pagination Controls -->
+<div class="flex items-center justify-between px-1">
+<span class="font-data-sm text-data-sm text-ink-secondary">
+        Zeige <span class="font-bold text-ink-primary tabular-nums">1–5</span> von <span class="tabular-nums">3.842</span>
+</span>
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 rounded-lg bg-ink-panel text-tile-peak font-data-sm text-data-sm font-bold flex items-center justify-center shadow-[0_1px_4px_rgba(27,24,38,0.2)]">
+          1
+        </button>
+<button class="w-8 h-8 rounded-lg bg-tile-peak text-ink-secondary hover:text-ink-primary font-data-sm text-data-sm font-medium flex items-center justify-center shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+          2
+        </button>
+<button class="w-8 h-8 rounded-lg bg-tile-peak text-ink-secondary hover:text-ink-primary font-data-sm text-data-sm font-medium flex items-center justify-center shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+          3
+        </button>
+<span class="text-ink-tertiary px-0.5">…</span>
+<button class="w-8 h-8 rounded-lg bg-tile-peak text-ink-secondary hover:text-ink-primary font-data-sm text-data-sm font-medium flex items-center justify-center shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+          385
+        </button>
+</div>
+</div>
+<!-- Primary Export Button (Violet Core / Ink On-Dark) -->
+<button class="w-full min-h-[48px] py-3 rounded-xl bg-primary-container hover:bg-violet-press text-ink-on-dark font-headline-sm text-headline-sm flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(90,68,201,0.3)] active:translate-y-[1px] transition-all">
+<span class="material-symbols-outlined text-[20px]">file_download</span>
+<span>Transaktionen als CSV / DATEV exportieren</span>
+</button>
+</div>
+</div>
+<script>
+  // Dynamic Tab Activation for Bottom Navigation
+  (function() {
+    const navLinks = document.querySelectorAll('nav a[data-path]');
+    navLinks.forEach(link => {
+      const path = link.getAttribute('data-path');
+      if (path === 'bestellungen') {
+        link.classList.remove('text-ink-tertiary');
+        link.classList.add('text-tile-peak', 'relative', 'after:content-[""]', 'after:w-1.5', 'after:h-1.5', 'after:rounded-full', 'after:bg-secondary-container', 'after:absolute', 'after:bottom-2');
+        const icon = link.querySelector('.material-symbols-outlined');
+        if (icon) {
+          icon.style.fontVariationSettings = "'FILL' 1";
+          icon.classList.add('text-secondary-container');
+        }
+      } else {
+        link.classList.remove('text-tile-peak', 'relative', 'after:content-[""]', 'after:w-1.5', 'after:h-1.5', 'after:rounded-full', 'after:bg-secondary-container', 'after:absolute', 'after:bottom-2');
+        link.classList.add('text-ink-tertiary');
+      }
+    });
+
+    // Quick Search Input Clear Toggle
+    const searchInput = document.getElementById('order-search-input');
+    const clearBtn = document.getElementById('clear-search');
+    if (searchInput && clearBtn) {
+      searchInput.addEventListener('input', (e) => {
+        if (e.target.value.length > 0) {
+          clearBtn.classList.remove('hidden');
+        } else {
+          clearBtn.classList.add('hidden');
+        }
+      });
+      clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearBtn.classList.add('hidden');
+        searchInput.focus();
+      });
+    }
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-[env(safe-area-inset-bottom,0px)] bg-ink-panel/95 backdrop-blur-xl shadow-[0_-4px_24px_rgba(27,24,38,0.25)]" data-active-classes="text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2"><div class="flex justify-around items-center h-16 max-w-[390px] mx-auto px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 transition-all duration-150 text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2" data-path="analyse" href="#"><span class="material-symbols-outlined text-[22px]">insights</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Analyse</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[22px]">inventory_2</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Bestellungen</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="ads" href="#"><span class="material-symbols-outlined text-[22px]">campaign</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Ads</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Setup</span></a></div></nav></body></html>

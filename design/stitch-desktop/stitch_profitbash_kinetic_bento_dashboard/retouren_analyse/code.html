@@ -1,0 +1,817 @@
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tile-peak": "#FFFFFF",
+          "ink-on-dark": "#EDECF3",
+          "surface-dim": "#ddd8e4",
+          "on-tertiary": "#ffffff",
+          "on-error-container": "#93000a",
+          "primary": "#4227b1",
+          "on-surface-variant": "#484554",
+          "surface": "#fdf8ff",
+          "warn-amber": "#E0A233",
+          "tertiary": "#6e3300",
+          "inverse-on-surface": "#f4effa",
+          "secondary-container": "#c4ef3e",
+          "ink-secondary": "#63607A",
+          "well-sunken": "#E6E4EC",
+          "on-primary-container": "#d6ceff",
+          "on-error": "#ffffff",
+          "surface-container": "#f1ecf8",
+          "on-tertiary-fixed-variant": "#733600",
+          "on-secondary-fixed": "#161f00",
+          "on-primary": "#ffffff",
+          "inverse-surface": "#312f38",
+          "lime-deep": "#7E9E12",
+          "tertiary-container": "#924600",
+          "violet-press": "#4835A6",
+          "surface-tint": "#5d47cc",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-highest": "#e5e0ec",
+          "surface-container-low": "#f7f1fd",
+          "inverse-primary": "#c8bfff",
+          "background": "#fdf8ff",
+          "outline": "#787585",
+          "ink-primary": "#1B1826",
+          "outline-variant": "#c9c4d6",
+          "on-surface": "#1c1b23",
+          "primary-fixed": "#e5deff",
+          "tile-raise": "#FAFAFC",
+          "on-background": "#1c1b23",
+          "on-tertiary-container": "#ffc8a7",
+          "ink-panel": "#1B1826",
+          "on-secondary-container": "#546b00",
+          "error": "#ba1a1a",
+          "secondary": "#506600",
+          "surface-bright": "#fdf8ff",
+          "primary-fixed-dim": "#c8bfff",
+          "secondary-fixed-dim": "#acd522",
+          "primary-container": "#5a44c9",
+          "on-secondary-fixed-variant": "#3c4d00",
+          "on-primary-fixed-variant": "#452bb3",
+          "surface-variant": "#e5e0ec",
+          "violet-wash": "#ECE8FA",
+          "on-secondary": "#ffffff",
+          "tertiary-fixed": "#ffdbc7",
+          "canvas-mist": "#EEEDF3",
+          "ink-tertiary": "#9C99AD",
+          "on-tertiary-fixed": "#311300",
+          "on-primary-fixed": "#1a0064",
+          "whisper-line": "rgba(27,24,38,0.06)",
+          "error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb688",
+          "surface-container-high": "#ebe6f2",
+          "secondary-fixed": "#c7f241",
+          "loss-red": "#D6524B"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-lg": "1.25rem",
+          "space-xl": "1.75rem",
+          "gutter": "1.25rem",
+          "space-xs": "0.25rem",
+          "gutter-mobile": "0.75rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "headline-lg-mobile": [
+            "Space Grotesk"
+          ],
+          "body-lg": [
+            "Space Grotesk"
+          ],
+          "headline-lg": [
+            "Space Grotesk"
+          ],
+          "label-eyebrow": [
+            "Space Grotesk"
+          ],
+          "display": [
+            "Space Grotesk"
+          ],
+          "data-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Space Grotesk"
+          ],
+          "data-sm": [
+            "JetBrains Mono"
+          ],
+          "body-md": [
+            "Space Grotesk"
+          ],
+          "data-hero-mobile": [
+            "JetBrains Mono"
+          ],
+          "display-mobile": [
+            "Space Grotesk"
+          ],
+          "body-sm": [
+            "Space Grotesk"
+          ],
+          "headline-sm": [
+            "Space Grotesk"
+          ],
+          "data-md": [
+            "JetBrains Mono"
+          ],
+          "data-hero": [
+            "JetBrains Mono"
+          ]
+        },
+        "fontSize": {
+          "headline-lg-mobile": [
+            "22px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "30px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-eyebrow": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "700"
+            }
+          ],
+          "display": [
+            "52px",
+            {
+              "lineHeight": "52px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "data-lg": [
+            "22px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "21px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "data-hero-mobile": [
+            "26px",
+            {
+              "lineHeight": "30px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-mobile": [
+            "32px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-sm": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "18px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "data-hero": [
+            "42px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist text-ink-primary antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-ink-panel z-50 flex flex-col justify-between p-margin shadow-[0_10px_30px_rgba(48,38,92,0.12)]"><div class="flex flex-col gap-space-lg"><div class="flex items-center gap-space-xs px-space-sm py-space-xs"><span class="font-headline-lg text-headline-lg tracking-tight text-ink-on-dark uppercase">ProfitBash</span><span class="h-2 w-2 rounded-full bg-secondary-fixed mb-1"></span></div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]"><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="dashboard" href="#dashboard"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-body-md text-body-md">Dashboard</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="verkaufsanalyse" href="#verkaufsanalyse"><span class="material-symbols-outlined text-[20px]">query_stats</span><span class="font-body-md text-body-md">Verkaufsanalyse</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="profitabilitat" href="#profitabilitat"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-body-md text-body-md">Profitabilität</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="marken-produkte" href="#marken-produkte"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-body-md text-body-md">Marken &amp; Produkte</span></a><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-ink-on-dark font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]" data-path="retouren" href="#retouren"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="font-body-md text-body-md">Retouren</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="bestellungen" href="#bestellungen"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-body-md text-body-md">Bestellungen</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="amazon-ads" href="#amazon-ads"><span class="material-symbols-outlined text-[20px]">campaign</span><span class="font-body-md text-body-md">Amazon Ads</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="einstellungen" href="#einstellungen"><span class="material-symbols-outlined text-[20px]">tune</span><span class="font-body-md text-body-md">Einstellungen</span></a></nav></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-xl bg-ink-on-dark/5"><div class="flex items-center gap-space-xs"><span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span><span class="font-data-sm text-data-sm text-ink-on-dark/80 uppercase">Channels Live</span></div><span class="font-data-sm text-data-sm text-ink-tertiary">v2.4</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-canvas-mist/85 backdrop-blur-xl z-40 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-headline-sm text-headline-sm text-ink-primary">Guten Morgen, Dominik</span><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="h-2 w-2 rounded-full bg-lime-deep"></span><span class="font-data-sm text-data-sm text-ink-secondary">Amazon, eBay, Otto, Shopify</span><span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">Synced</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="material-symbols-outlined text-ink-secondary text-[18px]">calendar_today</span><span class="font-data-sm text-data-sm text-ink-primary font-semibold">Sept 2026</span></div><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="font-body-sm text-body-sm font-semibold">Export</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative pt-16 bg-canvas-mist min-h-screen"><div class="flex flex-col w-full">
+<!-- Interactive Script for Filtering & Highlight Updates -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Highlight Active Navigation in Shell Rail
+      const navLinks = document.querySelectorAll('aside nav a');
+      navLinks.forEach(link => {
+        if (link.getAttribute('data-path') === 'retouren') {
+          link.className = 'flex items-center gap-space-sm px-space-md py-space-sm rounded-xl bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)] transition-all';
+        } else {
+          link.className = 'flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all';
+        }
+      });
+    });
+
+    function setPeriodFilter(btn, period) {
+      const parent = btn.parentElement;
+      parent.querySelectorAll('button').forEach(b => {
+        b.className = 'px-space-md py-1.5 rounded-xl font-body-sm text-body-sm text-ink-secondary hover:text-ink-primary transition-all';
+      });
+      btn.className = 'px-space-md py-1.5 rounded-xl font-body-sm text-body-sm font-semibold bg-tile-peak text-ink-primary shadow-[0_1px_2px_rgba(48,38,92,0.08)] transition-all';
+    }
+  </script>
+<!-- Main View Container: Bento Layout constrained to 1440px -->
+<div class="w-full max-w-[1440px] mx-auto p-margin space-y-space-lg">
+<!-- Page Header & Filter Zone -->
+<header class="flex flex-col xl:flex-row xl:items-end justify-between gap-space-md">
+<div class="space-y-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow uppercase tracking-widest text-ink-tertiary">Qualitätssicherung &amp; Retourenmanagement</span>
+<span class="text-ink-tertiary font-body-sm">•</span>
+<span class="font-label-eyebrow text-label-eyebrow uppercase tracking-widest text-primary font-bold">Multi-Channel Audit</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-ink-primary tracking-tight">Retouren-Analyse &amp; Margen-Schutz</h1>
+<p class="font-body-md text-body-md text-ink-secondary">
+          Detaillierte Erfassung von Rücksendequoten, Kosten-Impacts und Rücksendegründen über alle Marktplätze • <span class="font-data-sm text-data-sm text-ink-primary">Stand heute, 16:50 Uhr</span>
+</p>
+</div>
+<!-- Segment Pills & Filter Bar -->
+<div class="flex flex-wrap items-center gap-space-sm">
+<!-- Marketplaces Filter -->
+<div class="flex items-center gap-space-xs px-space-md py-1.5 rounded-xl bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] cursor-pointer hover:bg-tile-peak transition-all">
+<span class="material-symbols-outlined text-ink-secondary text-[16px]">storefront</span>
+<span class="font-body-sm text-body-sm font-semibold text-ink-primary">Alle Marktplätze</span>
+<span class="px-1.5 py-0.2 rounded-full bg-well-sunken font-data-sm text-data-sm text-ink-primary font-semibold">4</span>
+</div>
+<!-- Fulfillment Filter -->
+<div class="flex items-center gap-space-xs px-space-md py-1.5 rounded-xl bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] cursor-pointer hover:bg-tile-peak transition-all">
+<span class="material-symbols-outlined text-ink-secondary text-[16px]">local_shipping</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Fulfillment:</span>
+<span class="font-body-sm text-body-sm font-semibold text-ink-primary">Alle (FBA, FBM, Otto, Shopify)</span>
+</div>
+<!-- Period Toggle Switch -->
+<div class="flex items-center p-1 rounded-xl bg-well-sunken shadow-inner">
+<button class="px-space-md py-1.5 rounded-xl font-body-sm text-body-sm font-semibold bg-tile-peak text-ink-primary shadow-[0_1px_2px_rgba(48,38,92,0.08)] transition-all" onclick="setPeriodFilter(this, 'month')" type="button">
+            Diesen Monat (Sept 2026)
+          </button>
+<button class="px-space-md py-1.5 rounded-xl font-body-sm text-body-sm text-ink-secondary hover:text-ink-primary transition-all" onclick="setPeriodFilter(this, '30d')" type="button">
+            30T
+          </button>
+<button class="px-space-md py-1.5 rounded-xl font-body-sm text-body-sm text-ink-secondary hover:text-ink-primary transition-all" onclick="setPeriodFilter(this, '90d')" type="button">
+            90T
+          </button>
+</div>
+</div>
+</header>
+<!-- Top Bento Section: 4 Cols Gauge + 8 Cols Impact/Trend -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-stretch">
+<!-- 1. Hero Gauge Tile (Spans 4) -->
+<div class="xl:col-span-4 rounded-[1.5rem] bg-tile-raise p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between hover:-translate-y-0.5 transition-all">
+<div>
+<!-- Eyebrow & Status Pill -->
+<div class="flex items-center justify-between gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Gesamt-Retourenquote (Sept 2026)</span>
+<div class="flex items-center gap-1 px-space-xs py-0.5 rounded-full bg-error-container/60 text-loss-red">
+<span class="material-symbols-outlined text-[14px]">arrow_upward</span>
+<span class="font-data-sm text-data-sm font-bold">+0,8 % vs. VM</span>
+</div>
+</div>
+<!-- Radial Gauge Visualization (SVG) -->
+<div class="relative flex flex-col items-center justify-center my-space-md pt-space-xs">
+<svg class="w-60 h-32 overflow-visible" viewBox="0 0 240 130">
+<defs>
+<linearGradient id="gaugeViolentBase" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" stop-color="#5A44C9" stop-opacity="0.25"></stop>
+<stop offset="100%" stop-color="#5A44C9" stop-opacity="0.8"></stop>
+</linearGradient>
+</defs>
+<!-- Background Arc: Target Zone (< 7.5%) -->
+<path d="M 20 120 A 100 100 0 0 1 142 22" fill="none" stroke="#E6E4EC" stroke-linecap="round" stroke-width="16"></path>
+<!-- Normal Operational Range -->
+<path d="M 20 120 A 100 100 0 0 1 128 24" fill="none" stroke="url(#gaugeViolentBase)" stroke-linecap="round" stroke-width="16"></path>
+<!-- Excess Delta Arc (> 7.5% up to 9.6%) -->
+<path d="M 134 22 A 100 100 0 0 1 168 33" fill="none" stroke="#E0A233" stroke-linecap="round" stroke-width="16"></path>
+<!-- Target Line Marker at 7.5% (Angle ≈ 67.5 deg from top) -->
+<circle cx="132" cy="22" fill="#1B1826" r="3.5"></circle>
+<line stroke="#1B1826" stroke-linecap="round" stroke-width="2" x1="132" x2="136" y1="22" y2="12"></line>
+</svg>
+<!-- Centered Data Hero KPI -->
+<div class="text-center -mt-16">
+<span class="font-data-hero text-data-hero text-ink-primary font-bold tracking-tight">9,6 %</span>
+<div class="mt-1 flex items-center justify-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-warn-amber animate-pulse"></span>
+<span class="font-data-sm text-data-sm text-tertiary-container font-semibold">+2,1 pp über Zielkorridor (7,5 %)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Secondary Breakdown in Sunken Well -->
+<div class="rounded-xl bg-well-sunken p-space-md space-y-space-xs mt-space-sm">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-secondary">Retouren absolut</span>
+<span class="font-data-md text-data-md text-ink-primary font-bold">398 <span class="text-ink-tertiary font-normal">/ 4.117 Units</span></span>
+</div>
+<!-- Dual Progress Bar (A-Ware vs Write-off) -->
+<div class="w-full h-2 rounded-full bg-canvas-mist overflow-hidden flex">
+<div class="h-full bg-primary-container" style="width: 74.2%;"></div>
+<div class="h-full bg-loss-red" style="width: 25.8%;"></div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">A-Ware (Wiederverkauf): <strong class="text-ink-primary">74,2 %</strong></span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-loss-red"></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Abschreibung: <strong class="text-ink-primary">25,8 %</strong></span>
+</div>
+</div>
+</div>
+</div>
+<!-- 2. Financial Impact & Trend Tile (Spans 8) -->
+<div class="xl:col-span-8 rounded-[1.5rem] bg-tile-raise p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between hover:-translate-y-0.5 transition-all">
+<div>
+<!-- Header Area -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs">
+<div class="space-y-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Finanzieller Impact &amp; Kosten-Trend</span>
+<div class="flex items-baseline gap-space-sm">
+<span class="font-data-hero text-data-hero text-ink-primary font-bold">€ 12.340,00</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Netto-Schadenssumme (September)</span>
+</div>
+</div>
+<!-- Savings / Reduction Pill -->
+<div class="flex items-center gap-1 px-space-sm py-1 rounded-full bg-secondary-fixed/40 text-on-secondary-fixed-variant self-start sm:self-auto">
+<span class="material-symbols-outlined text-[16px] text-lime-deep">trending_down</span>
+<span class="font-data-sm text-data-sm font-bold text-on-secondary-fixed">- € 1.840 (-13,0 %)</span>
+<span class="font-body-sm text-body-sm text-on-secondary-fixed">vs. Vormonat</span>
+</div>
+</div>
+<!-- Sunken Well with 30-Day Line/Area Chart & Peak Marker -->
+<div class="mt-space-md p-space-md rounded-xl bg-well-sunken relative overflow-hidden">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-secondary uppercase">30-Tage Schadensverlauf (€ Netto / Tag)</span>
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-loss-red"></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Täglicher Verlust</span>
+</div>
+</div>
+<!-- Inline Area Graph -->
+<div class="relative w-full h-36">
+<svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 720 140">
+<defs>
+<linearGradient id="areaGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#D6524B" stop-opacity="0.3"></stop>
+<stop offset="60%" stop-color="#5A44C9" stop-opacity="0.1"></stop>
+<stop offset="100%" stop-color="#5A44C9" stop-opacity="0"></stop>
+</linearGradient>
+</defs>
+<!-- Soft Horizontal Grid Guides -->
+<line stroke="rgba(27,24,38,0.06)" stroke-dasharray="4" x1="0" x2="720" y1="35" y2="35"></line>
+<line stroke="rgba(27,24,38,0.06)" stroke-dasharray="4" x1="0" x2="720" y1="80" y2="80"></line>
+<line stroke="rgba(27,24,38,0.06)" stroke-dasharray="4" x1="0" x2="720" y1="125" y2="125"></line>
+<!-- Filled Area Under Curve -->
+<path d="M 0 115 
+                         Q 40 105, 80 110 
+                         T 160 95 
+                         T 240 100 
+                         T 320 85 
+                         T 400 90 
+                         T 480 70 
+                         T 540 85 
+                         L 600 20 
+                         L 640 92 
+                         L 720 75 
+                         L 720 140 L 0 140 Z" fill="url(#areaGradient)"></path>
+<!-- Stroke Curve Line -->
+<path d="M 0 115 
+                         Q 40 105, 80 110 
+                         T 160 95 
+                         T 240 100 
+                         T 320 85 
+                         T 400 90 
+                         T 480 70 
+                         T 540 85 
+                         L 600 20 
+                         L 640 92 
+                         L 720 75" fill="none" stroke="#D6524B" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Peak Marker Tag on Sept 25 (X=600, Y=20) -->
+<circle cx="600" cy="20" fill="#D6524B" r="5"></circle>
+<circle cx="600" cy="20" fill="#D6524B" fill-opacity="0.2" r="9"></circle>
+<line stroke="#D6524B" stroke-dasharray="2" stroke-width="1.5" x1="600" x2="600" y1="20" y2="135"></line>
+</svg>
+<!-- Peak Callout Badge (Floating overlay) -->
+<div class="absolute top-1 left-[78%] -translate-x-1/2 px-space-xs py-1 rounded-md bg-ink-panel text-ink-on-dark shadow-md pointer-events-none">
+<span class="block font-data-sm text-data-sm font-bold text-loss-red">€ 890,00 Peak</span>
+<span class="block font-label-eyebrow text-[9px] text-ink-tertiary">25. Sept • Early Access</span>
+</div>
+</div>
+<div class="flex justify-between items-center text-ink-tertiary font-data-sm text-[11px] pt-1">
+<span class="">01. Sept</span>
+<span class="">08. Sept</span>
+<span class="">15. Sept</span>
+<span class="">22. Sept</span>
+<span class="text-loss-red font-bold">25. Sept (Peak)</span>
+<span class="">30. Sept</span>
+</div>
+</div>
+</div>
+<!-- 4-Pillar Schadenskomponenten Breakdown -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-space-sm pt-space-md">
+<div class="p-space-sm rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">Transport &amp; Label</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold block mt-1">€ 3.980,00</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">32,2 % Anteil</span>
+</div>
+<div class="p-space-sm rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">Wiedereinlagerung</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold block mt-1">€ 2.410,00</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">FBA / Otto Fee</span>
+</div>
+<div class="p-space-sm rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">B-Ware Abschreibung</span>
+<span class="font-data-lg text-data-lg text-loss-red font-bold block mt-1">€ 4.820,00</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Wertverlust</span>
+</div>
+<div class="p-space-sm rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">Prüfung &amp; Handling</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold block mt-1">€ 1.130,00</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">QA-Labor intern</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Bento Section: 6 Cols Causes + 6 Cols Top SKUs Action Table -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-stretch">
+<!-- 3. Retouren-Ursachen (Qualitäts-Audit) (Spans 6) -->
+<div class="xl:col-span-6 rounded-[1.5rem] bg-tile-raise p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between hover:-translate-y-0.5 transition-all">
+<div>
+<div class="flex items-center justify-between mb-space-md">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider block">Ursachen-Aufschlüsselung</span>
+<h2 class="font-headline-md text-headline-md text-ink-primary">Retouren-Ursachen (Qualitäts-Audit)</h2>
+</div>
+<span class="px-2 py-1 rounded-lg bg-well-sunken font-data-sm text-data-sm text-ink-secondary">398 Fälle total</span>
+</div>
+<!-- Horizontal Bar Breakdown Chart -->
+<div class="space-y-space-md">
+<!-- Reason 1: Defekt / Fehlfunktion (Critical) -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-loss-red animate-ping"></span>
+<span class="font-body-md text-body-md font-semibold text-ink-primary">Defekt / Fehlfunktion</span>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md font-bold text-loss-red">38,4 %</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-2">(153 Fälle)</span>
+</div>
+</div>
+<div class="w-full h-3 rounded-full bg-well-sunken overflow-hidden flex">
+<div class="h-full bg-gradient-to-r from-primary to-loss-red rounded-full" style="width: 38.4%;"></div>
+</div>
+</div>
+<!-- Reason 2: Passform / Größe -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-body-md text-body-md text-ink-primary">Passform / Größe unpassend</span>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">26,1 %</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-2">(104 Fälle)</span>
+</div>
+</div>
+<div class="w-full h-3 rounded-full bg-well-sunken overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 26.1%;"></div>
+</div>
+</div>
+<!-- Reason 3: Falsch bestellt / Sinneswandel -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-fixed-dim"></span>
+<span class="font-body-md text-body-md text-ink-primary">Falsch bestellt / Sinneswandel</span>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">18,5 %</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-2">(74 Fälle)</span>
+</div>
+</div>
+<div class="w-full h-3 rounded-full bg-well-sunken overflow-hidden">
+<div class="h-full bg-primary-fixed-dim rounded-full" style="width: 18.5%;"></div>
+</div>
+</div>
+<!-- Reason 4: Beschädigt (Transport / Logistik) -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-warn-amber"></span>
+<span class="font-body-md text-body-md text-ink-primary">Transportschaden / Verpackung</span>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">11,2 %</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-2">(45 Fälle)</span>
+</div>
+</div>
+<div class="w-full h-3 rounded-full bg-well-sunken overflow-hidden">
+<div class="h-full bg-warn-amber rounded-full" style="width: 11.2%;"></div>
+</div>
+</div>
+<!-- Reason 5: Sonstiges / Keine Angabe -->
+<div class="space-y-1">
+<div class="flex justify-between items-baseline">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-ink-tertiary"></span>
+<span class="font-body-md text-body-md text-ink-secondary">Sonstiges / Keine Angabe</span>
+</div>
+<div class="text-right">
+<span class="font-data-md text-data-md font-bold text-ink-secondary">5,8 %</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary ml-2">(22 Fälle)</span>
+</div>
+</div>
+<div class="w-full h-3 rounded-full bg-well-sunken overflow-hidden">
+<div class="h-full bg-ink-tertiary rounded-full" style="width: 5.8%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Smart Insight Callout -->
+<div class="mt-space-lg p-space-md rounded-xl bg-violet-wash flex items-start gap-space-sm shadow-[0_1px_2px_rgba(48,38,92,0.03)]">
+<span class="material-symbols-outlined text-primary text-[22px] shrink-0 mt-0.5">lightbulb</span>
+<div class="text-ink-primary space-y-0.5">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-primary font-bold block">Kritische Erkenntnis (Root Cause)</span>
+<p class="font-body-sm text-body-sm text-ink-primary">
+<strong class="font-data-sm text-data-sm text-primary">SKU-AT-902</strong> treibt <strong class="text-loss-red font-bold">64 %</strong> der Defekt-Meldungen durch Bluetooth-Pairing-Timeouts. Firmware-Update v1.4 für Charge 883 ready.
+            </p>
+</div>
+</div>
+</div>
+<!-- 4. Top-Retouren-SKUs (Handlungsbedarf) (Spans 6) -->
+<div class="xl:col-span-6 rounded-[1.5rem] bg-tile-raise p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between hover:-translate-y-0.5 transition-all">
+<div>
+<div class="flex items-center justify-between mb-space-md">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider block">Priorisierung nach Schaden</span>
+<h2 class="font-headline-md text-headline-md text-ink-primary">Top-Retouren-SKUs (Handlungsbedarf)</h2>
+</div>
+<button class="text-primary hover:text-violet-press font-body-sm text-body-sm font-semibold transition-colors" type="button">
+              Alle 142 SKUs →
+            </button>
+</div>
+<!-- Responsive Data Matrix Table -->
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-whisper-line">
+<th class="py-space-xs font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">SKU / Produkt</th>
+<th class="py-space-xs font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">Ret.-Quote</th>
+<th class="py-space-xs font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">Einheiten</th>
+<th class="py-space-xs font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">Schaden</th>
+<th class="py-space-xs font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-center">Trend</th>
+<th class="py-space-xs font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">Aktion</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-whisper-line">
+<!-- Row 1: SKU-AT-902 (Rank 1 - Highest Impact) -->
+<tr class="hover:bg-tile-peak transition-colors bg-well-sunken/40">
+<td class="py-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-full bg-loss-red/20 text-loss-red font-data-sm text-[11px] font-bold flex items-center justify-center">1</span>
+<div>
+<span class="font-data-sm text-data-sm font-bold text-ink-primary block">SKU-AT-902</span>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate max-w-[140px] block">AuraTech Pro ANC</span>
+</div>
+</div>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-loss-red">14,2 %</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md text-ink-primary">118</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">€ 4.472,00</span>
+</td>
+<td class="py-space-sm text-center">
+<span class="material-symbols-outlined text-loss-red text-[18px]">trending_up</span>
+</td>
+<td class="py-space-sm text-right">
+<button class="px-space-xs py-1 rounded-lg text-primary hover:bg-violet-wash font-body-sm text-body-sm font-semibold transition-all" type="button">
+                      Fehlerbericht
+                    </button>
+</td>
+</tr>
+<!-- Row 2: SKU-NL-218 -->
+<tr class="hover:bg-tile-peak transition-colors">
+<td class="py-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-full bg-well-sunken text-ink-secondary font-data-sm text-[11px] font-bold flex items-center justify-center">2</span>
+<div>
+<span class="font-data-sm text-data-sm font-bold text-ink-primary block">SKU-NL-218</span>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate max-w-[140px] block">NordicLiving Wollplaid</span>
+</div>
+</div>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-warn-amber">11,8 %</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md text-ink-primary">84</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">€ 2.856,00</span>
+</td>
+<td class="py-space-sm text-center">
+<span class="material-symbols-outlined text-lime-deep text-[18px]">trending_down</span>
+</td>
+<td class="py-space-sm text-right">
+<button class="px-space-xs py-1 rounded-lg text-primary hover:bg-violet-wash font-body-sm text-body-sm font-semibold transition-all" type="button">
+                      Größentabelle
+                    </button>
+</td>
+</tr>
+<!-- Row 3: SKU-VS-890 -->
+<tr class="hover:bg-tile-peak transition-colors bg-well-sunken/40">
+<td class="py-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-full bg-well-sunken text-ink-secondary font-data-sm text-[11px] font-bold flex items-center justify-center">3</span>
+<div>
+<span class="font-data-sm text-data-sm font-bold text-ink-primary block">SKU-VS-890</span>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate max-w-[140px] block">Veloce Thermo 1L</span>
+</div>
+</div>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">9,4 %</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md text-ink-primary">45</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">€ 1.125,00</span>
+</td>
+<td class="py-space-sm text-center">
+<span class="material-symbols-outlined text-ink-tertiary text-[18px]">trending_flat</span>
+</td>
+<td class="py-space-sm text-right">
+<button class="px-space-xs py-1 rounded-lg text-primary hover:bg-violet-wash font-body-sm text-body-sm font-semibold transition-all" type="button">
+                      Verpackung
+                    </button>
+</td>
+</tr>
+<!-- Row 4: SKU-KP-104 (Positive/Healthy Rate) -->
+<tr class="hover:bg-tile-peak transition-colors">
+<td class="py-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="w-5 h-5 rounded-full bg-secondary-fixed/40 text-on-secondary-fixed font-data-sm text-[11px] font-bold flex items-center justify-center">4</span>
+<div>
+<span class="font-data-sm text-data-sm font-bold text-ink-primary block">SKU-KP-104</span>
+<span class="font-body-sm text-body-sm text-ink-secondary truncate max-w-[140px] block">Kumo Aktivkohlefilter</span>
+</div>
+</div>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-lime-deep">4,1 %</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md text-ink-primary">19</span>
+</td>
+<td class="py-space-sm text-right">
+<span class="font-data-md text-data-md font-bold text-ink-primary">€ 418,00</span>
+</td>
+<td class="py-space-sm text-center">
+<span class="material-symbols-outlined text-lime-deep text-[18px]">trending_down</span>
+</td>
+<td class="py-space-sm text-right">
+<button class="px-space-xs py-1 rounded-lg text-primary hover:bg-violet-wash font-body-sm text-body-sm font-semibold transition-all" type="button">
+                      Details
+                    </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Action Bar Footer -->
+<div class="mt-space-md pt-space-sm flex items-center justify-between border-t border-whisper-line">
+<div class="flex items-center gap-space-xs text-ink-secondary">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span class="font-body-sm text-body-sm">4 von 142 SKUs erzeugen 71,8 % aller Retourenkosten</span>
+</div>
+<button class="px-space-md py-1.5 rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press font-body-sm text-body-sm font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.2)] transition-all" type="button">
+            Automatisches SKU-Routing aktivieren
+          </button>
+</div>
+</div>
+</div>
+<!-- Satellite Metric Strip: Channel Cross-Audit -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-space-md pt-space-xs">
+<!-- Channel: Amazon -->
+<div class="rounded-xl bg-tile-raise p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex items-center justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">Amazon (FBA + FBM)</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold block mt-0.5">10,8 % <span class="text-loss-red text-[13px] font-semibold">(+1,2%)</span></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 7.820 Kosten</span>
+</div>
+<div class="w-10 h-10 rounded-xl bg-violet-wash flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">shopping_cart</span>
+</div>
+</div>
+<!-- Channel: Otto -->
+<div class="rounded-xl bg-tile-raise p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex items-center justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">Otto Market</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold block mt-0.5">9,1 % <span class="text-warn-amber text-[13px] font-semibold">(±0,0%)</span></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 2.640 Kosten</span>
+</div>
+<div class="w-10 h-10 rounded-xl bg-violet-wash flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">store</span>
+</div>
+</div>
+<!-- Channel: eBay -->
+<div class="rounded-xl bg-tile-raise p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex items-center justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">eBay Motors &amp; Tech</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold block mt-0.5">6,9 % <span class="text-lime-deep text-[13px] font-semibold">(-0,9%)</span></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 1.130 Kosten</span>
+</div>
+<div class="w-10 h-10 rounded-xl bg-violet-wash flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">token</span>
+</div>
+</div>
+<!-- Channel: Shopify D2C -->
+<div class="rounded-xl bg-tile-raise p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex items-center justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase block">Shopify Webshop</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold block mt-0.5">4,8 % <span class="text-lime-deep text-[13px] font-semibold">(-1,4%)</span></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 750 Kosten</span>
+</div>
+<div class="w-10 h-10 rounded-xl bg-secondary-fixed/30 flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[20px] text-lime-deep">web</span>
+</div>
+</div>
+</div>
+</div>
+</div></main></div>
+
+</body></html>

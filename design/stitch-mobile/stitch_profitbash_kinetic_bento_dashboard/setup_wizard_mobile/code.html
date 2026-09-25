@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>ProfitBash Cockpit</title><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "secondary-container": "#c4ef3e",
+        "surface-container-high": "#ebe6f2",
+        "on-tertiary-container": "#ffc8a7",
+        "surface-bright": "#fdf8ff",
+        "inverse-surface": "#312f38",
+        "secondary-fixed": "#c7f241",
+        "on-primary-fixed": "#1a0064",
+        "outline-variant": "#c9c4d6",
+        "surface-container": "#f1ecf8",
+        "ink-secondary": "#63607A",
+        "canvas-mist": "#EEEDF3",
+        "on-tertiary": "#ffffff",
+        "inverse-on-surface": "#f4effa",
+        "ink-primary": "#1B1826",
+        "secondary-fixed-dim": "#acd522",
+        "violet-wash": "#ECE8FA",
+        "primary-container": "#5a44c9",
+        "warn-amber": "#E0A233",
+        "on-primary": "#ffffff",
+        "surface-tint": "#5d47cc",
+        "surface-container-lowest": "#ffffff",
+        "on-primary-fixed-variant": "#452bb3",
+        "on-error-container": "#93000a",
+        "tile-raise": "#FAFAFC",
+        "on-surface": "#1c1b23",
+        "ink-tertiary": "#9C99AD",
+        "loss-red": "#D6524B",
+        "surface-container-highest": "#e5e0ec",
+        "error": "#ba1a1a",
+        "surface": "#fdf8ff",
+        "whisper-line": "rgba(27,24,38,0.06)",
+        "on-surface-variant": "#484554",
+        "well-sunken": "#E6E4EC",
+        "secondary": "#506600",
+        "tile-peak": "#FFFFFF",
+        "background": "#fdf8ff",
+        "outline": "#787585",
+        "surface-container-low": "#f7f1fd",
+        "primary": "#4227b1",
+        "ink-on-dark": "#EDECF3",
+        "lime-deep": "#7E9E12",
+        "on-secondary-fixed-variant": "#3c4d00",
+        "violet-press": "#4835A6",
+        "on-tertiary-fixed-variant": "#733600",
+        "error-container": "#ffdad6",
+        "primary-fixed": "#e5deff",
+        "on-secondary": "#ffffff",
+        "tertiary-fixed": "#ffdbc7",
+        "surface-dim": "#ddd8e4",
+        "tertiary-container": "#924600",
+        "tertiary-fixed-dim": "#ffb688",
+        "inverse-primary": "#c8bfff",
+        "primary-fixed-dim": "#c8bfff",
+        "on-tertiary-fixed": "#311300",
+        "on-secondary-container": "#546b00",
+        "on-error": "#ffffff",
+        "ink-panel": "#1B1826",
+        "surface-variant": "#e5e0ec",
+        "tertiary": "#6e3300",
+        "on-background": "#1c1b23",
+        "on-primary-container": "#d6ceff",
+        "on-secondary-fixed": "#161f00"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "margin": "1.5rem",
+        "gutter-mobile": "0.75rem",
+        "space-lg": "1.25rem",
+        "margin-mobile": "1rem",
+        "space-xs": "0.25rem",
+        "space-xl": "1.75rem",
+        "space-md": "1rem",
+        "gutter": "1.25rem",
+        "space-sm": "0.5rem"
+      },
+      "fontFamily": {
+        "headline-sm": ["Space Grotesk"],
+        "display": ["Space Grotesk"],
+        "data-hero-mobile": ["JetBrains Mono"],
+        "headline-md": ["Space Grotesk"],
+        "data-hero": ["JetBrains Mono"],
+        "data-md": ["JetBrains Mono"],
+        "headline-lg": ["Space Grotesk"],
+        "body-sm": ["Space Grotesk"],
+        "headline-lg-mobile": ["Space Grotesk"],
+        "body-lg": ["Space Grotesk"],
+        "body-md": ["Space Grotesk"],
+        "display-mobile": ["Space Grotesk"],
+        "data-lg": ["JetBrains Mono"],
+        "label-eyebrow": ["Space Grotesk"],
+        "data-sm": ["JetBrains Mono"]
+      },
+      "fontSize": {
+        "headline-sm": ["16px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "display": ["48px", {"lineHeight": "52px", "letterSpacing": "-0.03em", "fontWeight": "700"}],
+        "data-hero-mobile": ["26px", {"lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "headline-md": ["20px", {"lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+        "data-hero": ["36px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "500"}],
+        "headline-lg": ["28px", {"lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "body-md": ["14px", {"lineHeight": "21px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "display-mobile": ["32px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-lg": ["20px", {"lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "label-eyebrow": ["11px", {"lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700"}],
+        "data-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "500"}]
+      }
+    }
+  }
+}</script><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;background-color:#EEEDF3;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 5rem);}.pt-safe{padding-top:env(safe-area-inset-top, 0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist font-body-md text-body-md text-ink-primary flex flex-col min-h-screen selection:bg-secondary-container selection:text-ink-panel"><header class="fixed top-0 w-full z-50 bg-canvas-mist/85 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(48,38,92,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="flex items-center gap-1.5 shrink-0"><span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span><span class="font-headline-sm text-headline-sm tracking-tight text-ink-primary">ProfitBash</span></div><div class="h-3.5 w-px bg-whisper-line shrink-0"></div><div class="flex items-center gap-1 min-w-0"><span class="font-label-eyebrow text-label-eyebrow text-ink-secondary truncate uppercase">Live SP-API</span><span class="px-1.5 py-0.5 rounded-full bg-well-sunken text-ink-primary font-data-sm text-data-sm font-semibold shrink-0">Sept '26</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button class="w-11 h-11 flex items-center justify-center text-ink-secondary hover:text-ink-primary active:scale-95 transition-transform"><span class="material-symbols-outlined text-[20px]">notifications</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-[0_2px_8px_rgba(66,39,177,0.25)] shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin-mobile pt-16 pb-safe bg-canvas-mist max-w-[390px] mx-auto"><div class="flex flex-col w-full pb-8">
+<!-- Progress Stepper (Step 1 of 3) -->
+<section class="w-full pt-2 pb-4">
+<div class="grid grid-cols-3 gap-space-xs items-center">
+<!-- Step 1: Active -->
+<div class="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-primary shadow-[0_4px_16px_rgba(66,39,177,0.22)] transition-all">
+<div class="w-2 h-2 rounded-full bg-secondary-container shrink-0 animate-pulse"></div>
+<div class="min-w-0 flex flex-col">
+<span class="font-label-eyebrow text-[9px] uppercase tracking-wider text-primary-fixed/80 leading-none">Stufe 01</span>
+<span class="font-body-sm text-[12px] font-semibold text-ink-on-dark truncate leading-tight mt-0.5">Kanäle</span>
+</div>
+</div>
+<!-- Step 2: Inactive -->
+<div class="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-tile-raise/80 transition-all">
+<div class="w-1.5 h-1.5 rounded-full bg-ink-tertiary/40 shrink-0"></div>
+<div class="min-w-0 flex flex-col">
+<span class="font-label-eyebrow text-[9px] uppercase tracking-wider text-ink-tertiary leading-none">Stufe 02</span>
+<span class="font-body-sm text-[12px] font-medium text-ink-secondary truncate leading-tight mt-0.5">Kosten</span>
+</div>
+</div>
+<!-- Step 3: Inactive -->
+<div class="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-tile-raise/80 transition-all">
+<div class="w-1.5 h-1.5 rounded-full bg-ink-tertiary/40 shrink-0"></div>
+<div class="min-w-0 flex flex-col">
+<span class="font-label-eyebrow text-[9px] uppercase tracking-wider text-ink-tertiary leading-none">Stufe 03</span>
+<span class="font-body-sm text-[12px] font-medium text-ink-secondary truncate leading-tight mt-0.5">Analyse</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Header Section -->
+<header class="flex flex-col mt-2 mb-4">
+<div class="inline-flex items-center gap-1.5 self-start px-2 py-0.5 rounded-full bg-violet-wash mb-2">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-[10px] tracking-wider uppercase font-semibold text-primary">ECHTZEIT-API &amp; MCP PROTOKOLL V2.4</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-ink-primary tracking-tight">Verbinde deine Verkaufskanäle</h1>
+<p class="font-body-sm text-body-sm text-ink-secondary mt-1 leading-relaxed">
+      Synchronisiere Bestellungen, Werbeausgaben und Marktplatzgebühren automatisch in Echtzeit.
+    </p>
+</header>
+<!-- Channels Bento Stack -->
+<main class="flex flex-col gap-3">
+<!-- Card 1: Amazon Pro (Connected) -->
+<article class="bg-tile-peak rounded-2xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-3 relative overflow-hidden">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-10 h-10 rounded-xl bg-ink-panel flex items-center justify-center font-data-md font-bold text-tile-peak shrink-0 shadow-inner">
+            az
+          </div>
+<div class="min-w-0 flex flex-col">
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight truncate">Amazon Pro</h2>
+<span class="font-data-sm text-[11px] text-ink-secondary truncate">Seller Central &amp; DSP API</span>
+</div>
+</div>
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-secondary-container/30 text-lime-deep font-data-sm text-[11px] font-semibold shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+<span>MCP Aktiv</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+        Vollständiger Abruf von Settlement-Reports, FBA-Lagergebühren, Werbeausgaben (SP/SB/SD) und Retourenabrechnungen.
+      </p>
+<!-- Monospace Telemetry Strip -->
+<div class="p-2.5 rounded-lg bg-well-sunken flex items-center justify-between gap-2 font-data-sm text-[11px] text-ink-primary">
+<div class="flex items-center gap-1.5 truncate">
+<span class="material-symbols-outlined text-[14px] text-lime-deep shrink-0">sync</span>
+<span class="tabular-nums truncate"><strong class="font-semibold">2.710</strong> Bestellungen synchronisiert</span>
+</div>
+<span class="text-ink-tertiary tabular-nums shrink-0">vor 2 Min.</span>
+</div>
+<div class="flex items-center justify-between pt-0.5">
+<div class="flex items-center gap-1 text-ink-tertiary font-data-sm text-[11px]">
+<span class="material-symbols-outlined text-[14px]">bolt</span>
+<span>SP-API v2026.9</span>
+</div>
+<button class="min-h-[44px] px-3.5 flex items-center justify-center rounded-lg bg-violet-wash hover:bg-violet-wash/80 active:translate-y-px transition-all text-primary font-headline-sm text-[13px] font-semibold">
+          Konfigurieren
+        </button>
+</div>
+</article>
+<!-- Card 2: Otto Market (Not Connected) -->
+<article class="bg-tile-raise rounded-2xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_8px_20px_rgba(48,38,92,0.05)] flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-10 h-10 rounded-xl bg-tertiary-fixed flex items-center justify-center font-data-md font-bold text-on-tertiary-fixed shrink-0">
+            OT
+          </div>
+<div class="min-w-0 flex flex-col">
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight truncate">Otto Market</h2>
+<span class="font-data-sm text-[11px] text-ink-secondary truncate">Partner Connect Business API</span>
+</div>
+</div>
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-well-sunken text-ink-tertiary font-data-sm text-[11px] font-medium shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span>Getrennt</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+        Automatischer Abruf von Provisionssätzen, Zahlungsberichten und Retourenquoten für Otto Plattform-Händler.
+      </p>
+<div class="flex items-center justify-between pt-0.5">
+<div class="flex items-center gap-1 text-ink-tertiary font-data-sm text-[11px]">
+<span class="material-symbols-outlined text-[14px]">lock_open</span>
+<span>OAUTH 2.0 PKCE</span>
+</div>
+<button class="min-h-[44px] px-4 flex items-center justify-center rounded-lg bg-primary-fixed hover:bg-violet-wash active:translate-y-px transition-all text-primary font-headline-sm text-[13px] font-bold">
+          Verbinden
+        </button>
+</div>
+</article>
+<!-- Card 3: eBay DE (Not Connected) -->
+<article class="bg-tile-raise rounded-2xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_8px_20px_rgba(48,38,92,0.05)] flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center font-data-md font-bold text-primary shrink-0">
+            eB
+          </div>
+<div class="min-w-0 flex flex-col">
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight truncate">eBay DE</h2>
+<span class="font-data-sm text-[11px] text-ink-secondary truncate">Fulfillment &amp; Finances API</span>
+</div>
+</div>
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-well-sunken text-ink-tertiary font-data-sm text-[11px] font-medium shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span>Getrennt</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+        Live-Abgleich von Transaktionsprotokollen, variablen Angebotsgebühren und Promoted Listings TACoS-Kampagnen.
+      </p>
+<div class="flex items-center justify-between pt-0.5">
+<div class="flex items-center gap-1 text-ink-tertiary font-data-sm text-[11px]">
+<span class="material-symbols-outlined text-[14px]">swap_horiz</span>
+<span>REST &amp; Webhooks</span>
+</div>
+<button class="min-h-[44px] px-4 flex items-center justify-center rounded-lg bg-primary-fixed hover:bg-violet-wash active:translate-y-px transition-all text-primary font-headline-sm text-[13px] font-bold">
+          Verbinden
+        </button>
+</div>
+</article>
+<!-- Card 4: Shopify Direct (Not Connected) -->
+<article class="bg-tile-raise rounded-2xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_8px_20px_rgba(48,38,92,0.05)] flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-10 h-10 rounded-xl bg-secondary-fixed flex items-center justify-center font-data-md font-bold text-on-secondary-fixed shrink-0">
+            sh
+          </div>
+<div class="min-w-0 flex flex-col">
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight truncate">Shopify Direct</h2>
+<span class="font-data-sm text-[11px] text-ink-secondary truncate">Storefront &amp; Admin GraphQL</span>
+</div>
+</div>
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-well-sunken text-ink-tertiary font-data-sm text-[11px] font-medium shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span>Getrennt</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+        D2C-Margenprüfung, Shopify Payments Gebührenabzug und lückenloser Wareneinsatz (COGS)-Abgleich.
+      </p>
+<div class="flex items-center justify-between pt-0.5">
+<div class="flex items-center gap-1 text-ink-tertiary font-data-sm text-[11px]">
+<span class="material-symbols-outlined text-[14px]">data_object</span>
+<span>GraphQL 2026.07</span>
+</div>
+<button class="min-h-[44px] px-4 flex items-center justify-center rounded-lg bg-primary-fixed hover:bg-violet-wash active:translate-y-px transition-all text-primary font-headline-sm text-[13px] font-bold">
+          Verbinden
+        </button>
+</div>
+</article>
+</main>
+<!-- Background Ingestion Telemetry Tile -->
+<section class="mt-4 p-3 rounded-xl bg-well-sunken/80 flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-tile-peak flex items-center justify-center text-primary shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">sync_alt</span>
+</div>
+<div class="min-w-0 flex-1">
+<p class="font-body-sm text-[12px] text-ink-primary leading-tight">
+<strong class="font-semibold">Hintergrund-Synchronisation aktiv:</strong> 1 von 4 Marktplätzen speisen historische Daten (365 Tage) ein.
+      </p>
+<div class="flex items-center gap-3 font-data-sm text-[10px] text-ink-secondary mt-1 tabular-nums">
+<span>Latenz: <strong class="text-lime-deep">18ms</strong></span>
+<span>Queue: <strong>0 Aufträge</strong></span>
+</div>
+</div>
+</section>
+<!-- Sticky Bottom Controls Container -->
+<footer class="sticky bottom-16 left-0 w-full mt-6 pt-2 pb-1 bg-gradient-to-t from-canvas-mist via-canvas-mist/95 to-transparent z-40 flex flex-col gap-2">
+<button class="w-full min-h-[48px] py-3 px-4 rounded-xl bg-primary hover:bg-violet-press active:translate-y-px text-ink-on-dark font-headline-sm text-[15px] font-semibold tracking-wide flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(66,39,177,0.3)] transition-all">
+<span>Weiter: Kosten hinterlegen</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+<button class="min-h-[44px] py-2 flex items-center justify-center text-ink-secondary hover:text-ink-primary active:scale-98 transition-all font-body-sm text-[13px]">
+      Abbrechen &amp; später fortsetzen
+    </button>
+</footer>
+</div>
+<script>
+  // Ensure the Setup icon is marked active in the global nav shell
+  document.addEventListener('DOMContentLoaded', () => {
+    const setupTab = document.querySelector('nav a[data-path="einstellungen"]');
+    if (setupTab) {
+      document.querySelectorAll('nav a').forEach(el => {
+        el.classList.remove('text-tile-peak', 'relative', 'after:content-[\'\']', 'after:w-1.5', 'after:h-1.5', 'after:rounded-full', 'after:bg-secondary-container', 'after:absolute', 'after:bottom-2');
+        el.classList.add('text-ink-tertiary');
+      });
+      setupTab.classList.add('text-tile-peak', 'relative', 'after:content-[\'\']', 'after:w-1.5', 'after:h-1.5', 'after:rounded-full', 'after:bg-secondary-container', 'after:absolute', 'after:bottom-2');
+      setupTab.classList.remove('text-ink-tertiary');
+    }
+  });
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-[env(safe-area-inset-bottom,0px)] bg-ink-panel/95 backdrop-blur-xl shadow-[0_-4px_24px_rgba(27,24,38,0.25)]" data-active-classes="text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2"><div class="flex justify-around items-center h-16 max-w-[390px] mx-auto px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 transition-all duration-150 text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2" data-path="analyse" href="#"><span class="material-symbols-outlined text-[22px]">insights</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Analyse</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[22px]">inventory_2</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Bestellungen</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="ads" href="#"><span class="material-symbols-outlined text-[22px]">campaign</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Ads</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Setup</span></a></div></nav></body></html>

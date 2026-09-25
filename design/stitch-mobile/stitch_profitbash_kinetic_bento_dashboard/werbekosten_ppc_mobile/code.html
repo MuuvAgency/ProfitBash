@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#EEEDF3]" lang="de"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Werbekosten (PPC) | ProfitBash Mobile</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@500,700,900&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: { mist: '#EEEDF3' },
+            tile: { raise: '#FAFAFC', peak: '#FFFFFF' },
+            well: { sunken: '#E6E4EC' },
+            ink: {
+              panel: '#1B1826',
+              primary: '#1B1826',
+              secondary: '#63607A',
+              tertiary: '#9C99AD',
+              ondark: '#EDECF3'
+            },
+            brand: {
+              core: '#5A44C9',
+              press: '#4835A6',
+              wash: '#ECE8FA'
+            },
+            lime: {
+              signal: '#B4DE2C',
+              deep: '#7E9E12'
+            },
+            loss: '#D6524B',
+            warn: '#E0A233'
+          },
+          fontFamily: {
+            sans: ['Satoshi', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          borderRadius: {
+            '2.5xl': '1.25rem',
+            '3xl': '1.5rem',
+            '4xl': '2rem'
+          }
+        }
+      }
+    }
+  </script>
+<!-- Typography & Layout Styles -->
+<style data-purpose="typography">
+    body {
+      font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      color: #1B1826;
+      background-color: #EEEDF3;
+    }
+    .num-mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-feature-settings: "tnum" 1, "zero" 1;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+<style data-purpose="custom-utilities">
+    /* Remove tap highlight & customize scrollbars */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+<style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head>
+<body class="min-h-full flex flex-col justify-between antialiased selection:bg-brand-wash selection:text-brand-core">
+<!-- BEGIN: MobileHeader -->
+<header class="sticky top-0 z-40 bg-canvas-mist/95 backdrop-blur-md px-4 pt-3 pb-2.5">
+<div class="flex items-center justify-between">
+<!-- Left side brand & context -->
+<div class="flex items-center space-x-2">
+<div class="flex items-center space-x-1.5 bg-tile-peak px-2.5 py-1.5 rounded-full shadow-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-lime-signal inline-block ring-2 ring-lime-signal/30 animate-pulse"></span>
+<span class="text-sm font-black tracking-tight text-ink-primary">PROFITBASH</span>
+</div>
+<span class="text-ink-tertiary text-xs font-mono">/</span>
+<!-- Sync badge -->
+<div class="flex items-center space-x-1 bg-well-sunken/80 px-2 py-1 rounded-full text-[11px] font-mono font-medium text-ink-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+<span>LIVE SP-API</span>
+</div>
+</div>
+<!-- Right side controls -->
+<div class="flex items-center space-x-2">
+<div class="bg-tile-peak px-2 py-1 rounded-full text-[11px] font-mono text-ink-secondary shadow-sm">
+          Sept '26
+        </div>
+<!-- User avatar -->
+<button aria-label="Benutzerprofil" class="w-9 h-9 rounded-full bg-brand-core flex items-center justify-center text-tile-peak font-mono font-bold text-xs shadow-sm active:scale-95 transition-transform" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</div>
+</header>
+<!-- END: MobileHeader -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-4 pt-2 pb-28 space-y-4 max-w-md mx-auto w-full">
+<!-- Screen Title Block -->
+<section class="pt-1 pb-1" data-purpose="screen-title">
+<div class="flex items-center space-x-1.5 text-[10px] uppercase font-mono font-semibold tracking-wider text-ink-tertiary mb-1">
+<span>MARKETING &amp; WERBUNG</span>
+<span>·</span>
+<span class="text-brand-core">CROSS-CHANNEL ATTRIBUTION</span>
+</div>
+<h1 class="text-2xl font-bold tracking-tight text-ink-primary">Werbekosten (PPC)</h1>
+<p class="text-xs text-ink-secondary mt-1 leading-relaxed">
+        Kanalübergreifende Ad-Spends, aggregierter Blended ROAS/ACOS und Deckungsbeitrag-Attribution.
+      </p>
+</section>
+<!-- BEGIN: InvertedHeroTile -->
+<section class="bg-ink-panel rounded-3xl p-5 text-ink-ondark shadow-md relative overflow-hidden" data-purpose="inverted-hero-tile">
+<!-- Background subtle glow -->
+<div class="absolute -right-8 -top-8 w-44 h-44 bg-brand-core/25 rounded-full blur-3xl pointer-events-none"></div>
+<div class="relative z-10">
+<!-- Eyebrow with Lime Dot -->
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center space-x-2">
+<span class="w-2 h-2 rounded-full bg-lime-signal ring-4 ring-lime-signal/20"></span>
+<span class="text-[11px] font-mono tracking-wider uppercase text-ink-tertiary">Attribuierte Performance</span>
+</div>
+<span class="text-[10px] font-mono bg-white/10 px-2 py-0.5 rounded-full text-ink-ondark/80">Echtzeit</span>
+</div>
+<!-- Metric Big Display -->
+<div class="mt-1">
+<span class="text-xs font-mono text-ink-tertiary uppercase block">Attribuierter Werbeumsatz</span>
+<div class="text-3xl font-bold font-mono tracking-tight text-tile-peak mt-0.5">
+            € 57.993<span class="text-ink-tertiary text-xl font-medium">,00</span>
+</div>
+</div>
+<!-- Micro underfill sparkline preview -->
+<div class="w-full h-7 my-3">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 100 24">
+<defs>
+<lineargradient id="violetGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#5A44C9" stop-opacity="0.5"></stop>
+<stop offset="100%" stop-color="#5A44C9" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,18 Q 15,19 30,14 T 60,11 T 85,6 L 100,3 L 100,24 L 0,24 Z" fill="url(#violetGradient)"></path>
+<path d="M0,18 Q 15,19 30,14 T 60,11 T 85,6 L 100,3" fill="none" stroke="#B4DE2C" stroke-linecap="round" stroke-width="2"></path>
+</svg>
+</div>
+<!-- Sub Grid: Deckungsbeitrag & TACoS -->
+<div class="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
+<div class="bg-white/5 rounded-2xl p-2.5">
+<span class="text-[10px] font-mono uppercase text-ink-tertiary block leading-tight">Deckungsbeitrag n. PPC</span>
+<div class="text-lg font-bold font-mono text-lime-signal mt-1">
+              € 19.420<span class="text-xs">,00</span>
+</div>
+</div>
+<div class="bg-white/5 rounded-2xl p-2.5">
+<div class="flex items-center justify-between">
+<span class="text-[10px] font-mono uppercase text-ink-tertiary block leading-tight">TACoS Sortiment</span>
+<span class="text-[9px] font-mono bg-lime-signal/20 text-lime-signal px-1.5 py-0.2 rounded">&lt; 8%</span>
+</div>
+<div class="text-lg font-bold font-mono text-tile-peak mt-1">
+              6,92 <span class="text-xs font-normal text-ink-tertiary">%</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: InvertedHeroTile -->
+<!-- BEGIN: BentoKpiGrid -->
+<section class="grid grid-cols-2 gap-3" data-purpose="kpi-mini-grid">
+<!-- Tile 1: Ad Spend -->
+<div class="bg-tile-peak rounded-3xl p-4 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">Ad Spend Gesamt</span>
+<svg class="w-3.5 h-3.5 text-ink-tertiary" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div class="text-xl font-bold font-mono text-ink-primary tracking-tight">
+            € 14.870<span class="text-sm text-ink-tertiary">,00</span>
+</div>
+</div>
+<div class="mt-3 pt-2 border-t border-well-sunken/60 flex items-center justify-between">
+<span class="inline-flex items-center text-[10px] font-mono font-medium text-warn bg-warn/10 px-1.5 py-0.5 rounded-full">
+            ↗ +6,8 %
+          </span>
+<span class="text-[9px] font-mono text-ink-tertiary">Deckung 100%</span>
+</div>
+</div>
+<!-- Tile 2: Blended ROI -->
+<div class="bg-tile-peak rounded-3xl p-4 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">ROI (Blended)</span>
+<svg class="w-3.5 h-3.5 text-lime-deep" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div class="text-xl font-bold font-mono text-ink-primary tracking-tight">
+            3,9 <span class="text-sm font-sans font-medium text-ink-secondary">×</span>
+</div>
+</div>
+<div class="mt-3 pt-2 border-t border-well-sunken/60 flex items-center justify-between">
+<span class="inline-flex items-center text-[10px] font-mono font-medium text-lime-deep bg-lime-signal/25 px-1.5 py-0.5 rounded-full">
+            +0,4× vs. Bench
+          </span>
+<span class="text-[9px] font-mono text-ink-tertiary">Top 12%</span>
+</div>
+</div>
+<!-- Tile 3: ACOS Gesamt (Full Width Banner) -->
+<div class="col-span-2 bg-tile-peak rounded-3xl p-4 shadow-sm flex items-center justify-between">
+<div class="space-y-0.5">
+<div class="flex items-center space-x-1.5">
+<span class="text-[10px] font-mono uppercase tracking-wider text-ink-secondary">ACOS Gesamt</span>
+<span class="w-1.5 h-1.5 rounded-full bg-warn"></span>
+</div>
+<div class="text-2xl font-bold font-mono text-ink-primary">
+            24,1 <span class="text-base text-ink-secondary font-normal">%</span>
+</div>
+</div>
+<div class="text-right">
+<div class="inline-flex items-center space-x-1 bg-warn/15 text-ink-primary px-2.5 py-1 rounded-full text-xs font-mono font-medium">
+<span class="text-warn font-bold">!</span>
+<span>Ziel: 22,0%</span>
+<span class="text-warn font-semibold">(+2,1 pp)</span>
+</div>
+<span class="block text-[10px] font-mono text-ink-tertiary mt-1">3 Tage über Guardrail</span>
+</div>
+</div>
+</section>
+<!-- END: BentoKpiGrid -->
+<!-- BEGIN: ChartTileTrend -->
+<section class="bg-tile-peak rounded-3xl p-4 shadow-sm space-y-3" data-purpose="chart-spend-profit">
+<!-- Card Header -->
+<div class="flex flex-col space-y-2">
+<div class="flex items-center justify-between">
+<div>
+<span class="text-[10px] font-mono uppercase tracking-wider text-ink-tertiary block">Multi-Channel Korrelation</span>
+<h2 class="text-sm font-bold text-ink-primary">Ad Spend Trend &amp; Deckungsbeitrag</h2>
+</div>
+<!-- Period Toggle -->
+<div class="bg-well-sunken p-0.5 rounded-xl flex items-center text-[10px] font-mono">
+<button class="bg-tile-peak text-ink-primary font-semibold px-2 py-1 rounded-lg shadow-xs" type="button">30T</button>
+<button class="text-ink-secondary px-2 py-1" type="button">90T</button>
+<button class="text-ink-secondary px-2 py-1" type="button">YTD</button>
+</div>
+</div>
+<!-- Legend Pills -->
+<div class="flex flex-wrap items-center gap-2 pt-0.5">
+<div class="flex items-center space-x-1.5 text-[11px] font-mono text-ink-secondary bg-well-sunken/50 px-2 py-0.5 rounded-md">
+<span class="w-2 h-2 rounded-full bg-brand-core"></span>
+<span>Spend (€ 14.870)</span>
+</div>
+<div class="flex items-center space-x-1.5 text-[11px] font-mono text-ink-secondary bg-well-sunken/50 px-2 py-0.5 rounded-md">
+<span class="w-2 h-2 rounded-full bg-lime-deep"></span>
+<span>Gewinn (€ 19.420)</span>
+</div>
+</div>
+</div>
+<!-- Chart Canvas Area (SVG) -->
+<div class="relative pt-2 pb-1">
+<!-- Interactive Tag Callout (Desktop Simulation) -->
+<div class="bg-ink-panel text-tile-peak rounded-xl p-2 text-[10px] font-mono shadow-md mb-2 flex items-center justify-between border border-white/10">
+<div>
+<span class="text-ink-tertiary">18. Sept 2026:</span>
+<span class="font-bold text-tile-peak ml-1">Spend € 540</span>
+<span class="mx-1 text-ink-tertiary">/</span>
+<span class="text-lime-signal font-bold">Profit € 2.180</span>
+</div>
+<span class="bg-brand-core/60 text-tile-peak px-1.5 py-0.2 rounded text-[9px]">ROI 4,04×</span>
+</div>
+<svg class="w-full h-36 overflow-visible" preserveaspectratio="none" viewbox="0 0 320 120">
+<defs>
+<!-- Gradient for Deckungsbeitrag/Profit Curve -->
+<lineargradient id="profitGradMobile" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#B4DE2C" stop-opacity="0.35"></stop>
+<stop offset="90%" stop-color="#B4DE2C" stop-opacity="0.0"></stop>
+</lineargradient>
+<!-- Gradient for Spend Curve -->
+<lineargradient id="spendGradMobile" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#5A44C9" stop-opacity="0.25"></stop>
+<stop offset="100%" stop-color="#5A44C9" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<!-- Grid Lines -->
+<line stroke="#E6E4EC" stroke-dasharray="3,3" stroke-width="1" x1="0" x2="320" y1="20" y2="20"></line>
+<line stroke="#E6E4EC" stroke-dasharray="3,3" stroke-width="1" x1="0" x2="320" y1="60" y2="60"></line>
+<line stroke="#E6E4EC" stroke-dasharray="3,3" stroke-width="1" x1="0" x2="320" y1="100" y2="100"></line>
+<!-- Crosshair Line for 18. Sept (at x=185) -->
+<line stroke="#9C99AD" stroke-dasharray="2,2" stroke-width="1" x1="185" x2="185" y1="0" y2="115"></line>
+<!-- Profit Area & Line -->
+<path d="M 0,98 Q 45,95 90,82 T 185,45 T 260,32 L 320,24 L 320,115 L 0,115 Z" fill="url(#profitGradMobile)"></path>
+<path d="M 0,98 Q 45,95 90,82 T 185,45 T 260,32 L 320,24" fill="none" stroke="#7E9E12" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Spend Area & Line -->
+<path d="M 0,105 Q 60,100 120,95 T 185,82 T 260,78 L 320,74 L 320,115 L 0,115 Z" fill="url(#spendGradMobile)"></path>
+<path d="M 0,105 Q 60,100 120,95 T 185,82 T 260,78 L 320,74" fill="none" stroke="#5A44C9" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Anchor Dots on Peak -->
+<circle cx="185" cy="45" fill="#FFFFFF" r="4.5" stroke="#7E9E12" stroke-width="2.5"></circle>
+<circle cx="185" cy="82" fill="#FFFFFF" r="4" stroke="#5A44C9" stroke-width="2"></circle>
+</svg>
+<!-- X-Axis Timeline Labels -->
+<div class="flex justify-between text-[10px] font-mono text-ink-tertiary pt-1.5 border-t border-well-sunken">
+<span>01. Sept</span>
+<span>08. Sept</span>
+<span class="text-ink-primary font-semibold">18. Sept</span>
+<span>22. Sept</span>
+<span>30. Sept</span>
+</div>
+</div>
+<!-- Average Spend Footer -->
+<div class="text-[10px] font-mono text-ink-secondary text-right">
+        Tagesschnitt: <span class="font-semibold text-ink-primary">€ 495,66 Spend</span>
+</div>
+</section>
+<!-- END: ChartTileTrend -->
+<!-- BEGIN: ChartTileAcosGuardrail -->
+<section class="bg-tile-peak rounded-3xl p-4 shadow-sm space-y-3" data-purpose="chart-guardrail">
+<div class="flex items-center justify-between">
+<div>
+<span class="text-[10px] font-mono uppercase tracking-wider text-ink-tertiary block">Guardrail-Überwachung</span>
+<h2 class="text-sm font-bold text-ink-primary">ACOS vs. Schwellenwert</h2>
+</div>
+<span class="text-[10px] font-mono font-semibold bg-warn/15 text-warn px-2 py-0.5 rounded-full">
+          ● 3 Tage &gt; Ziel
+        </span>
+</div>
+<p class="text-[11px] text-ink-secondary leading-snug">
+        Tagesgenaue Abweichung des aggregierten Kostenanteils vom Margen-Zielwert.
+      </p>
+<!-- SVG Guardrail Chart -->
+<div class="relative pt-1 pb-1">
+<svg class="w-full h-28 overflow-visible" preserveaspectratio="none" viewbox="0 0 320 90">
+<!-- Threshold line 22% (Amber) -->
+<line stroke="#E0A233" stroke-dasharray="4,3" stroke-width="1.5" x1="0" x2="320" y1="42" y2="42"></line>
+<text fill="#E0A233" font-family="'JetBrains Mono'" font-size="9" font-weight="600" text-anchor="end" x="318" y="37">Ziel: 22,0%</text>
+<!-- ACOS Trend Line (crossing threshold) -->
+<path d="M 0,65 Q 70,62 130,58 T 220,44 T 285,32 L 320,29" fill="none" stroke="#5A44C9" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Breach point marker -->
+<circle cx="305" cy="30" fill="#FAFAFC" r="4.5" stroke="#D6524B" stroke-width="2.5"></circle>
+<text fill="#D6524B" font-family="'JetBrains Mono'" font-size="10" font-weight="700" text-anchor="end" x="300" y="16">Aktuell: 24,1 %</text>
+</svg>
+</div>
+<!-- Metric Callout Boxes -->
+<div class="grid grid-cols-2 gap-2.5 pt-1">
+<div class="bg-well-sunken/60 rounded-2xl p-2.5">
+<span class="text-[10px] font-mono uppercase text-ink-secondary block">TACoS Verhältnis</span>
+<div class="text-sm font-bold font-mono text-ink-primary mt-0.5">
+            6,9 % <span class="text-[10px] font-normal text-lime-deep">(Ziel &lt; 8%)</span>
+</div>
+<span class="text-[9px] text-ink-tertiary block mt-0.5">Organischer Hebel intakt</span>
+</div>
+<div class="bg-well-sunken/60 rounded-2xl p-2.5">
+<span class="text-[10px] font-mono uppercase text-ink-secondary block">Effizienz-Potenzial</span>
+<div class="text-sm font-bold font-mono text-loss mt-0.5">
+            -€ 1.280
+          </div>
+<span class="text-[9px] text-ink-tertiary block mt-0.5">durch Gebotsschnitt (PMax)</span>
+</div>
+</div>
+</section>
+<!-- END: ChartTileAcosGuardrail -->
+<!-- BEGIN: ChannelPerformanceBentoSection -->
+<section class="space-y-2.5" data-purpose="channel-performance">
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center space-x-2">
+<h2 class="text-sm font-bold tracking-tight text-ink-primary">Performance nach Kanälen</h2>
+<span class="text-[10px] font-mono bg-brand-wash text-brand-core font-semibold px-2 py-0.5 rounded-full">4 aktiv</span>
+</div>
+</div>
+<!-- Channel Card 1: Amazon Ads -->
+<div class="bg-tile-peak rounded-3xl p-4 shadow-sm space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-xl bg-ink-panel text-tile-peak font-mono font-bold text-xs flex items-center justify-center">
+              AZ
+            </div>
+<div>
+<div class="text-xs font-bold text-ink-primary">Amazon Ads</div>
+<div class="text-[10px] font-mono text-ink-tertiary">Sponsored Products, DSP</div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-ink-secondary bg-well-sunken px-2 py-0.5 rounded-md">42 aktiv</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Spend</span>
+<span class="font-bold text-ink-primary">€ 9.420,00</span>
+</div>
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Umsatz</span>
+<span class="font-bold text-ink-primary">€ 44.274,00</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ROAS</span>
+<span class="font-bold text-lime-deep">4,70×</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ACOS</span>
+<span class="font-bold text-ink-primary flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-signal inline-block"></span>
+<span>21,3 %</span>
+</span>
+</div>
+</div>
+<!-- Allocation bar -->
+<div class="space-y-1 pt-1 border-t border-well-sunken/60">
+<div class="flex justify-between text-[10px] font-mono">
+<span class="text-ink-tertiary">Spend-Allokation</span>
+<span class="font-semibold text-ink-primary">63,3 %</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden">
+<div class="bg-brand-core h-full rounded-full" style="width: 63.3%"></div>
+</div>
+</div>
+</div>
+<!-- Channel Card 2: Google Ads -->
+<div class="bg-tile-peak rounded-3xl p-4 shadow-sm space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-xl bg-brand-wash text-brand-core font-mono font-bold text-xs flex items-center justify-center">
+              GG
+            </div>
+<div>
+<div class="text-xs font-bold text-ink-primary">Google Ads</div>
+<div class="text-[10px] font-mono text-ink-tertiary">Performance Max &amp; Shopping</div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-ink-secondary bg-well-sunken px-2 py-0.5 rounded-md">14 aktiv</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Spend</span>
+<span class="font-bold text-ink-primary">€ 3.250,00</span>
+</div>
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Umsatz</span>
+<span class="font-bold text-ink-primary">€ 9.425,00</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ROAS</span>
+<span class="font-bold text-ink-primary">2,90×</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ACOS</span>
+<span class="font-bold text-warn flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-warn inline-block"></span>
+<span>34,5 %</span>
+</span>
+</div>
+</div>
+<!-- Allocation bar -->
+<div class="space-y-1 pt-1 border-t border-well-sunken/60">
+<div class="flex justify-between text-[10px] font-mono">
+<span class="text-ink-tertiary">Spend-Allokation</span>
+<span class="font-semibold text-ink-primary">21,9 %</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden">
+<div class="bg-brand-core/70 h-full rounded-full" style="width: 21.9%"></div>
+</div>
+</div>
+</div>
+<!-- Channel Card 3: Meta Ads -->
+<div class="bg-tile-peak rounded-3xl p-4 shadow-sm space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-xl bg-well-sunken text-ink-primary font-mono font-bold text-xs flex items-center justify-center">
+              FB
+            </div>
+<div>
+<div class="text-xs font-bold text-ink-primary">Meta Ads</div>
+<div class="text-[10px] font-mono text-ink-tertiary">Instagram / FB Retargeting</div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-ink-secondary bg-well-sunken px-2 py-0.5 rounded-md">8 aktiv</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Spend</span>
+<span class="font-bold text-ink-primary">€ 1.680,00</span>
+</div>
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Umsatz</span>
+<span class="font-bold text-ink-primary">€ 3.192,00</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ROAS</span>
+<span class="font-bold text-loss">1,90×</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ACOS</span>
+<span class="font-bold text-loss flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-loss inline-block"></span>
+<span>52,6 %</span>
+</span>
+</div>
+</div>
+<!-- Allocation bar -->
+<div class="space-y-1 pt-1 border-t border-well-sunken/60">
+<div class="flex justify-between text-[10px] font-mono">
+<span class="text-ink-tertiary">Spend-Allokation</span>
+<span class="font-semibold text-ink-primary">11,3 %</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden">
+<div class="bg-brand-core/50 h-full rounded-full" style="width: 11.3%"></div>
+</div>
+</div>
+</div>
+<!-- Channel Card 4: Otto AdMedia -->
+<div class="bg-tile-peak rounded-3xl p-4 shadow-sm space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 font-mono font-bold text-xs flex items-center justify-center">
+              OT
+            </div>
+<div>
+<div class="text-xs font-bold text-ink-primary">Otto AdMedia</div>
+<div class="text-[10px] font-mono text-ink-tertiary">Plattform-Anzeigen &amp; Placement</div>
+</div>
+</div>
+<span class="text-[10px] font-mono text-ink-secondary bg-well-sunken px-2 py-0.5 rounded-md">5 aktiv</span>
+</div>
+<div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Spend</span>
+<span class="font-bold text-ink-primary">€ 520,00</span>
+</div>
+<div>
+<span class="text-[9px] uppercase text-ink-tertiary block">Umsatz</span>
+<span class="font-bold text-ink-primary">€ 1.102,00</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ROAS</span>
+<span class="font-bold text-ink-primary">2,12×</span>
+</div>
+<div class="pt-1">
+<span class="text-[9px] uppercase text-ink-tertiary block">ACOS</span>
+<span class="font-bold text-warn flex items-center space-x-1">
+<span class="w-1.5 h-1.5 rounded-full bg-warn inline-block"></span>
+<span>47,2 %</span>
+</span>
+</div>
+</div>
+<!-- Allocation bar -->
+<div class="space-y-1 pt-1 border-t border-well-sunken/60">
+<div class="flex justify-between text-[10px] font-mono">
+<span class="text-ink-tertiary">Spend-Allokation</span>
+<span class="font-semibold text-ink-primary">3,5 %</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden">
+<div class="bg-brand-core/30 h-full rounded-full" style="width: 3.5%"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: ChannelPerformanceBentoSection -->
+<!-- BEGIN: RecommendationCard -->
+<section class="bg-brand-wash rounded-3xl p-4 border border-brand-core/15 space-y-3" data-purpose="recommendation-bento">
+<div class="flex items-start space-x-3">
+<div class="w-9 h-9 rounded-2xl bg-brand-core text-tile-peak flex items-center justify-center shrink-0">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div>
+<h3 class="text-xs font-bold text-ink-primary">Automatische MCP-Gebotsoptimierung</h3>
+<p class="text-[11px] text-ink-secondary mt-1 leading-normal">
+            Für Meta &amp; Google Ads liegen die Akquisekosten über der Deckungsbeitragsgrenze. Begrenzung spart bis zu <span class="font-mono font-semibold text-brand-core">€ 840,00</span> unrentablen Spend pro Monat.
+          </p>
+</div>
+</div>
+<button class="w-full min-h-[44px] bg-tile-peak hover:bg-white active:bg-brand-wash text-brand-core text-xs font-bold font-mono rounded-2xl border border-brand-core/20 flex items-center justify-center space-x-2 transition-colors" type="button">
+<span>Kanal-Regeln konfigurieren</span>
+<span>→</span>
+</button>
+</section>
+<!-- END: RecommendationCard -->
+<!-- BEGIN: ActionButtonsGroup -->
+<section class="space-y-2 pt-1 pb-2" data-purpose="action-buttons">
+<button class="w-full min-h-[46px] bg-brand-core hover:bg-brand-press active:scale-[0.99] text-tile-peak rounded-2xl font-medium text-xs flex items-center justify-center space-x-2 shadow-sm transition-all" type="button">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="font-mono font-semibold">Budget-Regeln anpassen</span>
+</button>
+<button class="w-full min-h-[44px] bg-tile-peak hover:bg-well-sunken text-ink-secondary rounded-2xl font-mono text-xs flex items-center justify-center space-x-2 shadow-xs transition-colors" type="button">
+<svg class="w-4 h-4 text-ink-tertiary" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span>Bericht exportieren (CSV)</span>
+</button>
+</section>
+<!-- END: ActionButtonsGroup -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: PersistentMobileBottomNav -->
+<nav class="fixed bottom-0 inset-x-0 bg-tile-peak/95 backdrop-blur-lg border-t border-well-sunken/80 px-4 py-2 z-50" data-purpose="mobile-nav-bar">
+<div class="max-w-md mx-auto grid grid-cols-4 gap-1">
+<!-- Tab 1: Dashboard / Analyse -->
+<a class="flex flex-col items-center justify-center min-h-[44px] py-1 text-ink-tertiary hover:text-ink-primary transition-colors" href="#analyse">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="text-[10px] font-sans font-medium">Analyse</span>
+</a>
+<!-- Tab 2: Orders -->
+<a class="flex flex-col items-center justify-center min-h-[44px] py-1 text-ink-tertiary hover:text-ink-primary transition-colors" href="#orders">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="text-[10px] font-sans font-medium">Bestellungen</span>
+</a>
+<!-- Tab 3: Ads (Active) -->
+<a class="flex flex-col items-center justify-center min-h-[44px] py-1 text-brand-core relative" href="#ads">
+<div class="relative">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"></path>
+</svg>
+<span class="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-lime-signal ring-2 ring-tile-peak"></span>
+</div>
+<span class="text-[10px] font-sans font-bold">Werbekosten</span>
+</a>
+<!-- Tab 4: Settings / Setup -->
+<a class="flex flex-col items-center justify-center min-h-[44px] py-1 text-ink-tertiary hover:text-ink-primary transition-colors" href="#setup">
+<svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="text-[10px] font-sans font-medium">Setup</span>
+</a>
+</div>
+</nav>
+<!-- END: PersistentMobileBottomNav -->
+</body></html>

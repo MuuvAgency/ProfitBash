@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>ProfitBash Cockpit</title><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "secondary-container": "#c4ef3e",
+        "surface-container-high": "#ebe6f2",
+        "on-tertiary-container": "#ffc8a7",
+        "surface-bright": "#fdf8ff",
+        "inverse-surface": "#312f38",
+        "secondary-fixed": "#c7f241",
+        "on-primary-fixed": "#1a0064",
+        "outline-variant": "#c9c4d6",
+        "surface-container": "#f1ecf8",
+        "ink-secondary": "#63607A",
+        "canvas-mist": "#EEEDF3",
+        "on-tertiary": "#ffffff",
+        "inverse-on-surface": "#f4effa",
+        "ink-primary": "#1B1826",
+        "secondary-fixed-dim": "#acd522",
+        "violet-wash": "#ECE8FA",
+        "primary-container": "#5a44c9",
+        "warn-amber": "#E0A233",
+        "on-primary": "#ffffff",
+        "surface-tint": "#5d47cc",
+        "surface-container-lowest": "#ffffff",
+        "on-primary-fixed-variant": "#452bb3",
+        "on-error-container": "#93000a",
+        "tile-raise": "#FAFAFC",
+        "on-surface": "#1c1b23",
+        "ink-tertiary": "#9C99AD",
+        "loss-red": "#D6524B",
+        "surface-container-highest": "#e5e0ec",
+        "error": "#ba1a1a",
+        "surface": "#fdf8ff",
+        "whisper-line": "rgba(27,24,38,0.06)",
+        "on-surface-variant": "#484554",
+        "well-sunken": "#E6E4EC",
+        "secondary": "#506600",
+        "tile-peak": "#FFFFFF",
+        "background": "#fdf8ff",
+        "outline": "#787585",
+        "surface-container-low": "#f7f1fd",
+        "primary": "#4227b1",
+        "ink-on-dark": "#EDECF3",
+        "lime-deep": "#7E9E12",
+        "on-secondary-fixed-variant": "#3c4d00",
+        "violet-press": "#4835A6",
+        "on-tertiary-fixed-variant": "#733600",
+        "error-container": "#ffdad6",
+        "primary-fixed": "#e5deff",
+        "on-secondary": "#ffffff",
+        "tertiary-fixed": "#ffdbc7",
+        "surface-dim": "#ddd8e4",
+        "tertiary-container": "#924600",
+        "tertiary-fixed-dim": "#ffb688",
+        "inverse-primary": "#c8bfff",
+        "primary-fixed-dim": "#c8bfff",
+        "on-tertiary-fixed": "#311300",
+        "on-secondary-container": "#546b00",
+        "on-error": "#ffffff",
+        "ink-panel": "#1B1826",
+        "surface-variant": "#e5e0ec",
+        "tertiary": "#6e3300",
+        "on-background": "#1c1b23",
+        "on-primary-container": "#d6ceff",
+        "on-secondary-fixed": "#161f00"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "margin": "1.5rem",
+        "gutter-mobile": "0.75rem",
+        "space-lg": "1.25rem",
+        "margin-mobile": "1rem",
+        "space-xs": "0.25rem",
+        "space-xl": "1.75rem",
+        "space-md": "1rem",
+        "gutter": "1.25rem",
+        "space-sm": "0.5rem"
+      },
+      "fontFamily": {
+        "headline-sm": ["Space Grotesk"],
+        "display": ["Space Grotesk"],
+        "data-hero-mobile": ["JetBrains Mono"],
+        "headline-md": ["Space Grotesk"],
+        "data-hero": ["JetBrains Mono"],
+        "data-md": ["JetBrains Mono"],
+        "headline-lg": ["Space Grotesk"],
+        "body-sm": ["Space Grotesk"],
+        "headline-lg-mobile": ["Space Grotesk"],
+        "body-lg": ["Space Grotesk"],
+        "body-md": ["Space Grotesk"],
+        "display-mobile": ["Space Grotesk"],
+        "data-lg": ["JetBrains Mono"],
+        "label-eyebrow": ["Space Grotesk"],
+        "data-sm": ["JetBrains Mono"]
+      },
+      "fontSize": {
+        "headline-sm": ["16px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "display": ["48px", {"lineHeight": "52px", "letterSpacing": "-0.03em", "fontWeight": "700"}],
+        "data-hero-mobile": ["26px", {"lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "headline-md": ["20px", {"lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+        "data-hero": ["36px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "500"}],
+        "headline-lg": ["28px", {"lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "body-md": ["14px", {"lineHeight": "21px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "display-mobile": ["32px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-lg": ["20px", {"lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "label-eyebrow": ["11px", {"lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700"}],
+        "data-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "500"}]
+      }
+    }
+  }
+}</script><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;background-color:#EEEDF3;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 5rem);}.pt-safe{padding-top:env(safe-area-inset-top, 0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist font-body-md text-body-md text-ink-primary flex flex-col min-h-screen selection:bg-secondary-container selection:text-ink-panel"><header class="fixed top-0 w-full z-50 bg-canvas-mist/85 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(48,38,92,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="flex items-center gap-1.5 shrink-0"><span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span><span class="font-headline-sm text-headline-sm tracking-tight text-ink-primary">ProfitBash</span></div><div class="h-3.5 w-px bg-whisper-line shrink-0"></div><div class="flex items-center gap-1 min-w-0"><span class="font-label-eyebrow text-label-eyebrow text-ink-secondary truncate uppercase">Live SP-API</span><span class="px-1.5 py-0.5 rounded-full bg-well-sunken text-ink-primary font-data-sm text-data-sm font-semibold shrink-0">Sept '26</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button class="w-11 h-11 flex items-center justify-center text-ink-secondary hover:text-ink-primary active:scale-95 transition-transform"><span class="material-symbols-outlined text-[20px]">notifications</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-[0_2px_8px_rgba(66,39,177,0.25)] shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin-mobile pt-16 pb-safe bg-canvas-mist max-w-[390px] mx-auto"><div class="flex flex-col w-full gap-space-md">
+<!-- 1. Screen Header & Sub-Eyebrow Navigation -->
+<div class="flex flex-col gap-space-xs pt-space-xs">
+<div class="flex items-center gap-1.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary tracking-wider uppercase">Einstellungen / Kosten &amp; OPEX</span>
+<span class="w-1 h-1 rounded-full bg-ink-tertiary"></span>
+<span class="font-label-eyebrow text-label-eyebrow text-primary uppercase">Indirekte Ausgaben</span>
+</div>
+<div class="flex items-baseline justify-between gap-space-sm">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-ink-primary tracking-tight">Indirekte Ausgaben (OPEX)</h1>
+<span class="px-2 py-0.5 rounded-full bg-violet-wash font-data-sm text-data-sm text-primary font-semibold shrink-0">18 Buchungen</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+      Monatliche Betriebsausgaben für die vollständige Netto-Profitabilitäts- und P&amp;L-Kalkulation (EBIT / Net Profit).
+    </p>
+</div>
+<!-- 2. Inverted Command Hero Bento (Ink Panel #1B1826) -->
+<div class="w-full bg-ink-panel rounded-[1.75rem] p-space-lg text-ink-on-dark shadow-[0_10px_30px_rgba(27,24,38,0.18)] flex flex-col gap-space-md relative overflow-hidden">
+<!-- Ambient tonal accent -->
+<div class="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-primary/20 blur-3xl pointer-events-none"></div>
+<div class="flex items-center justify-between relative z-10">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span>
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">Monatliche Run-Rate</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-white/10 text-ink-on-dark font-label-eyebrow text-label-eyebrow uppercase tracking-wider">Plan-Fix</span>
+</div>
+<div class="flex flex-col gap-1 relative z-10">
+<div class="flex items-baseline gap-space-sm flex-wrap">
+<span class="font-data-hero-mobile text-data-hero-mobile font-bold tracking-tight text-tile-peak">€ 21.400,00</span>
+<span class="px-2 py-0.5 rounded-full bg-white/10 text-ink-tertiary font-data-sm text-data-sm">±0,0 % vs. Vormonat</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-tertiary">
+        Entspricht <span class="text-tile-peak font-data-sm text-data-sm font-semibold">9,95 %</span> vom Monatsumsatz (<span class="font-data-sm text-data-sm">€ 214.980,00</span>).
+      </p>
+</div>
+<!-- 2-Col Sub-Metrics inside Inverted Command Panel -->
+<div class="grid grid-cols-2 gap-space-sm pt-space-xs relative z-10">
+<div class="bg-white/5 rounded-xl p-space-sm flex flex-col gap-0.5">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">EBIT-Hebel</span>
+<span class="font-data-md text-data-md font-semibold text-tile-peak">€ 713,33 / Tag</span>
+</div>
+<div class="bg-white/5 rounded-xl p-space-sm flex flex-col gap-0.5">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">DB3 Puffer (Deckung)</span>
+<span class="font-data-md text-data-md font-semibold text-secondary-container">42,6 % gesichert</span>
+</div>
+</div>
+</div>
+<!-- 3. 2-Up Bento KPI Grid -->
+<div class="grid grid-cols-2 gap-space-sm w-full">
+<!-- Tile 1: Fixkosten je Sendung -->
+<div class="bg-tile-raise rounded-[1.5rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">Fixkosten / Sendung</span>
+<span class="material-symbols-outlined text-[18px] text-primary">local_shipping</span>
+</div>
+<div>
+<div class="font-data-hero-mobile text-data-hero-mobile text-ink-primary font-bold">€ 5,57</div>
+<div class="font-body-sm text-body-sm text-ink-secondary mt-0.5">je versendete Best.</div>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container shrink-0"></span>
+<span class="font-data-sm text-[11px] text-ink-tertiary leading-tight">3.842 Orders · BE OK</span>
+</div>
+</div>
+<!-- Tile 2: SaaS & Tool-Quote -->
+<div class="bg-tile-raise rounded-[1.5rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">SaaS-Quote</span>
+<span class="material-symbols-outlined text-[18px] text-primary">hub</span>
+</div>
+<div>
+<div class="font-data-hero-mobile text-data-hero-mobile text-ink-primary font-bold">€ 2.850,00</div>
+<div class="font-body-sm text-body-sm text-ink-secondary mt-0.5">13,3 % des OPEX</div>
+</div>
+<div class="mt-space-sm pt-space-xs flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-warn-amber shrink-0"></span>
+<span class="font-data-sm text-[11px] text-ink-tertiary leading-tight">14 Lizenzen · 2 inaktiv</span>
+</div>
+</div>
+</div>
+<!-- 4. OPEX Allokations-Kachel -->
+<div class="w-full bg-tile-raise rounded-[1.5rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">OPEX Allokation</span>
+<span class="font-headline-sm text-headline-sm text-ink-primary">Verteilung der Fixkosten</span>
+</div>
+<div class="w-9 h-9 rounded-full bg-violet-wash flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[18px]">pie_chart</span>
+</div>
+</div>
+<!-- Segmented Proportional Bar -->
+<div class="w-full h-3 rounded-full bg-well-sunken flex overflow-hidden p-0.5 gap-0.5">
+<div class="bg-primary rounded-l-full h-full" style="width: 57.9%;"></div>
+<div class="bg-ink-panel h-full" style="width: 16.8%;"></div>
+<div class="bg-primary-container h-full" style="width: 13.3%;"></div>
+<div class="bg-tertiary-container h-full" style="width: 6.3%;"></div>
+<div class="bg-warn-amber rounded-r-full h-full" style="width: 5.6%;"></div>
+</div>
+<!-- Allocation Breakdown Table -->
+<div class="flex flex-col gap-2">
+<!-- Item 1 -->
+<div class="flex items-center justify-between py-1">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-primary shrink-0"></span>
+<span class="font-body-md text-body-md text-ink-primary truncate">Personal &amp; Gehälter</span>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-data-sm text-data-sm text-ink-secondary">57,9 %</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary">€ 12.400,00</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center justify-between py-1">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-ink-panel shrink-0"></span>
+<span class="font-body-md text-body-md text-ink-primary truncate">Miete &amp; Lager</span>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-data-sm text-data-sm text-ink-secondary">16,8 %</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary">€ 3.600,00</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center justify-between py-1">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container shrink-0"></span>
+<span class="font-body-md text-body-md text-ink-primary truncate">SaaS, ERP &amp; Tools</span>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-data-sm text-data-sm text-ink-secondary">13,3 %</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary">€ 2.850,00</span>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="flex items-center justify-between py-1">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-tertiary-container shrink-0"></span>
+<span class="font-body-md text-body-md text-ink-primary truncate">Versicherung &amp; Recht</span>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-data-sm text-data-sm text-ink-secondary">6,3 %</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary">€ 1.350,00</span>
+</div>
+</div>
+<!-- Item 5 -->
+<div class="flex items-center justify-between py-1">
+<div class="flex items-center gap-2 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-warn-amber shrink-0"></span>
+<span class="font-body-md text-body-md text-ink-primary truncate">Sonstiges &amp; Rückstellung</span>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-data-sm text-data-sm text-ink-secondary">5,6 %</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary">€ 1.200,00</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 5. P&L Hebel & Net Profit (EBIT-Berechnung) -->
+<div class="w-full bg-well-sunken rounded-[1.5rem] p-space-md flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">P&amp;L Hebel &amp; Net Profit</span>
+<span class="font-headline-sm text-headline-sm text-ink-primary">EBIT-Berechnung</span>
+</div>
+<div class="w-9 h-9 rounded-full bg-tile-peak flex items-center justify-center text-primary shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">account_balance</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+      Abzug der Fixkosten vom Deckungsbeitrag 2 (CM2 nach Werbekosten &amp; FBA-Gebühren).
+    </p>
+<!-- Calculation Card: Tile Peak -->
+<div class="bg-tile-peak rounded-xl p-space-md shadow-[0_4px_16px_rgba(48,38,92,0.06)] flex flex-col gap-space-sm">
+<div class="flex items-center justify-between text-body-md">
+<span class="text-ink-secondary">Deckungsbeitrag 2 (CM2)</span>
+<span class="font-data-md text-data-md font-semibold text-ink-primary">€ 45.890,00</span>
+</div>
+<div class="flex items-center justify-between text-body-md">
+<span class="text-ink-secondary">Indirekte OPEX (Gesamt)</span>
+<span class="font-data-md text-data-md font-semibold text-loss-red">-€ 21.400,00</span>
+</div>
+<!-- Micro-Separation via Sunken Tier -->
+<div class="w-full h-px bg-well-sunken my-0.5"></div>
+<div class="flex items-end justify-between">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">Bereinigter EBIT</span>
+<span class="font-data-hero-mobile text-data-hero-mobile font-bold text-ink-primary">€ 24.490,00</span>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">Nettomarge</span>
+<span class="px-2.5 py-1 rounded-full bg-secondary-container text-ink-panel font-data-sm text-data-sm font-bold shadow-sm">
+            11,39 %
+          </span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-1 text-ink-secondary">
+<span class="material-symbols-outlined text-[15px]">sync</span>
+<span class="font-body-sm text-[12px]">Live synchronisiert mit P&amp;L Cockpit &amp; SKR-04</span>
+</div>
+</div>
+<!-- 6. Fixkosten-Positionen & Budgets (Card Stack) -->
+<div class="flex flex-col gap-space-sm w-full">
+<div class="flex items-center justify-between px-1">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary">Fixkosten-Positionen</h2>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">5 Kategorien · 18 Buchungen</span>
+</div>
+<button class="h-8 px-3 rounded-lg bg-violet-wash text-primary font-headline-sm text-body-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Erfassen</span>
+</button>
+</div>
+<!-- Card 1: Personal -->
+<div class="bg-tile-raise rounded-[1.25rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_20px_rgba(48,38,92,0.05)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between">
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary">Personal &amp; Gehälter</div>
+<div class="font-body-sm text-body-sm text-ink-secondary">Warehousing &amp; PPC-Team (8 FTE) · SKR 41</div>
+</div>
+<span class="font-data-lg text-data-lg font-bold text-ink-primary">€ 12.400,00</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden mt-1">
+<div class="bg-primary h-full rounded-full" style="width: 57.9%;"></div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-data-sm text-data-sm text-ink-tertiary">Monatlich (28. d. M.)</span>
+<span class="font-data-sm text-data-sm font-semibold text-primary">57,9 % vom OPEX</span>
+</div>
+</div>
+<!-- Card 2: Miete & Lager -->
+<div class="bg-tile-raise rounded-[1.25rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_20px_rgba(48,38,92,0.05)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between">
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary">Miete &amp; Lager</div>
+<div class="font-body-sm text-body-sm text-ink-secondary">Außenlager &amp; Büro Berlin (640 qm) · SKR 42</div>
+</div>
+<span class="font-data-lg text-data-lg font-bold text-ink-primary">€ 3.600,00</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden mt-1">
+<div class="bg-ink-panel h-full rounded-full" style="width: 16.8%;"></div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-data-sm text-data-sm text-ink-tertiary">Monatlich (01. d. M.)</span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-secondary">16,8 % vom OPEX</span>
+</div>
+</div>
+<!-- Card 3: SaaS & Tools -->
+<div class="bg-tile-raise rounded-[1.25rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_20px_rgba(48,38,92,0.05)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between">
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary">SaaS, ERP &amp; Marketplace</div>
+<div class="font-body-sm text-body-sm text-ink-secondary">Plentymarkets, Sellerboard, H10 · 14 Subscriptions</div>
+</div>
+<span class="font-data-lg text-data-lg font-bold text-ink-primary">€ 2.850,00</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden mt-1">
+<div class="bg-primary-container h-full rounded-full" style="width: 13.3%;"></div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-data-sm text-data-sm text-ink-tertiary">Monatlich / Anteilsmäßig</span>
+<span class="font-data-sm text-data-sm font-semibold text-primary-container">13,3 % vom OPEX</span>
+</div>
+</div>
+<!-- Card 4: Versicherung & Recht -->
+<div class="bg-tile-raise rounded-[1.25rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_20px_rgba(48,38,92,0.05)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between">
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary">Versicherung &amp; Recht</div>
+<div class="font-body-sm text-body-sm text-ink-secondary">Produkthaftung, Cyber-Police · Allianz Global</div>
+</div>
+<span class="font-data-lg text-data-lg font-bold text-ink-primary">€ 1.350,00</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden mt-1">
+<div class="bg-tertiary-container h-full rounded-full" style="width: 6.3%;"></div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-data-sm text-data-sm text-ink-tertiary">Quartal (geteilt)</span>
+<span class="font-data-sm text-data-sm font-semibold text-tertiary">6,3 % vom OPEX</span>
+</div>
+</div>
+<!-- Card 5: Sonstiges -->
+<div class="bg-tile-raise rounded-[1.25rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_20px_rgba(48,38,92,0.05)] flex flex-col gap-space-xs">
+<div class="flex items-start justify-between">
+<div>
+<div class="font-headline-sm text-headline-sm text-ink-primary">Sonstiges &amp; Rückstellungen</div>
+<div class="font-body-sm text-body-sm text-ink-secondary">Steuerberatung, DATEV-Hosting, Puffer aktiv</div>
+</div>
+<span class="font-data-lg text-data-lg font-bold text-ink-primary">€ 1.200,00</span>
+</div>
+<div class="w-full bg-well-sunken h-1.5 rounded-full overflow-hidden mt-1">
+<div class="bg-warn-amber h-full rounded-full" style="width: 5.6%;"></div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="font-data-sm text-data-sm text-ink-tertiary">Laufend</span>
+<span class="font-data-sm text-data-sm font-semibold text-warn-amber">5,6 % vom OPEX</span>
+</div>
+</div>
+<!-- Button to Add Category -->
+<button class="w-full py-3 px-4 rounded-xl bg-violet-wash text-primary font-body-md text-body-md font-semibold flex items-center justify-center gap-2 active:scale-98 transition-transform">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>+ Weitere Buchungskategorie anlegen</span>
+</button>
+</div>
+<!-- 7. Fixkostendegression & Sensitivitäts-Bento -->
+<div class="w-full bg-tile-raise rounded-[1.5rem] p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-lime-deep">trending_up</span>
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">Break-Even &amp; Sensitivität</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-ink-panel font-data-sm text-data-sm font-bold">
+        214,4 % der Schwelle
+      </span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+      Break-Even Point bei aktuellem Sortiment: Zur vollständigen Deckung der Fixkosten (<span class="font-data-sm text-data-sm font-semibold text-ink-primary">€ 21.400,00</span>) benötigt der Shop monatlich einen Mindest-Deckungsbeitrag 1 von <span class="font-data-sm text-data-sm font-semibold text-ink-primary">1.792 Einheiten</span>.
+    </p>
+<div class="pt-space-xs">
+<button class="w-full py-2.5 rounded-xl bg-well-sunken text-ink-primary font-body-md text-body-md font-semibold flex items-center justify-center gap-2 active:scale-98 transition-transform">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+<span>Sensitivitätsanalyse öffnen</span>
+</button>
+</div>
+</div>
+<!-- 8. Mobile Action Cluster -->
+<div class="flex flex-col gap-space-xs pt-space-xs pb-space-sm">
+<button class="w-full h-12 rounded-xl bg-primary text-on-primary font-headline-sm text-headline-sm font-semibold flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(66,39,177,0.3)] active:bg-violet-press active:scale-98 transition-all">
+<span class="material-symbols-outlined text-[20px]">add_box</span>
+<span>Neue Ausgabe erfassen</span>
+</button>
+<button class="w-full h-11 rounded-xl bg-transparent text-primary font-body-md text-body-md font-semibold flex items-center justify-center gap-2 hover:bg-violet-wash active:scale-98 transition-all">
+<span class="material-symbols-outlined text-[18px]">ios_share</span>
+<span>OPEX-Bericht exportieren (CSV)</span>
+</button>
+</div>
+</div>
+<script>
+  (function initOpexInteractions() {
+    // Light spring feedback for interactive elements
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(btn => {
+      btn.addEventListener('touchstart', () => {
+        btn.style.transform = 'scale(0.97)';
+      }, { passive: true });
+      btn.addEventListener('touchend', () => {
+        btn.style.transform = '';
+      }, { passive: true });
+    });
+
+    // Mark the setup nav as active via App Shell standard convention
+    const navItems = document.querySelectorAll('nav a[data-path]');
+    navItems.forEach(item => {
+      if (item.getAttribute('data-path') === 'einstellungen') {
+        item.classList.remove('text-ink-tertiary');
+        item.classList.add('text-tile-peak', 'relative');
+      }
+    });
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-[env(safe-area-inset-bottom,0px)] bg-ink-panel/95 backdrop-blur-xl shadow-[0_-4px_24px_rgba(27,24,38,0.25)]" data-active-classes="text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2"><div class="flex justify-around items-center h-16 max-w-[390px] mx-auto px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 transition-all duration-150 text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2" data-path="analyse" href="#"><span class="material-symbols-outlined text-[22px]">insights</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Analyse</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[22px]">inventory_2</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Bestellungen</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="ads" href="#"><span class="material-symbols-outlined text-[22px]">campaign</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Ads</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Setup</span></a></div></nav></body></html>

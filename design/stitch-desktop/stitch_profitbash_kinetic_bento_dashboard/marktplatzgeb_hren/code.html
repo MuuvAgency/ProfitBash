@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tile-peak": "#FFFFFF",
+          "ink-on-dark": "#EDECF3",
+          "surface-dim": "#ddd8e4",
+          "on-tertiary": "#ffffff",
+          "on-error-container": "#93000a",
+          "primary": "#4227b1",
+          "on-surface-variant": "#484554",
+          "surface": "#fdf8ff",
+          "warn-amber": "#E0A233",
+          "tertiary": "#6e3300",
+          "inverse-on-surface": "#f4effa",
+          "secondary-container": "#c4ef3e",
+          "ink-secondary": "#63607A",
+          "well-sunken": "#E6E4EC",
+          "on-primary-container": "#d6ceff",
+          "on-error": "#ffffff",
+          "surface-container": "#f1ecf8",
+          "on-tertiary-fixed-variant": "#733600",
+          "on-secondary-fixed": "#161f00",
+          "on-primary": "#ffffff",
+          "inverse-surface": "#312f38",
+          "lime-deep": "#7E9E12",
+          "tertiary-container": "#924600",
+          "violet-press": "#4835A6",
+          "surface-tint": "#5d47cc",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-highest": "#e5e0ec",
+          "surface-container-low": "#f7f1fd",
+          "inverse-primary": "#c8bfff",
+          "background": "#fdf8ff",
+          "outline": "#787585",
+          "ink-primary": "#1B1826",
+          "outline-variant": "#c9c4d6",
+          "on-surface": "#1c1b23",
+          "primary-fixed": "#e5deff",
+          "tile-raise": "#FAFAFC",
+          "on-background": "#1c1b23",
+          "on-tertiary-container": "#ffc8a7",
+          "ink-panel": "#1B1826",
+          "on-secondary-container": "#546b00",
+          "error": "#ba1a1a",
+          "secondary": "#506600",
+          "surface-bright": "#fdf8ff",
+          "primary-fixed-dim": "#c8bfff",
+          "secondary-fixed-dim": "#acd522",
+          "primary-container": "#5a44c9",
+          "on-secondary-fixed-variant": "#3c4d00",
+          "on-primary-fixed-variant": "#452bb3",
+          "surface-variant": "#e5e0ec",
+          "violet-wash": "#ECE8FA",
+          "on-secondary": "#ffffff",
+          "tertiary-fixed": "#ffdbc7",
+          "canvas-mist": "#EEEDF3",
+          "ink-tertiary": "#9C99AD",
+          "on-tertiary-fixed": "#311300",
+          "on-primary-fixed": "#1a0064",
+          "whisper-line": "rgba(27,24,38,0.06)",
+          "error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb688",
+          "surface-container-high": "#ebe6f2",
+          "secondary-fixed": "#c7f241",
+          "loss-red": "#D6524B"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-lg": "1.25rem",
+          "space-xl": "1.75rem",
+          "gutter": "1.25rem",
+          "space-xs": "0.25rem",
+          "gutter-mobile": "0.75rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "headline-lg-mobile": [
+            "Space Grotesk"
+          ],
+          "body-lg": [
+            "Space Grotesk"
+          ],
+          "headline-lg": [
+            "Space Grotesk"
+          ],
+          "label-eyebrow": [
+            "Space Grotesk"
+          ],
+          "display": [
+            "Space Grotesk"
+          ],
+          "data-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Space Grotesk"
+          ],
+          "data-sm": [
+            "JetBrains Mono"
+          ],
+          "body-md": [
+            "Space Grotesk"
+          ],
+          "data-hero-mobile": [
+            "JetBrains Mono"
+          ],
+          "display-mobile": [
+            "Space Grotesk"
+          ],
+          "body-sm": [
+            "Space Grotesk"
+          ],
+          "headline-sm": [
+            "Space Grotesk"
+          ],
+          "data-md": [
+            "JetBrains Mono"
+          ],
+          "data-hero": [
+            "JetBrains Mono"
+          ]
+        },
+        "fontSize": {
+          "headline-lg-mobile": [
+            "22px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "30px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-eyebrow": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "700"
+            }
+          ],
+          "display": [
+            "52px",
+            {
+              "lineHeight": "52px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "data-lg": [
+            "22px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "21px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "data-hero-mobile": [
+            "26px",
+            {
+              "lineHeight": "30px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-mobile": [
+            "32px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-sm": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "18px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "data-hero": [
+            "42px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist text-ink-primary antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-ink-panel z-50 flex flex-col justify-between p-margin shadow-[0_10px_30px_rgba(48,38,92,0.12)]"><div class="flex flex-col gap-space-lg"><div class="flex items-center gap-space-xs px-space-sm py-space-xs"><span class="font-headline-lg text-headline-lg tracking-tight text-ink-on-dark uppercase">ProfitBash</span><span class="h-2 w-2 rounded-full bg-secondary-fixed mb-1"></span></div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]"><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-body-md text-body-md">Dashboard</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="verkaufsanalyse" href="#"><span class="material-symbols-outlined text-[20px]">query_stats</span><span class="font-body-md text-body-md">Verkaufsanalyse</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="profitabilitat" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-body-md text-body-md">Profitabilität</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="marken-produkte" href="#"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-body-md text-body-md">Marken &amp; Produkte</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="retouren" href="#"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="font-body-md text-body-md">Retouren</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-body-md text-body-md">Bestellungen</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="amazon-ads" href="#"><span class="material-symbols-outlined text-[20px]">campaign</span><span class="font-body-md text-body-md">Amazon Ads</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[20px]">tune</span><span class="font-body-md text-body-md">Einstellungen</span></a></nav></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-xl bg-ink-on-dark/5"><div class="flex items-center gap-space-xs"><span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span><span class="font-data-sm text-data-sm text-ink-on-dark/80 uppercase">Channels Live</span></div><span class="font-data-sm text-data-sm text-ink-tertiary">v2.4</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-canvas-mist/85 backdrop-blur-xl z-40 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-headline-sm text-headline-sm text-ink-primary">Guten Morgen, Dominik</span><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="h-2 w-2 rounded-full bg-lime-deep"></span><span class="font-data-sm text-data-sm text-ink-secondary">Amazon, eBay, Otto, Shopify</span><span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">Synced</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="material-symbols-outlined text-ink-secondary text-[18px]">calendar_today</span><span class="font-data-sm text-data-sm text-ink-primary font-semibold">Sept 2026</span></div><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="font-body-sm text-body-sm font-semibold">Export</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative pt-16 bg-canvas-mist min-h-screen"><div class="flex flex-col w-full">
+<!-- Active Sidebar Nav Sync Script for Global Shell -->
+<script>
+    (function () {
+      const navLinks = document.querySelectorAll('aside nav a');
+      navLinks.forEach((el) => {
+        el.classList.remove('bg-primary-container', 'text-on-primary-container', 'font-semibold', 'shadow-[0_4px_12px_rgba(90,68,201,0.25)]');
+        el.classList.add('text-ink-on-dark/70');
+        if (el.getAttribute('data-path') === 'einstellungen') {
+          el.classList.add('bg-primary-container', 'text-on-primary-container', 'font-semibold', 'shadow-[0_4px_12px_rgba(90,68,201,0.25)]');
+          el.classList.remove('text-ink-on-dark/70');
+        }
+      });
+    })();
+  </script>
+<div class="max-w-[1440px] w-full mx-auto px-margin py-space-lg flex flex-col gap-space-xl">
+<!-- Breadcrumb & Top Bar -->
+<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs text-ink-tertiary font-label-eyebrow text-label-eyebrow uppercase tracking-wider">
+<a class="hover:text-primary transition-colors" href="#">Einstellungen</a>
+<span>/</span>
+<span class="text-ink-secondary">Marktplatzgebühren &amp; Provisionen</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-ink-primary tracking-tight">
+          Marktplatzgebühren &amp; Provisionsmatrizen
+        </h1>
+<p class="font-body-md text-body-md text-ink-secondary max-w-3xl">
+          Kategorienspezifische Verkaufsgebühren, Mindestprovisionen und Zahlungsabwicklungsentgelte je Marktplatz für exakte Deckungsbeitragsrechnung.
+        </p>
+</div>
+<div class="flex items-center gap-space-sm self-start lg:self-auto">
+<button class="group flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-transparent hover:bg-violet-wash text-primary font-body-sm text-body-sm font-semibold transition-all" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">table_chart</span>
+<span>Matrix exportieren (CSV)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-lg py-space-sm rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press active:translate-y-[1px] font-body-sm text-body-sm font-semibold transition-all shadow-[0_4px_14px_rgba(90,68,201,0.28)]" id="saveButton" type="button">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span>Gebührenstruktur speichern</span>
+</button>
+</div>
+</div>
+<!-- Marketplace Selector Bar -->
+<div class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">Marktplatz wählen</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Live API-Verbindungen: <strong class="text-lime-deep font-semibold">4 / 4 verbunden</strong></span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md" id="marketplace-selector">
+<!-- Amazon DE (Active) -->
+<button class="channel-card active relative text-left p-space-md rounded-[1.25rem] bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_24px_rgba(48,38,92,0.08)] transition-all hover:-translate-y-0.5" type="button">
+<div class="absolute top-space-md right-space-md flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-violet-wash text-primary font-data-sm text-data-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"></span>
+<span>Aktiv</span>
+</div>
+<div class="flex items-center gap-space-sm mb-space-xs">
+<div class="w-8 h-8 rounded-xl bg-ink-panel text-ink-on-dark flex items-center justify-center font-bold text-[14px]">
+              A
+            </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight">Amazon DE</h2>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">SP-API Sync</span>
+</div>
+</div>
+<div class="flex items-baseline justify-between mt-space-sm pt-space-xs bg-well-sunken/40 px-space-sm py-1 rounded-lg">
+<span class="font-body-sm text-body-sm text-ink-secondary">Ø Provision</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold">15,0 %</span>
+</div>
+</button>
+<!-- Otto Market -->
+<button class="channel-card relative text-left p-space-md rounded-[1.25rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.04)] hover:bg-tile-peak transition-all hover:-translate-y-0.5" type="button">
+<div class="absolute top-space-md right-space-md flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-tile-peak text-ink-secondary font-data-sm text-data-sm">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>Sync OK</span>
+</div>
+<div class="flex items-center gap-space-sm mb-space-xs">
+<div class="w-8 h-8 rounded-xl bg-error text-on-error flex items-center justify-center font-bold text-[13px]">
+              OT
+            </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight">Otto Market</h2>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Partner Connect</span>
+</div>
+</div>
+<div class="flex items-baseline justify-between mt-space-sm pt-space-xs bg-well-sunken/40 px-space-sm py-1 rounded-lg">
+<span class="font-body-sm text-body-sm text-ink-secondary">Ø Provision</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold">14,2 %</span>
+</div>
+</button>
+<!-- eBay DE -->
+<button class="channel-card relative text-left p-space-md rounded-[1.25rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.04)] hover:bg-tile-peak transition-all hover:-translate-y-0.5" type="button">
+<div class="absolute top-space-md right-space-md flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-tile-peak text-ink-secondary font-data-sm text-data-sm">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>Sync OK</span>
+</div>
+<div class="flex items-center gap-space-sm mb-space-xs">
+<div class="w-8 h-8 rounded-xl bg-violet-press text-ink-on-dark flex items-center justify-center font-bold text-[13px]">
+              eB
+            </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight">eBay DE</h2>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Managed Payments</span>
+</div>
+</div>
+<div class="flex items-baseline justify-between mt-space-sm pt-space-xs bg-well-sunken/40 px-space-sm py-1 rounded-lg">
+<span class="font-body-sm text-body-sm text-ink-secondary">Ø Provision</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold">12,8 %</span>
+</div>
+</button>
+<!-- Shopify Direct -->
+<button class="channel-card relative text-left p-space-md rounded-[1.25rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.04)] hover:bg-tile-peak transition-all hover:-translate-y-0.5" type="button">
+<div class="absolute top-space-md right-space-md flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-tile-peak text-ink-secondary font-data-sm text-data-sm">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>Gateway</span>
+</div>
+<div class="flex items-center gap-space-sm mb-space-xs">
+<div class="w-8 h-8 rounded-xl bg-lime-deep text-on-primary flex items-center justify-center font-bold text-[13px]">
+              SH
+            </div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-ink-primary leading-tight">Shopify Direct</h2>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Payment Gateways</span>
+</div>
+</div>
+<div class="flex items-baseline justify-between mt-space-sm pt-space-xs bg-well-sunken/40 px-space-sm py-1 rounded-lg">
+<span class="font-body-sm text-body-sm text-ink-secondary">Fix + Variabel</span>
+<span class="font-data-lg text-data-lg text-ink-primary font-bold">2,1 % + 0,25 €</span>
+</div>
+</button>
+</div>
+</div>
+<!-- Asymmetric Top KPI Overview Bento -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-md">
+<!-- Tile 1: Ø Provision (Gewichtet) - 4 cols -->
+<div class="md:col-span-4 rounded-[1.5rem] bg-tile-peak p-space-xl flex flex-col justify-between shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Ø Provision (Gewichtet)</span>
+<span class="font-body-sm text-body-sm text-ink-secondary mt-0.5">Amazon DE Portfolio</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-secondary-container/30 text-lime-deep font-data-sm text-data-sm font-semibold">
+<span class="h-2 w-2 rounded-full bg-lime-deep"></span>
+<span>Im Plan</span>
+</div>
+</div>
+<div class="my-space-md">
+<div class="flex items-baseline gap-space-xs">
+<span class="font-data-hero text-data-hero text-ink-primary">13,8</span>
+<span class="font-data-lg text-data-lg text-ink-secondary font-normal">%</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary mt-1">
+            bezogen auf <span class="font-data-sm text-data-sm font-semibold text-ink-primary">€ 214.980</span> Monatsumsatz
+          </p>
+</div>
+<!-- Inline Sparkline Curve -->
+<div class="pt-space-xs">
+<div class="flex items-center justify-between text-ink-tertiary font-data-sm text-data-sm mb-1">
+<span>30-Tage Verlauf</span>
+<span class="text-lime-deep font-medium">-0,3 pp vs. Ziel</span>
+</div>
+<div class="w-full h-10">
+<svg class="w-full h-full" fill="none" preserveaspectratio="none" viewbox="0 0 280 40">
+<path d="M0,28 C35,28 50,32 80,24 C110,16 140,26 180,18 C220,10 250,14 280,12" stroke="#4227b1" stroke-linecap="round" stroke-width="2.5"></path>
+<circle cx="280" cy="12" fill="#7E9E12" r="4"></circle>
+</svg>
+</div>
+</div>
+</div>
+<!-- Tile 2: Höchste Kategoriegebühr (Warning Amber) - 4 cols -->
+<div class="md:col-span-4 rounded-[1.5rem] bg-tile-raise p-space-xl flex flex-col justify-between shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div>
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Höchste Kategoriegebühr</span>
+<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-warn-amber/15 text-warn-amber font-data-sm text-data-sm font-bold">
+<span class="material-symbols-outlined text-[14px]">warning</span>
+<span>Deckungsbeitrag</span>
+</div>
+</div>
+<div class="mt-space-sm">
+<h3 class="font-headline-md text-headline-md text-ink-primary">Schmuck &amp; Uhren</h3>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-data-hero text-data-hero text-warn-amber">20,0</span>
+<span class="font-data-lg text-data-lg text-warn-amber font-normal">%</span>
+<span class="font-body-sm text-body-sm text-ink-tertiary ml-1">Regulär</span>
+</div>
+</div>
+</div>
+<div class="p-space-sm rounded-xl bg-well-sunken/60 mt-space-md flex items-start gap-space-xs">
+<span class="material-symbols-outlined text-[18px] text-warn-amber flex-shrink-0 mt-0.5">error_outline</span>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+            Mindestgebühr <strong class="text-ink-primary font-mono">€ 1,50</strong> je Artikel übersteigt bei <span class="font-semibold text-ink-primary">3 Low-Ticket SKUs</span> den Deckungsbeitrag (Marge negativ).
+          </p>
+</div>
+</div>
+<!-- Tile 3: Inverted Command Tier (Net Marketplace Cost Hero) - 4 cols -->
+<div class="md:col-span-4 rounded-[1.5rem] bg-ink-panel p-space-xl flex flex-col justify-between text-ink-on-dark shadow-[0_12px_36px_rgba(27,24,38,0.22)] relative overflow-hidden">
+<!-- Subtle gradient backdrop -->
+<div class="absolute -right-10 -bottom-10 w-44 h-44 rounded-full bg-primary/20 blur-2xl pointer-events-none"></div>
+<div>
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Monatliche Marktplatz-Kosten</span>
+<span class="px-2 py-0.5 rounded-full bg-ink-on-dark/10 text-secondary-fixed font-data-sm text-data-sm font-semibold">Aktueller Run-Rate</span>
+</div>
+<div class="mt-space-md">
+<div class="font-data-hero text-data-hero text-ink-on-dark tracking-tight">
+              € 29.667,24
+            </div>
+<div class="flex items-center gap-space-xs mt-1 font-body-sm text-body-sm text-ink-on-dark/80">
+<span class="font-semibold text-secondary-fixed">13,80 %</span>
+<span>vom Bruttoumsatz</span>
+</div>
+</div>
+</div>
+<div class="pt-space-md mt-space-md border-t border-whisper-line flex items-center justify-between">
+<div class="flex items-center gap-1.5 text-secondary-fixed font-data-sm text-data-sm">
+<span class="material-symbols-outlined text-[16px]">trending_down</span>
+<span>-0,4 pp Vormonat</span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-tertiary text-right text-[12px]">Optimiert via GL-Remapping</span>
+</div>
+</div>
+</div>
+<!-- Main Content Bento Grid: 8 Cols (Matrix Table) + 4 Cols (Calculators & Additional Fees) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- Left Column: Category Fee Matrix Table (8 Columns) -->
+<div class="lg:col-span-8 rounded-[1.5rem] bg-tile-raise p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-space-md">
+<!-- Table Control & Filter Header -->
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-space-sm pb-space-xs">
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-headline-md text-headline-md text-ink-primary">Kategorie-Staffeln &amp; Provisionsmatrix</h2>
+<span class="px-2 py-0.5 rounded-full bg-violet-wash font-data-sm text-data-sm text-primary font-bold">6 Kategorien aktiv</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">Amazon DE Seller Central Gebührentabelle 2026</p>
+</div>
+<!-- Search & Filter Field -->
+<div class="flex items-center gap-space-xs">
+<div class="relative min-w-[220px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary text-[18px]">search</span>
+<input class="w-full pl-9 pr-3 py-1.5 rounded-xl bg-tile-peak text-ink-primary font-body-sm text-body-sm placeholder:text-ink-tertiary outline-none focus:ring-2 focus:ring-primary transition-all" id="matrixSearch" placeholder="Kategorie oder GL-Code..." type="text" aria-label="Kategorie oder GL-Code"/>
+</div>
+<button class="p-2 rounded-xl bg-tile-peak text-ink-secondary hover:text-ink-primary hover:bg-well-sunken/60 transition-colors" title="Filtereinstellungen" type="button">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+</div>
+<!-- High-Density Responsive Table Container -->
+<div class="overflow-x-auto -mx-space-lg px-space-lg">
+<table class="w-full text-left border-collapse min-w-[760px]" id="feeMatrixTable">
+<thead>
+<tr class="border-b border-whisper-line text-ink-tertiary font-label-eyebrow text-label-eyebrow uppercase">
+<th class="py-space-sm px-space-xs font-label-eyebrow">Kategorie &amp; GL-Code</th>
+<th class="py-space-sm px-space-xs font-label-eyebrow">Staffel-Schwellenwert</th>
+<th class="py-space-sm px-space-xs font-label-eyebrow text-right">Provision %</th>
+<th class="py-space-sm px-space-xs font-label-eyebrow text-right">Mindestgebühr</th>
+<th class="py-space-sm px-space-xs font-label-eyebrow text-right">DST / Zuschlag</th>
+<th class="py-space-sm px-space-xs font-label-eyebrow text-right">Effektiv Ø</th>
+<th class="py-space-sm px-space-xs font-label-eyebrow text-right">Sync-Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-whisper-line">
+<!-- Row 1: Unterhaltungselektronik -->
+<tr class="group hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-sm px-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-well-sunken flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">devices</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-ink-primary">Unterhaltungselektronik</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">GL-CE-0824</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-xs">
+<span class="font-body-sm text-body-sm text-ink-secondary">Bis € 100 (7,0%) / darüber</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<input class="fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="8,0" aria-label="Bis € 100 (7,0%) / darüber Gebühr"/>
+<span class="font-data-md text-data-md text-ink-secondary ml-1">%</span>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<span class="font-data-md text-data-md text-ink-secondary mr-1">€</span>
+<input class="min-fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="0,30" aria-label="Wert Gebühr"/>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">+ 1,8% DST</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-md text-data-md text-ink-primary font-bold">€ 14,80</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container/20 text-lime-deep font-data-sm text-data-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>SP-API</span>
+</div>
+</td>
+</tr>
+<!-- Row 2: Bekleidung & Fashion -->
+<tr class="group hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-sm px-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-well-sunken flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">checkroom</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-ink-primary">Bekleidung &amp; Fashion</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">GL-APP-1102</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-xs">
+<span class="font-body-sm text-body-sm text-ink-secondary">Pauschal (bis € 45 Staffel)</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<input class="fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="15,0" aria-label="Pauschal (bis € 45 Staffel) Gebühr"/>
+<span class="font-data-md text-data-md text-ink-secondary ml-1">%</span>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<span class="font-data-md text-data-md text-ink-secondary mr-1">€</span>
+<input class="min-fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="0,30" aria-label="Wert Gebühr"/>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">+ 2,0% Retouren</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-md text-data-md text-ink-primary font-bold">€ 6,45</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container/20 text-lime-deep font-data-sm text-data-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>SP-API</span>
+</div>
+</td>
+</tr>
+<!-- Row 3: Küche & Haushalt -->
+<tr class="group hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-sm px-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-well-sunken flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">blender</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-ink-primary">Küche &amp; Haushalt</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">GL-HOME-3390</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-xs">
+<span class="font-body-sm text-body-sm text-ink-secondary">Staffel &gt; € 100 (15%/8%)</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<input class="fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="15,0" aria-label="Staffel &gt; € 100 (15%/8%) Gebühr"/>
+<span class="font-data-md text-data-md text-ink-secondary ml-1">%</span>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<span class="font-data-md text-data-md text-ink-secondary mr-1">€</span>
+<input class="min-fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="0,30" aria-label="Wert Gebühr"/>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">Keine</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-md text-data-md text-ink-primary font-bold">€ 11,20</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container/20 text-lime-deep font-data-sm text-data-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>SP-API</span>
+</div>
+</td>
+</tr>
+<!-- Row 4: Beauty & Körperpflege -->
+<tr class="group hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-sm px-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-well-sunken flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">spa</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-ink-primary">Beauty &amp; Körperpflege</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">GL-BEAU-7210</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-xs">
+<span class="font-body-sm text-body-sm text-ink-secondary">Bis € 10 (8,0%) / darüber</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<input class="fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="15,0" aria-label="Bis € 10 (8,0%) / darüber Gebühr"/>
+<span class="font-data-md text-data-md text-ink-secondary ml-1">%</span>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<span class="font-data-md text-data-md text-ink-secondary mr-1">€</span>
+<input class="min-fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="0,30" aria-label="Wert Gebühr"/>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">+ 1,5% Hazardous</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-md text-data-md text-ink-primary font-bold">€ 4,12</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-wash text-primary font-data-sm text-data-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+<span>Manuell</span>
+</div>
+</td>
+</tr>
+<!-- Row 5: Schmuck & Uhren (Critical / High Fee) -->
+<tr class="group hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-sm px-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-warn-amber/20 flex items-center justify-center text-warn-amber">
+<span class="material-symbols-outlined text-[18px]">watch</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-ink-primary">Schmuck &amp; Uhren</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">GL-JEWL-9901</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-xs">
+<span class="font-body-sm text-body-sm text-ink-secondary">Staffel &gt; € 250 (5% Rest)</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<input class="fee-input w-16 text-right font-data-md text-data-md font-bold text-warn-amber bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-warn-amber" type="text" value="20,0" aria-label="Staffel &gt; € 250 (5% Rest) Gebühr"/>
+<span class="font-data-md text-data-md text-ink-secondary ml-1">%</span>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<span class="font-data-md text-data-md text-ink-secondary mr-1">€</span>
+<input class="min-fee-input w-16 text-right font-data-md text-data-md font-bold text-warn-amber bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-warn-amber" type="text" value="1,50" aria-label="Wert Gebühr"/>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-sm text-data-sm text-loss-red font-medium">Mindestgebühr aktiv</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-md text-data-md text-ink-primary font-bold">€ 28,40</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container/20 text-lime-deep font-data-sm text-data-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>SP-API</span>
+</div>
+</td>
+</tr>
+<!-- Row 6: Sport & Outdoor -->
+<tr class="group hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-sm px-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-well-sunken flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">fitness_center</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-ink-primary">Sport &amp; Outdoor</div>
+<div class="font-data-sm text-data-sm text-ink-tertiary">GL-SPRT-5512</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-xs">
+<span class="font-body-sm text-body-sm text-ink-secondary">Standard (15%)</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<input class="fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="15,0" aria-label="Standard (15%) Gebühr"/>
+<span class="font-data-md text-data-md text-ink-secondary ml-1">%</span>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center justify-end">
+<span class="font-data-md text-data-md text-ink-secondary mr-1">€</span>
+<input class="min-fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" type="text" value="0,30" aria-label="Wert Gebühr"/>
+</div>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">+ 1,8% DST</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<span class="font-data-md text-data-md text-ink-primary font-bold">€ 13,49</span>
+</td>
+<td class="py-space-sm px-space-xs text-right">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container/20 text-lime-deep font-data-sm text-data-sm font-semibold">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span>SP-API</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Action & Footer Row -->
+<div class="pt-space-xs flex flex-col sm:flex-row items-center justify-between gap-space-sm border-t border-whisper-line">
+<button class="flex items-center gap-space-xs text-primary hover:text-violet-press font-body-sm text-body-sm font-semibold transition-colors" id="addStaffelBtn" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Kategorie-Sonderstaffel hinzufügen</span>
+</button>
+<div class="flex items-center gap-space-xs text-ink-tertiary font-data-sm text-data-sm">
+<span class="material-symbols-outlined text-[16px]">info</span>
+<span>Änderungen wirken sich sofort auf die Deckungsbeitrags-Berechnung aus.</span>
+</div>
+</div>
+</div>
+<!-- Right Column: Simulators, Margin Lever & Additional Fees (4 Columns) -->
+<div class="lg:col-span-4 flex flex-col gap-space-lg">
+<!-- Tile: Gebühren-Simulation & Margen-Hebel -->
+<div class="rounded-[1.5rem] bg-tile-raise p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Interaktiver Hebel</span>
+<h3 class="font-headline-sm text-headline-sm text-ink-primary">Gebühren-Simulation</h3>
+</div>
+<div class="w-8 h-8 rounded-xl bg-violet-wash text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+            Echtzeit-Szenario: Wie verändert eine Preisanpassung oder Provisionsstaffel Ihren Gesamtgewinn?
+          </p>
+<!-- Slider Widget -->
+<div class="flex flex-col gap-space-sm p-space-md rounded-xl bg-well-sunken/60">
+<div class="flex justify-between items-center">
+<span class="font-body-sm text-body-sm text-ink-primary font-medium">Provisionsanpassung (Delta)</span>
+<span class="font-data-md text-data-md font-bold text-primary" id="sliderValue">0.0 %</span>
+</div>
+<input class="w-full accent-primary cursor-pointer" id="feeSlider" max="2" min="-2" step="0.1" type="range" value="0" aria-label="Provisionsanpassung (Delta) Gebühr"/>
+<div class="flex justify-between text-ink-tertiary font-data-sm text-data-sm">
+<span>-2,0 pp</span>
+<span>Baseline</span>
+<span>+2,0 pp</span>
+</div>
+</div>
+<!-- Impact Metric Result -->
+<div class="p-space-md rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Deckungsbeitrags-Sensitivität</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-body-sm text-body-sm text-ink-secondary">Sensitivität bei ±1%:</span>
+<span class="font-data-lg text-data-lg font-bold text-ink-primary" id="impactMetric">€ 2.149 / Mo.</span>
+</div>
+<div class="mt-space-sm pt-space-xs border-t border-whisper-line flex items-center gap-1.5 text-lime-deep font-data-sm text-data-sm">
+<span class="material-symbols-outlined text-[16px]">arrow_circle_up</span>
+<span>Potenzial bei 0,5% Opt.: <strong class="font-mono text-ink-primary">+€ 1.074</strong></span>
+</div>
+</div>
+</div>
+<!-- Tile: Zusatzgebühren & Zahlungsabwicklung -->
+<div class="rounded-[1.5rem] bg-tile-raise p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Fix- &amp; Nebenkosten</span>
+<h3 class="font-headline-sm text-headline-sm text-ink-primary">Zusatzgebühren</h3>
+</div>
+<div class="w-8 h-8 rounded-xl bg-well-sunken text-ink-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">receipt</span>
+</div>
+</div>
+<div class="flex flex-col divide-y divide-whisper-line font-body-sm text-body-sm">
+<div class="py-2.5 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-ink-primary font-medium">Digital Services Tax (DST)</span>
+<span class="text-ink-tertiary font-data-sm text-data-sm">Amazon DE Regulativ</span>
+</div>
+<span class="font-data-md text-data-md font-semibold text-ink-primary">+ 1,80 %</span>
+</div>
+<div class="py-2.5 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-ink-primary font-medium">Closing Fee / Abschlussgebühr</span>
+<span class="text-ink-tertiary font-data-sm text-data-sm">Je Medientitel / SKU</span>
+</div>
+<span class="font-data-md text-data-md font-semibold text-ink-primary">€ 1,01</span>
+</div>
+<div class="py-2.5 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-ink-primary font-medium">High-Volume Listing Fee</span>
+<span class="text-ink-tertiary font-data-sm text-data-sm">Ab 1,5 Mio. aktive SKUs</span>
+</div>
+<span class="font-data-md text-data-md font-semibold text-lime-deep">€ 0,00</span>
+</div>
+<div class="py-2.5 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-ink-primary font-medium">Payment Gateway Fixsatz</span>
+<span class="text-ink-tertiary font-data-sm text-data-sm">Transaktionspauschale</span>
+</div>
+<span class="font-data-md text-data-md font-semibold text-ink-primary">€ 0,35 / Tx</span>
+</div>
+</div>
+<!-- Regulatory Sync Notice Card -->
+<div class="mt-space-xs p-space-md rounded-xl bg-well-sunken/80 flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[20px] flex-shrink-0 mt-0.5">sync_saved_locally</span>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-ink-primary">Letzter Abgleich mit Marktplatz</span>
+<span class="font-data-sm text-data-sm text-ink-secondary mt-0.5">Heute, 04:15 MESZ</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary mt-1">Amazon SP-API Fee Engine v2.4</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Notification Toast / Visual Feedback Container -->
+<div class="fixed bottom-6 right-6 px-space-md py-space-sm rounded-xl bg-ink-panel text-ink-on-dark shadow-[0_16px_36px_rgba(27,24,38,0.3)] flex items-center gap-space-sm translate-y-24 opacity-0 transition-all duration-300 pointer-events-none z-50" id="saveToast">
+<span class="material-symbols-outlined text-lime-deep text-[20px]">check_circle</span>
+<span class="font-body-sm text-body-sm font-medium">Gebührenmatrix erfolgreich gespeichert &amp; neu berechnet!</span>
+</div>
+</div>
+<!-- Micro-Interactions Script -->
+<script>
+    (function () {
+      // Marketplace selection toggle
+      const channelCards = document.querySelectorAll('.channel-card');
+      channelCards.forEach(card => {
+        card.addEventListener('click', () => {
+          channelCards.forEach(c => {
+            c.classList.remove('bg-tile-peak', 'shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_24px_rgba(48,38,92,0.08)]');
+            c.classList.add('bg-tile-raise');
+          });
+          card.classList.remove('bg-tile-raise');
+          card.classList.add('bg-tile-peak', 'shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_24px_rgba(48,38,92,0.08)]');
+        });
+      });
+
+      // Filter search inside matrix
+      const searchInput = document.getElementById('matrixSearch');
+      const tableRows = document.querySelectorAll('#feeMatrixTable tbody tr');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          const val = e.target.value.toLowerCase().trim();
+          tableRows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(val) ? '' : 'none';
+          });
+        });
+      }
+
+      // Slider Simulation
+      const slider = document.getElementById('feeSlider');
+      const sliderVal = document.getElementById('sliderValue');
+      const impactMetric = document.getElementById('impactMetric');
+      const baseMonthlyRev = 214980;
+
+      if (slider && sliderVal && impactMetric) {
+        slider.addEventListener('input', (e) => {
+          const delta = parseFloat(e.target.value);
+          const prefix = delta > 0 ? '+' : '';
+          sliderVal.innerText = `${prefix}${delta.toFixed(1)} %`;
+          
+          // Compute difference
+          const impact = Math.round((delta / 100) * baseMonthlyRev);
+          if (delta === 0) {
+            impactMetric.innerText = '€ 2.149 / Mo.';
+            impactMetric.classList.remove('text-loss-red', 'text-lime-deep');
+            impactMetric.classList.add('text-ink-primary');
+          } else if (delta > 0) {
+            impactMetric.innerText = `+€ ${impact.toLocaleString('de-DE')} Kosten`;
+            impactMetric.classList.remove('text-lime-deep', 'text-ink-primary');
+            impactMetric.classList.add('text-loss-red');
+          } else {
+            impactMetric.innerText = `${impact.toLocaleString('de-DE')} Ersparnis`;
+            impactMetric.classList.remove('text-loss-red', 'text-ink-primary');
+            impactMetric.classList.add('text-lime-deep');
+          }
+        });
+      }
+
+      // Save toast interaction
+      const saveBtn = document.getElementById('saveButton');
+      const toast = document.getElementById('saveToast');
+      if (saveBtn && toast) {
+        saveBtn.addEventListener('click', () => {
+          toast.classList.remove('translate-y-24', 'opacity-0');
+          setTimeout(() => {
+            toast.classList.add('translate-y-24', 'opacity-0');
+          }, 3200);
+        });
+      }
+
+      // Add dummy custom row
+      const addBtn = document.getElementById('addStaffelBtn');
+      const tbody = document.querySelector('#feeMatrixTable tbody');
+      if (addBtn && tbody) {
+        addBtn.addEventListener('click', () => {
+          const newRow = document.createElement('tr');
+          newRow.className = 'group hover:bg-well-sunken/40 transition-colors animate-pulse';
+          newRow.innerHTML = `
+            <td class="py-space-sm px-space-xs">
+              <div class="flex items-center gap-space-sm">
+                <div class="w-8 h-8 rounded-lg bg-well-sunken flex items-center justify-center text-primary">
+                  <span class="material-symbols-outlined text-[18px]">extension</span>
+                </div>
+                <div>
+                  <div class="font-body-md text-body-md font-semibold text-ink-primary">Neue Sonderkategorie</div>
+                  <div class="font-data-sm text-data-sm text-ink-tertiary">GL-CUSTOM-001</div>
+                </div>
+              </div>
+            </td>
+            <td class="py-space-sm px-space-xs">
+              <span class="font-body-sm text-body-sm text-ink-secondary">Benutzerdefiniert</span>
+            </td>
+            <td class="py-space-sm px-space-xs text-right">
+              <div class="inline-flex items-center justify-end">
+                <input type="text" value="12,0" class="fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" aria-label="Benutzerdefiniert Gebühr">
+                <span class="font-data-md text-data-md text-ink-secondary ml-1">%</span>
+              </div>
+            </td>
+            <td class="py-space-sm px-space-xs text-right">
+              <div class="inline-flex items-center justify-end">
+                <span class="font-data-md text-data-md text-ink-secondary mr-1">€</span>
+                <input type="text" value="0,50" class="min-fee-input w-16 text-right font-data-md text-data-md font-semibold text-ink-primary bg-tile-peak px-2 py-1 rounded-lg border-0 outline-none focus:ring-2 focus:ring-primary" aria-label="Wert Gebühr">
+              </div>
+            </td>
+            <td class="py-space-sm px-space-xs text-right">
+              <span class="font-data-sm text-data-sm text-ink-secondary">0,0%</span>
+            </td>
+            <td class="py-space-sm px-space-xs text-right">
+              <span class="font-data-md text-data-md text-ink-primary font-bold">€ 5,20</span>
+            </td>
+            <td class="py-space-sm px-space-xs text-right">
+              <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-wash text-primary font-data-sm text-data-sm font-semibold">
+                <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                <span>Manuell</span>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(newRow);
+          setTimeout(() => newRow.classList.remove('animate-pulse'), 800);
+        });
+      }
+    })();
+  </script>
+</div></main></div></body></html>

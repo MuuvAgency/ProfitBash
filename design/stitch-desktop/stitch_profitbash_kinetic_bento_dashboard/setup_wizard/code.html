@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tile-peak": "#FFFFFF",
+          "ink-on-dark": "#EDECF3",
+          "surface-dim": "#ddd8e4",
+          "on-tertiary": "#ffffff",
+          "on-error-container": "#93000a",
+          "primary": "#4227b1",
+          "on-surface-variant": "#484554",
+          "surface": "#fdf8ff",
+          "warn-amber": "#E0A233",
+          "tertiary": "#6e3300",
+          "inverse-on-surface": "#f4effa",
+          "secondary-container": "#c4ef3e",
+          "ink-secondary": "#63607A",
+          "well-sunken": "#E6E4EC",
+          "on-primary-container": "#d6ceff",
+          "on-error": "#ffffff",
+          "surface-container": "#f1ecf8",
+          "on-tertiary-fixed-variant": "#733600",
+          "on-secondary-fixed": "#161f00",
+          "on-primary": "#ffffff",
+          "inverse-surface": "#312f38",
+          "lime-deep": "#7E9E12",
+          "tertiary-container": "#924600",
+          "violet-press": "#4835A6",
+          "surface-tint": "#5d47cc",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-highest": "#e5e0ec",
+          "surface-container-low": "#f7f1fd",
+          "inverse-primary": "#c8bfff",
+          "background": "#fdf8ff",
+          "outline": "#787585",
+          "ink-primary": "#1B1826",
+          "outline-variant": "#c9c4d6",
+          "on-surface": "#1c1b23",
+          "primary-fixed": "#e5deff",
+          "tile-raise": "#FAFAFC",
+          "on-background": "#1c1b23",
+          "on-tertiary-container": "#ffc8a7",
+          "ink-panel": "#1B1826",
+          "on-secondary-container": "#546b00",
+          "error": "#ba1a1a",
+          "secondary": "#506600",
+          "surface-bright": "#fdf8ff",
+          "primary-fixed-dim": "#c8bfff",
+          "secondary-fixed-dim": "#acd522",
+          "primary-container": "#5a44c9",
+          "on-secondary-fixed-variant": "#3c4d00",
+          "on-primary-fixed-variant": "#452bb3",
+          "surface-variant": "#e5e0ec",
+          "violet-wash": "#ECE8FA",
+          "on-secondary": "#ffffff",
+          "tertiary-fixed": "#ffdbc7",
+          "canvas-mist": "#EEEDF3",
+          "ink-tertiary": "#9C99AD",
+          "on-tertiary-fixed": "#311300",
+          "on-primary-fixed": "#1a0064",
+          "whisper-line": "rgba(27,24,38,0.06)",
+          "error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb688",
+          "surface-container-high": "#ebe6f2",
+          "secondary-fixed": "#c7f241",
+          "loss-red": "#D6524B"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-lg": "1.25rem",
+          "space-xl": "1.75rem",
+          "gutter": "1.25rem",
+          "space-xs": "0.25rem",
+          "gutter-mobile": "0.75rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "headline-lg-mobile": [
+            "Space Grotesk"
+          ],
+          "body-lg": [
+            "Space Grotesk"
+          ],
+          "headline-lg": [
+            "Space Grotesk"
+          ],
+          "label-eyebrow": [
+            "Space Grotesk"
+          ],
+          "display": [
+            "Space Grotesk"
+          ],
+          "data-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Space Grotesk"
+          ],
+          "data-sm": [
+            "JetBrains Mono"
+          ],
+          "body-md": [
+            "Space Grotesk"
+          ],
+          "data-hero-mobile": [
+            "JetBrains Mono"
+          ],
+          "display-mobile": [
+            "Space Grotesk"
+          ],
+          "body-sm": [
+            "Space Grotesk"
+          ],
+          "headline-sm": [
+            "Space Grotesk"
+          ],
+          "data-md": [
+            "JetBrains Mono"
+          ],
+          "data-hero": [
+            "JetBrains Mono"
+          ]
+        },
+        "fontSize": {
+          "headline-lg-mobile": [
+            "22px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "30px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-eyebrow": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "700"
+            }
+          ],
+          "display": [
+            "52px",
+            {
+              "lineHeight": "52px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "data-lg": [
+            "22px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "21px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "data-hero-mobile": [
+            "26px",
+            {
+              "lineHeight": "30px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-mobile": [
+            "32px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-sm": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "18px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "data-hero": [
+            "42px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist text-ink-primary antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-ink-panel z-50 flex flex-col justify-between p-margin shadow-[0_10px_30px_rgba(48,38,92,0.12)]"><div class="flex flex-col gap-space-lg"><div class="flex items-center gap-space-xs px-space-sm py-space-xs"><span class="font-headline-lg text-headline-lg tracking-tight text-ink-on-dark uppercase">ProfitBash</span><span class="h-2 w-2 rounded-full bg-secondary-fixed mb-1"></span></div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]"><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-body-md text-body-md">Dashboard</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="verkaufsanalyse" href="#"><span class="material-symbols-outlined text-[20px]">query_stats</span><span class="font-body-md text-body-md">Verkaufsanalyse</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="profitabilitat" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-body-md text-body-md">Profitabilität</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="marken-produkte" href="#"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-body-md text-body-md">Marken &amp; Produkte</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="retouren" href="#"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="font-body-md text-body-md">Retouren</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-body-md text-body-md">Bestellungen</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="amazon-ads" href="#"><span class="material-symbols-outlined text-[20px]">campaign</span><span class="font-body-md text-body-md">Amazon Ads</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[20px]">tune</span><span class="font-body-md text-body-md">Einstellungen</span></a></nav></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-xl bg-ink-on-dark/5"><div class="flex items-center gap-space-xs"><span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span><span class="font-data-sm text-data-sm text-ink-on-dark/80 uppercase">Channels Live</span></div><span class="font-data-sm text-data-sm text-ink-tertiary">v2.4</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-canvas-mist/85 backdrop-blur-xl z-40 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-headline-sm text-headline-sm text-ink-primary">Guten Morgen, Dominik</span><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="h-2 w-2 rounded-full bg-lime-deep"></span><span class="font-data-sm text-data-sm text-ink-secondary">Amazon, eBay, Otto, Shopify</span><span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">Synced</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="material-symbols-outlined text-ink-secondary text-[18px]">calendar_today</span><span class="font-data-sm text-data-sm text-ink-primary font-semibold">Sept 2026</span></div><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="font-body-sm text-body-sm font-semibold">Export</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative pt-16 bg-canvas-mist min-h-screen"><div class="flex flex-col w-full">
+<!-- Interactive Setup Controller Script (Updates Left Navigation + Wizard Micro-actions) -->
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // Sync App Shell Sidebar active state to 'Einstellungen' (Setup/Settings)
+      const navLinks = document.querySelectorAll("aside nav a");
+      navLinks.forEach(link => {
+        link.classList.remove("bg-primary-container", "text-on-primary-container", "font-semibold", "shadow-[0_4px_12px_rgba(90,68,201,0.25)]");
+        link.classList.add("text-ink-on-dark/70");
+      });
+      const settingsLink = document.querySelector('aside nav a[data-path="einstellungen"]');
+      if (settingsLink) {
+        settingsLink.classList.remove("text-ink-on-dark/70");
+        settingsLink.classList.add("bg-primary-container", "text-on-primary-container", "font-semibold", "shadow-[0_4px_12px_rgba(90,68,201,0.25)]");
+      }
+    });
+
+    function toggleMarketplace(channelKey) {
+      const btn = document.getElementById('btn-' + channelKey);
+      const statusBadge = document.getElementById('badge-' + channelKey);
+      const dot = document.getElementById('dot-' + channelKey);
+      const text = document.getElementById('text-' + channelKey);
+      const syncMeta = document.getElementById('meta-' + channelKey);
+      const countEl = document.getElementById('active-sync-count');
+
+      if (!btn || !statusBadge) return;
+
+      if (btn.getAttribute('data-connected') === 'true') {
+        // Disconnect
+        btn.setAttribute('data-connected', 'false');
+        btn.innerText = 'Verbinden';
+        btn.className = 'w-full sm:w-auto px-space-md py-space-xs rounded-xl bg-transparent hover:bg-violet-wash text-primary-container font-headline-sm text-headline-sm transition-all text-center';
+        statusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-well-sunken/80 text-ink-secondary';
+        dot.className = 'w-2 h-2 rounded-full bg-ink-tertiary';
+        text.innerText = 'Nicht verbunden';
+        if (syncMeta) syncMeta.classList.add('hidden');
+      } else {
+        // Connect
+        btn.setAttribute('data-connected', 'true');
+        btn.innerText = 'Konfigurieren';
+        btn.className = 'w-full sm:w-auto px-space-md py-space-xs rounded-xl bg-violet-wash text-primary font-headline-sm text-headline-sm hover:bg-violet-wash/80 transition-all text-center';
+        statusBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/30 text-lime-deep';
+        dot.className = 'w-2 h-2 rounded-full bg-lime-deep animate-pulse';
+        text.innerText = 'Verbunden via MCP';
+        if (syncMeta) syncMeta.classList.remove('hidden');
+      }
+
+      // Update active counters
+      const connectedCount = document.querySelectorAll('[data-connected="true"]').length;
+      if (countEl) countEl.innerText = connectedCount;
+    }
+  </script>
+<!-- Shell Sub-header Context Bar: Breadcrumb + Operational Status -->
+<div class="w-full px-space-md lg:px-space-xl py-space-sm flex items-center justify-between">
+<div class="flex items-center gap-space-xs text-ink-tertiary font-label-eyebrow text-label-eyebrow uppercase tracking-widest">
+<span>ProfitBash Onboarding</span>
+<span>/</span>
+<span class="text-primary font-bold">Setup-Assistent</span>
+</div>
+<div class="hidden sm:flex items-center gap-space-sm font-data-sm text-data-sm text-ink-secondary">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+<span>REST v2.4 TLS 1.3 · Zero-Data Retention Vault</span>
+</div>
+</div>
+<!-- Primary Content Area: Centered Bento Module -->
+<div class="w-full max-w-[960px] mx-auto px-space-md sm:px-space-lg lg:px-0 pb-16 pt-space-xs">
+<!-- Main Bento Card -->
+<div class="w-full bg-tile-peak rounded-[2rem] shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] p-space-md sm:p-space-xl flex flex-col gap-space-lg">
+<!-- Wizard Stepper: 3 Distinct Calibrated Stages -->
+<nav aria-label="Onboarding Fortschritt" class="w-full pb-space-md">
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-space-xs sm:gap-space-sm relative">
+<!-- Stage 1 (Active) -->
+<div class="relative flex flex-col gap-space-xs p-space-sm rounded-xl bg-violet-wash/60 transition-colors">
+<div class="flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-primary font-bold">STUFE 01</span>
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+</div>
+<div class="font-headline-sm text-headline-sm text-primary font-bold">
+              1. Marktplatz verbinden
+            </div>
+<div class="w-full h-1 bg-primary-container rounded-full mt-0.5"></div>
+</div>
+<!-- Stage 2 (Upcoming) -->
+<div class="flex flex-col gap-space-xs p-space-sm rounded-xl bg-well-sunken/40">
+<div class="flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-ink-secondary font-medium">STUFE 02</span>
+<span class="w-1.5 h-1.5 rounded-full bg-ink-tertiary"></span>
+</div>
+<div class="font-headline-sm text-headline-sm text-ink-secondary font-semibold">
+              2. Kosten &amp; COGS hinterlegen
+            </div>
+<div class="w-full h-1 bg-well-sunken rounded-full mt-0.5"></div>
+</div>
+<!-- Stage 3 (Upcoming) -->
+<div class="flex flex-col gap-space-xs p-space-sm rounded-xl bg-well-sunken/20">
+<div class="flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-ink-tertiary font-medium">STUFE 03</span>
+<span class="w-1.5 h-1.5 rounded-full bg-ink-tertiary/60"></span>
+</div>
+<div class="font-headline-sm text-headline-sm text-ink-tertiary font-semibold">
+              3. Analyse &amp; Fertig
+            </div>
+<div class="w-full h-1 bg-well-sunken/60 rounded-full mt-0.5"></div>
+</div>
+</div>
+</nav>
+<!-- Headline Block & Operational Eyebrow -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-well-sunken font-data-sm text-data-sm text-ink-secondary font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+            Echtzeit-API &amp; MCP Protokoll v2.4
+          </span>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase hidden sm:inline-block">Kanalinitialisierung</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-ink-primary font-bold tracking-tight mt-1">
+          Verbinde deine Verkaufskanäle
+        </h1>
+<p class="font-body-md text-body-md text-ink-secondary max-w-2xl">
+          Synchronisiere Bestellungen, Werbeausgaben und Marktplatzgebühren automatisch in Echtzeit. Weitere Marktplätze können jederzeit im Dashboard ergänzt werden.
+        </p>
+</div>
+<!-- Marketplace Connect Grid (2x2 Kinetic Bento Stack) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+<!-- Tile 1: Amazon Pro (Seller Central & DSP) - Connected -->
+<div class="relative bg-tile-raise rounded-2xl p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex flex-col justify-between gap-space-md">
+<div class="flex flex-col gap-space-sm">
+<!-- Channel Header Row -->
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<!-- Amazon Visual Monogram -->
+<div class="w-12 h-12 rounded-xl bg-ink-panel flex items-center justify-center text-ink-on-dark font-data-lg text-data-lg font-bold shadow-sm">
+<span class="tracking-tighter">az</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary font-bold">Amazon Pro</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Seller Central &amp; DSP API</span>
+</div>
+</div>
+<!-- Status Pill -->
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/30 text-lime-deep" id="badge-amazon">
+<span class="w-2 h-2 rounded-full bg-lime-deep animate-pulse" id="dot-amazon"></span>
+<span class="font-data-sm text-data-sm font-semibold tracking-tight" id="text-amazon">Verbunden via MCP</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+              Vollständiger Abruf von Settlement-Reports, FBA-Lagergebühren, Werbeausgaben (SP/SB/SD) und Retourenabrechnungen.
+            </p>
+<!-- Sync Telemetry Block -->
+<div class="p-space-sm rounded-xl bg-well-sunken/60 flex flex-col gap-1" id="meta-amazon">
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-primary">
+<span class="font-semibold">2.710 Bestellungen synchronisiert</span>
+<span class="text-ink-tertiary">14 Kampagnen</span>
+</div>
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-secondary">
+<span>Letzter Datenabruf</span>
+<span class="font-medium text-ink-primary">vor 2 Min.</span>
+</div>
+</div>
+</div>
+<!-- Channel Action Row -->
+<div class="flex items-center justify-between pt-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-lime-deep font-bold">SP-API v2024 · Aktiv</span>
+<button class="w-full sm:w-auto px-space-md py-space-xs rounded-xl bg-violet-wash text-primary font-headline-sm text-headline-sm hover:bg-violet-wash/80 transition-all text-center" data-connected="true" id="btn-amazon" onclick="toggleMarketplace('amazon')" type="button">
+              Konfigurieren
+            </button>
+</div>
+</div>
+<!-- Tile 2: Otto Market (Business API) - Disconnected -->
+<div class="relative bg-tile-raise rounded-2xl p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex flex-col justify-between gap-space-md">
+<div class="flex flex-col gap-space-sm">
+<!-- Channel Header Row -->
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<!-- Otto Visual Monogram -->
+<div class="w-12 h-12 rounded-xl bg-error/10 text-error flex items-center justify-center font-data-lg text-data-lg font-bold shadow-sm">
+<span class="tracking-tighter">OT</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary font-bold">Otto Market</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Partner Connect Business API</span>
+</div>
+</div>
+<!-- Status Pill -->
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-well-sunken/80 text-ink-secondary" id="badge-otto">
+<span class="w-2 h-2 rounded-full bg-ink-tertiary" id="dot-otto"></span>
+<span class="font-data-sm text-data-sm font-semibold tracking-tight" id="text-otto">Nicht verbunden</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+              Automatischer Abruf von Provisionssätzen, Zahlungsberichten und Retourenquoten für Otto Plattform-Händler.
+            </p>
+<!-- Sync Telemetry Block (Hidden initially) -->
+<div class="hidden p-space-sm rounded-xl bg-well-sunken/60 flex flex-col gap-1" id="meta-otto">
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-primary">
+<span class="font-semibold">0 Bestellungen eingereiht</span>
+<span class="text-ink-tertiary">Initial Sync</span>
+</div>
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-secondary">
+<span>Status</span>
+<span class="font-medium text-lime-deep">Bereit für Abruf</span>
+</div>
+</div>
+</div>
+<!-- Channel Action Row -->
+<div class="flex items-center justify-between pt-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">OAuth 2.0 PKCE</span>
+<button class="w-full sm:w-auto px-space-md py-space-xs rounded-xl bg-transparent hover:bg-violet-wash text-primary-container font-headline-sm text-headline-sm transition-all text-center" data-connected="false" id="btn-otto" onclick="toggleMarketplace('otto')" type="button">
+              Verbinden
+            </button>
+</div>
+</div>
+<!-- Tile 3: eBay DE (Merchant API) - Disconnected -->
+<div class="relative bg-tile-raise rounded-2xl p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex flex-col justify-between gap-space-md">
+<div class="flex flex-col gap-space-sm">
+<!-- Channel Header Row -->
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<!-- eBay Visual Monogram -->
+<div class="w-12 h-12 rounded-xl bg-primary-fixed flex items-center justify-center text-primary font-data-lg text-data-lg font-bold shadow-sm">
+<span class="tracking-tighter">eB</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary font-bold">eBay DE</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Fulfillment &amp; Finances API</span>
+</div>
+</div>
+<!-- Status Pill -->
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-well-sunken/80 text-ink-secondary" id="badge-ebay">
+<span class="w-2 h-2 rounded-full bg-ink-tertiary" id="dot-ebay"></span>
+<span class="font-data-sm text-data-sm font-semibold tracking-tight" id="text-ebay">Nicht verbunden</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+              Live-Abgleich von Transaktionsprotokollen, variablen Angebotsgebühren und Promoted Listings TACoS-Kampagnen.
+            </p>
+<!-- Sync Telemetry Block (Hidden initially) -->
+<div class="hidden p-space-sm rounded-xl bg-well-sunken/60 flex flex-col gap-1" id="meta-ebay">
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-primary">
+<span class="font-semibold">0 Transaktionen</span>
+<span class="text-ink-tertiary">Handshake OK</span>
+</div>
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-secondary">
+<span>Finances API</span>
+<span class="font-medium text-lime-deep">Token aktiv</span>
+</div>
+</div>
+</div>
+<!-- Channel Action Row -->
+<div class="flex items-center justify-between pt-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">eBay RESTful v1</span>
+<button class="w-full sm:w-auto px-space-md py-space-xs rounded-xl bg-transparent hover:bg-violet-wash text-primary-container font-headline-sm text-headline-sm transition-all text-center" data-connected="false" id="btn-ebay" onclick="toggleMarketplace('ebay')" type="button">
+              Verbinden
+            </button>
+</div>
+</div>
+<!-- Tile 4: Shopify Direct (Storefront & Admin API) - Disconnected -->
+<div class="relative bg-tile-raise rounded-2xl p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.04)] flex flex-col justify-between gap-space-md">
+<div class="flex flex-col gap-space-sm">
+<!-- Channel Header Row -->
+<div class="flex items-start justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<!-- Shopify Visual Monogram -->
+<div class="w-12 h-12 rounded-xl bg-secondary-container/50 text-secondary flex items-center justify-center font-data-lg text-data-lg font-bold shadow-sm">
+<span class="tracking-tighter">sh</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary font-bold">Shopify Direct</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Storefront &amp; Admin GraphQL</span>
+</div>
+</div>
+<!-- Status Pill -->
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-well-sunken/80 text-ink-secondary" id="badge-shopify">
+<span class="w-2 h-2 rounded-full bg-ink-tertiary" id="dot-shopify"></span>
+<span class="font-data-sm text-data-sm font-semibold tracking-tight" id="text-shopify">Nicht verbunden</span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+              D2C-Margenprüfung, Shopify Payments Gebührenabzug und lückenloser Wareneinsatz (COGS)-Abgleich.
+            </p>
+<!-- Sync Telemetry Block (Hidden initially) -->
+<div class="hidden p-space-sm rounded-xl bg-well-sunken/60 flex flex-col gap-1" id="meta-shopify">
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-primary">
+<span class="font-semibold">0 Orders</span>
+<span class="text-ink-tertiary">Webhook aktiv</span>
+</div>
+<div class="flex items-center justify-between font-data-sm text-data-sm text-ink-secondary">
+<span>Webhook Event</span>
+<span class="font-medium text-lime-deep">orders/create</span>
+</div>
+</div>
+</div>
+<!-- Channel Action Row -->
+<div class="flex items-center justify-between pt-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary">Custom App Integration</span>
+<button class="w-full sm:w-auto px-space-md py-space-xs rounded-xl bg-transparent hover:bg-violet-wash text-primary-container font-headline-sm text-headline-sm transition-all text-center" data-connected="false" id="btn-shopify" onclick="toggleMarketplace('shopify')" type="button">
+              Verbinden
+            </button>
+</div>
+</div>
+</div>
+<!-- Live Sync Ingestion Indicator Panel (Depressed Sunken Tier) -->
+<div class="w-full p-space-md rounded-2xl bg-well-sunken/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-xl bg-tile-peak flex items-center justify-center text-primary shadow-sm">
+<span class="material-symbols-outlined text-[18px]">sync_alt</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary font-semibold">
+              Hintergrund-Synchronisation aktiv
+            </span>
+<span class="font-body-sm text-body-sm text-ink-secondary">
+<span class="font-data-sm text-data-sm font-bold text-ink-primary" id="active-sync-count">1</span> von 4 Marktplätzen speisen historische Daten (365 Tage) in den Profit-Motor ein.
+            </span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs self-end sm:self-center">
+<span class="font-data-sm text-data-sm text-ink-secondary">Latenz:</span>
+<span class="font-data-sm text-data-sm text-lime-deep font-bold">18ms</span>
+</div>
+</div>
+<!-- Action Footer Navigation -->
+<div class="pt-space-sm flex flex-col sm:flex-row items-center justify-between gap-space-md">
+<!-- Left Tertiary Action -->
+<button class="order-2 sm:order-1 text-ink-secondary hover:text-ink-primary font-headline-sm text-headline-sm px-space-sm py-space-xs transition-colors flex items-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+<span>Abbrechen &amp; später fortsetzen</span>
+</button>
+<!-- Right Single Primary Action CTA -->
+<div class="order-1 sm:order-2 flex flex-col sm:items-end gap-1 w-full sm:w-auto">
+<button class="w-full sm:w-auto px-space-xl py-3 rounded-xl bg-primary-container hover:bg-violet-press text-on-primary font-headline-sm text-headline-sm font-bold shadow-[0_4px_12px_rgba(90,68,201,0.2)] active:translate-y-[1px] transition-all flex items-center justify-center gap-space-xs" type="button">
+<span>Weiter: Kosten hinterlegen</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+<span class="font-body-sm text-body-sm text-ink-tertiary text-center sm:text-right">
+            Bereits verknüpfte Marktplätze starten den initialen Daten-Sync im Hintergrund.
+          </span>
+</div>
+</div>
+</div>
+<!-- Micro Metadata Bar underneath Bento Ground -->
+<div class="w-full mt-space-md px-space-sm flex flex-col sm:flex-row items-center justify-between gap-space-xs text-ink-tertiary font-data-sm text-data-sm">
+<div class="flex items-center gap-space-sm">
+<span>Session-ID: <span class="text-ink-secondary">#WIZ-2026-99214-DE</span></span>
+<span>·</span>
+<span>SSL 256-Bit</span>
+</div>
+<div>
+<span>Fragen zur Anbindung? <a class="text-primary hover:underline font-semibold" href="#">Live-Support kontaktieren</a></span>
+</div>
+</div>
+</div>
+</div></main></div></body></html>

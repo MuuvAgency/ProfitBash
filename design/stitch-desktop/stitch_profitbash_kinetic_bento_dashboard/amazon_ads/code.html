@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tile-peak": "#FFFFFF",
+          "ink-on-dark": "#EDECF3",
+          "surface-dim": "#ddd8e4",
+          "on-tertiary": "#ffffff",
+          "on-error-container": "#93000a",
+          "primary": "#4227b1",
+          "on-surface-variant": "#484554",
+          "surface": "#fdf8ff",
+          "warn-amber": "#E0A233",
+          "tertiary": "#6e3300",
+          "inverse-on-surface": "#f4effa",
+          "secondary-container": "#c4ef3e",
+          "ink-secondary": "#63607A",
+          "well-sunken": "#E6E4EC",
+          "on-primary-container": "#d6ceff",
+          "on-error": "#ffffff",
+          "surface-container": "#f1ecf8",
+          "on-tertiary-fixed-variant": "#733600",
+          "on-secondary-fixed": "#161f00",
+          "on-primary": "#ffffff",
+          "inverse-surface": "#312f38",
+          "lime-deep": "#7E9E12",
+          "tertiary-container": "#924600",
+          "violet-press": "#4835A6",
+          "surface-tint": "#5d47cc",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-highest": "#e5e0ec",
+          "surface-container-low": "#f7f1fd",
+          "inverse-primary": "#c8bfff",
+          "background": "#fdf8ff",
+          "outline": "#787585",
+          "ink-primary": "#1B1826",
+          "outline-variant": "#c9c4d6",
+          "on-surface": "#1c1b23",
+          "primary-fixed": "#e5deff",
+          "tile-raise": "#FAFAFC",
+          "on-background": "#1c1b23",
+          "on-tertiary-container": "#ffc8a7",
+          "ink-panel": "#1B1826",
+          "on-secondary-container": "#546b00",
+          "error": "#ba1a1a",
+          "secondary": "#506600",
+          "surface-bright": "#fdf8ff",
+          "primary-fixed-dim": "#c8bfff",
+          "secondary-fixed-dim": "#acd522",
+          "primary-container": "#5a44c9",
+          "on-secondary-fixed-variant": "#3c4d00",
+          "on-primary-fixed-variant": "#452bb3",
+          "surface-variant": "#e5e0ec",
+          "violet-wash": "#ECE8FA",
+          "on-secondary": "#ffffff",
+          "tertiary-fixed": "#ffdbc7",
+          "canvas-mist": "#EEEDF3",
+          "ink-tertiary": "#9C99AD",
+          "on-tertiary-fixed": "#311300",
+          "on-primary-fixed": "#1a0064",
+          "whisper-line": "rgba(27,24,38,0.06)",
+          "error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb688",
+          "surface-container-high": "#ebe6f2",
+          "secondary-fixed": "#c7f241",
+          "loss-red": "#D6524B"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-lg": "1.25rem",
+          "space-xl": "1.75rem",
+          "gutter": "1.25rem",
+          "space-xs": "0.25rem",
+          "gutter-mobile": "0.75rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "headline-lg-mobile": [
+            "Space Grotesk"
+          ],
+          "body-lg": [
+            "Space Grotesk"
+          ],
+          "headline-lg": [
+            "Space Grotesk"
+          ],
+          "label-eyebrow": [
+            "Space Grotesk"
+          ],
+          "display": [
+            "Space Grotesk"
+          ],
+          "data-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Space Grotesk"
+          ],
+          "data-sm": [
+            "JetBrains Mono"
+          ],
+          "body-md": [
+            "Space Grotesk"
+          ],
+          "data-hero-mobile": [
+            "JetBrains Mono"
+          ],
+          "display-mobile": [
+            "Space Grotesk"
+          ],
+          "body-sm": [
+            "Space Grotesk"
+          ],
+          "headline-sm": [
+            "Space Grotesk"
+          ],
+          "data-md": [
+            "JetBrains Mono"
+          ],
+          "data-hero": [
+            "JetBrains Mono"
+          ]
+        },
+        "fontSize": {
+          "headline-lg-mobile": [
+            "22px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "30px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-eyebrow": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "700"
+            }
+          ],
+          "display": [
+            "52px",
+            {
+              "lineHeight": "52px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "data-lg": [
+            "22px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "21px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "data-hero-mobile": [
+            "26px",
+            {
+              "lineHeight": "30px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-mobile": [
+            "32px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-sm": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "18px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "data-hero": [
+            "42px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist text-ink-primary antialiased"><h1 class="sr-only">Amazon Ads Optimierung</h1><aside class="fixed left-0 top-0 h-full w-64 bg-ink-panel z-50 flex flex-col justify-between p-margin shadow-[0_10px_30px_rgba(48,38,92,0.12)]"><div class="flex flex-col gap-space-lg"><div class="flex items-center gap-space-xs px-space-sm py-space-xs"><span class="font-headline-lg text-headline-lg tracking-tight text-ink-on-dark uppercase">ProfitBash</span><span class="h-2 w-2 rounded-full bg-secondary-fixed mb-1"></span></div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]"><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-body-md text-body-md">Dashboard</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="verkaufsanalyse" href="#"><span class="material-symbols-outlined text-[20px]">query_stats</span><span class="font-body-md text-body-md">Verkaufsanalyse</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="profitabilitat" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-body-md text-body-md">Profitabilität</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="marken-produkte" href="#"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-body-md text-body-md">Marken &amp; Produkte</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="retouren" href="#"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="font-body-md text-body-md">Retouren</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-body-md text-body-md">Bestellungen</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="amazon-ads" href="#"><span class="material-symbols-outlined text-[20px]">campaign</span><span class="font-body-md text-body-md">Amazon Ads</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[20px]">tune</span><span class="font-body-md text-body-md">Einstellungen</span></a></nav></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-xl bg-ink-on-dark/5"><div class="flex items-center gap-space-xs"><span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span><span class="font-data-sm text-data-sm text-ink-on-dark/80 uppercase">Channels Live</span></div><span class="font-data-sm text-data-sm text-ink-tertiary">v2.4</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-canvas-mist/85 backdrop-blur-xl z-40 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-headline-sm text-headline-sm text-ink-primary">Guten Morgen, Dominik</span><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="h-2 w-2 rounded-full bg-lime-deep"></span><span class="font-data-sm text-data-sm text-ink-secondary">Amazon, eBay, Otto, Shopify</span><span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">Synced</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="material-symbols-outlined text-ink-secondary text-[18px]">calendar_today</span><span class="font-data-sm text-data-sm text-ink-primary font-semibold">Sept 2026</span></div><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="font-body-sm text-body-sm font-semibold">Export</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative pt-16 bg-canvas-mist min-h-screen"><div class="flex flex-col w-full gap-space-lg p-margin">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Advertising Intelligence</span>
+<span class="text-ink-tertiary font-label-eyebrow text-label-eyebrow">/</span>
+<span class="font-label-eyebrow text-label-eyebrow text-primary font-bold uppercase tracking-wider">Amazon Ads Command Center</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05)]">
+<span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span>
+<span class="font-data-sm text-data-sm text-ink-primary font-medium">Amazon Ads API &amp; MCP Live</span>
+</div>
+<span class="font-body-sm text-body-sm text-ink-secondary">Synchronisation aktiv (Amazon DSP + Seller Central)</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-violet-wash text-primary hover:bg-surface-container-high transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+<span class="font-body-sm text-body-sm font-semibold">Neues Gebotslimit</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button">
+<span class="material-symbols-outlined text-[18px]">ios_share</span>
+<span class="font-body-sm text-body-sm font-semibold">Report exportieren</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-gutter">
+<div class="flex flex-col justify-between p-space-lg rounded-[1.75rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Ad Spend Gesamt</span>
+<span class="material-symbols-outlined text-ink-secondary text-[20px]">credit_card</span>
+</div>
+<div class="flex items-baseline gap-space-sm my-space-xs">
+<span class="font-data-hero text-data-hero text-ink-primary tracking-tight">€ 9.420,00</span>
+</div>
+<div class="flex items-center gap-space-xs mt-space-xs">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded-full bg-well-sunken text-ink-primary font-data-sm text-data-sm font-semibold">
+          +4,2 %
+        </span>
+<span class="font-body-sm text-body-sm text-ink-secondary">vs. Vormonat</span>
+</div>
+</div>
+<div class="flex flex-col justify-between p-space-lg rounded-[1.75rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Return on Ad Spend</span>
+<span class="material-symbols-outlined text-ink-secondary text-[20px]">trending_up</span>
+</div>
+<div class="flex items-baseline gap-space-sm my-space-xs">
+<span class="font-data-hero text-data-hero text-ink-primary tracking-tight">4,7×</span>
+</div>
+<div class="flex items-center gap-space-xs mt-space-xs">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-data-sm text-data-sm font-semibold">
+          +0,6× Effizienz
+        </span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Bench: 3,8×</span>
+</div>
+</div>
+<div class="flex flex-col justify-between p-space-lg rounded-[1.75rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Aktueller ACOS</span>
+<span class="material-symbols-outlined text-ink-secondary text-[20px]">percent</span>
+</div>
+<div class="flex items-baseline gap-space-sm my-space-xs">
+<span class="font-data-hero text-data-hero text-ink-primary tracking-tight">21,3 %</span>
+</div>
+<div class="flex items-center gap-space-xs mt-space-xs">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-data-sm text-data-sm font-semibold">
+          -1,8 pp
+        </span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Zielkorridor &lt; 22 %</span>
+</div>
+</div>
+<div class="flex flex-col justify-between p-space-lg rounded-[1.75rem] bg-ink-panel text-ink-on-dark shadow-[0_10px_30px_rgba(27,24,38,0.2)]">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Attribuierter Netto-Profit</span>
+<span class="h-2 w-2 rounded-full bg-secondary-fixed"></span>
+</div>
+<div class="flex items-baseline gap-space-sm my-space-xs">
+<span class="font-data-hero text-data-hero text-secondary-fixed tracking-tight">€ 18.760,00</span>
+</div>
+<div class="flex items-center gap-space-xs mt-space-xs">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded-full bg-secondary-fixed/20 text-secondary-fixed font-data-sm text-data-sm font-semibold">
+          +12,4 % MoM
+        </span>
+<span class="font-body-sm text-body-sm text-ink-on-dark/70">nach CPC &amp; Amazon Gebühren</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-gutter">
+<div class="xl:col-span-8 flex flex-col p-space-xl rounded-[2rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md mb-space-lg">
+<div>
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-md text-headline-md text-ink-primary">Dayparting &amp; 24h-Budgetallokation</span>
+<span class="px-space-xs py-0.5 rounded-md bg-violet-wash text-primary font-label-eyebrow text-label-eyebrow uppercase font-bold">Smart Curve</span>
+</div>
+<p class="font-body-md text-body-md text-ink-secondary mt-0.5">Tagesbudget € 320,00 · automatisch nach Konversionswahrscheinlichkeit verteilt</p>
+</div>
+<div class="flex items-center gap-space-md self-start sm:self-auto">
+<span class="font-body-sm text-body-sm text-ink-secondary font-medium">Dayparting aktiv</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" id="dayparting-toggle" type="checkbox"/>
+<div class="w-11 h-6 bg-well-sunken peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-tile-peak after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-tile-peak after:border-surface-variant after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+<div class="relative w-full rounded-2xl bg-well-sunken p-space-md flex flex-col">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="h-2.5 w-2.5 rounded-full bg-primary-container"></span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Budget-Gewichtung</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="h-2.5 w-2.5 rounded-full bg-secondary-fixed"></span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Peak Conversion Zone</span>
+</div>
+</div>
+<div class="px-space-sm py-1 rounded-lg bg-tile-peak text-ink-primary font-data-sm text-data-sm shadow-[0_1px_2px_rgba(48,38,92,0.05)]">
+<span class="font-semibold text-primary">19:00 Peak</span> • 160 % Gebot • € 28,40 Budget
+          </div>
+</div>
+<div class="w-full h-56 relative flex items-end">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 760 160">
+<defs>
+<lineargradient id="budgetCurveGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#5a44c9" stop-opacity="0.32"></stop>
+<stop offset="85%" stop-color="#5a44c9" stop-opacity="0.0"></stop>
+</lineargradient>
+<lineargradient id="peakHighlight" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#c4ef3e" stop-opacity="0.4"></stop>
+<stop offset="100%" stop-color="#c4ef3e" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<rect fill="url(#peakHighlight)" height="150" rx="8" width="160" x="510" y="8"></rect>
+<path d="M0,145 L30,145 L60,148 L90,150 L120,148 L150,140 L180,120 L210,105 L240,92 L270,95 L300,100 L330,90 L360,82 L390,75 L420,68 L450,55 L480,42 L510,25 L540,12 L570,10 L600,18 L630,35 L660,70 L690,110 L720,135 L760,145 L760,160 L0,160 Z" fill="url(#budgetCurveGradient)"></path>
+<path d="M0,145 L30,145 L60,148 L90,150 L120,148 L150,140 L180,120 L210,105 L240,92 L270,95 L300,100 L330,90 L360,82 L390,75 L420,68 L450,55 L480,42 L510,25 L540,12 L570,10 L600,18 L630,35 L660,70 L690,110 L720,135 L760,145" fill="none" stroke="#5a44c9" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
+<circle cx="570" cy="10" fill="#c7f241" r="5" stroke="#1B1826" stroke-width="2"></circle>
+<circle cx="510" cy="25" fill="#5a44c9" r="3.5"></circle>
+<circle cx="600" cy="18" fill="#5a44c9" r="3.5"></circle>
+</svg>
+</div>
+<div class="flex justify-between items-center pt-space-xs mt-space-xs font-data-sm text-data-sm text-ink-secondary">
+<span>00:00</span>
+<span>03:00</span>
+<span>06:00</span>
+<span>09:00</span>
+<span>12:00</span>
+<span>15:00</span>
+<span class="font-bold text-primary">18:00</span>
+<span class="font-bold text-secondary font-semibold">21:00</span>
+<span>23:00</span>
+</div>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-space-sm mt-space-md pt-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Profile Presets:</span>
+<button class="px-space-sm py-1 rounded-lg bg-well-sunken text-ink-primary hover:bg-tile-peak font-body-sm text-body-sm transition-all" type="button">Gleichmäßig</button>
+<button class="px-space-sm py-1 rounded-lg bg-primary text-on-primary font-body-sm text-body-sm font-semibold shadow-[0_2px_8px_rgba(66,39,177,0.25)]" type="button">Abend-Fokus (Bestseller)</button>
+<button class="px-space-sm py-1 rounded-lg bg-well-sunken text-ink-primary hover:bg-tile-peak font-body-sm text-body-sm transition-all" type="button">B2B Office (09–17h)</button>
+</div>
+<span class="font-data-sm text-data-sm text-ink-secondary">Auto-Boost: 17:00 – 22:00 Uhr MESZ</span>
+</div>
+</div>
+<div class="xl:col-span-4 flex flex-col justify-between p-space-xl rounded-[2rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div>
+<div class="flex items-center justify-between mb-space-md">
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-ink-primary">Auto-Bidding Guardrail</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Algorithmische Leitplanken für MCP-Agent</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[22px]">shield</span>
+</div>
+<div class="grid grid-cols-3 p-1 rounded-xl bg-well-sunken mb-space-lg">
+<button class="py-1.5 rounded-lg bg-tile-peak text-primary font-body-sm text-body-sm font-bold shadow-[0_1px_2px_rgba(48,38,92,0.08)]" type="button">Ziel-ACOS</button>
+<button class="py-1.5 rounded-lg text-ink-secondary hover:text-ink-primary font-body-sm text-body-sm font-medium transition-colors" type="button">Umsatz</button>
+<button class="py-1.5 rounded-lg text-ink-secondary hover:text-ink-primary font-body-sm text-body-sm font-medium transition-colors" type="button">Manuell</button>
+</div>
+<div class="flex flex-col gap-space-md">
+<div class="p-space-md rounded-xl bg-well-sunken flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-body-sm text-body-sm font-semibold text-ink-primary" for="guardrail-acos">Maximaler Ziel-ACOS</label>
+<span class="font-data-sm text-data-sm text-ink-secondary">Toleranz: ±1,5 %</span>
+</div>
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-data-lg text-data-lg text-ink-primary font-semibold">22,0 %</span>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Hard Ceiling</span>
+</div>
+</div>
+<div class="p-space-md rounded-xl bg-well-sunken flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-body-sm text-body-sm font-semibold text-ink-primary" for="guardrail-cpc">Max. Klickgebot (CPC Limit)</label>
+<span class="font-data-sm text-data-sm text-ink-secondary">Standard: € 1,20</span>
+</div>
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-data-lg text-data-lg text-ink-primary font-semibold">€ 1,80</span>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Exact ASINs</span>
+</div>
+</div>
+<div class="p-space-md rounded-xl bg-well-sunken flex flex-col gap-space-xs">
+<div class="flex justify-between items-center">
+<label class="font-body-sm text-body-sm font-semibold text-ink-primary">Budget-Puffer Überziehung</label>
+<span class="font-data-sm text-data-sm text-lime-deep font-semibold">Dynamic</span>
+</div>
+<div class="p-space-sm rounded-lg bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.04)]">
+<span class="font-body-md text-body-md text-ink-primary font-medium">max. 10 % an Peak-Tagen</span>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-space-lg pt-space-md flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-secondary">Leitplanken aktiv geschützt</span>
+<button class="px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press font-body-sm text-body-sm font-semibold transition-all" type="button">
+          Sichern
+        </button>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<div class="lg:col-span-7 flex flex-col p-space-xl rounded-[2rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div class="flex items-center justify-between mb-space-lg">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-md text-headline-md text-ink-primary">Automatisierungs-Regeln</span>
+<span class="px-space-sm py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-data-sm text-data-sm font-bold">4 Aktiv</span>
+</div>
+<button class="flex items-center gap-space-xs px-space-sm py-1 rounded-xl bg-violet-wash text-primary hover:bg-surface-container-high font-body-sm text-body-sm font-semibold transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Regel erstellen</span>
+</button>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="p-space-md rounded-2xl bg-well-sunken flex flex-col gap-space-xs">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col gap-0.5">
+<span class="font-body-md text-body-md font-semibold text-ink-primary">WENN ACOS &gt; 30 % über 3 Tage → Gebot −15 %</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Ziel: Eindämmung unprofitabler Keywords auf SP &amp; SD</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-canvas-mist rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-tile-peak after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-tile-peak after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center gap-space-xs mt-space-xs font-data-sm text-data-sm text-ink-secondary">
+<span class="material-symbols-outlined text-[16px] text-ink-tertiary">schedule</span>
+<span>Letzte Ausführung:</span>
+<span class="text-ink-primary font-medium">Heute, 14:20 Uhr (3 Kampagnen angepasst)</span>
+</div>
+</div>
+<div class="p-space-md rounded-2xl bg-well-sunken flex flex-col gap-space-xs">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col gap-0.5">
+<span class="font-body-md text-body-md font-semibold text-ink-primary">WENN CVR &gt; 18 % &amp; Impression Share &lt; 60 % → Tagesbudget +20 %</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Ziel: Wachstums-Skalierung renditestarker Bestseller</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-canvas-mist rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-tile-peak after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-tile-peak after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center gap-space-xs mt-space-xs font-data-sm text-data-sm text-ink-secondary">
+<span class="material-symbols-outlined text-[16px] text-ink-tertiary">schedule</span>
+<span>Letzte Ausführung:</span>
+<span class="text-ink-primary font-medium">Gestern, 23:00 Uhr (Keine Aktion erforderlich)</span>
+</div>
+</div>
+<div class="p-space-md rounded-2xl bg-well-sunken flex flex-col gap-space-xs">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col gap-0.5">
+<span class="font-body-md text-body-md font-semibold text-ink-primary">WENN Keyword Spend &gt; € 45 ohne Sale → Negativ schalten (Exact)</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Ziel: Automatische Budget-Leckagenbereinigung</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-canvas-mist rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-tile-peak after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-tile-peak after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center gap-space-xs mt-space-xs font-data-sm text-data-sm text-ink-secondary">
+<span class="material-symbols-outlined text-[16px] text-ink-tertiary">schedule</span>
+<span>Letzte Ausführung:</span>
+<span class="text-ink-primary font-medium">Heute, 09:15 Uhr (2 Keywords negativiert)</span>
+</div>
+</div>
+</div>
+<div class="mt-space-md p-space-sm rounded-xl bg-violet-wash flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">bolt</span>
+<span class="font-body-sm text-body-sm font-medium text-primary">IF / THEN Matrix mit automatischer Amazon MCP Ausführung</span>
+</div>
+<span class="font-label-eyebrow text-label-eyebrow text-primary uppercase font-bold">Rule Engine v3.1</span>
+</div>
+</div>
+<div class="lg:col-span-5 flex flex-col gap-gutter">
+<div class="p-space-lg rounded-[1.75rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-ink-primary">Amazon MCP Sync Bridge</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Echtzeit Bid-Stream &amp; Attributions-Cache</span>
+</div>
+<span class="inline-flex items-center gap-space-xs px-space-sm py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-eyebrow text-label-eyebrow uppercase font-bold">
+<span class="h-1.5 w-1.5 rounded-full bg-secondary"></span> Live Synced
+          </span>
+</div>
+<div class="p-space-md rounded-xl bg-well-sunken flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-secondary">MCP Gateway:</span>
+<span class="font-data-sm text-data-sm text-ink-primary font-semibold">eu-west-1.amazon-ads.mcp</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-secondary">Zuletzt aktualisiert:</span>
+<span class="font-data-sm text-data-sm text-ink-primary">30.09.2026, 16:54:12 UTC</span>
+</div>
+</div>
+<div class="flex items-center justify-between mt-space-md">
+<span class="font-body-sm text-body-sm text-ink-secondary">Integrität 100% verifiziert</span>
+<button class="flex items-center gap-space-xs px-space-md py-1.5 rounded-xl bg-violet-wash text-primary hover:bg-surface-container-high font-body-sm text-body-sm font-semibold transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">sync</span>
+<span>Jetzt synchronisieren</span>
+</button>
+</div>
+</div>
+<div class="p-space-lg rounded-[1.75rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-space-xs">
+<span class="font-headline-sm text-headline-sm text-ink-primary">Kampagnen-Builder</span>
+<span class="material-symbols-outlined text-ink-secondary text-[20px]">library_add</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary mb-space-md">Struktur wird automatisch angelegt &amp; via API gepusht</p>
+<div class="flex flex-col gap-space-xs">
+<div class="p-space-sm rounded-xl bg-well-sunken flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-0.5 rounded-md bg-tile-peak text-primary font-data-sm text-data-sm font-bold shadow-[0_1px_2px_rgba(48,38,92,0.04)]">SP</span>
+<div>
+<span class="block font-body-md text-body-md font-semibold text-ink-primary">Sponsored Products</span>
+<span class="block font-body-sm text-body-sm text-ink-secondary">Auto &amp; Manuell Keyword-Targeting</span>
+</div>
+</div>
+<button class="px-space-md py-1 rounded-lg bg-tile-peak text-primary hover:bg-violet-wash font-body-sm text-body-sm font-bold shadow-[0_1px_2px_rgba(48,38,92,0.05)] transition-all" type="button">Anlegen</button>
+</div>
+<div class="p-space-sm rounded-xl bg-well-sunken flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-0.5 rounded-md bg-tile-peak text-violet-press font-data-sm text-data-sm font-bold shadow-[0_1px_2px_rgba(48,38,92,0.04)]">SB</span>
+<div>
+<span class="block font-body-md text-body-md font-semibold text-ink-primary">Sponsored Brands</span>
+<span class="block font-body-sm text-body-sm text-ink-secondary">Storefront &amp; Video Ads mit Logo</span>
+</div>
+</div>
+<button class="px-space-md py-1 rounded-lg bg-tile-peak text-primary hover:bg-violet-wash font-body-sm text-body-sm font-bold shadow-[0_1px_2px_rgba(48,38,92,0.05)] transition-all" type="button">Anlegen</button>
+</div>
+<div class="p-space-sm rounded-xl bg-well-sunken flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-0.5 rounded-md bg-tile-peak text-ink-secondary font-data-sm text-data-sm font-bold shadow-[0_1px_2px_rgba(48,38,92,0.04)]">SD</span>
+<div>
+<span class="block font-body-md text-body-md font-semibold text-ink-primary">Sponsored Display</span>
+<span class="block font-body-sm text-body-sm text-ink-secondary">Retargeting &amp; Mitbewerber-ASINs</span>
+</div>
+</div>
+<button class="px-space-md py-1 rounded-lg bg-tile-peak text-primary hover:bg-violet-wash font-body-sm text-body-sm font-bold shadow-[0_1px_2px_rgba(48,38,92,0.05)] transition-all" type="button">Anlegen</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col p-space-xl rounded-[2rem] bg-tile-raise shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)]">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md mb-space-lg">
+<div>
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-md text-headline-md text-ink-primary">Live Kampagnen-Performance</span>
+<span class="px-space-xs py-0.5 rounded-md bg-violet-wash text-primary font-label-eyebrow text-label-eyebrow uppercase font-bold">14 Kampagnen</span>
+</div>
+<p class="font-body-md text-body-md text-ink-secondary mt-0.5">Automatisierte Gebotsüberwachung &amp; tagesaktuelle Attribution</p>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative">
+<input class="px-space-md py-1.5 pl-9 rounded-xl bg-well-sunken text-ink-primary placeholder:text-ink-tertiary font-body-sm text-body-sm focus:outline-none focus:bg-tile-peak shadow-[inset_0_1px_2px_rgba(48,38,92,0.04)]" placeholder="Kampagne / ASIN filtern..." type="text" aria-label="Kampagne / ASIN filtern"/>
+<span class="material-symbols-outlined text-ink-secondary absolute left-2.5 top-2 text-[18px]">search</span>
+</div>
+<button class="p-2 rounded-xl bg-well-sunken text-ink-secondary hover:text-ink-primary hover:bg-tile-peak transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="shadow-[0_1px_0_rgba(27,24,38,0.06)]">
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Status</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Kampagne &amp; ASIN</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Typ</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">Spend</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">Umsatz</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">ACOS</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">ROAS</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-right">7-Tage Trend</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase text-center">Aktion</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md text-ink-primary">
+<tr class="hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-md px-space-md">
+<span class="flex items-center gap-1.5">
+<span class="h-2 w-2 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-data-sm text-ink-primary">Aktiv</span>
+</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-semibold text-ink-primary">SP | AuraTech Headphones | Exact Core</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">B09XYZ4512 • 42 Keywords</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="px-2 py-0.5 rounded bg-violet-wash text-primary font-data-sm text-data-sm font-bold">SP</span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md">€ 3.240,00</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-semibold">€ 18.620,00</td>
+<td class="py-space-md px-space-md text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-data-md text-data-md font-bold">
+                17,4 %
+              </span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-bold">5,74×</td>
+<td class="py-space-md px-space-md text-right">
+<svg class="inline-block w-24 h-6 overflow-visible" viewbox="0 0 100 24">
+<path d="M0,18 Q20,16 40,10 T70,8 T100,3" fill="none" stroke="#506600" stroke-linecap="round" stroke-width="2"></path>
+<circle cx="100" cy="3" fill="#c7f241" r="3" stroke="#506600" stroke-width="1.5"></circle>
+</svg>
+</td>
+<td class="py-space-md px-space-md text-center">
+<button class="p-1 rounded-lg text-ink-secondary hover:text-primary hover:bg-tile-peak transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="bg-well-sunken/20 hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-md px-space-md">
+<span class="flex items-center gap-1.5">
+<span class="h-2 w-2 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-data-sm text-ink-primary">Aktiv</span>
+</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-semibold text-ink-primary">SB | Brand Store Video | Lifestyle</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">Brand Profile V2 • Video Reel</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="px-2 py-0.5 rounded bg-violet-wash text-violet-press font-data-sm text-data-sm font-bold">SB</span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md">€ 2.890,00</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-semibold">€ 14.160,00</td>
+<td class="py-space-md px-space-md text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-data-md text-data-md font-bold">
+                20,4 %
+              </span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-bold">4,90×</td>
+<td class="py-space-md px-space-md text-right">
+<svg class="inline-block w-24 h-6 overflow-visible" viewbox="0 0 100 24">
+<path d="M0,14 Q25,20 50,12 T75,9 T100,5" fill="none" stroke="#506600" stroke-linecap="round" stroke-width="2"></path>
+<circle cx="100" cy="5" fill="#c7f241" r="3" stroke="#506600" stroke-width="1.5"></circle>
+</svg>
+</td>
+<td class="py-space-md px-space-md text-center">
+<button class="p-1 rounded-lg text-ink-secondary hover:text-primary hover:bg-tile-peak transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-md px-space-md">
+<span class="flex items-center gap-1.5">
+<span class="h-2 w-2 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-data-sm text-ink-primary">Aktiv</span>
+</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-semibold text-ink-primary">SP | ANC Earbuds | Auto Expansion</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">B08KKT8831 • Loose Match</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="px-2 py-0.5 rounded bg-violet-wash text-primary font-data-sm text-data-sm font-bold">SP</span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md">€ 1.940,00</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-semibold">€ 7.210,00</td>
+<td class="py-space-md px-space-md text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-error-container text-loss-red font-data-md text-data-md font-bold">
+                26,9 %
+              </span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-bold">3,71×</td>
+<td class="py-space-md px-space-md text-right">
+<svg class="inline-block w-24 h-6 overflow-visible" viewbox="0 0 100 24">
+<path d="M0,6 Q30,12 60,15 T100,20" fill="none" stroke="#D6524B" stroke-linecap="round" stroke-width="2"></path>
+<circle cx="100" cy="20" fill="#D6524B" r="3" stroke="#ffdad6" stroke-width="1.5"></circle>
+</svg>
+</td>
+<td class="py-space-md px-space-md text-center">
+<button class="p-1 rounded-lg text-ink-secondary hover:text-primary hover:bg-tile-peak transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="bg-well-sunken/20 hover:bg-well-sunken/40 transition-colors">
+<td class="py-space-md px-space-md">
+<span class="flex items-center gap-1.5">
+<span class="h-2 w-2 rounded-full bg-warn-amber"></span>
+<span class="font-data-sm text-data-sm text-ink-primary">Begrenzt</span>
+</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-semibold text-ink-primary">SD | Competitor Defense | Tech</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">Product Contextual Target • 18 ASINs</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="px-2 py-0.5 rounded bg-well-sunken text-ink-primary font-data-sm text-data-sm font-bold">SD</span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md">€ 1.350,00</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-semibold">€ 6.220,00</td>
+<td class="py-space-md px-space-md text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-data-md text-data-md font-bold">
+                21,7 %
+              </span>
+</td>
+<td class="py-space-md px-space-md text-right font-data-md text-data-md font-bold">4,60×</td>
+<td class="py-space-md px-space-md text-right">
+<svg class="inline-block w-24 h-6 overflow-visible" viewbox="0 0 100 24">
+<path d="M0,12 Q30,6 60,14 T100,10" fill="none" stroke="#5a44c9" stroke-linecap="round" stroke-width="2"></path>
+<circle cx="100" cy="10" fill="#5a44c9" r="3" stroke="#ECE8FA" stroke-width="1.5"></circle>
+</svg>
+</td>
+<td class="py-space-md px-space-md text-center">
+<button class="p-1 rounded-lg text-ink-secondary hover:text-primary hover:bg-tile-peak transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="flex flex-col sm:flex-row items-center justify-between gap-space-sm mt-space-md pt-space-sm text-ink-secondary">
+<span class="font-body-sm text-body-sm">Zeige 1-4 von 14 synchronisierten Amazon Ad Gruppen</span>
+<div class="flex items-center gap-space-xs">
+<button class="px-space-sm py-1 rounded-lg bg-well-sunken text-ink-secondary font-body-sm text-body-sm cursor-not-allowed" disabled="" type="button">Vorherige</button>
+<span class="px-space-sm py-1 rounded-lg bg-tile-peak font-data-sm text-data-sm font-semibold text-primary shadow-[0_1px_2px_rgba(48,38,92,0.05)]">1</span>
+<button class="px-space-sm py-1 rounded-lg bg-well-sunken hover:bg-tile-peak text-ink-primary font-body-sm text-body-sm transition-all" type="button">2</button>
+<button class="px-space-sm py-1 rounded-lg bg-well-sunken hover:bg-tile-peak text-ink-primary font-body-sm text-body-sm transition-all" type="button">Nächste</button>
+</div>
+</div>
+</div>
+</div></main></div></body></html>

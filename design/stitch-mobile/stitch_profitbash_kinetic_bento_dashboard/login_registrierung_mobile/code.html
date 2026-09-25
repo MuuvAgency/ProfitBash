@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><title>ProfitBash Cockpit</title><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "secondary-container": "#c4ef3e",
+        "surface-container-high": "#ebe6f2",
+        "on-tertiary-container": "#ffc8a7",
+        "surface-bright": "#fdf8ff",
+        "inverse-surface": "#312f38",
+        "secondary-fixed": "#c7f241",
+        "on-primary-fixed": "#1a0064",
+        "outline-variant": "#c9c4d6",
+        "surface-container": "#f1ecf8",
+        "ink-secondary": "#63607A",
+        "canvas-mist": "#EEEDF3",
+        "on-tertiary": "#ffffff",
+        "inverse-on-surface": "#f4effa",
+        "ink-primary": "#1B1826",
+        "secondary-fixed-dim": "#acd522",
+        "violet-wash": "#ECE8FA",
+        "primary-container": "#5a44c9",
+        "warn-amber": "#E0A233",
+        "on-primary": "#ffffff",
+        "surface-tint": "#5d47cc",
+        "surface-container-lowest": "#ffffff",
+        "on-primary-fixed-variant": "#452bb3",
+        "on-error-container": "#93000a",
+        "tile-raise": "#FAFAFC",
+        "on-surface": "#1c1b23",
+        "ink-tertiary": "#9C99AD",
+        "loss-red": "#D6524B",
+        "surface-container-highest": "#e5e0ec",
+        "error": "#ba1a1a",
+        "surface": "#fdf8ff",
+        "whisper-line": "rgba(27,24,38,0.06)",
+        "on-surface-variant": "#484554",
+        "well-sunken": "#E6E4EC",
+        "secondary": "#506600",
+        "tile-peak": "#FFFFFF",
+        "background": "#fdf8ff",
+        "outline": "#787585",
+        "surface-container-low": "#f7f1fd",
+        "primary": "#4227b1",
+        "ink-on-dark": "#EDECF3",
+        "lime-deep": "#7E9E12",
+        "on-secondary-fixed-variant": "#3c4d00",
+        "violet-press": "#4835A6",
+        "on-tertiary-fixed-variant": "#733600",
+        "error-container": "#ffdad6",
+        "primary-fixed": "#e5deff",
+        "on-secondary": "#ffffff",
+        "tertiary-fixed": "#ffdbc7",
+        "surface-dim": "#ddd8e4",
+        "tertiary-container": "#924600",
+        "tertiary-fixed-dim": "#ffb688",
+        "inverse-primary": "#c8bfff",
+        "primary-fixed-dim": "#c8bfff",
+        "on-tertiary-fixed": "#311300",
+        "on-secondary-container": "#546b00",
+        "on-error": "#ffffff",
+        "ink-panel": "#1B1826",
+        "surface-variant": "#e5e0ec",
+        "tertiary": "#6e3300",
+        "on-background": "#1c1b23",
+        "on-primary-container": "#d6ceff",
+        "on-secondary-fixed": "#161f00"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "margin": "1.5rem",
+        "gutter-mobile": "0.75rem",
+        "space-lg": "1.25rem",
+        "margin-mobile": "1rem",
+        "space-xs": "0.25rem",
+        "space-xl": "1.75rem",
+        "space-md": "1rem",
+        "gutter": "1.25rem",
+        "space-sm": "0.5rem"
+      },
+      "fontFamily": {
+        "headline-sm": ["Space Grotesk"],
+        "display": ["Space Grotesk"],
+        "data-hero-mobile": ["JetBrains Mono"],
+        "headline-md": ["Space Grotesk"],
+        "data-hero": ["JetBrains Mono"],
+        "data-md": ["JetBrains Mono"],
+        "headline-lg": ["Space Grotesk"],
+        "body-sm": ["Space Grotesk"],
+        "headline-lg-mobile": ["Space Grotesk"],
+        "body-lg": ["Space Grotesk"],
+        "body-md": ["Space Grotesk"],
+        "display-mobile": ["Space Grotesk"],
+        "data-lg": ["JetBrains Mono"],
+        "label-eyebrow": ["Space Grotesk"],
+        "data-sm": ["JetBrains Mono"]
+      },
+      "fontSize": {
+        "headline-sm": ["16px", {"lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "display": ["48px", {"lineHeight": "52px", "letterSpacing": "-0.03em", "fontWeight": "700"}],
+        "data-hero-mobile": ["26px", {"lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "headline-md": ["20px", {"lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+        "data-hero": ["36px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "500"}],
+        "headline-lg": ["28px", {"lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+        "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "body-md": ["14px", {"lineHeight": "21px", "letterSpacing": "0em", "fontWeight": "400"}],
+        "display-mobile": ["32px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+        "data-lg": ["20px", {"lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600"}],
+        "label-eyebrow": ["11px", {"lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700"}],
+        "data-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0em", "fontWeight": "500"}]
+      }
+    }
+  }
+}</script><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100vh;}body{overscroll-behavior-y:none;background-color:#EEEDF3;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 5rem);}.pt-safe{padding-top:env(safe-area-inset-top, 0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist font-body-md text-body-md text-ink-primary flex flex-col min-h-screen selection:bg-secondary-container selection:text-ink-panel"><header class="fixed top-0 w-full z-50 bg-canvas-mist/85 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(48,38,92,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><div class="flex items-center gap-1.5 shrink-0"><span class="w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span><span class="font-headline-sm text-headline-sm tracking-tight text-ink-primary">ProfitBash</span></div><div class="h-3.5 w-px bg-whisper-line shrink-0"></div><div class="flex items-center gap-1 min-w-0"><span class="font-label-eyebrow text-label-eyebrow text-ink-secondary truncate uppercase">Live SP-API</span><span class="px-1.5 py-0.5 rounded-full bg-well-sunken text-ink-primary font-data-sm text-data-sm font-semibold shrink-0">Sept '26</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button class="w-11 h-11 flex items-center justify-center text-ink-secondary hover:text-ink-primary active:scale-95 transition-transform"><span class="material-symbols-outlined text-[20px]">notifications</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-[0_2px_8px_rgba(66,39,177,0.25)] shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin-mobile pt-16 pb-safe bg-canvas-mist max-w-[390px] mx-auto"><div class="flex flex-col w-full gap-space-md">
+<!-- 1. Top Compact Brand & Status Bar (Ink Panel) -->
+<section class="w-full bg-ink-panel text-ink-on-dark rounded-2xl p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] relative overflow-hidden">
+<!-- Atmospheric subtle ambient violet sheen -->
+<div class="absolute -top-12 -right-12 w-40 h-40 bg-primary/20 rounded-full blur-3xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col gap-space-sm">
+<!-- Eyebrow + Live Indicator row -->
+<div class="flex items-center justify-between gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Marketplace Financial Cockpit</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-variant/20 text-secondary-container font-data-sm text-data-sm font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary-container animate-pulse"></span>
+          SP-API v3.8 ready
+        </span>
+</div>
+<!-- Headline -->
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-ink-on-dark font-bold leading-tight mt-0.5">
+        Sicherer Zugang für Amazon-, Otto- &amp; Multi-Channel-Seller
+      </h1>
+<!-- Micro Security Matrix Bar -->
+<div class="mt-1 pt-2.5 border-t border-whisper-line/20 flex items-center gap-2 text-ink-tertiary">
+<span class="material-symbols-outlined text-[16px] text-secondary-container shrink-0">verified_user</span>
+<p class="font-data-sm text-data-sm text-ink-tertiary tracking-tight truncate">
+          256-Bit TLS · SP-API OAuth · DATEV ready
+        </p>
+</div>
+</div>
+</section>
+<!-- 2. Segmented Mode Switcher (Pill tab container on Well Sunken) -->
+<div class="w-full bg-well-sunken p-1 rounded-full flex items-center justify-between select-none">
+<button class="flex-1 py-2 px-3 text-center rounded-full bg-tile-peak text-primary font-headline-sm text-headline-sm font-semibold shadow-[0_2px_8px_rgba(48,38,92,0.08)] transition-all duration-150 min-h-[44px]" id="tab-login" type="button">
+      Anmelden
+    </button>
+<button class="flex-1 py-2 px-3 text-center rounded-full text-ink-secondary font-body-sm text-body-sm font-medium hover:text-ink-primary transition-all duration-150 min-h-[44px]" id="tab-register" type="button">
+      Konto erstellen <span class="font-data-sm text-data-sm text-ink-tertiary hidden sm:inline">(14 Tage Test)</span>
+</button>
+</div>
+<!-- 3. Social / Marketplace One-Click Auth Stack -->
+<section class="w-full flex flex-col gap-2">
+<!-- Amazon Seller Central Button -->
+<button class="w-full min-h-[48px] px-4 py-2.5 bg-tile-peak hover:bg-surface-bright active:scale-[0.99] rounded-xl shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_16px_rgba(48,38,92,0.06)] flex items-center justify-between transition-all group" type="button">
+<div class="flex items-center gap-3">
+<!-- Clean Amazon Custom Path Mark -->
+<span class="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center shrink-0">
+<svg class="w-4 h-4 text-ink-primary fill-current" viewbox="0 0 24 24">
+<path d="M13.9 12.5c-.3.4-.8.6-1.4.6-.9 0-1.5-.5-1.5-1.5 0-1.1.7-1.7 1.8-1.7.5 0 .9.1 1.1.2v2.4zm2.4 3.7c-.1.2-.4.3-.6.1-.8-.6-1-1-1.4-1.6-.8 1.1-1.8 1.7-3.1 1.7-1.9 0-3.3-1.2-3.3-3.2 0-1.6.9-2.9 2.4-3.5 1-.4 2.4-.5 3.5-.6v-.3c0-.6-.3-1.1-1.3-1.1-.9 0-1.4.3-1.6.9-.1.2-.2.3-.4.3l-1.8-.2c-.2 0-.3-.2-.2-.4.6-1.9 2.2-2.5 4.1-2.5 2.1 0 3.6 1.1 3.6 3.4v4.4c0 .9.4 1.3.8 1.8.2.2.2.4 0 .6l-.9.6zM21.7 18.2c-.3.4-.7.5-1.1.3-5-2.9-10.7-2.9-15.8 0-.4.2-.8.1-1-.2-.2-.4-.1-.8.2-1 5.6-3.2 11.8-3.2 17.4 0 .3.2.4.6.3.9z"></path>
+</svg>
+</span>
+<span class="font-body-md text-body-md font-semibold text-ink-primary">Mit Amazon Seller Central</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-violet-wash text-primary font-data-sm text-data-sm font-semibold tracking-tight">
+        Auto-Sync
+      </span>
+</button>
+<!-- Google Workspace Button -->
+<button class="w-full min-h-[48px] px-4 py-2.5 bg-tile-peak hover:bg-surface-bright active:scale-[0.99] rounded-xl shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_16px_rgba(48,38,92,0.06)] flex items-center justify-between transition-all group" type="button">
+<div class="flex items-center gap-3">
+<span class="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center shrink-0">
+<svg class="w-4 h-4 text-ink-primary fill-current" viewbox="0 0 24 24">
+<path d="M12.24 10.285V13.8h6.887C18.6 16.14 16.5 18 12.24 18c-3.315 0-6-2.685-6-6s2.685-6 6-6c1.5 0 2.865.555 3.915 1.47l2.67-2.67C17.205 3.27 14.895 2.4 12.24 2.4 6.945 2.4 2.64 6.705 2.64 12s4.305 9.6 9.6 9.6c5.535 0 9.2-3.885 9.2-9.36 0-.63-.06-1.245-.18-1.955H12.24z"></path>
+</svg>
+</span>
+<span class="font-body-md text-body-md font-medium text-ink-primary">Mit Google Workspace</span>
+</div>
+<span class="material-symbols-outlined text-[18px] text-ink-tertiary group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+</button>
+<!-- Apple ID Button -->
+<button class="w-full min-h-[48px] px-4 py-2.5 bg-tile-peak hover:bg-surface-bright active:scale-[0.99] rounded-xl shadow-[0_1px_2px_rgba(48,38,92,0.04),0_6px_16px_rgba(48,38,92,0.06)] flex items-center justify-between transition-all group" type="button">
+<div class="flex items-center gap-3">
+<span class="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center shrink-0">
+<svg class="w-4 h-4 text-ink-primary fill-current" viewbox="0 0 24 24">
+<path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.63 1.34-.56.65-1.05 1.72-.92 2.74 1.01.08 2.01-.48 2.63-1.23z"></path>
+</svg>
+</span>
+<span class="font-body-md text-body-md font-medium text-ink-primary">Mit Apple ID fortfahren</span>
+</div>
+<span class="material-symbols-outlined text-[18px] text-ink-tertiary group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+</button>
+</section>
+<!-- Divider Tier -->
+<div class="relative flex items-center justify-center py-1">
+<div class="w-full h-px bg-whisper-line"></div>
+<span class="absolute bg-canvas-mist px-3 font-label-eyebrow text-label-eyebrow uppercase text-ink-tertiary tracking-widest">
+      Oder mit E-Mail &amp; Passwort
+    </span>
+</div>
+<!-- 4. Direct Login Form (Tile Peak Bento Tile) -->
+<form class="w-full bg-tile-peak rounded-2xl p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-space-md" id="auth-form" onsubmit="event.preventDefault();">
+<!-- Input Group 1: E-Mail -->
+<div class="flex flex-col gap-1.5">
+<label class="font-body-sm text-body-sm text-ink-secondary flex items-center justify-between" for="email">
+<span>Geschäftliche E-Mail</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">SSO Ready</span>
+</label>
+<div class="relative flex items-center">
+<input autocomplete="email" class="w-full h-12 pl-11 pr-3 bg-surface-bright rounded-xl text-ink-primary placeholder:text-ink-tertiary font-body-md text-body-md outline-none focus:ring-2 focus:ring-primary transition-all" id="email" name="email" placeholder="seller@unternehmen.de" required="" type="email"/ aria-label="E-Mail-Adresse">
+<span class="material-symbols-outlined absolute left-3.5 text-ink-tertiary text-[20px] pointer-events-none">mail</span>
+</div>
+</div>
+<!-- Input Group 2: Password -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="font-body-sm text-body-sm text-ink-secondary" for="password">Passwort</label>
+<button class="font-body-sm text-body-sm text-primary font-medium hover:text-violet-press active:underline" type="button">
+          Passwort vergessen?
+        </button>
+</div>
+<div class="relative flex items-center">
+<input autocomplete="current-password" class="w-full h-12 pl-11 pr-11 bg-surface-bright rounded-xl text-ink-primary placeholder:text-ink-tertiary font-body-md text-body-md tracking-wider outline-none focus:ring-2 focus:ring-primary transition-all" id="password" name="password" placeholder="••••••••••••" required="" type="password"/ aria-label="Passwort">
+<span class="material-symbols-outlined absolute left-3.5 text-ink-tertiary text-[20px] pointer-events-none">lock</span>
+<button class="absolute right-2.5 w-8 h-8 flex items-center justify-center text-ink-tertiary hover:text-ink-primary" id="toggle-pwd" type="button">
+<span class="material-symbols-outlined text-[19px]">visibility</span>
+</button>
+</div>
+</div>
+<!-- Input Group 3: Optional 2FA TOTP Token -->
+<div class="flex flex-col gap-1.5">
+<label class="font-body-sm text-body-sm text-ink-secondary flex items-center justify-between" for="totp">
+<span>2FA TOTP Token</span>
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Falls aktiviert</span>
+</label>
+<div class="relative flex items-center">
+<input class="w-full h-12 pl-11 pr-3 bg-well-sunken/40 rounded-xl text-ink-primary placeholder:text-ink-tertiary font-data-md text-data-md tracking-widest outline-none focus:ring-2 focus:ring-primary focus:bg-tile-peak transition-all" id="totp" inputmode="numeric" maxlength="6" name="totp" pattern="[0-9]*" placeholder="492 108" type="text"/ aria-label="Sicherheitscode">
+<span class="material-symbols-outlined absolute left-3.5 text-ink-tertiary text-[20px] pointer-events-none">pin</span>
+</div>
+</div>
+<!-- Remember Me Checkbox -->
+<label class="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+<input checked="" class="w-5 h-5 rounded-lg accent-primary cursor-pointer text-primary focus:ring-primary" id="remember-me" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-ink-secondary">
+        Angemeldet bleiben <span class="font-data-sm text-data-sm text-ink-tertiary">(30 Tage Gültigkeit)</span>
+</span>
+</label>
+<!-- Primary Action Button -->
+<button class="w-full h-12 mt-1 rounded-xl bg-primary text-ink-on-dark font-headline-sm text-headline-sm font-semibold flex items-center justify-center gap-2 hover:bg-violet-press active:translate-y-px transition-all shadow-[0_4px_12px_rgba(66,39,177,0.25)]" id="submit-btn" type="submit">
+<span>Im Cockpit einloggen</span>
+<span class="material-symbols-outlined text-[19px]">arrow_forward</span>
+</button>
+</form>
+<!-- 5. Trust & Compliance Banner (Tile Raise) -->
+<section class="w-full bg-tile-raise rounded-2xl p-space-md shadow-[0_1px_2px_rgba(48,38,92,0.04),0_8px_20px_rgba(48,38,92,0.06)] flex flex-col gap-3">
+<!-- Badges Row -->
+<div class="grid grid-cols-3 gap-2">
+<!-- Trust Item 1 -->
+<div class="flex flex-col items-center text-center p-2 rounded-xl bg-canvas-mist/60">
+<span class="material-symbols-outlined text-primary text-[20px] mb-1">cloud_done</span>
+<span class="font-label-eyebrow text-label-eyebrow font-bold text-ink-primary">DSGVO</span>
+<span class="font-data-sm text-data-sm text-ink-secondary leading-tight mt-0.5">Frankfurt a.M.</span>
+</div>
+<!-- Trust Item 2 -->
+<div class="flex flex-col items-center text-center p-2 rounded-xl bg-canvas-mist/60">
+<span class="material-symbols-outlined text-primary text-[20px] mb-1">shield_lock</span>
+<span class="font-label-eyebrow text-label-eyebrow font-bold text-ink-primary">Zero-Trust</span>
+<span class="font-data-sm text-data-sm text-ink-secondary leading-tight mt-0.5">AES-256 SP-API</span>
+</div>
+<!-- Trust Item 3 -->
+<div class="flex flex-col items-center text-center p-2 rounded-xl bg-canvas-mist/60">
+<span class="material-symbols-outlined text-primary text-[20px] mb-1">receipt_long</span>
+<span class="font-label-eyebrow text-label-eyebrow font-bold text-ink-primary">DATEV</span>
+<span class="font-data-sm text-data-sm text-ink-secondary leading-tight mt-0.5">SKR-03 / 04</span>
+</div>
+</div>
+<!-- GMV Metric Proof Bar -->
+<div class="w-full py-2 px-3 rounded-xl bg-well-sunken/60 flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-ink-secondary flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-lime-deep"></span>
+        Marktplatzvolumen
+      </span>
+<span class="font-data-sm text-data-sm font-semibold text-ink-primary">
+        &gt; 42.840.000 € GMV <span class="text-ink-tertiary font-normal">in Q3 '26</span>
+</span>
+</div>
+</section>
+<!-- 6. Footer / Support Links -->
+<footer class="w-full py-2 flex flex-col items-center text-center gap-2">
+<p class="font-body-sm text-body-sm text-ink-secondary max-w-[320px]">
+      Noch kein Konto? <a class="text-primary font-semibold hover:underline" href="#">14 Tage kostenlos testen</a> · keine Kreditkarte erforderlich.
+    </p>
+<!-- System Status & Legal Matrix -->
+<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-ink-tertiary pt-1">
+<a class="font-data-sm text-data-sm hover:text-ink-primary transition-colors" href="#">Datenschutz</a>
+<span>·</span>
+<a class="font-data-sm text-data-sm hover:text-ink-primary transition-colors" href="#">Impressum</a>
+<span>·</span>
+<div class="inline-flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-data-sm text-ink-secondary font-medium">Alle Systeme operational</span>
+</div>
+</div>
+</footer>
+</div>
+<script>
+  // Tab switching interaction
+  const loginTab = document.getElementById('tab-login');
+  const regTab = document.getElementById('tab-register');
+  const submitBtn = document.getElementById('submit-btn');
+
+  if (loginTab && regTab) {
+    regTab.addEventListener('click', () => {
+      regTab.className = 'flex-1 py-2 px-3 text-center rounded-full bg-tile-peak text-primary font-headline-sm text-headline-sm font-semibold shadow-[0_2px_8px_rgba(48,38,92,0.08)] transition-all duration-150 min-h-[44px]';
+      loginTab.className = 'flex-1 py-2 px-3 text-center rounded-full text-ink-secondary font-body-sm text-body-sm font-medium hover:text-ink-primary transition-all duration-150 min-h-[44px]';
+      if (submitBtn) {
+        submitBtn.innerHTML = '<span>Kostenlos registrieren</span><span class="material-symbols-outlined text-[19px]">rocket_launch</span>';
+      }
+    });
+
+    loginTab.addEventListener('click', () => {
+      loginTab.className = 'flex-1 py-2 px-3 text-center rounded-full bg-tile-peak text-primary font-headline-sm text-headline-sm font-semibold shadow-[0_2px_8px_rgba(48,38,92,0.08)] transition-all duration-150 min-h-[44px]';
+      regTab.className = 'flex-1 py-2 px-3 text-center rounded-full text-ink-secondary font-body-sm text-body-sm font-medium hover:text-ink-primary transition-all duration-150 min-h-[44px]';
+      if (submitBtn) {
+        submitBtn.innerHTML = '<span>Im Cockpit einloggen</span><span class="material-symbols-outlined text-[19px]">arrow_forward</span>';
+      }
+    });
+  }
+
+  // Password visibility toggle
+  const togglePwd = document.getElementById('toggle-pwd');
+  const pwdInput = document.getElementById('password');
+  if (togglePwd && pwdInput) {
+    togglePwd.addEventListener('click', () => {
+      const isPwd = pwdInput.type === 'password';
+      pwdInput.type = isPwd ? 'text' : 'password';
+      const icon = togglePwd.querySelector('.material-symbols-outlined');
+      if (icon) {
+        icon.textContent = isPwd ? 'visibility_off' : 'visibility';
+      }
+    });
+  }
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-[env(safe-area-inset-bottom,0px)] bg-ink-panel/95 backdrop-blur-xl shadow-[0_-4px_24px_rgba(27,24,38,0.25)]" data-active-classes="text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2"><div class="flex justify-around items-center h-16 max-w-[390px] mx-auto px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 transition-all duration-150 text-tile-peak relative after:content-[''] after:w-1.5 after:h-1.5 after:rounded-full after:bg-secondary-container after:absolute after:bottom-2" data-path="analyse" href="#"><span class="material-symbols-outlined text-[22px]">insights</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Analyse</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[22px]">inventory_2</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Bestellungen</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="ads" href="#"><span class="material-symbols-outlined text-[22px]">campaign</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Ads</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] w-16 h-14 text-ink-tertiary transition-all duration-150" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-eyebrow text-label-eyebrow mt-0.5">Setup</span></a></div></nav></body></html>

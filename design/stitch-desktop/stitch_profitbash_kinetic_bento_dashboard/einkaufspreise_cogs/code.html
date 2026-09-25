@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+
+<html lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tile-peak": "#FFFFFF",
+          "ink-on-dark": "#EDECF3",
+          "surface-dim": "#ddd8e4",
+          "on-tertiary": "#ffffff",
+          "on-error-container": "#93000a",
+          "primary": "#4227b1",
+          "on-surface-variant": "#484554",
+          "surface": "#fdf8ff",
+          "warn-amber": "#E0A233",
+          "tertiary": "#6e3300",
+          "inverse-on-surface": "#f4effa",
+          "secondary-container": "#c4ef3e",
+          "ink-secondary": "#63607A",
+          "well-sunken": "#E6E4EC",
+          "on-primary-container": "#d6ceff",
+          "on-error": "#ffffff",
+          "surface-container": "#f1ecf8",
+          "on-tertiary-fixed-variant": "#733600",
+          "on-secondary-fixed": "#161f00",
+          "on-primary": "#ffffff",
+          "inverse-surface": "#312f38",
+          "lime-deep": "#7E9E12",
+          "tertiary-container": "#924600",
+          "violet-press": "#4835A6",
+          "surface-tint": "#5d47cc",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-highest": "#e5e0ec",
+          "surface-container-low": "#f7f1fd",
+          "inverse-primary": "#c8bfff",
+          "background": "#fdf8ff",
+          "outline": "#787585",
+          "ink-primary": "#1B1826",
+          "outline-variant": "#c9c4d6",
+          "on-surface": "#1c1b23",
+          "primary-fixed": "#e5deff",
+          "tile-raise": "#FAFAFC",
+          "on-background": "#1c1b23",
+          "on-tertiary-container": "#ffc8a7",
+          "ink-panel": "#1B1826",
+          "on-secondary-container": "#546b00",
+          "error": "#ba1a1a",
+          "secondary": "#506600",
+          "surface-bright": "#fdf8ff",
+          "primary-fixed-dim": "#c8bfff",
+          "secondary-fixed-dim": "#acd522",
+          "primary-container": "#5a44c9",
+          "on-secondary-fixed-variant": "#3c4d00",
+          "on-primary-fixed-variant": "#452bb3",
+          "surface-variant": "#e5e0ec",
+          "violet-wash": "#ECE8FA",
+          "on-secondary": "#ffffff",
+          "tertiary-fixed": "#ffdbc7",
+          "canvas-mist": "#EEEDF3",
+          "ink-tertiary": "#9C99AD",
+          "on-tertiary-fixed": "#311300",
+          "on-primary-fixed": "#1a0064",
+          "whisper-line": "rgba(27,24,38,0.06)",
+          "error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb688",
+          "surface-container-high": "#ebe6f2",
+          "secondary-fixed": "#c7f241",
+          "loss-red": "#D6524B"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-lg": "1.25rem",
+          "space-xl": "1.75rem",
+          "gutter": "1.25rem",
+          "space-xs": "0.25rem",
+          "gutter-mobile": "0.75rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "headline-lg-mobile": [
+            "Space Grotesk"
+          ],
+          "body-lg": [
+            "Space Grotesk"
+          ],
+          "headline-lg": [
+            "Space Grotesk"
+          ],
+          "label-eyebrow": [
+            "Space Grotesk"
+          ],
+          "display": [
+            "Space Grotesk"
+          ],
+          "data-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Space Grotesk"
+          ],
+          "data-sm": [
+            "JetBrains Mono"
+          ],
+          "body-md": [
+            "Space Grotesk"
+          ],
+          "data-hero-mobile": [
+            "JetBrains Mono"
+          ],
+          "display-mobile": [
+            "Space Grotesk"
+          ],
+          "body-sm": [
+            "Space Grotesk"
+          ],
+          "headline-sm": [
+            "Space Grotesk"
+          ],
+          "data-md": [
+            "JetBrains Mono"
+          ],
+          "data-hero": [
+            "JetBrains Mono"
+          ]
+        },
+        "fontSize": {
+          "headline-lg-mobile": [
+            "22px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "30px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-eyebrow": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "700"
+            }
+          ],
+          "display": [
+            "52px",
+            {
+              "lineHeight": "52px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "data-lg": [
+            "22px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "21px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "data-hero-mobile": [
+            "26px",
+            {
+              "lineHeight": "30px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-mobile": [
+            "32px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-sm": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "18px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "data-hero": [
+            "42px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist text-ink-primary antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-ink-panel z-50 flex flex-col justify-between p-margin shadow-[0_10px_30px_rgba(48,38,92,0.12)]"><div class="flex flex-col gap-space-lg"><div class="flex items-center gap-space-xs px-space-sm py-space-xs"><span class="font-headline-lg text-headline-lg tracking-tight text-ink-on-dark uppercase">ProfitBash</span><span class="h-2 w-2 rounded-full bg-secondary-fixed mb-1"></span></div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]"><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl transition-all bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-body-md text-body-md">Dashboard</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="verkaufsanalyse" href="#"><span class="material-symbols-outlined text-[20px]">query_stats</span><span class="font-body-md text-body-md">Verkaufsanalyse</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="profitabilitat" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-body-md text-body-md">Profitabilität</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="marken-produkte" href="#"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-body-md text-body-md">Marken &amp; Produkte</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="retouren" href="#"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="font-body-md text-body-md">Retouren</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-body-md text-body-md">Bestellungen</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="amazon-ads" href="#"><span class="material-symbols-outlined text-[20px]">campaign</span><span class="font-body-md text-body-md">Amazon Ads</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[20px]">tune</span><span class="font-body-md text-body-md">Einstellungen</span></a></nav></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-xl bg-ink-on-dark/5"><div class="flex items-center gap-space-xs"><span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span><span class="font-data-sm text-data-sm text-ink-on-dark/80 uppercase">Channels Live</span></div><span class="font-data-sm text-data-sm text-ink-tertiary">v2.4</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-canvas-mist/85 backdrop-blur-xl z-40 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-headline-sm text-headline-sm text-ink-primary">Guten Morgen, Dominik</span><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="h-2 w-2 rounded-full bg-lime-deep"></span><span class="font-data-sm text-data-sm text-ink-secondary">Amazon, eBay, Otto, Shopify</span><span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">Synced</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="material-symbols-outlined text-ink-secondary text-[18px]">calendar_today</span><span class="font-data-sm text-data-sm text-ink-primary font-semibold">Sept 2026</span></div><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="font-body-sm text-body-sm font-semibold">Export</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative pt-16 bg-canvas-mist min-h-screen"><div class="flex flex-col w-full">
+<div class="w-full max-w-[1440px] mx-auto px-margin py-space-lg flex flex-col gap-space-lg">
+<!-- Sub-Header & Breadcrumb Bar -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-space-sm pb-space-xs">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs text-ink-secondary">
+<span class="font-label-eyebrow text-label-eyebrow tracking-wider uppercase">Konfiguration &amp; Kosten</span>
+<span class="text-ink-tertiary">/</span>
+<span class="font-label-eyebrow text-label-eyebrow text-primary tracking-wider uppercase">Einkaufspreise (COGS)</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="h-1.5 w-1.5 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Stand: 30. Sept 2026 · Echtzeit-Wechselkurse EZB aktiv</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs self-start md:self-auto">
+<div class="px-space-sm py-1 rounded-full bg-well-sunken text-ink-secondary flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-ink-tertiary">cloud_done</span>
+<span class="font-data-sm text-data-sm">Amazon SP-API, Otto, eBay, Shopify synchron</span>
+</div>
+</div>
+</div>
+<!-- Screen Title & Top Actions -->
+<div class="flex flex-col xl:flex-row xl:items-end justify-between gap-space-md">
+<div class="flex flex-col max-w-3xl">
+<h1 class="font-headline-lg text-headline-lg text-ink-primary tracking-tight">Einkaufspreise &amp; COGS-Verwaltung</h1>
+<p class="font-body-md text-body-md text-ink-secondary mt-1">
+          Lückenlose Erfassung von Wareneinsatz, Fremdwährungen und Frachtkosten je Einheit für exakte Deckungsbeitragsrechnung über alle 4 angebundenen Marktplätze.
+        </p>
+</div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<button class="flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-tile-peak text-ink-primary hover:bg-violet-wash hover:text-primary transition-all shadow-[0_1px_2px_rgba(48,38,92,0.05)]" type="button">
+<span class="material-symbols-outlined text-[18px]">file_download</span>
+<span class="font-body-sm text-body-sm font-semibold">Vorlagen-Download</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-tile-peak text-ink-primary hover:bg-violet-wash hover:text-primary transition-all shadow-[0_1px_2px_rgba(48,38,92,0.05)]" type="button">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+<span class="font-body-sm text-body-sm font-semibold">CSV / ERP Import</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-sm rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_14px_rgba(90,68,201,0.25)]" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span class="font-body-sm text-body-sm font-semibold">+ SKU hinzufügen</span>
+</button>
+</div>
+</div>
+<!-- Top Bento Summary & FX Rates (Asymmetric 12-col: 5 / 4 / 3) -->
+<div class="grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 gap-gutter">
+<!-- Tile 1: Live EZB Ticker (5 cols) -->
+<div class="md:col-span-6 xl:col-span-5 bg-tile-peak rounded-[1.5rem] p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">EZB Live-Wechselkurse · Automatischer Abgleich</span>
+<span class="font-headline-sm text-headline-sm text-ink-primary">Währungsabsicherung &amp; FX-Index</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-0.5 rounded-full bg-lime-deep/10 text-lime-deep">
+<span class="h-2 w-2 rounded-full bg-lime-deep animate-pulse"></span>
+<span class="font-data-sm text-data-sm uppercase font-semibold">Live EZB</span>
+</div>
+</div>
+<!-- FX Ticker Grid -->
+<div class="grid grid-cols-2 gap-space-md p-space-sm rounded-xl bg-well-sunken/60">
+<div class="flex flex-col bg-tile-peak/80 p-space-sm rounded-lg">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-secondary">USD / EUR</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-data-lg text-data-lg text-ink-primary font-bold">0,9214</span>
+<span class="font-data-sm text-data-sm text-lime-deep font-semibold">+0,18%</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary mt-0.5">1 EUR = $ 1,0853</span>
+</div>
+<div class="flex flex-col bg-tile-peak/80 p-space-sm rounded-lg">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-secondary">GBP / EUR</span>
+<div class="flex items-baseline gap-space-xs mt-1">
+<span class="font-data-lg text-data-lg text-ink-primary font-bold">1,1748</span>
+<span class="font-data-sm text-data-sm text-loss-red font-semibold">-0,05%</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary mt-0.5">1 EUR = £ 0,8512</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs">
+<div class="flex items-center gap-space-xs text-ink-tertiary">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span class="font-data-sm text-data-sm">Zuletzt aktualisiert: Heute, 16:45:12 MESZ</span>
+</div>
+<div class="inline-flex rounded-full bg-well-sunken p-0.5">
+<button class="px-space-sm py-0.5 rounded-full bg-tile-peak font-data-sm text-data-sm text-primary font-semibold shadow-sm" type="button">Echtzeit aktiv</button>
+<button class="px-space-sm py-0.5 rounded-full font-data-sm text-data-sm text-ink-secondary hover:text-ink-primary transition-colors" type="button">Fixkurs Q3</button>
+</div>
+</div>
+</div>
+<!-- Tile 2: COGS Portfolio Health (4 cols) -->
+<div class="md:col-span-3 xl:col-span-4 bg-tile-raise rounded-[1.5rem] p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between gap-space-md">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Datenqualität &amp; Vollständigkeit</span>
+<span class="font-headline-sm text-headline-sm text-ink-primary">COGS-Deckungsgrad</span>
+</div>
+<span class="px-space-sm py-0.5 rounded-full bg-loss-red/10 text-loss-red font-data-sm text-data-sm font-semibold">6 SKUs ohne COGS</span>
+</div>
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-baseline justify-between">
+<span class="font-data-hero text-data-hero text-ink-primary">97,9<span class="text-headline-md">%</span></span>
+<span class="font-data-md text-data-md text-ink-secondary">278 / 284 SKUs</span>
+</div>
+<!-- Progress Bar in Sunken Well -->
+<div class="w-full h-2.5 rounded-full bg-well-sunken overflow-hidden flex">
+<div class="h-full bg-primary-container rounded-l-full" style="width: 92%;"></div>
+<div class="h-full bg-lime-deep" style="width: 5.9%;"></div>
+<div class="h-full bg-loss-red rounded-r-full" style="width: 2.1%;"></div>
+</div>
+</div>
+<div class="flex items-center justify-between text-ink-secondary">
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-lime-deep"></span>
+<span class="font-body-sm text-body-sm">264 Vollständig kalkuliert</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-warn-amber"></span>
+<span class="font-body-sm text-body-sm">14 Schätzwerte</span>
+</div>
+</div>
+</div>
+<!-- Tile 3: Avg Freight & Duty Buffer (3 cols) -->
+<div class="md:col-span-3 xl:col-span-3 bg-tile-raise rounded-[1.5rem] p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col justify-between gap-space-md">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Durchschn. Frachtanteil</span>
+<span class="font-headline-sm text-headline-sm text-ink-primary">Nebenkosten je Einheit</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-violet-wash flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">local_shipping</span>
+</div>
+</div>
+<div class="flex flex-col">
+<div class="flex items-baseline gap-space-xs">
+<span class="font-data-hero text-data-hero text-ink-primary">€ 3,42</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">/ Stk.</span>
+</div>
+<div class="flex items-center gap-space-xs mt-1">
+<span class="px-space-xs py-0.5 rounded bg-well-sunken font-data-sm text-data-sm text-ink-primary font-semibold">14,2%</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">bezogen auf den Netto-EK</span>
+</div>
+</div>
+<div class="pt-space-xs flex items-center gap-space-xs text-ink-secondary">
+<span class="material-symbols-outlined text-[16px] text-ink-tertiary">check_circle</span>
+<span class="font-data-sm text-data-sm">Inkl. Seefracht, Containerumlage &amp; Zoll</span>
+</div>
+</div>
+</div>
+<!-- Main Bento Table Container -->
+<div class="w-full bg-tile-peak rounded-[2rem] p-space-lg shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-space-md">
+<!-- Table Filter and Action Bar -->
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-md">
+<!-- Left: Search & Filter Tabs -->
+<div class="flex flex-col sm:flex-row sm:items-center gap-space-sm flex-1">
+<div class="relative min-w-[280px] max-w-md w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary text-[18px]">search</span>
+<input class="w-full pl-9 pr-space-md py-space-xs rounded-xl bg-well-sunken text-ink-primary font-body-sm placeholder:text-ink-tertiary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" placeholder="SKU, EAN oder Produktname..." type="text" aria-label="SKU, EAN oder Produktname"/>
+</div>
+<div class="flex items-center gap-space-xs overflow-x-auto pb-1 sm:pb-0">
+<button class="px-space-md py-space-xs rounded-full bg-ink-panel text-ink-on-dark font-body-sm text-body-sm font-semibold whitespace-nowrap shadow-sm" type="button">
+              Alle Produkte <span class="font-data-sm text-data-sm text-ink-on-dark/70 ml-1">(284)</span>
+</button>
+<button class="px-space-md py-space-xs rounded-full bg-well-sunken text-ink-secondary hover:text-ink-primary font-body-sm text-body-sm whitespace-nowrap transition-colors" type="button">
+              Fremdwährung USD/GBP <span class="font-data-sm text-data-sm text-ink-tertiary ml-1">(142)</span>
+</button>
+<button class="px-space-md py-space-xs rounded-full bg-loss-red/10 text-loss-red hover:bg-loss-red/20 font-body-sm text-body-sm font-semibold whitespace-nowrap transition-colors" type="button">
+              Fehlender EK <span class="font-data-sm text-data-sm ml-1">(6)</span>
+</button>
+</div>
+</div>
+<!-- Right: Batch Ops -->
+<div class="flex items-center gap-space-sm self-end lg:self-auto">
+<div class="hidden xl:flex items-center gap-space-xs px-space-sm py-1 rounded-xl bg-well-sunken text-ink-secondary">
+<span class="material-symbols-outlined text-[16px] text-lime-deep">sync</span>
+<span class="font-data-sm text-data-sm">Auto-Berechnung aktiv</span>
+</div>
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-violet-wash text-primary hover:bg-primary hover:text-on-primary font-body-sm text-body-sm font-semibold transition-all" type="button">
+<span class="material-symbols-outlined text-[16px]">currency_exchange</span>
+<span>EZB-Kurse anwenden</span>
+</button>
+</div>
+</div>
+<!-- Data Table Wrap -->
+<div class="w-full overflow-x-auto rounded-xl">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-well-sunken/40 text-ink-secondary shadow-[0_1px_0_rgba(27,24,38,0.06)]">
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow uppercase tracking-wider">SKU &amp; Status</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow uppercase tracking-wider min-w-[240px]">Produkt</th>
+<th class="py-space-sm px-space-sm font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-right">Netto-EK</th>
+<th class="py-space-sm px-space-sm font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-center">Währung</th>
+<th class="py-space-sm px-space-sm font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-right">EZB-Kurs</th>
+<th class="py-space-sm px-space-sm font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-right">Fracht / Stk.</th>
+<th class="py-space-sm px-space-sm font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-right">Zoll / Puffer</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-right">Effektiver EK (EUR)</th>
+<th class="py-space-sm px-space-sm font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-right">Marge Ref.</th>
+<th class="py-space-sm px-space-md font-label-eyebrow text-label-eyebrow uppercase tracking-wider text-center">Aktionen</th>
+</tr>
+</thead>
+<tbody class="divide-y-0">
+<!-- Row 1: SKU-AT-902 -->
+<tr class="hover:bg-violet-wash/30 transition-colors group">
+<td class="py-space-md px-space-md whitespace-nowrap">
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-lime-deep" title="COGS vollständig"></span>
+<span class="font-data-md text-data-md text-ink-primary font-bold">SKU-AT-902</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">EAN 426019283011</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-ink-primary group-hover:text-primary transition-colors">AuraTech Pro ANC Wireless Headphones Gen 2</span>
+<div class="flex items-center gap-space-xs mt-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">AuraTech</span>
+<span class="text-ink-tertiary">·</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Consumer Electronics</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-20 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="22.50" aria-label="Consumer Electronics Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-center">
+<span class="px-space-xs py-0.5 rounded bg-well-sunken font-data-sm text-data-sm font-semibold text-ink-primary">USD</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">0,9214</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-16 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="2.70" aria-label="USD Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 1,07</span>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center px-space-sm py-1 rounded-xl bg-violet-wash">
+<span class="font-data-lg text-data-lg text-primary font-bold">€ 24,50</span>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex flex-col items-end">
+<span class="font-data-md text-data-md text-lime-deep font-bold">41,9%</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">VK € 69,99</span>
+</div>
+</td>
+<td class="py-space-md px-space-md text-center">
+<div class="flex items-center justify-center gap-1 text-ink-tertiary">
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Gespeichert" type="button">
+<span class="material-symbols-outlined text-[18px] text-lime-deep">check_circle</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Historie" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Optionen" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2: SKU-NL-218 -->
+<tr class="bg-well-sunken/20 hover:bg-violet-wash/30 transition-colors group">
+<td class="py-space-md px-space-md whitespace-nowrap">
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-lime-deep" title="COGS vollständig"></span>
+<span class="font-data-md text-data-md text-ink-primary font-bold">SKU-NL-218</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">EAN 735002918231</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-ink-primary group-hover:text-primary transition-colors">NordicLiving Wollplaid Anthrazit 150x200cm</span>
+<div class="flex items-center gap-space-xs mt-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">NordicLiving</span>
+<span class="text-ink-tertiary">·</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Home &amp; Living</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-20 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="14.80" aria-label="Home &amp; Living Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-center">
+<span class="px-space-xs py-0.5 rounded bg-well-sunken font-data-sm text-data-sm font-semibold text-ink-primary">EUR</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-tertiary">1,0000</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-16 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="1.90" aria-label="EUR Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-tertiary">€ 0,00</span>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center px-space-sm py-1 rounded-xl bg-violet-wash">
+<span class="font-data-lg text-data-lg text-primary font-bold">€ 16,70</span>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex flex-col items-end">
+<span class="font-data-md text-data-md text-lime-deep font-bold">52,3%</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">VK € 49,95</span>
+</div>
+</td>
+<td class="py-space-md px-space-md text-center">
+<div class="flex items-center justify-center gap-1 text-ink-tertiary">
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Gespeichert" type="button">
+<span class="material-symbols-outlined text-[18px] text-lime-deep">check_circle</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Historie" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Optionen" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: SKU-VS-890 -->
+<tr class="hover:bg-violet-wash/30 transition-colors group">
+<td class="py-space-md px-space-md whitespace-nowrap">
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-lime-deep" title="COGS vollständig"></span>
+<span class="font-data-md text-data-md text-ink-primary font-bold">SKU-VS-890</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">EAN 425129381029</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-ink-primary group-hover:text-primary transition-colors">Veloce Trinkflasche Thermo 1L Matt Schwarz</span>
+<div class="flex items-center gap-space-xs mt-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Veloce</span>
+<span class="text-ink-tertiary">·</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Sport &amp; Outdoor</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-20 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="4.20" aria-label="Sport &amp; Outdoor Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-center">
+<span class="px-space-xs py-0.5 rounded bg-well-sunken font-data-sm text-data-sm font-semibold text-ink-primary">USD</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">0,9214</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-16 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="0.85" aria-label="USD Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 0,22</span>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center px-space-sm py-1 rounded-xl bg-violet-wash">
+<span class="font-data-lg text-data-lg text-primary font-bold">€ 4,94</span>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex flex-col items-end">
+<span class="font-data-md text-data-md text-lime-deep font-bold">64,8%</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">VK € 24,90</span>
+</div>
+</td>
+<td class="py-space-md px-space-md text-center">
+<div class="flex items-center justify-center gap-1 text-ink-tertiary">
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Gespeichert" type="button">
+<span class="material-symbols-outlined text-[18px] text-lime-deep">check_circle</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Historie" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Optionen" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: SKU-KP-104 -->
+<tr class="bg-well-sunken/20 hover:bg-violet-wash/30 transition-colors group">
+<td class="py-space-md px-space-md whitespace-nowrap">
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-lime-deep" title="COGS vollständig"></span>
+<span class="font-data-md text-data-md text-ink-primary font-bold">SKU-KP-104</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">EAN 506048192004</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-ink-primary group-hover:text-primary transition-colors">Kumo Pure Aktivkohlefilter 3er-Pack</span>
+<div class="flex items-center gap-space-xs mt-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">Kumo Pure</span>
+<span class="text-ink-tertiary">·</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Klima &amp; Luft</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-20 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="5.10" aria-label="Klima &amp; Luft Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-center">
+<span class="px-space-xs py-0.5 rounded bg-well-sunken font-data-sm text-data-sm font-semibold text-ink-primary">GBP</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">1,1748</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-16 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="0.65" aria-label="GBP Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 0,18</span>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center px-space-sm py-1 rounded-xl bg-violet-wash">
+<span class="font-data-lg text-data-lg text-primary font-bold">€ 6,82</span>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex flex-col items-end">
+<span class="font-data-md text-data-md text-lime-deep font-bold">48,1%</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">VK € 19,90</span>
+</div>
+</td>
+<td class="py-space-md px-space-md text-center">
+<div class="flex items-center justify-center gap-1 text-ink-tertiary">
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Gespeichert" type="button">
+<span class="material-symbols-outlined text-[18px] text-lime-deep">check_circle</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Historie" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Optionen" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5: SKU-AT-404 -->
+<tr class="hover:bg-violet-wash/30 transition-colors group">
+<td class="py-space-md px-space-md whitespace-nowrap">
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-warn-amber" title="Zollwert kalkulatorisch geschätzt"></span>
+<span class="font-data-md text-data-md text-ink-primary font-bold">SKU-AT-404</span>
+</div>
+<span class="font-data-sm text-data-sm text-ink-tertiary">EAN 426019283404</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-ink-primary group-hover:text-primary transition-colors">USB-C Fast Charger 65W GaN Dual-Port</span>
+<div class="flex items-center gap-space-xs mt-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">AuraTech</span>
+<span class="text-ink-tertiary">·</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Consumer Electronics</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-20 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="7.80" aria-label="Consumer Electronics Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-center">
+<span class="px-space-xs py-0.5 rounded bg-well-sunken font-data-sm text-data-sm font-semibold text-ink-primary">USD</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">0,9214</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-16 text-right px-space-xs py-1 rounded-lg bg-well-sunken font-data-md text-data-md text-ink-primary focus:outline-none focus:bg-tile-peak focus:shadow-[0_0_0_2px_#5A44C9] transition-all" type="text" value="1.20" aria-label="USD Einkaufspreis"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-warn-amber font-semibold">€ 0,35*</span>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center px-space-sm py-1 rounded-xl bg-violet-wash">
+<span class="font-data-lg text-data-lg text-primary font-bold">€ 8,74</span>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex flex-col items-end">
+<span class="font-data-md text-data-md text-lime-deep font-bold">38,5%</span>
+<span class="font-data-sm text-data-sm text-ink-tertiary">VK € 22,99</span>
+</div>
+</td>
+<td class="py-space-md px-space-md text-center">
+<div class="flex items-center justify-center gap-1 text-ink-tertiary">
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Gespeichert" type="button">
+<span class="material-symbols-outlined text-[18px] text-lime-deep">check_circle</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Historie" type="button">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+<button class="p-1 rounded-lg hover:text-primary hover:bg-tile-peak transition-colors" title="Optionen" type="button">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 6: SKU-AT-883 (Missing COGS Alert State) -->
+<tr class="bg-loss-red/5 hover:bg-loss-red/10 transition-colors group">
+<td class="py-space-md px-space-md whitespace-nowrap">
+<div class="flex items-center gap-space-xs">
+<span class="h-2 w-2 rounded-full bg-loss-red animate-ping" title="Einkaufspreis fehlt"></span>
+<span class="font-data-md text-data-md text-loss-red font-bold">SKU-AT-883</span>
+</div>
+<span class="font-data-sm text-data-sm text-loss-red/80">EAN 426019283883</span>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs">
+<span class="font-body-md text-body-md font-semibold text-ink-primary">AuraTech Sport Earbuds V2 Wasserdicht</span>
+<span class="px-space-xs py-0.5 rounded-full bg-loss-red text-tile-peak font-label-eyebrow text-label-eyebrow uppercase tracking-wider font-bold">Achtung: Marge blind</span>
+</div>
+<div class="flex items-center gap-space-xs mt-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase">AuraTech</span>
+<span class="text-ink-tertiary">·</span>
+<span class="font-body-sm text-body-sm text-ink-secondary">Neu eingelastet (Otto &amp; Amazon)</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-20 text-right px-space-xs py-1 rounded-lg bg-tile-peak text-loss-red font-data-md text-data-md shadow-[0_0_0_2px_#D6524B] focus:outline-none transition-all placeholder:text-loss-red/50" placeholder="0.00" type="text" aria-label="0.00"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-center">
+<select class="px-space-xs py-1 rounded bg-tile-peak font-data-sm text-data-sm font-semibold text-ink-primary border-0 focus:outline-none">
+<option>USD</option>
+<option>EUR</option>
+<option>GBP</option>
+</select>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-secondary">0,9214</span>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<div class="inline-flex items-center justify-end">
+<input class="w-16 text-right px-space-xs py-1 rounded-lg bg-tile-peak font-data-md text-data-md text-ink-primary shadow-[0_0_0_1px_#c9c4d6] focus:outline-none focus:shadow-[0_0_0_2px_#5A44C9] transition-all placeholder:text-ink-tertiary" placeholder="Fracht" type="text" aria-label="Fracht"/>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-ink-tertiary">--</span>
+</td>
+<td class="py-space-md px-space-md text-right whitespace-nowrap">
+<div class="inline-flex items-center px-space-sm py-1 rounded-xl bg-loss-red/10 text-loss-red">
+<span class="font-data-md text-data-md font-bold">Unbekannt</span>
+</div>
+</td>
+<td class="py-space-md px-space-sm text-right">
+<span class="font-data-sm text-data-sm text-loss-red font-semibold">Nicht berechenbar</span>
+</td>
+<td class="py-space-md px-space-md text-center">
+<button class="px-space-sm py-1 rounded-lg bg-loss-red text-tile-peak font-body-sm text-body-sm font-semibold hover:bg-error transition-all shadow-sm" type="button">
+                  Erfassen
+                </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer / Pagination / Summary -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md pt-space-xs text-ink-secondary">
+<div class="flex items-center gap-space-sm">
+<span class="font-data-sm text-data-sm">Zeige 1-6 von 284 Datensätzen</span>
+<span class="text-ink-tertiary">·</span>
+<span class="font-body-sm text-body-sm">Letzte Batch-Synchronisierung vor 14 Min.</span>
+</div>
+<div class="flex items-center gap-space-xs self-end sm:self-auto">
+<button class="w-8 h-8 rounded-lg bg-well-sunken text-ink-secondary flex items-center justify-center hover:bg-violet-wash hover:text-primary transition-colors disabled:opacity-40" disabled="" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg bg-primary-container text-on-primary-container font-data-sm text-data-sm font-bold flex items-center justify-center" type="button">1</button>
+<button class="w-8 h-8 rounded-lg bg-well-sunken text-ink-primary font-data-sm text-data-sm flex items-center justify-center hover:bg-violet-wash hover:text-primary transition-colors" type="button">2</button>
+<button class="w-8 h-8 rounded-lg bg-well-sunken text-ink-primary font-data-sm text-data-sm flex items-center justify-center hover:bg-violet-wash hover:text-primary transition-colors" type="button">3</button>
+<span class="px-1 text-ink-tertiary font-data-sm text-data-sm">...</span>
+<button class="w-8 h-8 rounded-lg bg-well-sunken text-ink-primary font-data-sm text-data-sm flex items-center justify-center hover:bg-violet-wash hover:text-primary transition-colors" type="button">24</button>
+<button class="w-8 h-8 rounded-lg bg-well-sunken text-ink-secondary flex items-center justify-center hover:bg-violet-wash hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bottom Bento Feature: Quick Import & Batch Maintenance -->
+<div class="w-full bg-ink-panel rounded-[2rem] p-space-xl shadow-[0_10px_30px_rgba(48,38,92,0.12)] text-ink-on-dark flex flex-col md:flex-row items-center justify-between gap-space-lg relative overflow-hidden">
+<!-- Ambient Visual Background Accent -->
+<div class="absolute -right-16 -top-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl pointer-events-none"></div>
+<div class="flex items-start gap-space-md max-w-2xl z-10">
+<div class="w-12 h-12 rounded-2xl bg-tile-peak/10 flex-shrink-0 flex items-center justify-center text-secondary-fixed">
+<span class="material-symbols-outlined text-[28px]">insights</span>
+</div>
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-secondary-fixed uppercase tracking-wider font-bold">Automatische Marktplatz-Kopplung</span>
+<h2 class="font-headline-md text-headline-md text-ink-on-dark font-bold">Neues Produkt ohne hinterlegten Einkaufspreis?</h2>
+<p class="font-body-md text-body-md text-ink-on-dark/70">
+            Synchronisierte Artikel aus Amazon SP-API &amp; Otto Partner Connect werden automatisch importiert. Hinterlege jetzt den Wareneinsatz für präzise Deckungsbeitragsrechnung in Echtzeit.
+          </p>
+</div>
+</div>
+<div class="flex flex-col sm:flex-row items-center gap-space-sm z-10 w-full md:w-auto justify-end">
+<button class="w-full sm:w-auto px-space-md py-space-sm rounded-xl bg-ink-on-dark/10 hover:bg-ink-on-dark/20 text-ink-on-dark font-body-sm text-body-sm font-semibold transition-all flex items-center justify-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">table_view</span>
+<span>Muster-CSV herunterladen (UTF-8)</span>
+</button>
+<button class="w-full sm:w-auto px-space-md py-space-sm rounded-xl bg-secondary-fixed text-on-secondary-fixed hover:bg-lime-deep hover:text-tile-peak font-body-sm text-body-sm font-bold transition-all shadow-[0_4px_14px_rgba(199,242,65,0.25)] flex items-center justify-center gap-space-xs" type="button">
+<span class="material-symbols-outlined text-[18px]">post_add</span>
+<span>Ersten Einkaufspreis anlegen</span>
+</button>
+</div>
+</div>
+</div>
+<script>
+    // Lightweight inline UX behavior for COGS data inputs
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputs = document.querySelectorAll('input[type="text"]');
+      inputs.forEach(input => {
+        input.addEventListener('focus', () => {
+          input.classList.add('scale-[1.02]');
+        });
+        input.addEventListener('blur', () => {
+          input.classList.remove('scale-[1.02]');
+        });
+      });
+    });
+  </script>
+</div></main></div></body></html>

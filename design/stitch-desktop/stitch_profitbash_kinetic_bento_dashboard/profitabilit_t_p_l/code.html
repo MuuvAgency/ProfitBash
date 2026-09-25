@@ -1,0 +1,691 @@
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&amp;family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tile-peak": "#FFFFFF",
+          "ink-on-dark": "#EDECF3",
+          "surface-dim": "#ddd8e4",
+          "on-tertiary": "#ffffff",
+          "on-error-container": "#93000a",
+          "primary": "#4227b1",
+          "on-surface-variant": "#484554",
+          "surface": "#fdf8ff",
+          "warn-amber": "#E0A233",
+          "tertiary": "#6e3300",
+          "inverse-on-surface": "#f4effa",
+          "secondary-container": "#c4ef3e",
+          "ink-secondary": "#63607A",
+          "well-sunken": "#E6E4EC",
+          "on-primary-container": "#d6ceff",
+          "on-error": "#ffffff",
+          "surface-container": "#f1ecf8",
+          "on-tertiary-fixed-variant": "#733600",
+          "on-secondary-fixed": "#161f00",
+          "on-primary": "#ffffff",
+          "inverse-surface": "#312f38",
+          "lime-deep": "#7E9E12",
+          "tertiary-container": "#924600",
+          "violet-press": "#4835A6",
+          "surface-tint": "#5d47cc",
+          "surface-container-lowest": "#ffffff",
+          "surface-container-highest": "#e5e0ec",
+          "surface-container-low": "#f7f1fd",
+          "inverse-primary": "#c8bfff",
+          "background": "#fdf8ff",
+          "outline": "#787585",
+          "ink-primary": "#1B1826",
+          "outline-variant": "#c9c4d6",
+          "on-surface": "#1c1b23",
+          "primary-fixed": "#e5deff",
+          "tile-raise": "#FAFAFC",
+          "on-background": "#1c1b23",
+          "on-tertiary-container": "#ffc8a7",
+          "ink-panel": "#1B1826",
+          "on-secondary-container": "#546b00",
+          "error": "#ba1a1a",
+          "secondary": "#506600",
+          "surface-bright": "#fdf8ff",
+          "primary-fixed-dim": "#c8bfff",
+          "secondary-fixed-dim": "#acd522",
+          "primary-container": "#5a44c9",
+          "on-secondary-fixed-variant": "#3c4d00",
+          "on-primary-fixed-variant": "#452bb3",
+          "surface-variant": "#e5e0ec",
+          "violet-wash": "#ECE8FA",
+          "on-secondary": "#ffffff",
+          "tertiary-fixed": "#ffdbc7",
+          "canvas-mist": "#EEEDF3",
+          "ink-tertiary": "#9C99AD",
+          "on-tertiary-fixed": "#311300",
+          "on-primary-fixed": "#1a0064",
+          "whisper-line": "rgba(27,24,38,0.06)",
+          "error-container": "#ffdad6",
+          "tertiary-fixed-dim": "#ffb688",
+          "surface-container-high": "#ebe6f2",
+          "secondary-fixed": "#c7f241",
+          "loss-red": "#D6524B"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-lg": "1.25rem",
+          "space-xl": "1.75rem",
+          "gutter": "1.25rem",
+          "space-xs": "0.25rem",
+          "gutter-mobile": "0.75rem",
+          "space-md": "1rem",
+          "space-sm": "0.5rem"
+        },
+        "fontFamily": {
+          "headline-lg-mobile": [
+            "Space Grotesk"
+          ],
+          "body-lg": [
+            "Space Grotesk"
+          ],
+          "headline-lg": [
+            "Space Grotesk"
+          ],
+          "label-eyebrow": [
+            "Space Grotesk"
+          ],
+          "display": [
+            "Space Grotesk"
+          ],
+          "data-lg": [
+            "JetBrains Mono"
+          ],
+          "headline-md": [
+            "Space Grotesk"
+          ],
+          "data-sm": [
+            "JetBrains Mono"
+          ],
+          "body-md": [
+            "Space Grotesk"
+          ],
+          "data-hero-mobile": [
+            "JetBrains Mono"
+          ],
+          "display-mobile": [
+            "Space Grotesk"
+          ],
+          "body-sm": [
+            "Space Grotesk"
+          ],
+          "headline-sm": [
+            "Space Grotesk"
+          ],
+          "data-md": [
+            "JetBrains Mono"
+          ],
+          "data-hero": [
+            "JetBrains Mono"
+          ]
+        },
+        "fontSize": {
+          "headline-lg-mobile": [
+            "22px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "30px",
+            {
+              "lineHeight": "34px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "label-eyebrow": [
+            "11px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "700"
+            }
+          ],
+          "display": [
+            "52px",
+            {
+              "lineHeight": "52px",
+              "letterSpacing": "-0.03em",
+              "fontWeight": "700"
+            }
+          ],
+          "data-lg": [
+            "22px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "21px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "data-hero-mobile": [
+            "26px",
+            {
+              "lineHeight": "30px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "700"
+            }
+          ],
+          "display-mobile": [
+            "32px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ],
+          "body-sm": [
+            "13px",
+            {
+              "lineHeight": "18px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "18px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0em",
+              "fontWeight": "600"
+            }
+          ],
+          "data-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "data-hero": [
+            "42px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "700"
+            }
+          ]
+        }
+      },
+    },
+  }</script><style>@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}</style></head><body class="bg-canvas-mist text-ink-primary antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-ink-panel z-50 flex flex-col justify-between p-margin shadow-[0_10px_30px_rgba(48,38,92,0.12)]"><div class="flex flex-col gap-space-lg"><div class="flex items-center gap-space-xs px-space-sm py-space-xs"><span class="font-headline-lg text-headline-lg tracking-tight text-ink-on-dark uppercase">ProfitBash</span><span class="h-2 w-2 rounded-full bg-secondary-fixed mb-1"></span></div><nav class="flex flex-col gap-space-xs" data-active-classes="bg-primary-container text-on-primary-container font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)]"><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span class="font-body-md text-body-md">Dashboard</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="verkaufsanalyse" href="#"><span class="material-symbols-outlined text-[20px]">query_stats</span><span class="font-body-md text-body-md">Verkaufsanalyse</span></a><a aria-current="page" class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl bg-primary-container text-on-primary font-semibold shadow-[0_4px_12px_rgba(90,68,201,0.25)] transition-all" data-path="profitabilitat" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span class="font-body-md text-body-md">Profitabilität</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="marken-produkte" href="#"><span class="material-symbols-outlined text-[20px]">inventory_2</span><span class="font-body-md text-body-md">Marken &amp; Produkte</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="retouren" href="#"><span class="material-symbols-outlined text-[20px]">assignment_return</span><span class="font-body-md text-body-md">Retouren</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="bestellungen" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span class="font-body-md text-body-md">Bestellungen</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="amazon-ads" href="#"><span class="material-symbols-outlined text-[20px]">campaign</span><span class="font-body-md text-body-md">Amazon Ads</span></a><a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-ink-on-dark/70 hover:bg-ink-on-dark/10 hover:text-ink-on-dark transition-all" data-path="einstellungen" href="#"><span class="material-symbols-outlined text-[20px]">tune</span><span class="font-body-md text-body-md">Einstellungen</span></a></nav></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-xl bg-ink-on-dark/5"><div class="flex items-center gap-space-xs"><span class="h-2 w-2 rounded-full bg-secondary-fixed animate-pulse"></span><span class="font-data-sm text-data-sm text-ink-on-dark/80 uppercase">Channels Live</span></div><span class="font-data-sm text-data-sm text-ink-tertiary">v2.4</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-canvas-mist/85 backdrop-blur-xl z-40 shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.04)]"><div class="h-16 w-full px-space-lg flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-headline-sm text-headline-sm text-ink-primary">Guten Morgen, Dominik</span><div class="hidden xl:flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="h-2 w-2 rounded-full bg-lime-deep"></span><span class="font-data-sm text-data-sm text-ink-secondary">Amazon, eBay, Otto, Shopify</span><span class="font-label-eyebrow text-label-eyebrow text-lime-deep uppercase font-bold">Synced</span></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-tile-peak shadow-[0_1px_2px_rgba(48,38,92,0.05)]"><span class="material-symbols-outlined text-ink-secondary text-[18px]">calendar_today</span><span class="font-data-sm text-data-sm text-ink-primary font-semibold">Sept 2026</span></div><button class="flex items-center gap-space-xs px-space-md py-space-xs rounded-xl bg-primary-container text-on-primary-container hover:bg-violet-press transition-all shadow-[0_4px_12px_rgba(90,68,201,0.2)]" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="font-body-sm text-body-sm font-semibold">Export</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="relative pt-16 bg-canvas-mist min-h-screen"><div class="flex flex-col w-full px-space-lg py-space-lg gap-space-xl max-w-[1440px] mx-auto">
+<!-- Page Header & Period Control Panel -->
+<section class="flex flex-col lg:flex-row lg:items-end justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Ergebnisrechnung &amp; Deckungsbeitrag</span>
+<span class="w-1.5 h-1.5 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Multi-Channel Verifiziert</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-ink-primary tracking-tight">
+        Profitabilität &amp; Deckungsbeitrag (P&amp;L)
+      </h1>
+<p class="font-body-md text-body-md text-ink-secondary">
+        Vollständige Margen- und Kostenstruktur nach Marktplatzabzügen · Stand: Heute, 16:45 Uhr
+      </p>
+</div>
+<!-- Segmented Time Period Selector -->
+<div class="flex items-center gap-1.5 p-1 rounded-xl bg-well-sunken/70 self-start lg:self-auto shadow-inner">
+<button class="px-space-md py-1.5 rounded-lg bg-violet-wash text-primary font-body-sm text-body-sm font-semibold transition-all shadow-[0_1px_3px_rgba(66,39,177,0.12)]" type="button">
+        Diesen Monat (Sept 2026)
+      </button>
+<button class="px-space-md py-1.5 rounded-lg text-ink-secondary hover:text-ink-primary font-body-sm text-body-sm font-medium transition-all" type="button">
+        Vormonat (Aug 2026)
+      </button>
+<button class="px-space-md py-1.5 rounded-lg text-ink-secondary hover:text-ink-primary font-body-sm text-body-sm font-medium transition-all" type="button">
+        Q3 2026
+      </button>
+</div>
+</section>
+<!-- Margin KPI Bento Block (Asymmetric 12-Column Grid) -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-gutter">
+<!-- 1. Hero KPI Card: Netto-Marge (Inverted Command Surface Tier) -->
+<div class="lg:col-span-4 bg-ink-panel rounded-[1.75rem] p-space-xl flex flex-col justify-between relative overflow-hidden shadow-[0_10px_30px_rgba(27,24,38,0.18)] min-h-[220px]">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Netto-Marge (Realisierter Ertrag)</span>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-fixed/15">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed animate-pulse"></span>
+<span class="font-data-sm text-data-sm font-semibold text-secondary-fixed">+1,8 % vs. Vormonat</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs my-space-md">
+<div class="flex items-baseline gap-space-xs">
+<span class="font-data-hero text-data-hero text-ink-on-dark tracking-tight">22,4 %</span>
+<span class="w-3 h-3 rounded-full bg-secondary-fixed mb-2 ml-1"></span>
+</div>
+<span class="font-data-lg text-data-lg text-secondary-fixed tracking-tight">€ 48.213,60</span>
+</div>
+<div class="pt-space-sm">
+<p class="font-body-sm text-body-sm text-ink-on-dark/70">
+          Reingewinn nach Abzug aller Waren-, Versand-, Marketing- &amp; Fixkosten
+        </p>
+</div>
+</div>
+<!-- 2. Bruttomarge (Standard Tile Tier) -->
+<div class="lg:col-span-3 bg-tile-raise rounded-[1.75rem] p-space-xl flex flex-col justify-between shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] min-h-[220px]">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Bruttomarge (COGS)</span>
+<span class="font-data-sm text-data-sm px-2 py-0.5 rounded-full bg-lime-deep/10 text-lime-deep font-semibold">+0,7 %</span>
+</div>
+<div class="flex flex-col gap-space-xs my-space-sm">
+<span class="font-data-hero text-data-hero text-ink-primary tracking-tight">41,2 %</span>
+<span class="font-data-md text-data-md text-ink-secondary">€ 88.560,00 Rohertrag</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+        Rohertrag nach COGS, Zollabwicklung &amp; Seefracht
+      </p>
+</div>
+<!-- 3. Deckungsbeitrag (DB II) -->
+<div class="lg:col-span-3 bg-tile-raise rounded-[1.75rem] p-space-xl flex flex-col justify-between shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] min-h-[220px]">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Deckungsbeitrag (DB II)</span>
+<span class="font-data-sm text-data-sm px-2 py-0.5 rounded-full bg-lime-deep/10 text-lime-deep font-semibold">+9,4 %</span>
+</div>
+<div class="flex flex-col gap-space-xs my-space-sm">
+<span class="font-data-hero text-data-hero text-ink-primary tracking-tight">€ 88.560,00</span>
+<span class="font-data-md text-data-md text-ink-secondary">41,19 % vom Umsatz</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary">
+        Deckungsbeitrag nach variablen Vertriebs-, Pick- &amp; Versandkosten
+      </p>
+</div>
+<!-- 4. Break-Even Run-Rate -->
+<div class="lg:col-span-2 bg-tile-raise rounded-[1.75rem] p-space-xl flex flex-col justify-between shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] min-h-[220px]">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Break-Even Run-Rate</span>
+</div>
+<div class="flex flex-col gap-space-xs my-space-sm">
+<span class="font-data-lg text-data-lg text-ink-primary font-bold tracking-tight">€ 118.420</span>
+<div class="flex items-center gap-1.5 pt-1">
+<span class="w-2 h-2 rounded-full bg-lime-deep"></span>
+<span class="font-body-sm text-body-sm font-semibold text-lime-deep">Erreicht am 14. Sept</span>
+</div>
+</div>
+<div class="w-full bg-well-sunken rounded-full h-2 overflow-hidden">
+<div class="bg-primary-container h-full rounded-full w-full"></div>
+</div>
+</div>
+</section>
+<!-- P&L Waterfall Tile (Full-Width High-Impact Hero Bento) -->
+<section class="bg-tile-peak rounded-[2rem] p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.08)] flex flex-col gap-space-lg">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm">
+<div class="flex flex-col gap-0.5">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Finanz-Deckungsbeitrags-Kaskade</span>
+<h2 class="font-headline-md text-headline-md text-ink-primary tracking-tight">
+          P&amp;L Waterfall: Vom Bruttoumsatz zum Netto-Gewinn
+        </h2>
+</div>
+<div class="flex items-center gap-space-sm self-start md:self-auto">
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-wash">
+<span class="font-data-sm text-data-sm font-semibold text-primary">Basis Brutto: € 214.980,00</span>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-fixed/30">
+<span class="w-2 h-2 rounded-full bg-lime-deep"></span>
+<span class="font-data-sm text-data-sm font-bold text-ink-primary">22,4 % Realisierte Marge</span>
+</div>
+</div>
+</div>
+<!-- Waterfall Interactive Sunken Well Canvas -->
+<div class="bg-well-sunken rounded-2xl p-space-lg overflow-x-auto">
+<div class="min-w-[920px] h-[340px] flex flex-col justify-between relative select-none">
+<!-- Background Monospace Scale Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30 py-2">
+<div class="w-full flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 220.000</span>
+<div class="flex-1 mx-3 h-[1px] bg-ink-tertiary/40"></div>
+</div>
+<div class="w-full flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 165.000</span>
+<div class="flex-1 mx-3 h-[1px] bg-ink-tertiary/40"></div>
+</div>
+<div class="w-full flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 110.000</span>
+<div class="flex-1 mx-3 h-[1px] bg-ink-tertiary/40"></div>
+</div>
+<div class="w-full flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 55.000</span>
+<div class="flex-1 mx-3 h-[1px] bg-ink-tertiary/40"></div>
+</div>
+<div class="w-full flex items-center justify-between">
+<span class="font-data-sm text-data-sm text-ink-secondary">€ 0 (Basis)</span>
+<div class="flex-1 mx-3 h-[1px] bg-ink-primary/50"></div>
+</div>
+</div>
+<!-- Waterfall SVG Bars & Connectors Container -->
+<svg class="w-full h-full relative z-10 overflow-visible" preserveAspectRatio="none" viewBox="0 0 940 300">
+<defs>
+<!-- Step Connectors Pattern -->
+<line id="connector" stroke="#9C99AD" stroke-dasharray="3,3" stroke-width="1.5"></line>
+</defs>
+<!-- Horizontal Alignment Guides Between Drop Bars -->
+<!-- 1 -> 2: from y=40 to drop COGS -->
+<line stroke="#9C99AD" stroke-dasharray="3 3" stroke-width="1.5" x1="120" x2="160" y1="40" y2="40"></line>
+<!-- 2 -> 3: from COGS bottom y=120 to Marktplatz top y=120 -->
+<line stroke="#9C99AD" stroke-dasharray="3 3" stroke-width="1.5" x1="250" x2="290" y1="120" y2="120"></line>
+<!-- 3 -> 4: from Marktplatz bottom y=158 to Versand top y=158 -->
+<line stroke="#9C99AD" stroke-dasharray="3 3" stroke-width="1.5" x1="380" x2="420" y1="158" y2="158"></line>
+<!-- 4 -> 5: from Versand bottom y=188 to Ads top y=188 -->
+<line stroke="#9C99AD" stroke-dasharray="3 3" stroke-width="1.5" x1="510" x2="550" y1="188" y2="188"></line>
+<!-- 5 -> 6: from Ads bottom y=214 to OPEX top y=214 -->
+<line stroke="#9C99AD" stroke-dasharray="3 3" stroke-width="1.5" x1="640" x2="680" y1="214" y2="214"></line>
+<!-- 6 -> 7: from OPEX bottom y=236 to Netto top y=236 -->
+<line stroke="#9C99AD" stroke-dasharray="3 3" stroke-width="1.5" x1="770" x2="810" y1="236" y2="236"></line>
+<!-- BAR 1: Bruttoumsatz (Solid Primary Violet from Baseline) -->
+<g class="cursor-pointer group">
+<rect class="fill-primary-container group-hover:fill-violet-press transition-colors" height="236" rx="8" width="90" x="30" y="40"></rect>
+<text class="font-data-sm text-data-sm fill-ink-primary font-bold" text-anchor="middle" x="75" y="30">€ 214.980</text>
+<text class="font-data-sm text-data-sm fill-ink-on-dark font-semibold" text-anchor="middle" x="75" y="60">100,0 %</text>
+</g>
+<!-- BAR 2: COGS / Wareneinsatz (Floating Drop Bar) -->
+<g class="cursor-pointer group">
+<rect class="fill-loss-red group-hover:opacity-90 transition-opacity" height="80" rx="8" width="90" x="160" y="40"></rect>
+<text class="font-data-sm text-data-sm fill-loss-red font-bold" text-anchor="middle" x="205" y="30">−€ 68.420</text>
+<text class="font-data-sm text-data-sm fill-on-primary font-semibold" text-anchor="middle" x="205" y="85">31,8 %</text>
+</g>
+<!-- BAR 3: Marktplatzgebühren (Floating Drop Bar) -->
+<g class="cursor-pointer group">
+<rect class="fill-loss-red/90 group-hover:opacity-90 transition-opacity" height="38" rx="8" width="90" x="290" y="120"></rect>
+<text class="font-data-sm text-data-sm fill-loss-red font-bold" text-anchor="middle" x="335" y="112">−€ 32.246</text>
+<text class="font-data-sm text-data-sm fill-on-primary font-semibold" text-anchor="middle" x="335" y="144">15,0 %</text>
+</g>
+<!-- BAR 4: Versand & Fulfillment (Floating Drop Bar) -->
+<g class="cursor-pointer group">
+<rect class="fill-loss-red/80 group-hover:opacity-90 transition-opacity" height="30" rx="8" width="90" x="420" y="158"></rect>
+<text class="font-data-sm text-data-sm fill-loss-red font-bold" text-anchor="middle" x="465" y="150">−€ 25.754</text>
+<text class="font-data-sm text-data-sm fill-on-primary font-semibold" text-anchor="middle" x="465" y="179">12,0 %</text>
+</g>
+<!-- BAR 5: Werbekosten (PPC / Ads) (Floating Drop Bar) -->
+<g class="cursor-pointer group">
+<rect class="fill-loss-red/75 group-hover:opacity-90 transition-opacity" height="26" rx="8" width="90" x="550" y="188"></rect>
+<text class="font-data-sm text-data-sm fill-loss-red font-bold" text-anchor="middle" x="595" y="180">−€ 22.146</text>
+<text class="font-data-sm text-data-sm fill-on-primary font-semibold" text-anchor="middle" x="595" y="206">10,3 %</text>
+</g>
+<!-- BAR 6: OPEX & Fix (Floating Drop Bar) -->
+<g class="cursor-pointer group">
+<rect class="fill-loss-red/70 group-hover:opacity-90 transition-opacity" height="22" rx="8" width="90" x="680" y="214"></rect>
+<text class="font-data-sm text-data-sm fill-loss-red font-bold" text-anchor="middle" x="725" y="206">−€ 18.200</text>
+<text class="font-data-sm text-data-sm fill-on-primary font-semibold" text-anchor="middle" x="725" y="230">8,5 %</text>
+</g>
+<!-- BAR 7: Netto-Gewinn (Lime Bar Landing on Baseline) -->
+<g class="cursor-pointer group">
+<rect class="fill-secondary-fixed group-hover:fill-secondary-fixed-dim transition-colors" height="40" rx="8" width="90" x="810" y="236"></rect>
+<text class="font-data-sm text-data-sm fill-ink-primary font-bold" text-anchor="middle" x="855" y="226">€ 48.214</text>
+<text class="font-data-sm text-data-sm fill-on-secondary-fixed font-bold" text-anchor="middle" x="855" y="260">22,4 %</text>
+</g>
+</svg>
+<!-- Step Descriptions Footnote Grid Underneath Waterfall -->
+<div class="grid grid-cols-7 gap-2 pt-2 text-center select-none">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-bold text-ink-primary truncate">Bruttoumsatz</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Alle Kanäle</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-loss-red truncate">COGS Einkauf</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Wareneinsatz</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-loss-red truncate">Marktplatzgeb.</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Provisionen</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-loss-red truncate">Versand &amp; FBA</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Logistikkosten</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-loss-red truncate">Werbung (PPC)</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Amazon/Otto/eBay</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-loss-red truncate">OPEX / Fixkosten</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Tools &amp; Team</span>
+</div>
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-bold text-ink-primary truncate">Netto-Gewinn</span>
+<span class="font-data-sm text-data-sm text-secondary font-semibold">Realer Cash-Ertrag</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Secondary Bento Row: Asymmetric 7/5 Distribution -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- LEFT TILE: Kostenverteilung (7 Columns) -->
+<div class="lg:col-span-7 bg-tile-raise rounded-[2rem] p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] flex flex-col justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Kostenverteilung &amp; Absorptionsquote</span>
+<span class="font-data-sm text-data-sm text-ink-secondary">Gesamtaufwand: € 166.766,40</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-ink-primary">
+          Segmentierte Kostenblöcke je Euro Umsatz
+        </h3>
+</div>
+<!-- Single Compact Stacked Horizontal Bento Bar -->
+<div class="flex flex-col gap-space-sm">
+<div class="w-full h-8 rounded-xl overflow-hidden flex shadow-inner bg-well-sunken">
+<div class="h-full bg-[#5a44c9] hover:opacity-90 transition-opacity" style="width: 31.8%" title="COGS: 31,8%"></div>
+<div class="h-full bg-[#735cd9] hover:opacity-90 transition-opacity" style="width: 15.0%" title="Marktplatz: 15,0%"></div>
+<div class="h-full bg-[#8e7ae3] hover:opacity-90 transition-opacity" style="width: 12.0%" title="Versand &amp; FBA: 12,0%"></div>
+<div class="h-full bg-[#ac9fed] hover:opacity-90 transition-opacity" style="width: 10.3%" title="PPC Ads: 10,3%"></div>
+<div class="h-full bg-[#cbc3f5] hover:opacity-90 transition-opacity" style="width: 8.5%" title="OPEX: 8,5%"></div>
+<div class="h-full bg-secondary-fixed hover:opacity-90 transition-opacity" style="width: 22.4%" title="Reingewinn: 22,4%"></div>
+</div>
+<!-- Bar Labels Underneath -->
+<div class="flex justify-between text-ink-tertiary font-data-sm text-data-sm px-1">
+<span class="">0 % (Brutto Start)</span>
+<span class="text-secondary font-bold">22,4 % Gewinnspanne verbleibend</span>
+<span class="">100 % (Umsatz)</span>
+</div>
+</div>
+<!-- Structured Monospace Data Breakdown Table -->
+<div class="bg-well-sunken/60 rounded-xl p-space-md">
+<div class="grid grid-cols-12 pb-space-xs font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">
+<span class="col-span-5">Kostenkategorie</span>
+<span class="col-span-3 text-right">Betrag (EUR)</span>
+<span class="col-span-2 text-right">Anteil</span>
+<span class="col-span-2 text-right">vs. Aug</span>
+</div>
+<div class="flex flex-col gap-1.5 pt-space-xs font-body-sm text-body-sm">
+<!-- Row 1: COGS -->
+<div class="grid grid-cols-12 items-center py-1 rounded-lg px-1 hover:bg-tile-peak/50 transition-colors">
+<div class="col-span-5 flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-sm bg-[#5a44c9]"></span>
+<span class="font-medium text-ink-primary">Wareneinsatz (COGS)</span>
+</div>
+<span class="col-span-3 font-data-sm text-data-sm text-right text-ink-primary">€ 68.420,00</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-ink-secondary">31,8 %</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-lime-deep font-semibold">−0,8 %</span>
+</div>
+<!-- Row 2: Marktplatz -->
+<div class="grid grid-cols-12 items-center py-1 rounded-lg px-1 hover:bg-tile-peak/50 transition-colors">
+<div class="col-span-5 flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-sm bg-[#735cd9]"></span>
+<span class="font-medium text-ink-primary">Marktplatz-Provisionen</span>
+</div>
+<span class="col-span-3 font-data-sm text-data-sm text-right text-ink-primary">€ 32.246,40</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-ink-secondary">15,0 %</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-loss-red font-semibold">+0,4 %</span>
+</div>
+<!-- Row 3: Versand -->
+<div class="grid grid-cols-12 items-center py-1 rounded-lg px-1 hover:bg-tile-peak/50 transition-colors">
+<div class="col-span-5 flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-sm bg-[#8e7ae3]"></span>
+<span class="font-medium text-ink-primary">FBA &amp; Paketlogistik</span>
+</div>
+<span class="col-span-3 font-data-sm text-data-sm text-right text-ink-primary">€ 25.753,60</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-ink-secondary">12,0 %</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-lime-deep font-semibold">−0,3 %</span>
+</div>
+<!-- Row 4: PPC Ads -->
+<div class="grid grid-cols-12 items-center py-1 rounded-lg px-1 hover:bg-tile-peak/50 transition-colors">
+<div class="col-span-5 flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-sm bg-[#ac9fed]"></span>
+<span class="font-medium text-ink-primary">Werbekosten (TACoS 10,3%)</span>
+</div>
+<span class="col-span-3 font-data-sm text-data-sm text-right text-ink-primary">€ 22.146,40</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-ink-secondary">10,3 %</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-loss-red font-semibold">+1,1 %</span>
+</div>
+<!-- Row 5: OPEX -->
+<div class="grid grid-cols-12 items-center py-1 rounded-lg px-1 hover:bg-tile-peak/50 transition-colors">
+<div class="col-span-5 flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-sm bg-[#cbc3f5]"></span>
+<span class="font-medium text-ink-primary">OPEX, Lizenzen &amp; Software</span>
+</div>
+<span class="col-span-3 font-data-sm text-data-sm text-right text-ink-primary">€ 18.200,00</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-ink-secondary">8,5 %</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-ink-tertiary">0,0 %</span>
+</div>
+<!-- Row 6: Reingewinn -->
+<div class="grid grid-cols-12 items-center py-1.5 rounded-lg px-1 bg-tile-peak shadow-sm font-semibold">
+<div class="col-span-5 flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-sm bg-secondary-fixed"></span>
+<span class="text-ink-primary">Reingewinn (Net Retention)</span>
+</div>
+<span class="col-span-3 font-data-sm text-data-sm text-right text-primary font-bold">€ 48.213,60</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-primary font-bold">22,4 %</span>
+<span class="col-span-2 font-data-sm text-data-sm text-right text-lime-deep font-bold">+1,8 %</span>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT TILE: Margen-Treiber & Kosten-Lecks (5 Columns) -->
+<div class="lg:col-span-5 bg-tile-raise rounded-[2rem] p-space-xl shadow-[0_1px_2px_rgba(48,38,92,0.05),0_10px_30px_rgba(48,38,92,0.06)] flex flex-col justify-between gap-space-lg">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-eyebrow text-label-eyebrow text-ink-tertiary uppercase tracking-wider">Automatisierte Rentabilitäts-Audits</span>
+<span class="w-2 h-2 rounded-full bg-lime-deep animate-ping"></span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-ink-primary">
+          Margen-Treiber &amp; Kosten-Lecks
+        </h3>
+</div>
+<!-- Insight Cards Stack -->
+<div class="flex flex-col gap-space-md">
+<!-- Card 1: Positive Driver -->
+<div class="bg-tile-peak rounded-xl p-space-md shadow-sm hover:translate-y-[-2px] transition-transform">
+<div class="flex items-start gap-space-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-lime-deep mt-1 flex-shrink-0"></span>
+<div class="flex flex-col gap-1 w-full">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm font-bold text-ink-primary">Amazon FBA Retourenquote gesunken</span>
+<span class="font-data-sm text-data-sm px-2 py-0.5 rounded-full bg-lime-deep/10 text-lime-deep font-semibold">+ € 1.430/Mo</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+                Quote um <span class="font-data-sm text-data-sm font-semibold text-lime-deep">−1,4 %</span> auf <span class="font-data-sm text-data-sm font-semibold">4,8 %</span> gefallen durch überarbeitete Produktabmessungen bei Kategorie Küchengeräte.
+              </p>
+</div>
+</div>
+</div>
+<!-- Card 2: Warning Alert -->
+<div class="bg-tile-peak rounded-xl p-space-md shadow-sm hover:translate-y-[-2px] transition-transform">
+<div class="flex items-start gap-space-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-warn-amber mt-1 flex-shrink-0"></span>
+<div class="flex flex-col gap-1 w-full">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm font-bold text-ink-primary">Otto Provision Consumer Electronics</span>
+<span class="font-data-sm text-data-sm px-2 py-0.5 rounded-full bg-warn-amber/15 text-warn-amber font-semibold">Kostenanstieg</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+                Marktplatz-Fee automatisch angepasst auf <span class="font-data-sm text-data-sm font-semibold text-ink-primary">14,5 %</span> (<span class="font-data-sm text-data-sm font-semibold text-loss-red">+1,5 %</span> seit 01. Sept). Margenverlust ca. € 780/Monat.
+              </p>
+</div>
+</div>
+</div>
+<!-- Card 3: Optimization Opportunity -->
+<div class="bg-tile-peak rounded-xl p-space-md shadow-sm hover:translate-y-[-2px] transition-transform">
+<div class="flex items-start gap-space-sm">
+<span class="w-2.5 h-2.5 rounded-full bg-primary-container mt-1 flex-shrink-0"></span>
+<div class="flex flex-col gap-1 w-full">
+<div class="flex items-center justify-between">
+<span class="font-body-sm text-body-sm font-bold text-ink-primary">PPC TACoS auf eBay optimieren</span>
+<span class="font-data-sm text-data-sm text-loss-red font-semibold">14,2 % TACoS</span>
+</div>
+<p class="font-body-sm text-body-sm text-ink-secondary leading-snug">
+                Zielwert liegt bei <span class="font-data-sm text-data-sm font-semibold text-ink-primary">&lt; 10,0 %</span>. Drei Auto-Kampagnen binden Werbebudget ohne inkrementelle Conversion.
+              </p>
+<div class="pt-1">
+<a class="inline-flex items-center gap-1 font-body-sm text-body-sm font-semibold text-primary hover:text-violet-press transition-colors" href="#">
+<span class="">Gebotsregeln automatisch drosseln</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Action Summary Banner inside Bento -->
+<div class="bg-violet-wash/60 rounded-xl p-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">insights</span>
+<span class="font-body-sm text-body-sm text-ink-primary font-medium">Margenpotenzial identifiziert:</span>
+</div>
+<span class="font-data-md text-data-md font-bold text-primary">+ € 3.820 / Mo</span>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Dynamic visual feedback for waterfall steps
+  document.addEventListener('DOMContentLoaded', () => {
+    const bars = document.querySelectorAll('svg g.cursor-pointer');
+    bars.forEach(bar => {
+      bar.addEventListener('mouseenter', () => {
+        bar.style.transform = 'translateY(-2px)';
+        bar.style.transition = 'transform 0.15s ease-out';
+      });
+      bar.addEventListener('mouseleave', () => {
+        bar.style.transform = 'translateY(0)';
+      });
+    });
+  });
+</script></main></div>
+
+</body></html>
