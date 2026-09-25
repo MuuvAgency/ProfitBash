@@ -113,6 +113,11 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
   dazu ein Anfrage-Budget je Profil. Asynchrone Amazon-Reports: anfordern, Status mit Backoff abfragen,
   Report-Zustand in der DB festhalten, damit ein Neustart nichts verliert.
 - **Schlüsselrotation** für verschlüsselte Tokens ist ab 0.3 vorgesehen (Schlüssel-ID im Ciphertext).
+- **Geldbeträge aus Amazon-JSON:** `parseJsonLossless` (0.5) liefert nur unsichere Ganzzahlen als String, Dezimalzahlen
+  noch als `number`. Vor dem ersten Import von Beträgen (Reports, Budgets) eine Option ergänzen, die Dezimalzahlen als
+  Quelltext-String liefert, statt über `String(number)` zu gehen.
+- **Ablauf der Refresh-Tokens:** Amazon-Refresh-Tokens ab 30.07.2026 laufen 365 Tage nach der Einwilligung ab. Den Zeitpunkt
+  der Einwilligung je Connection festhalten und rechtzeitig zum Neu-Verbinden auffordern (spätestens mit den Notifications in Phase 5).
 
 ## 6. Betriebskosten-Stufen
 

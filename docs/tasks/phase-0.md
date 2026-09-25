@@ -162,7 +162,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] Typisierte ESLint-Regeln aktivieren (`@typescript-eslint/no-floating-promises`, `no-misused-promises`), bevor Job- und Request-Code wächst.
 
 ### 0.5 Amazon-Client (`packages/amazon-ads`)
-- [ ] Konfiguration je Region als Konstanten mit Quellen-Kommentar (gegen die aktuelle Amazon-Ads-Doku verifizieren):
+- [x] Konfiguration je Region als Konstanten mit Quellen-Kommentar (gegen die aktuelle Amazon-Ads-Doku verifizieren):
 
   | Region | Authorize | Token | LWA-Profil | API-Host |
   |---|---|---|---|---|
@@ -170,22 +170,39 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   | na | `https://www.amazon.com/ap/oa` | `https://api.amazon.com/auth/o2/token` | `https://api.amazon.com/user/profile` | `https://advertising-api.amazon.com` |
   | fe | `https://apac.account.amazon.com/ap/oa` | `https://api.amazon.co.jp/auth/o2/token` | `https://api.amazon.co.jp/user/profile` | `https://advertising-api-fe.amazon.com` |
 
-- [ ] `buildAuthorizeUrl(state)` mit den Scopes `advertising::campaign_management profile`.
-- [ ] `exchangeCode(code)` → Refresh-Token; `getAccountIdentity(accessToken)` → LWA `user_id` (→ `external_account_id`) und E-Mail.
-- [ ] `getAccessToken(connection)` mit In-Memory-Cache bis kurz vor Ablauf.
-- [ ] Refresh-Token-Rotation: Liefert Amazon beim Refresh einen neuen Refresh-Token, wird dieser sofort verschlüsselt gespeichert und ersetzt den alten.
+- [x] `buildAuthorizeUrl(state)` mit den Scopes `advertising::campaign_management profile`.
+- [x] `exchangeCode(code)` → Refresh-Token; `getAccountIdentity(accessToken)` → LWA `user_id` (→ `external_account_id`) und E-Mail.
+- [x] `getAccessToken(connection)` mit In-Memory-Cache bis kurz vor Ablauf.
+- [x] Refresh-Token-Rotation: Liefert Amazon beim Refresh einen neuen Refresh-Token, wird dieser sofort verschlüsselt gespeichert und ersetzt den alten.
   Der Refresh einer Connection läuft unter einer Sperre (Advisory-Lock bzw. `SELECT … FOR UPDATE`), damit API und Worker sich nicht gegenseitig einen rotierten Token überschreiben.
-- [ ] Zentraler `request()`:
+- [x] Zentraler `request()`:
   - setzt die Header `Authorization`, `Amazon-Advertising-API-ClientId` und bei Bedarf `Amazon-Advertising-API-Scope`
   - Retry bei 429/5xx mit exponentiellem Backoff und Jitter, `Retry-After` respektieren
   - Timeout
   - Logging ohne Tokens
   - **Verlustfreies JSON-Parsing:** Große Zahlen (Profil-, Kampagnen-IDs) werden als String gelesen, nie als `number`.
   - Alle Antworten werden mit zod validiert; unbekannte Enum-Werte (z. B. neuer `accountType`) werden durchgereicht und geloggt, nicht verworfen.
-- [ ] `listProfiles(connection)` → normalisierte Profile (`amazonProfileId`, `amazonAccountId` als String).
-- [ ] **Mock-Anbieter** hinter derselben Schnittstelle (`AMAZON_ADS_USE_MOCK=true`): simulierte Einwilligungsseite → Callback mit Test-Code,
+- [x] `listProfiles(connection)` → normalisierte Profile (`amazonProfileId`, `amazonAccountId` als String).
+- [x] **Mock-Anbieter** hinter derselben Schnittstelle (`AMAZON_ADS_USE_MOCK=true`): simulierte Einwilligungsseite → Callback mit Test-Code,
   feste Test-Identität und Test-Profile (inkl. einer Profil-ID > `Number.MAX_SAFE_INTEGER`). Damit ist Phase 0 ohne API-Freigabe vorführbar.
-- [ ] Tests mit msw: 429-Retry, Token-Rotation, Identität, und eine Profil-ID größer als `Number.MAX_SAFE_INTEGER` kommt unverändert an.
+- [x] Tests mit msw: 429-Retry, Token-Rotation, Identität, und eine Profil-ID größer als `Number.MAX_SAFE_INTEGER` kommt unverändert an.
+- [x] Umsetzung (Stand für 0.6/0.7):
+  - **Doku geprüft am 2026-09-26:** Tabelle oben stimmt. Amazon liefert beim Refresh normalerweise **denselben** Refresh-Token;
+    Rotation wird trotzdem unterstützt. Refresh-Tokens ab 30.07.2026 laufen **365 Tage nach der Einwilligung** ab (`invalid_grant`).
+  - Einstieg `createAmazonAdsClient({ credentials, store, logger })` → `AmazonAdsClient` (`buildAuthorizeUrl`, `exchangeCode`,
+    `getAccountIdentity`, `getAccessToken`, `invalidateAccessToken`, `request`, `listProfiles`). `ConnectionRef` = `{ id, organizationId, region }`.
+  - `request()` nimmt nur Pfade relativ zum API-Host (Tokens gehen nie an fremde Hosts). Bei 401 höchstens ein erzwungener Token-Refresh
+    je Minute und Connection (Amazon meldet 401 auch für nicht zugängliche Profile).
+  - Retry: 429 immer; 5xx, Timeout und Netzwerkfehler nur bei GET oder mit `retryServerErrors` (keine Doppel-Writes). Equal Jitter,
+    `Retry-After` hat Vorrang; ist es länger als `maxRetryAfterMs`, endet der Aufruf mit `AmazonAdsHttpError.retryAfterMs` (für Jobs).
+  - Fehlerarten: `AmazonAdsHttpError`, `AmazonAdsReauthRequiredError` (LWA `invalid_grant`), `AmazonAdsNetworkError`, `AmazonAdsResponseError`.
+  - Token-Store: `createConnectionTokenStore({ db, keyring })` in `@profitbash/db` (anbieterneutral). Transaktion mit `lock_timeout` (20 s)
+    und `SELECT … FOR NO KEY UPDATE` gefiltert nach Connection **und** Organisation. `FOR NO KEY UPDATE` statt `FOR UPDATE`, damit Profil-Upserts
+    (Fremdschlüssel → `FOR KEY SHARE`) nicht blockieren (Review-Befund). LWA-Aufrufe unter der Sperre haben knappe Limits (`LWA_HTTP_DEFAULTS`: 10 s, 3 Versuche,
+    `Retry-After` höchstens 5 s).
+  - Mock: `createMockAmazonAdsClient({ redirectUri, consentUrl, store })` ist der echte Client mit einem In-Process-`fetch` für die Amazon-Endpunkte.
+    Die Einwilligungsseite rendert `renderMockConsentPage({ redirectUri, state })`; sie leitet nur auf die konfigurierte Redirect-URI zurück.
+  - msw ist Dev-Abhängigkeit von `packages/amazon-ads`; sein Postinstall (Service-Worker-Datei für Browser) ist in `pnpm-workspace.yaml` abgeschaltet.
 
 ### 0.6 OAuth-Flow & Connections-API (`apps/api`)
 - [ ] `POST /api/amazon/oauth/start` (nur Admin, optional `connectionId` für „Neu verbinden") → Redirect-URL mit `state`:
@@ -204,6 +221,12 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] Jede schreibende Aktion erzeugt ein `audit_event`.
 - [ ] Tests: fremde Session am Callback, abgelaufener und wiederverwendeter `state`, Neu-Verbinden aktualisiert statt dupliziert
   **und der gespeicherte Token lässt sich danach entschlüsseln**.
+- [ ] Offen aus 0.5:
+  - Env-Schema für `AMAZON_ADS_CLIENT_ID`/`_SECRET`/`_REDIRECT_URI`/`_USE_MOCK` und `ENCRYPTION_*` (Keyring) in die API einbinden;
+    `AMAZON_ADS_USE_MOCK=true` → `createMockAmazonAdsClient`, sonst `createAmazonAdsClient` (Client-ID/Secret dann Pflicht).
+  - Route für die Mock-Einwilligungsseite (`renderMockConsentPage`) nur bei `AMAZON_ADS_USE_MOCK=true` mounten, `consentUrl` darauf zeigen lassen.
+  - Beim Verdrahten per Typ prüfen, dass `ConnectionTokenStore` (db) zu `RefreshTokenStore` (amazon-ads) passt (heute strukturell kompatibel).
+  - Nach dem Neu-Verbinden `invalidateAccessToken(connectionId)` aufrufen. Callback-Parameter `error=access_denied` als Hinweis anzeigen.
 
 ### 0.7 Worker & Jobs (`apps/worker`)
 - [ ] pg-boss-Setup, Job-Wrapper `runJob(name, scope, fn)`:
@@ -214,6 +237,9 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   Der eigenständige Worker-Prozess beendet sich bei `WORKER_MODE=inline` mit einem Hinweis (sonst liefe er in `pnpm dev` doppelt).
 - [ ] Jobs je Connection laufen nicht parallel (pg-boss `singletonKey` = Connection-ID).
 - [ ] `token-refresh`: stündlich; markiert Connections mit ungültigem Token als `status = 'reauth_required'`.
+  - Aus 0.5: `AmazonAdsReauthRequiredError` → Status in einer **eigenen** Anweisung nach dem Rollback setzen (die Store-Transaktion rollt zurück).
+  - Connections mit `reauth_required` nicht mehr refreshen (auch der Store ruft LWA bisher unabhängig vom Status auf).
+  - `AmazonAdsHttpError.retryAfterMs` für das Neu-Planen nutzen.
 - [ ] `profiles-sync`: täglich 05:00 Europe/Berlin und on demand.
   - Profile upserten über (`organization_id`, `amazon_profile_id`); `connection_id` auf die synchronisierende Connection setzen; `removed_at` zurücksetzen, wenn ein Profil wieder auftaucht.
   - Profile, die Amazon über keine Connection der Org mehr liefert, bekommen `removed_at = now()`. Nichts wird gelöscht, `is_hidden` bleibt unberührt.
@@ -291,6 +317,6 @@ Die Datei `.env.example` im Repo-Root ist die Quelle. Neue Variablen in den Aufg
 
 ## Reihenfolge für Claude Code
 
-0.1 → 0.2 → 0.3 → 0.4 → 0.8 (Login + Shell) ✓ → 0.5 → 0.6 → 0.7 → 0.8 (Connections, Sync-Status, Settings) → 0.9.
+0.1 → 0.2 → 0.3 → 0.4 → 0.8 (Login + Shell) ✓ → 0.5 ✓ → 0.6 → 0.7 → 0.8 (Connections, Sync-Status, Settings) → 0.9.
 
 Nach jedem Schritt: Tests grün, kurzer Commit, Häkchen in dieser Datei setzen.
