@@ -1,12 +1,14 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  foreignKey,
   index,
   jsonb,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -36,7 +38,6 @@ const organizationId = () =>
 export const connectionProvider = pgEnum('connection_provider', ['amazon_ads']);
 export const connectionRegion = pgEnum('connection_region', ['eu', 'na', 'fe']);
 export const connectionStatus = pgEnum('connection_status', ['active', 'reauth_required', 'error']);
-export const amazonAccountType = pgEnum('amazon_account_type', ['seller', 'vendor', 'agency']);
 export const jobRunStatus = pgEnum('job_run_status', ['running', 'success', 'failed']);
 
 // ---------------------------------------------------------------------------
@@ -71,11 +72,15 @@ export const clients = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [uniqueIndex('clients_org_slug_uq').on(t.organizationId, t.slug)],
+  (t) => [
+    uniqueIndex('clients_org_slug_uq').on(t.organizationId, t.slug),
+    // Ziel der zusammengesetzten Fremdschlüssel (verhindert Zuordnungen über Org-Grenzen)
+    unique('clients_id_org_uq').on(t.id, t.organizationId),
+  ],
 );
 
 // ---------------------------------------------------------------------------
-// Connections: OAuth-Verbindungen zu externen APIs
+// Connections: OAuth-Verbindungen zu externen APIs (provider-neutral)
 // ---------------------------------------------------------------------------
 
 export const connections = pgTable(
@@ -84,9 +89,15 @@ export const connections = pgTable(
     id: id(),
     organizationId: organizationId(),
     provider: connectionProvider('provider').notNull(),
-    region: connectionRegion('region').notNull(),
-    amazonAccountEmail: text('amazon_account_email'),
-    /** Verschlüsselt mit packages/shared crypto (Format v1:<iv>:<tag>:<cipher>). Nie im Klartext. */
+    /** API-Region (Amazon: eu | na | fe). Leer bei Anbietern ohne Regionen. */
+    region: connectionRegion('region'),
+    /**
+     * Stabile ID des externen Kontos, mit dem verbunden wurde (Amazon: LWA-User-ID `amzn1.account…`).
+     * Verhindert doppelte Connections beim erneuten Verbinden.
+     */
+    externalAccountId: text('external_account_id').notNull(),
+    externalAccountEmail: text('external_account_email'),
+    /** Verschlüsselt über `@profitbash/shared/crypto`. Nie im Klartext speichern oder loggen. */
     refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
     status: connectionStatus('status').notNull().default('active'),
     lastRefreshedAt: timestamp('last_refreshed_at', { withTimezone: true, mode: 'date' }),
@@ -94,7 +105,13 @@ export const connections = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index('connections_org_idx').on(t.organizationId)],
+  (t) => [
+    unique('connections_account_uq')
+      .on(t.organizationId, t.provider, t.region, t.externalAccountId)
+      .nullsNotDistinct(),
+    unique('connections_id_org_uq').on(t.id, t.organizationId),
+    index('connections_org_idx').on(t.organizationId),
+  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -104,20 +121,26 @@ export const connections = pgTable(
 export const amazonAdsProfiles = pgTable(
   'amazon_ads_profiles',
   {
+    /** Interne ID. In der App heißt sie `profileId`, die Amazon-ID immer `amazonProfileId`. */
     id: id(),
     organizationId: organizationId(),
+    /** Aktueller Zugriffsweg. Gehört zwingend zur selben Organisation (zusammengesetzter FK). */
     connectionId: uuid('connection_id')
       .notNull()
       .references(() => connections.id, { onDelete: 'cascade' }),
+    /** Zugeordneter Client derselben Organisation (zusammengesetzter FK). */
     clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
     /** Amazon-Profil-ID. Immer Text, weil die Zahl JavaScripts sichere Ganzzahlgrenze überschreiten kann. */
-    profileId: text('profile_id').notNull(),
+    amazonProfileId: text('amazon_profile_id').notNull(),
+    /** Amazon `accountInfo.id` (Seller-/Vendor-/Entity-ID), wird von späteren APIs gebraucht. */
+    amazonAccountId: text('amazon_account_id'),
     accountName: text('account_name').notNull(),
     countryCode: text('country_code').notNull(),
     currencyCode: text('currency_code').notNull(),
     timezone: text('timezone').notNull(),
     marketplaceId: text('marketplace_id'),
-    accountType: amazonAccountType('account_type').notNull(),
+    /** seller | vendor | agency. Text statt Enum: Ein neuer Wert von Amazon darf den Sync nicht brechen. */
+    accountType: text('account_type').notNull(),
     /** Vom Nutzer ausgeblendet. */
     isHidden: boolean('is_hidden').notNull().default(false),
     /** Amazon liefert das Profil nicht mehr. Wird beim erneuten Auftauchen zurückgesetzt. */
@@ -127,8 +150,23 @@ export const amazonAdsProfiles = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    uniqueIndex('amazon_ads_profiles_connection_profile_uq').on(t.connectionId, t.profileId),
+    // Ein Amazon-Profil gibt es pro Organisation nur einmal, egal über wie viele Connections es sichtbar ist.
+    uniqueIndex('amazon_ads_profiles_org_amazon_profile_uq').on(
+      t.organizationId,
+      t.amazonProfileId,
+    ),
+    foreignKey({
+      name: 'amazon_ads_profiles_connection_org_fk',
+      columns: [t.connectionId, t.organizationId],
+      foreignColumns: [connections.id, connections.organizationId],
+    }),
+    foreignKey({
+      name: 'amazon_ads_profiles_client_org_fk',
+      columns: [t.clientId, t.organizationId],
+      foreignColumns: [clients.id, clients.organizationId],
+    }),
     index('amazon_ads_profiles_org_idx').on(t.organizationId),
+    index('amazon_ads_profiles_connection_idx').on(t.connectionId),
     index('amazon_ads_profiles_client_idx').on(t.clientId),
   ],
 );

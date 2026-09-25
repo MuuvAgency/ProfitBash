@@ -1,4 +1,4 @@
-import { databaseDirectUrlSchema, loadEnv, nodeEnvSchema } from '@profitbash/shared';
+import { databaseDirectUrlSchema, loadEnv, nodeEnvSchema } from '@profitbash/shared/env';
 
 export const workerEnvSchema = nodeEnvSchema.extend(databaseDirectUrlSchema.shape);
 

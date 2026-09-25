@@ -4,7 +4,7 @@ import {
   orgRoles,
   platformAccessControl,
   platformRoles,
-} from '@profitbash/shared';
+} from '@profitbash/shared/access-control';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, organization } from 'better-auth/plugins';
@@ -44,8 +44,9 @@ export function createAuth({ db, secret, baseURL, trustedOrigins = [] }: CreateA
         schema: {
           organization: {
             additionalFields: {
-              // internal = Agentur (Muuv), client = Kundenorganisation
-              type: { type: 'string', required: true, defaultValue: 'client', input: true },
+              // internal = Agentur (Muuv), client = Kundenorganisation.
+              // input: false → Clients können den Typ nicht setzen oder ändern, nur der Server.
+              type: { type: 'string', required: true, defaultValue: 'client', input: false },
             },
           },
         },

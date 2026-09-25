@@ -1,7 +1,7 @@
 import { schema } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import { FEATURE_KEYS } from '@profitbash/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuth, type Auth } from './auth';
 import { seed, SEED_ORG } from './seed';
@@ -66,6 +66,50 @@ describe('seed', () => {
     expect(await testDb.db.select().from(schema.organizations)).toHaveLength(1);
     expect(await testDb.db.select().from(schema.members)).toHaveLength(1);
     expect(await testDb.db.select().from(schema.orgEntitlements)).toHaveLength(FEATURE_KEYS.length);
+  });
+
+  it('lässt bewusst abgeschaltete Entitlements beim erneuten Seed abgeschaltet', async () => {
+    const [org] = await testDb.db.select().from(schema.organizations);
+    const onlyGoals = and(
+      eq(schema.orgEntitlements.organizationId, org!.id),
+      eq(schema.orgEntitlements.feature, 'goals'),
+    );
+    await testDb.db.update(schema.orgEntitlements).set({ enabled: false }).where(onlyGoals);
+
+    await seed({ db: testDb.db, auth, admin });
+
+    const [goals] = await testDb.db.select().from(schema.orgEntitlements).where(onlyGoals);
+    expect(goals?.enabled).toBe(false);
+  });
+
+  it('ein Org-Admin kann den Org-Typ nicht über die API ändern', async () => {
+    const [org] = await testDb.db.select().from(schema.organizations);
+    const { headers: signInHeaders } = await auth.api.signInEmail({
+      body: { email: admin.email, password: admin.password },
+      returnHeaders: true,
+    });
+    const sessionCookie = signInHeaders.get('set-cookie')!.split(';')[0]!;
+    const headers = new Headers({ cookie: sessionCookie });
+
+    // Kontrolle: Die Session funktioniert, normale Felder lassen sich ändern.
+    await auth.api.updateOrganization({
+      headers,
+      body: { organizationId: org!.id, data: { name: 'Muuv GmbH' } },
+    });
+    // Versuch, den schreibgeschützten Typ zu ändern (abgelehnt oder ignoriert, beides ist ok).
+    await auth.api
+      .updateOrganization({
+        headers,
+        body: { organizationId: org!.id, data: { type: 'client' } as { name?: string } },
+      })
+      .catch(() => undefined);
+
+    const [after] = await testDb.db
+      .select()
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, org!.id));
+    expect(after?.name).toBe('Muuv GmbH');
+    expect(after?.type).toBe('internal');
   });
 
   it('der Admin kann sich mit E-Mail und Passwort anmelden', async () => {

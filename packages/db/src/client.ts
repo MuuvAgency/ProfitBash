@@ -12,7 +12,13 @@ export interface CreateDbOptions {
  * pg-boss und Migrationen nutzen die direkte URL (`DATABASE_URL_DIRECT`), nie einen Transaction-Pooler.
  */
 export function createDb(url: string, options: CreateDbOptions = {}) {
-  const client = postgres(url, { max: options.max ?? 10, onnotice: () => {} });
+  const client = postgres(url, {
+    max: options.max ?? 10,
+    onnotice: () => {},
+    // Immer UTC, unabhängig von der Server-Zeitzone. Die better-auth-Tabellen nutzen `timestamp`
+    // ohne Zeitzone; mit UTC-Sessions sind DB-Defaults (now()) und App-Werte konsistent.
+    connection: { TimeZone: 'UTC' },
+  });
   const db = drizzle({ client, schema });
   return { db, client, close: () => client.end() };
 }

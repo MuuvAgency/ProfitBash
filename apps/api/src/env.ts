@@ -4,7 +4,7 @@ import {
   loadEnv,
   nodeEnvSchema,
   workerModeSchema,
-} from '@profitbash/shared';
+} from '@profitbash/shared/env';
 
 export const apiEnvSchema = nodeEnvSchema
   .extend(appUrlSchema.shape)

@@ -6,7 +6,7 @@ import {
   loadEnv,
   nodeEnvSchema,
   seedAdminSchema,
-} from '@profitbash/shared';
+} from '@profitbash/shared/env';
 import { createAuth } from './auth';
 import { seed } from './seed';
 

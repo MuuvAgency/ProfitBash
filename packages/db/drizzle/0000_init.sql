@@ -1,4 +1,3 @@
-CREATE TYPE "public"."amazon_account_type" AS ENUM('seller', 'vendor', 'agency');--> statement-breakpoint
 CREATE TYPE "public"."connection_provider" AS ENUM('amazon_ads');--> statement-breakpoint
 CREATE TYPE "public"."connection_region" AS ENUM('eu', 'na', 'fe');--> statement-breakpoint
 CREATE TYPE "public"."connection_status" AS ENUM('active', 'reauth_required', 'error');--> statement-breakpoint
@@ -92,13 +91,14 @@ CREATE TABLE "amazon_ads_profiles" (
 	"organization_id" uuid NOT NULL,
 	"connection_id" uuid NOT NULL,
 	"client_id" uuid,
-	"profile_id" text NOT NULL,
+	"amazon_profile_id" text NOT NULL,
+	"amazon_account_id" text,
 	"account_name" text NOT NULL,
 	"country_code" text NOT NULL,
 	"currency_code" text NOT NULL,
 	"timezone" text NOT NULL,
 	"marketplace_id" text,
-	"account_type" "amazon_account_type" NOT NULL,
+	"account_type" text NOT NULL,
 	"is_hidden" boolean DEFAULT false NOT NULL,
 	"removed_at" timestamp with time zone,
 	"synced_at" timestamp with time zone,
@@ -121,21 +121,25 @@ CREATE TABLE "clients" (
 	"name" text NOT NULL,
 	"slug" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "clients_id_org_uq" UNIQUE("id","organization_id")
 );
 --> statement-breakpoint
 CREATE TABLE "connections" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" uuid NOT NULL,
 	"provider" "connection_provider" NOT NULL,
-	"region" "connection_region" NOT NULL,
-	"amazon_account_email" text,
+	"region" "connection_region",
+	"external_account_id" text NOT NULL,
+	"external_account_email" text,
 	"refresh_token_encrypted" text NOT NULL,
 	"status" "connection_status" DEFAULT 'active' NOT NULL,
 	"last_refreshed_at" timestamp with time zone,
 	"created_by" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "connections_account_uq" UNIQUE NULLS NOT DISTINCT("organization_id","provider","region","external_account_id"),
+	CONSTRAINT "connections_id_org_uq" UNIQUE("id","organization_id")
 );
 --> statement-breakpoint
 CREATE TABLE "job_runs" (
@@ -188,6 +192,8 @@ ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY
 ALTER TABLE "amazon_ads_profiles" ADD CONSTRAINT "amazon_ads_profiles_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "amazon_ads_profiles" ADD CONSTRAINT "amazon_ads_profiles_connection_id_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "amazon_ads_profiles" ADD CONSTRAINT "amazon_ads_profiles_client_id_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "amazon_ads_profiles" ADD CONSTRAINT "amazon_ads_profiles_connection_org_fk" FOREIGN KEY ("connection_id","organization_id") REFERENCES "public"."connections"("id","organization_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "amazon_ads_profiles" ADD CONSTRAINT "amazon_ads_profiles_client_org_fk" FOREIGN KEY ("client_id","organization_id") REFERENCES "public"."clients"("id","organization_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audit_events" ADD CONSTRAINT "audit_events_actor_user_id_users_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "clients" ADD CONSTRAINT "clients_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -204,8 +210,9 @@ CREATE INDEX "members_organizationId_idx" ON "members" USING btree ("organizatio
 CREATE INDEX "members_userId_idx" ON "members" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "sessions_userId_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "verifications_identifier_idx" ON "verifications" USING btree ("identifier");--> statement-breakpoint
-CREATE UNIQUE INDEX "amazon_ads_profiles_connection_profile_uq" ON "amazon_ads_profiles" USING btree ("connection_id","profile_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "amazon_ads_profiles_org_amazon_profile_uq" ON "amazon_ads_profiles" USING btree ("organization_id","amazon_profile_id");--> statement-breakpoint
 CREATE INDEX "amazon_ads_profiles_org_idx" ON "amazon_ads_profiles" USING btree ("organization_id");--> statement-breakpoint
+CREATE INDEX "amazon_ads_profiles_connection_idx" ON "amazon_ads_profiles" USING btree ("connection_id");--> statement-breakpoint
 CREATE INDEX "amazon_ads_profiles_client_idx" ON "amazon_ads_profiles" USING btree ("client_id");--> statement-breakpoint
 CREATE INDEX "audit_events_org_created_idx" ON "audit_events" USING btree ("organization_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE UNIQUE INDEX "clients_org_slug_uq" ON "clients" USING btree ("organization_id","slug");--> statement-breakpoint

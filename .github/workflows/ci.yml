@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
@@ -39,6 +40,15 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Auth-Schema und Migrationen passen zum Code
+        run: |
+          pnpm --filter @profitbash/api run auth:schema
+          pnpm db:generate
+          if [ -n "$(git status --porcelain packages/db)" ]; then
+            git status --porcelain packages/db
+            echo "::error::Schema oder Migrationen sind nicht aktuell. Lokal 'pnpm --filter @profitbash/api auth:schema' und 'pnpm db:generate' ausführen und committen."
+            exit 1
+          fi
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test

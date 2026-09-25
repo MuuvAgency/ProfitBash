@@ -3,3 +3,4 @@ design/
 coverage/
 pnpm-lock.yaml
 *.md
+packages/db/drizzle/

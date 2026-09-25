@@ -19,7 +19,8 @@ export const workerModeSchema = z.object({
   WORKER_MODE: z.enum(['inline', 'separate']).default('inline'),
 });
 
-const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
+export const postgresUrlSchema = z.url({ protocol: /^postgres(ql)?$/ });
+const postgresUrl = postgresUrlSchema;
 
 export const databaseUrlSchema = z.object({ DATABASE_URL: postgresUrl });
 export const databaseDirectUrlSchema = z.object({ DATABASE_URL_DIRECT: postgresUrl });

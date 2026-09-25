@@ -82,7 +82,7 @@ export async function visibleProfileIds(db: Db, input: ProfileVisibilityInput): 
   return rows.map((row) => row.id);
 }
 
-/** Darf der Nutzer dieses Profil sehen? (`profileId` = `amazon_ads_profiles.id`) */
+/** Darf der Nutzer dieses Profil sehen? `profileId` ist die interne ID (`amazon_ads_profiles.id`), nicht die Amazon-ID. */
 export async function canSeeProfile(
   db: Db,
   input: ProfileVisibilityInput & { profileId: string },

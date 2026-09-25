@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { databaseTestUrlSchema, loadEnv } from '@profitbash/shared';
+import { databaseTestUrlSchema, loadEnv, postgresUrlSchema } from '@profitbash/shared/env';
 import postgres from 'postgres';
 import { createDb, type Db } from './client';
 import { runMigrations } from './migrate';
@@ -10,13 +10,47 @@ import { runMigrations } from './migrate';
  * Dadurch laufen Testdateien parallel, ohne sich gegenseitig Daten zu überschreiben.
  */
 
-function testDatabaseUrls() {
-  const { DATABASE_URL_TEST } = loadEnv(databaseTestUrlSchema);
-  const url = new URL(DATABASE_URL_TEST);
+/**
+ * Schutz vor Datenverlust: Die Test-Einrichtung löscht Datenbanken. Deshalb nur Namen mit
+ * `_test`-Endung zulassen, und nie dieselbe Datenbank wie `DATABASE_URL` / `DATABASE_URL_DIRECT`.
+ */
+export function assertSafeTestDatabase(
+  testUrl: string,
+  otherUrls: Array<string | undefined>,
+): { template: string } {
+  const url = new URL(testUrl);
   const template = decodeURIComponent(url.pathname.slice(1));
-  if (!/^[a-z0-9_]+$/.test(template)) {
-    throw new Error('DATABASE_URL_TEST muss einen einfachen Datenbanknamen enthalten ([a-z0-9_]).');
+  if (!/^[a-z0-9_]+_test$/.test(template)) {
+    throw new Error(
+      `DATABASE_URL_TEST muss auf eine Datenbank mit der Endung "_test" zeigen (gefunden: "${template}"). ` +
+        'Die Test-Einrichtung löscht diese Datenbank.',
+    );
   }
+  for (const other of otherUrls) {
+    if (!other) continue;
+    const o = new URL(other);
+    const sameServer = o.hostname === url.hostname && (o.port || '5432') === (url.port || '5432');
+    if (sameServer && decodeURIComponent(o.pathname.slice(1)) === template) {
+      throw new Error(
+        'DATABASE_URL_TEST darf nicht dieselbe Datenbank wie DATABASE_URL(_DIRECT) sein.',
+      );
+    }
+  }
+  return { template };
+}
+
+function testDatabaseUrls() {
+  const env = loadEnv(
+    databaseTestUrlSchema.extend({
+      DATABASE_URL: postgresUrlSchema.optional(),
+      DATABASE_URL_DIRECT: postgresUrlSchema.optional(),
+    }),
+  );
+  const url = new URL(env.DATABASE_URL_TEST);
+  const { template } = assertSafeTestDatabase(env.DATABASE_URL_TEST, [
+    env.DATABASE_URL,
+    env.DATABASE_URL_DIRECT,
+  ]);
   const maintenance = new URL(url);
   maintenance.pathname = '/postgres';
   return { url, template, maintenance: maintenance.toString() };
@@ -39,7 +73,7 @@ export async function prepareTestTemplate(): Promise<void> {
   const { url, template, maintenance } = testDatabaseUrls();
   await withMaintenanceConnection(maintenance, async (sql) => {
     const leftovers = await sql<{ datname: string }[]>`
-      select datname from pg_database where datname like ${`${template}\\_%`}`;
+      select datname from pg_database where datname ~ ${`^${template}_[0-9a-f]{12}$`}`;
     for (const { datname } of leftovers) {
       await sql.unsafe(`DROP DATABASE IF EXISTS "${datname}" WITH (FORCE)`);
     }

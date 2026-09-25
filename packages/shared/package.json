@@ -5,13 +5,15 @@
   "type": "module",
   "description": "zod-Schemas, Feature-Keys, Formatierung, Verschl\u00fcsselung, Env-Validierung",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts",
+    "./access-control": "./src/access-control.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "better-auth": "^1.7.5",
+    "better-auth": "1.7.5",
     "zod": "^4.6.5"
   }
 }

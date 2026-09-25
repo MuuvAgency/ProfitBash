@@ -1,4 +1,4 @@
-import { databaseDirectUrlSchema, loadEnv } from '@profitbash/shared';
+import { databaseDirectUrlSchema, loadEnv } from '@profitbash/shared/env';
 import { runMigrations } from './migrate';
 
 const env = loadEnv(databaseDirectUrlSchema);

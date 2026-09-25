@@ -21,10 +21,11 @@ export interface SeedResult {
 }
 
 /**
- * Legt die Grundausstattung an. Idempotent: Ein zweiter Lauf ändert nichts Bestehendes.
+ * Legt die Grundausstattung an. Idempotent: Ein zweiter Lauf legt nichts doppelt an. Er stellt nur
+ * sicher, dass Admin-Rollen und der Org-Typ stimmen.
  * - Admin-User (Plattform-Rolle `superadmin`) über die better-auth-API, nicht über den Signup
  * - Organisation „Muuv" (`type = internal`) mit dem Admin als Org-Admin
- * - alle Feature-Entitlements aktiv
+ * - fehlende Feature-Entitlements aktiv anlegen (bestehende bleiben, wie sie sind)
  *
  * Ein bestehendes Passwort wird nicht überschrieben.
  */
@@ -67,12 +68,14 @@ export async function seed({
 
   if (!org) {
     const created = await auth.api.createOrganization({
-      body: { name: SEED_ORG.name, slug: SEED_ORG.slug, type: SEED_ORG.type, userId: user.id },
+      body: { name: SEED_ORG.name, slug: SEED_ORG.slug, userId: user.id },
     });
     if (!created) throw new Error('Organisation konnte nicht angelegt werden.');
     org = { id: created.id };
     createdOrganization = true;
   }
+  // Der Typ ist für Clients schreibgeschützt (input: false) und wird deshalb serverseitig gesetzt.
+  await db.update(organizations).set({ type: SEED_ORG.type }).where(eq(organizations.id, org.id));
 
   // 3) Mitgliedschaft als Org-Admin sicherstellen (falls die Org schon ohne ihn existierte)
   const [membership] = await db
@@ -88,14 +91,11 @@ export async function seed({
     await db.update(members).set({ role: 'admin' }).where(eq(members.id, membership.id));
   }
 
-  // 4) Alle Entitlements aktiv
+  // 4) Fehlende Entitlements aktiv anlegen. Bewusst abgeschaltete bleiben abgeschaltet.
   await db
     .insert(orgEntitlements)
     .values(FEATURE_KEYS.map((feature) => ({ organizationId: org.id, feature, enabled: true })))
-    .onConflictDoUpdate({
-      target: [orgEntitlements.organizationId, orgEntitlements.feature],
-      set: { enabled: true },
-    });
+    .onConflictDoNothing({ target: [orgEntitlements.organizationId, orgEntitlements.feature] });
 
   return { userId: user.id, organizationId: org.id, createdUser, createdOrganization };
 }
