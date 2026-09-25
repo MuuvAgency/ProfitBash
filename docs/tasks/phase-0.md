@@ -103,12 +103,15 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   Die Migrationen wurden vor dem ersten Deploy zu `0000_init` zusammengefasst. Ab dem ersten Deploy werden Migrationen nie mehr geändert.
 
 ### 0.3 Verschlüsselung (`@profitbash/shared/crypto`, nur Server)
-- [ ] Eigener Einstiegspunkt `@profitbash/shared/crypto` (nutzt `node:crypto`, nie in der Browser-Wurzel exportieren).
-- [ ] `encrypt(plaintext, { aad })` / `decrypt(ciphertext, { aad })` mit AES-256-GCM.
-  - Format `v1:<keyId>:<iv>:<tag>:<cipher>` (base64url). Aktueller Schlüssel aus `ENCRYPTION_KEY` (32 Byte, base64) mit `ENCRYPTION_KEY_ID`.
-  - Schlüsselrotation: `ENCRYPTION_KEYS_PREVIOUS` (`id:key,id:key`) wird nur zum Entschlüsseln genutzt. Ein Rotations-Skript verschlüsselt alle Tokens neu.
-  - **AAD** = `connection:<organizationId>:<connectionId>`. Ein kopierter Ciphertext lässt sich in keiner anderen Zeile oder Organisation entschlüsseln.
-- [ ] Tests: Roundtrip, falscher Key, manipulierter Ciphertext, falsche AAD, Entschlüsseln mit altem Schlüssel nach Rotation, unbekannte `keyId`.
+- [x] Eigener Einstiegspunkt `@profitbash/shared/crypto` (nutzt `node:crypto`, nicht in der Browser-Wurzel exportiert).
+- [x] `encrypt(plaintext, { keyring, aad })` / `decrypt(ciphertext, { keyring, aad })` mit AES-256-GCM.
+  - Format `v1:<keyId>:<iv>:<tag>:<cipher>` (base64url). Aktueller Schlüssel aus `ENCRYPTION_KEY` (32 Byte, base64) mit `ENCRYPTION_KEY_ID`, geprüft über `parseKeyring()`.
+  - Schlüsselrotation: `ENCRYPTION_KEYS_PREVIOUS` (`id:key,id:key`) nur zum Entschlüsseln; `needsReencryption()` erkennt alte Werte.
+    Das Rotations-Skript über alle Connections folgt mit 0.9 (`docs/deploy.md`).
+  - **AAD** = `connectionTokenAad(organizationId, connectionId)` → `connection:<org>:<conn>` (IDs ohne `:`, nicht leer).
+- [x] Tests (TDD): Roundtrip, zufällige IV, Format ohne Klartext, falscher Key, manipulierter Ciphertext und Tag, falsche AAD,
+  leere AAD, unbekannte `keyId`, kaputte Formate, Rotation, Schlüsselprüfung ohne Schlüssel in Fehlermeldungen.
+- [ ] Einbindung in die Env-Validierung der Apps mit dem ersten Nutzer (0.6: Connection anlegen).
 
 ### 0.4 Auth & `/api/me` (`apps/api`)
 - [ ] Hono-Server, better-auth gemountet unter `/api/auth/*`, E-Mail/Passwort, Organization-Plugin mit eigenen Rollen, Admin-Plugin, Signup deaktiviert, `trustedOrigins` = `APP_URL`.
@@ -215,6 +218,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
 - [ ] Railway-Postgres mit Backups; falls der Hobby-Plan keine enthält: nächtlicher `pg_dump` per GitHub Action in einen privaten Speicher.
 - [ ] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
+- [ ] Rotations-Skript: verschlüsselt alle Tokens, bei denen `needsReencryption()` greift, mit dem aktuellen Schlüssel neu.
 
 ## `.env.example`
 
