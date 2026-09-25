@@ -1,0 +1,16 @@
+{
+  "name": "@profitbash/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Drizzle-Schema, Migrationen, Seed, Access-Layer",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "generate": "node -e \"console.log('db:generate wird in Aufgabe 0.2 eingerichtet')\"",
+    "migrate": "node -e \"console.log('db:migrate wird in Aufgabe 0.2 eingerichtet')\"",
+    "seed": "node -e \"console.log('db:seed wird in Aufgabe 0.2 eingerichtet')\""
+  }
+}

@@ -16,7 +16,7 @@ und um weitere Marktplätze erweiterbar.
 
 | Bereich | Wahl |
 |---|---|
-| Sprache | TypeScript überall (`strict`, `noUncheckedIndexedAccess`) |
+| Sprache | TypeScript **6.0** überall (`strict`, `noUncheckedIndexedAccess`). TypeScript 7 (nativer Compiler) erst, wenn typescript-eslint und vue-tsc es unterstützen (Stand 09/2026: typescript-eslint nur bis 6.0) |
 | Monorepo | pnpm-Workspaces: `apps/{api,worker,web}`, `packages/{db,amazon-ads,engine,shared}` |
 | API | Hono (Node), zod, OpenAPI via `@hono/zod-openapi` |
 | Auth | better-auth: E-Mail/Passwort, Organization-Plugin (eigene Rollen admin/editor/viewer), Admin-Plugin (Superadmin) |
@@ -24,6 +24,7 @@ und um weitere Marktplätze erweiterbar.
 | Jobs | pg-boss (Queue und Cron in Postgres, kein Redis) |
 | Web | Vue 3 + Vite, PrimeVue (Styled Mode, eigenes Preset aus `design/theme.js`), Tailwind v4 für Layout, Pinia, Vue Router, TanStack Query, vue-i18n |
 | Tabellen / Charts | AG Grid **Community**, AG Charts Community |
+| Build | Apps `api`/`worker` mit tsup (bündelt die Workspace-Pakete, die TS-Quellcode exportieren); Web mit Vite. Dev: `tsx watch` |
 | Tests | Vitest, HTTP-Mocks mit msw |
 | CI | GitHub Actions, Postgres als Service-Container |
 | Hosting | Railway |

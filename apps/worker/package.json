@@ -1,0 +1,20 @@
+{
+  "name": "@profitbash/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "pg-boss-Worker für Hintergrundjobs",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@profitbash/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15"
+  }
+}

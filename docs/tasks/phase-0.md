@@ -50,13 +50,13 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 ## Aufgaben
 
 ### 0.1 Monorepo & Tooling
-- [ ] pnpm-Workspace mit `apps/{api,worker,web}` und `packages/{db,amazon-ads,engine,shared}`. Package-Scope `@profitbash/*`.
-- [ ] Gemeinsame `tsconfig.base.json` (`strict`, `noUncheckedIndexedAccess`), ESLint + Prettier, Vitest.
-- [ ] Lokale DB ist eingerichtet: Postgres 17 (Homebrew), Rolle `profitbash`, Datenbanken `profitbash` und `profitbash_test`. Tests nutzen `DATABASE_URL_TEST`. CI nutzt einen Postgres-17-Service-Container.
-- [ ] Root-Skripte: `dev`, `build`, `test`, `typecheck`, `lint`, `db:generate`, `db:migrate`, `db:seed`.
-- [ ] GitHub-Actions-Workflow; Postgres für Tests als Service-Container.
-- [ ] `.env.example` mit allen Variablen (siehe unten); Env-Validierung per zod beim Start jeder App.
-- [ ] Vite-Dev-Server leitet `/api` an `http://localhost:8787` weiter. So laufen alle Browser-Requests über eine Origin.
+- [x] pnpm-Workspace mit `apps/{api,worker,web}` und `packages/{db,amazon-ads,engine,shared}`. Package-Scope `@profitbash/*`.
+- [x] Gemeinsame `tsconfig.base.json` (`strict`, `noUncheckedIndexedAccess`), ESLint + Prettier, Vitest.
+- [x] Lokale DB ist eingerichtet: Postgres 17 (Homebrew), Rolle `profitbash`, Datenbanken `profitbash` und `profitbash_test`. Tests nutzen `DATABASE_URL_TEST`. CI nutzt einen Postgres-17-Service-Container.
+- [x] Root-Skripte: `dev`, `build`, `test`, `typecheck`, `lint`, `db:generate`, `db:migrate`, `db:seed`.
+- [x] GitHub-Actions-Workflow; Postgres für Tests als Service-Container. (Lokal verifiziert; erster echter Lauf nach dem Push ins GitHub-Repo, siehe 0.0f.)
+- [x] `.env.example` mit allen Variablen (siehe unten); Env-Validierung per zod beim Start jeder App (`loadEnv` in `packages/shared`; das Web ist eine statische SPA und bekommt nur `VITE_*`-Variablen).
+- [x] Vite-Dev-Server leitet `/api` an `http://localhost:8787` weiter. So laufen alle Browser-Requests über eine Origin.
 
 ### 0.2 Datenbank-Basis (`packages/db`)
 - [ ] Drizzle + drizzle-kit, Migrationsordner, Treiber `postgres` (postgres.js) für App und Migrationen.

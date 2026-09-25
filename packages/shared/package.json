@@ -1,0 +1,16 @@
+{
+  "name": "@profitbash/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "zod-Schemas, Feature-Keys, Formatierung, Verschlüsselung, Env-Validierung",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}

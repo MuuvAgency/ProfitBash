@@ -1,0 +1,22 @@
+{
+  "name": "@profitbash/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hono-API (liefert in Prod auch das Web aus)",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@profitbash/shared": "workspace:*",
+    "hono": "^4.13.9"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15"
+  }
+}

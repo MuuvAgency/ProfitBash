@@ -1,0 +1,13 @@
+{
+  "name": "@profitbash/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fachlogik ohne I/O (Regeln, Pacing, Berechnungen)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
