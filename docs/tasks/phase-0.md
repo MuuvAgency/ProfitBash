@@ -1,6 +1,6 @@
 # Phase 0 – Fundament
 
-> Vor Beginn lesen: `CLAUDE.md`, `docs/plan.md` (Navigation, Feature-Keys, Leitplanken), `docs/decisions/001-stack.md`.
+> Vor Beginn lesen: `CLAUDE.md`, `docs/plan.md` (Navigation, Feature-Keys, Leitplanken), `docs/decisions/` (001 Stack, 002 Mandanten-Modell).
 
 ## Ziel
 
@@ -13,19 +13,20 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 ## Definition of Done
 
 - [ ] `pnpm dev` startet api, worker und web lokal (lokales Postgres 17 über Homebrew); `pnpm test`, `pnpm typecheck` und `pnpm lint` sind grün.
-- [ ] CI (GitHub Actions) läuft bei jedem Push: typecheck, lint, test, build.
-- [ ] Railway-Service `app` (API + Web auf einer Origin, `WORKER_MODE=inline`) ist erreichbar und nutzt Railway-Postgres. Neon-Projekt mit Branch `dev` existiert für Entwicklung.
+- [ ] CI (GitHub Actions) läuft bei jedem Push auf `main` und bei Pull Requests: Schema-/Migrations-Check, typecheck, lint, test, build.
+- [ ] Railway-Service `app` (API + Web auf einer Origin, `WORKER_MODE=inline`, `NODE_ENV=production`) ist erreichbar und nutzt Railway-Postgres mit Backups.
 - [ ] Login mit E-Mail/Passwort. Der Seed legt einen Admin an (Org-Admin von „Muuv" und Plattform-Superadmin). Öffentliche Registrierung ist deaktiviert.
 - [ ] Die App-Shell zeigt die komplette Sidebar aus `docs/plan.md` §3. Menüpunkte späterer Phasen öffnen eine Platzhalterseite „Kommt in Phase N".
-- [ ] Unter *Admin → Clients & Connections* lässt sich ein Amazon-Ads-Account verbinden (OAuth, Region EU).
+- [ ] Unter *Admin → Clients & Connections* lässt sich ein Amazon-Ads-Account verbinden (OAuth, Region EU). Bis zur API-Freigabe mit dem Mock-Anbieter (`AMAZON_ADS_USE_MOCK=true`), danach einmal echt.
   - Die Profile erscheinen mit Land, Währung, Zeitzone und Typ.
   - Jedem Profil lässt sich ein **Client** zuordnen (auswählen oder neu anlegen).
   - Profile lassen sich ausblenden. Profile, die Amazon nicht mehr liefert, sind als „entfernt" markiert.
+  - Erneutes Verbinden desselben Amazon-Kontos aktualisiert die bestehende Connection, statt eine zweite anzulegen.
 - [ ] Die Jobs `token-refresh` und `profiles-sync` laufen über pg-boss, schreiben `job_runs` und pingen Healthchecks.io.
 - [ ] *Betrieb → Sync-Status* zeigt die letzten Jobläufe mit Status und Fehlertext.
 - [ ] Die Settings-Seite speichert Locale (Zahlenformat) und Theme serverseitig.
 - [ ] Die UI nutzt die Design-Tokens aus `design/theme.js` (Login und Shell im Kinetic-Bento-Look).
-- [ ] ADR `docs/decisions/001-stack.md` ist aktuell.
+- [ ] ADRs `docs/decisions/001-stack.md` und `002-tenancy.md` sind aktuell.
 
 ## Voraussetzungen (manuell, Dominik)
 
@@ -34,7 +35,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   Vorschlag: `~/Projects/profitbash`.
 - [ ] **0.0b Amazon Developer / LWA Security Profile anlegen**
   - Client-ID und Client-Secret notieren.
-  - Allowed Return URLs: `http://localhost:8787/api/amazon/oauth/callback` und `https://<app>.up.railway.app/api/amazon/oauth/callback`.
+  - Allowed Return URLs: `http://localhost:5173/api/amazon/oauth/callback` (über den Vite-Proxy) und `https://<app>.up.railway.app/api/amazon/oauth/callback`.
   - Prüfen, ob LWA die `http://localhost`-URL akzeptiert. Falls nicht: den OAuth-Test über die Railway-URL oder einen HTTPS-Tunnel (z. B. `cloudflared`) fahren.
 - [ ] **0.0c Ads-API-Zugang im Amazon Ads Partner Network beantragen**
   - Mit derselben E-Mail wie das Security Profile, als Agentur.
@@ -44,7 +45,9 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Das Amazon-Konto, mit dem später der OAuth-Login läuft, muss als User in den Werbekonten von Soapi, Aliseo und Evertag eingeladen sein.
   - Dann deckt eine Connection alle Profile ab.
 - [ ] **0.0e SP-API-Registrierung anstoßen** (wird erst in Phase 7 gebraucht, die Freigabe dauert aber).
-- [ ] **0.0f Accounts anlegen:** Railway (Trial reicht für Phase 0), Neon (Free), Healthchecks.io (Free), GitHub-Repo `profitbash` (privat).
+- [ ] **0.0f Accounts anlegen:** Railway, Healthchecks.io (Free), GitHub-Repo `profitbash` (privat). Neon (Free) nur bei Bedarf für geteilte Dev-/Preview-Datenbanken; lokal reicht Homebrew-Postgres.
+  - Railway-Hobby erst starten, wenn der erste echte Deploy ansteht (das Trial-Guthaben ist zeitlich begrenzt, die Amazon-Freigabe kann Wochen dauern).
+  - Prüfen, ob Backups für Railway-Postgres im Hobby-Plan enthalten sind. Falls nicht: nächtlicher `pg_dump` per GitHub Action (siehe 0.9).
 - [ ] **0.0g Secrets bereitstellen** (siehe `.env.example` unten).
 
 ## Aufgaben
@@ -69,14 +72,17 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] Eigene Tabellen (alle mit `id` uuid, `created_at`, `updated_at`, Zeitstempel mit Zeitzone):
   - `org_entitlements`: `organization_id`, `feature` (text, Keys aus `docs/plan.md` §3), `enabled`; unique (`organization_id`, `feature`)
   - `clients`: `organization_id`, `name`, `slug`; unique (`organization_id`, `slug`)
-  - `connections`:
-    - `organization_id`, `provider` (`amazon_ads`), `region` (`eu` | `na` | `fe`), `amazon_account_email`
+  - `connections` (provider-neutral):
+    - `organization_id`, `provider` (`amazon_ads`), `region` (`eu` | `na` | `fe`, nullable für Anbieter ohne Regionen)
+    - `external_account_id` (Amazon: LWA-User-ID), `external_account_email`
     - `refresh_token_encrypted`, `status` (`active` | `reauth_required` | `error`), `last_refreshed_at`, `created_by`
+    - unique (`organization_id`, `provider`, `region`, `external_account_id`) → erneutes Verbinden = Update statt Duplikat
   - `amazon_ads_profiles`:
-    - `organization_id`, `connection_id`, `client_id` (nullable)
-    - `profile_id` (text), `account_name`, `country_code`, `currency_code`, `timezone`, `marketplace_id`, `account_type` (`seller` | `vendor` | `agency`)
+    - `organization_id`, `connection_id` (aktueller Zugriffsweg), `client_id` (nullable)
+    - `amazon_profile_id` (text), `amazon_account_id` (`accountInfo.id`), `account_name`, `country_code`, `currency_code`, `timezone`, `marketplace_id`, `account_type` (Text: `seller` | `vendor` | `agency`, damit neue Amazon-Werte den Sync nicht brechen)
     - `is_hidden` (vom Nutzer ausgeblendet), `removed_at` (Amazon liefert das Profil nicht mehr), `synced_at`
-    - unique (`connection_id`, `profile_id`)
+    - unique (`organization_id`, `amazon_profile_id`): ein Profil pro Organisation, auch wenn mehrere Connections es sehen
+    - zusammengesetzte Fremdschlüssel (`connection_id`, `organization_id`) und (`client_id`, `organization_id`): keine Verknüpfungen über Org-Grenzen
   - `job_runs`: `organization_id` (null = plattformweit), `job`, `scope`, `status` (`running` | `success` | `failed`), `started_at`, `finished_at`, `error`, `counters` (jsonb)
   - `audit_events`: `organization_id`, `actor_user_id`, `action`, `target` (jsonb), `created_at`
   - `user_preferences`: `user_id` (unique), `theme`, `locale`, `density`
@@ -91,14 +97,24 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   alle Entitlements aktiv.
 - [x] Test-Datenbanken: Die globale Test-Einrichtung baut aus `DATABASE_URL_TEST` eine migrierte Template-DB,
   jede Testdatei arbeitet auf einem eigenen Klon (`createTestDatabase()` aus `@profitbash/db/testing`).
+  Schutz: `DATABASE_URL_TEST` muss auf `_test` enden und darf nicht `DATABASE_URL(_DIRECT)` sein.
+- [x] Nach Review angepasst (siehe Commit „package A"): `members` eindeutig pro Org/Nutzer mit Rollen-Check (Migration `0001`),
+  DB-Sessions in UTC, Org-`type` für Clients schreibgeschützt, Seed lässt abgeschaltete Entitlements aus.
+  Die Migrationen wurden vor dem ersten Deploy zu `0000_init` zusammengefasst. Ab dem ersten Deploy werden Migrationen nie mehr geändert.
 
-### 0.3 Verschlüsselung (`packages/shared`)
-- [ ] `encrypt()` / `decrypt()` mit AES-256-GCM, Key aus `ENCRYPTION_KEY` (32 Byte, base64), Format `v1:<iv>:<tag>:<cipher>`.
-- [ ] Tests: Roundtrip, falscher Key schlägt fehl, manipulierter Ciphertext schlägt fehl.
+### 0.3 Verschlüsselung (`@profitbash/shared/crypto`, nur Server)
+- [ ] Eigener Einstiegspunkt `@profitbash/shared/crypto` (nutzt `node:crypto`, nie in der Browser-Wurzel exportieren).
+- [ ] `encrypt(plaintext, { aad })` / `decrypt(ciphertext, { aad })` mit AES-256-GCM.
+  - Format `v1:<keyId>:<iv>:<tag>:<cipher>` (base64url). Aktueller Schlüssel aus `ENCRYPTION_KEY` (32 Byte, base64) mit `ENCRYPTION_KEY_ID`.
+  - Schlüsselrotation: `ENCRYPTION_KEYS_PREVIOUS` (`id:key,id:key`) wird nur zum Entschlüsseln genutzt. Ein Rotations-Skript verschlüsselt alle Tokens neu.
+  - **AAD** = `connection:<organizationId>:<connectionId>`. Ein kopierter Ciphertext lässt sich in keiner anderen Zeile oder Organisation entschlüsseln.
+- [ ] Tests: Roundtrip, falscher Key, manipulierter Ciphertext, falsche AAD, Entschlüsseln mit altem Schlüssel nach Rotation, unbekannte `keyId`.
 
 ### 0.4 Auth & `/api/me` (`apps/api`)
-- [ ] Hono-Server, better-auth gemountet unter `/api/auth/*`, E-Mail/Passwort, Organization-Plugin mit eigenen Rollen, Admin-Plugin, Signup deaktiviert.
+- [ ] Hono-Server, better-auth gemountet unter `/api/auth/*`, E-Mail/Passwort, Organization-Plugin mit eigenen Rollen, Admin-Plugin, Signup deaktiviert, `trustedOrigins` = `APP_URL`.
 - [ ] Middleware: Session prüfen, aktive Org setzen, `requireRole('admin')`, `requireSuperadmin()`.
+- [ ] CSRF-Schutz für eigene schreibende Endpunkte (Hono `csrf()` mit `APP_URL` als Origin), zusätzlich zu SameSite-Cookies.
+- [ ] Audit: Schreibvorgänge über better-auth (Mitglieder, Rollen, Organisation) erzeugen über better-auth-Hooks ebenfalls `audit_events`.
 - [ ] `GET /api/me`: User, Orgs, aktive Org, `features` (`{view, write, entitled}` je Feature-Key), Preferences.
   - `entitled` aus `org_entitlements`, `view`/`write` aus der Org-Rolle (`viewer` = nur view).
 - [ ] `GET /api/settings` und `PUT /api/settings`; `GET` und `PUT /api/settings/ui-state/:scope/:key`.
@@ -106,53 +122,69 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] zod-Schemas in `packages/shared`; OpenAPI-Dokument unter `/api/openapi.json`.
 - [ ] Einheitliches Fehlerformat `{error: {code, message}}`; Logging mit Request-ID.
 - [ ] Listen-Endpunkte nehmen viele IDs nie im Query-String entgegen, sondern per POST-Body oder serverseitigem Default.
+- [ ] Typisierte ESLint-Regeln aktivieren (`@typescript-eslint/no-floating-promises`, `no-misused-promises`), bevor Job- und Request-Code wächst.
 
 ### 0.5 Amazon-Client (`packages/amazon-ads`)
 - [ ] Konfiguration je Region als Konstanten mit Quellen-Kommentar (gegen die aktuelle Amazon-Ads-Doku verifizieren):
 
-  | Region | Authorize | Token | API-Host |
-  |---|---|---|---|
-  | eu | `https://eu.account.amazon.com/ap/oa` | `https://api.amazon.co.uk/auth/o2/token` | `https://advertising-api-eu.amazon.com` |
-  | na | `https://www.amazon.com/ap/oa` | `https://api.amazon.com/auth/o2/token` | `https://advertising-api.amazon.com` |
-  | fe | `https://apac.account.amazon.com/ap/oa` | `https://api.amazon.co.jp/auth/o2/token` | `https://advertising-api-fe.amazon.com` |
+  | Region | Authorize | Token | LWA-Profil | API-Host |
+  |---|---|---|---|---|
+  | eu | `https://eu.account.amazon.com/ap/oa` | `https://api.amazon.co.uk/auth/o2/token` | `https://api.amazon.co.uk/user/profile` | `https://advertising-api-eu.amazon.com` |
+  | na | `https://www.amazon.com/ap/oa` | `https://api.amazon.com/auth/o2/token` | `https://api.amazon.com/user/profile` | `https://advertising-api.amazon.com` |
+  | fe | `https://apac.account.amazon.com/ap/oa` | `https://api.amazon.co.jp/auth/o2/token` | `https://api.amazon.co.jp/user/profile` | `https://advertising-api-fe.amazon.com` |
 
-- [ ] `buildAuthorizeUrl(state)` mit Scope `advertising::campaign_management`.
-- [ ] `exchangeCode(code)` → Refresh-Token; `getAccessToken(connection)` mit In-Memory-Cache bis kurz vor Ablauf.
+- [ ] `buildAuthorizeUrl(state)` mit den Scopes `advertising::campaign_management profile`.
+- [ ] `exchangeCode(code)` → Refresh-Token; `getAccountIdentity(accessToken)` → LWA `user_id` (→ `external_account_id`) und E-Mail.
+- [ ] `getAccessToken(connection)` mit In-Memory-Cache bis kurz vor Ablauf.
 - [ ] Refresh-Token-Rotation: Liefert Amazon beim Refresh einen neuen Refresh-Token, wird dieser sofort verschlüsselt gespeichert und ersetzt den alten.
+  Der Refresh einer Connection läuft unter einer Sperre (Advisory-Lock bzw. `SELECT … FOR UPDATE`), damit API und Worker sich nicht gegenseitig einen rotierten Token überschreiben.
 - [ ] Zentraler `request()`:
   - setzt die Header `Authorization`, `Amazon-Advertising-API-ClientId` und bei Bedarf `Amazon-Advertising-API-Scope`
   - Retry bei 429/5xx mit exponentiellem Backoff und Jitter, `Retry-After` respektieren
   - Timeout
   - Logging ohne Tokens
   - **Verlustfreies JSON-Parsing:** Große Zahlen (Profil-, Kampagnen-IDs) werden als String gelesen, nie als `number`.
-- [ ] `listProfiles(connection)` → normalisierte Profile (`profileId` als String).
-- [ ] Tests mit msw: 429-Retry, Token-Rotation, und eine Profil-ID größer als `Number.MAX_SAFE_INTEGER` kommt unverändert an.
+  - Alle Antworten werden mit zod validiert; unbekannte Enum-Werte (z. B. neuer `accountType`) werden durchgereicht und geloggt, nicht verworfen.
+- [ ] `listProfiles(connection)` → normalisierte Profile (`amazonProfileId`, `amazonAccountId` als String).
+- [ ] **Mock-Anbieter** hinter derselben Schnittstelle (`AMAZON_ADS_USE_MOCK=true`): simulierte Einwilligungsseite → Callback mit Test-Code,
+  feste Test-Identität und Test-Profile (inkl. einer Profil-ID > `Number.MAX_SAFE_INTEGER`). Damit ist Phase 0 ohne API-Freigabe vorführbar.
+- [ ] Tests mit msw: 429-Retry, Token-Rotation, Identität, und eine Profil-ID größer als `Number.MAX_SAFE_INTEGER` kommt unverändert an.
 
 ### 0.6 OAuth-Flow & Connections-API (`apps/api`)
-- [ ] `POST /api/amazon/oauth/start` (nur Admin) → Redirect-URL mit signiertem `state` (HMAC; Org, User, Ablaufzeit 10 Min.).
-- [ ] `GET /api/amazon/oauth/callback` → `state` prüfen, Code tauschen, Connection anlegen (Token verschlüsselt), `profiles-sync` sofort enqueuen, Redirect auf `/admin/connections`. Fehler landen als Hinweis auf der Seite.
+- [ ] `POST /api/amazon/oauth/start` (nur Admin, optional `connectionId` für „Neu verbinden") → Redirect-URL mit `state`:
+  - signiert (HMAC mit `OAUTH_STATE_SECRET`), enthält Org, User, optional Connection, Ablaufzeit 10 Min. und eine Nonce
+  - die Nonce ist **einmal verwendbar** (in `verifications` gespeichert und beim Callback gelöscht)
+- [ ] `GET /api/amazon/oauth/callback`:
+  - verlangt eine Session: `session.userId == state.userId`, und der Nutzer ist weiterhin Admin von `state.orgId`
+  - Code tauschen, Identität holen, Connection per **Upsert** auf (`organization_id`, `provider`, `region`, `external_account_id`) anlegen bzw. aktualisieren (Token verschlüsselt, `status = active`)
+  - `profiles-sync` sofort enqueuen, Redirect auf `${APP_URL}/admin/connections`. Fehler landen als Hinweis auf der Seite.
 - [ ] Connections und Clients:
   - `GET /api/connections`, `POST /api/connections/:id/sync`
   - `GET /api/connections/:id/profiles`
-  - `PATCH /api/profiles/:id` (`client_id`, `is_hidden`)
+  - `PATCH /api/profiles/:id` (`client_id`, `is_hidden`); `client_id` muss zur selben Organisation gehören (die DB erzwingt es zusätzlich)
   - `GET /api/clients`, `POST /api/clients`, `PATCH /api/clients/:id`
 - [ ] Jede schreibende Aktion erzeugt ein `audit_event`.
+- [ ] Tests: fremde Session am Callback, abgelaufener und wiederverwendeter `state`, Neu-Verbinden aktualisiert statt dupliziert.
 
 ### 0.7 Worker & Jobs (`apps/worker`)
 - [ ] pg-boss-Setup, Job-Wrapper `runJob(name, scope, fn)`:
-  - schreibt `job_runs` (running → success/failed)
+  - schreibt `job_runs` (running → success/failed, mit `organization_id`)
   - fängt Fehler ab
   - pingt Healthchecks (Start/Erfolg/Fehler), wenn eine URL konfiguriert ist
 - [ ] Worker exportiert `startWorker()`. `WORKER_MODE=inline` startet ihn im API-Prozess, `separate` als eigenen Prozess.
+  Der eigenständige Worker-Prozess beendet sich bei `WORKER_MODE=inline` mit einem Hinweis (sonst liefe er in `pnpm dev` doppelt).
+- [ ] Jobs je Connection laufen nicht parallel (pg-boss `singletonKey` = Connection-ID).
 - [ ] `token-refresh`: stündlich; markiert Connections mit ungültigem Token als `status = 'reauth_required'`.
 - [ ] `profiles-sync`: täglich 05:00 Europe/Berlin und on demand.
-  - Profile upserten (über den Unique-Key `connection_id` + `profile_id`), `removed_at` zurücksetzen, wenn ein Profil wieder auftaucht.
-  - Profile, die Amazon nicht mehr liefert, bekommen `removed_at = now()`. Nichts wird gelöscht, `is_hidden` bleibt unberührt.
+  - Profile upserten über (`organization_id`, `amazon_profile_id`); `connection_id` auf die synchronisierende Connection setzen; `removed_at` zurücksetzen, wenn ein Profil wieder auftaucht.
+  - Profile, die Amazon über keine Connection der Org mehr liefert, bekommen `removed_at = now()`. Nichts wird gelöscht, `is_hidden` bleibt unberührt.
+- [ ] `job-runs-cleanup`: täglich, löscht `job_runs` älter als 90 Tage.
 - [ ] Graceful Shutdown.
 
 ### 0.8 Frontend-Grundgerüst (`apps/web`)
 - [ ] Vue 3 + Vite + PrimeVue (Styled Mode, eigenes Preset in `src/theme/` aus `design/theme.js`, Light/Dark), Tailwind v4 für Layout,
   Pinia, Vue Router, TanStack Query, vue-i18n (Default `de`), generierter API-Client aus `/api/openapi.json`.
+- [ ] Das Web importiert aus `@profitbash/shared` nur die browserfähige Wurzel und `/access-control`, nie `/env` oder `/crypto`.
 - [ ] Fonts self-hosted (Space Grotesk, JetBrains Mono für alle Zahlen), keine Google-Fonts-Links.
 - [ ] Visuelle Referenz: `design/PROFITBASH-claude-design.html` (Screens `login`, Sidebar/Shell). Nur als Vorlage, kein Copy-Paste des Stitch-HTML.
 - [ ] Login-Seite; Router-Guards für `requiresAuth`, `feature`, `requiresOrgAdmin`, `requiresSuperadmin`.
@@ -170,41 +202,25 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] Gemeinsame Komponenten: `EmptyState`, `InlineError`, `PageHeader`, `SkeletonBlock`; Formatierungs-Helper (Zahl, Währung, Prozent) aus `packages/shared`.
 
 ### 0.9 Deployment
+- [ ] Produktionsfähige Einstiegspunkte mit tsup bündeln: `apps/api` (Server), `migrate` und `seed` als eigene Bundles.
+  Kein `tsx` in Produktion. Der Migrationsordner ist konfigurierbar (`MIGRATIONS_DIR`) bzw. wird neben das Bundle kopiert
+  (der Pfad über `import.meta.url` stimmt nach dem Bündeln nicht mehr).
+- [ ] Build installiert inklusive Dev-Abhängigkeiten (tsup, vite); zur Laufzeit gilt `NODE_ENV=production` (aktiviert u. a. das Rate-Limit von better-auth).
 - [ ] Railway-Service `app`:
-  - Build von api und web; Hono liefert `apps/web/dist` aus, `/api/*` bleibt API (gleiche Origin)
-  - Pre-Deploy-Command: `pnpm db:migrate`
+  - Hono liefert `apps/web/dist` aus, `/api/*` bleibt API (gleiche Origin), SPA-Fallback auf `index.html` für alle übrigen Pfade
+  - Port aus `PORT` (von Railway gesetzt), Fallback `API_PORT`
+  - Pre-Deploy-Command: gebündelte Migration
   - Healthcheck `GET /api/health`
   - `WORKER_MODE=inline`
-- [ ] Railway-Postgres mit aktivierten Backups.
-- [ ] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service.
+- [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
+- [ ] Railway-Postgres mit Backups; falls der Hobby-Plan keine enthält: nächtlicher `pg_dump` per GitHub Action in einen privaten Speicher.
+- [ ] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
 
 ## `.env.example`
 
-```
-# Öffentliche Origin der App (Dev: Vite-Server, Prod: Railway-URL)
-APP_URL=http://localhost:5173
-API_PORT=8787
-WORKER_MODE=inline                 # inline | separate
-
-DATABASE_URL=postgres://profitbash:profitbash@localhost:5432/profitbash
-DATABASE_URL_DIRECT=postgres://profitbash:profitbash@localhost:5432/profitbash   # für pg-boss und Migrationen
-DATABASE_URL_TEST=postgres://profitbash:profitbash@localhost:5432/profitbash_test # nur für Tests
-
-BETTER_AUTH_SECRET=                # openssl rand -base64 32
-ENCRYPTION_KEY=                    # openssl rand -base64 32  (genau 32 Byte)
-OAUTH_STATE_SECRET=                # openssl rand -base64 32
-
-AMAZON_ADS_CLIENT_ID=
-AMAZON_ADS_CLIENT_SECRET=
-AMAZON_ADS_REDIRECT_URI=http://localhost:8787/api/amazon/oauth/callback
-AMAZON_ADS_USE_MOCK=true           # true bis zur API-Freigabe
-
-HEALTHCHECKS_TOKEN_REFRESH_URL=
-HEALTHCHECKS_PROFILES_SYNC_URL=
-
-SEED_ADMIN_EMAIL=
-SEED_ADMIN_PASSWORD=
-```
+Die Datei `.env.example` im Repo-Root ist die Quelle. Neue Variablen in den Aufgaben oben:
+`ENCRYPTION_KEY_ID`, `ENCRYPTION_KEYS_PREVIOUS` (0.3), `PORT` (0.9, von Railway gesetzt).
+`AMAZON_ADS_REDIRECT_URI` zeigt über den Vite-Proxy auf `APP_URL`, damit Callback und Session auf derselben Origin liegen.
 
 ## Bewusst nicht in Phase 0
 

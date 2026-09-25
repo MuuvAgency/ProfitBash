@@ -76,6 +76,8 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 - **Organisation:** `admin` | `editor` | `viewer`.
 - **Profil-Freigaben (Phase 6):** Mitglieder können auf einzelne Profile eingeschränkt werden.
   Phase 0: Jedes Mitglied sieht alle nicht ausgeblendeten Profile seiner Org. Die Regel steckt bereits im Access-Layer.
+- **Kundenzugang (Phase 6):** Die Agentur-Org besitzt alle Daten. Kunden-Orgs bekommen Lesezugriff auf die Profile
+  ihres Clients (siehe `docs/decisions/002-tenancy.md`).
 
 ## 5. Architektur-Leitplanken für Erweiterbarkeit
 
@@ -91,6 +93,26 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
    **Amazon-IDs immer als Text** (verlustfreies JSON-Parsing).
 7. **Mandantenfähig ab Tag 1.** Jede Query läuft über Org-Kontext und Access-Layer.
 8. **UI-Texte über i18n-Keys** (Default Deutsch), auch wenn vorerst nur Deutsch gepflegt wird.
+9. **Mandanten-Modell nach ADR 002:** Daten gehören der Agentur-Org. Abfragen filtern nie direkt nach
+   `organization_id`, sondern immer über den Access-Layer.
+10. **Eindeutige Begriffe:** `profileId` = interne UUID, `amazonProfileId` = Amazons ID. Dasselbe Muster für
+    spätere Entities (`campaignId` intern, `amazonCampaignId` extern).
+11. **`@profitbash/shared` hat getrennte Einstiegspunkte:** Die Wurzel ist browserfähig. Server-Code
+    (`/env`, `/crypto`) und schwere Abhängigkeiten (`/access-control`) liegen in eigenen Einstiegspunkten.
+
+### Festlegungen für Phase 1 und später
+
+- **Geld und Währungen:** Beträge in Originalwährung plus Währungscode speichern (`numeric`), eine
+  Decimal-Library für Berechnungen (Auswahl in Phase 1, z. B. `decimal.js`). Reporting-Währung EUR.
+  Tageskurse (z. B. EZB) in einer eigenen Tabelle, umgerechnete Summen in der UI mit „≈" kennzeichnen.
+  Im EU-Konto kommen EUR, GBP, SEK, PLN und TRY gemischt vor.
+- **Amazon-Kennzahlen sind vorläufig:** Amazon korrigiert jüngere Werte, bis die Attributionsfenster
+  abgeschlossen sind. Der tägliche Import lädt deshalb ein rollierendes Fenster (14–30 Tage) neu und schreibt
+  per Upsert (Profil, Datum, Entity).
+- **Rate-Limits und Nebenläufigkeit:** Jobs je Connection laufen nacheinander (pg-boss `singletonKey`),
+  dazu ein Anfrage-Budget je Profil. Asynchrone Amazon-Reports: anfordern, Status mit Backoff abfragen,
+  Report-Zustand in der DB festhalten, damit ein Neustart nichts verliert.
+- **Schlüsselrotation** für verschlüsselte Tokens ist ab 0.3 vorgesehen (Schlüssel-ID im Ciphertext).
 
 ## 6. Betriebskosten-Stufen
 

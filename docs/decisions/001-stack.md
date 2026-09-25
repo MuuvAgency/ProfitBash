@@ -58,8 +58,8 @@ Bitte die aktuellen Konditionen der Anbieter vor Start prüfen. Die Zahlen sind 
 
 | Stufe | Wann | Setup | Kosten |
 |---|---|---|---|
-| **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Homebrew-Postgres) oder Neon Free, GitHub Actions (Free-Kontingent), Healthchecks.io Free. Kein Hosting nötig. Railway-Trial-Guthaben für einen ersten Deploy-Test | **0 €** |
-| **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres mit Backups, `*.up.railway.app`-Domain | **ca. 5–10 $/Monat** |
+| **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Homebrew-Postgres), GitHub Actions (Free-Kontingent), Healthchecks.io Free. Neon Free nur bei Bedarf für geteilte Dev-/Preview-Datenbanken. Kein Hosting nötig. Das Railway-Trial-Guthaben ist zeitlich begrenzt: erst nutzen, wenn der erste Deploy ansteht | **0 €** |
+| **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres, `*.up.railway.app`-Domain. Backups prüfen: Sind sie im Hobby-Plan nicht enthalten, nächtlicher `pg_dump` per GitHub Action | **ca. 5–10 $/Monat** |
 | **C – Wachstum** | mehr Kunden/Daten | Worker separat, mehr DB-Ressourcen, eigene Domain, ggf. Neon Paid für Prod-Branches | nach Bedarf |
 
 **Was dauerhaft kostenlos ist:** Amazon Ads API und SP-API, GitHub (privat), Healthchecks.io (bis 20 Checks),

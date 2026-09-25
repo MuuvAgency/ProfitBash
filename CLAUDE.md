@@ -7,7 +7,7 @@ später ergänzt um Profitabilität (SP-API). Fokus jetzt: **nur Amazon Ads**.
 **Vor jeder Aufgabe lesen:**
 1. `docs/plan.md` – Roadmap, Navigation, Feature-Keys, Architektur-Leitplanken
 2. `docs/tasks/phase-N.md` – die aktuelle Phase (Häkchen zeigen den Stand)
-3. `docs/decisions/` – getroffene Entscheidungen (ADRs). Nicht stillschweigend davon abweichen.
+3. `docs/decisions/` – getroffene Entscheidungen (ADRs, u. a. 001 Stack, 002 Mandanten-Modell). Nicht stillschweigend davon abweichen.
 
 ## Struktur
 ```
@@ -17,7 +17,8 @@ apps/web        Vue 3 + PrimeVue + Tailwind
 packages/db     Drizzle-Schema, Migrationen, Access-Layer, Test-Datenbanken
 packages/amazon-ads  Amazon-Ads-API-Client (je externe API ein eigenes Paket)
 packages/engine Fachlogik ohne I/O (Regeln, Pacing, Berechnungen)
-packages/shared zod-Schemas, Feature-Keys, Formatierung, Verschlüsselung
+packages/shared zod-Schemas, Feature-Keys, Rollen, Formatierung (Wurzel: browserfähig);
+                Server-only über /env, /crypto; better-auth-Zugriffskontrolle über /access-control
 design/         Design-System und Stitch-Referenzen (nur lesen, nicht verändern)
 docs/           Plan, Phasen-Aufgaben, ADRs
 ```
@@ -26,7 +27,8 @@ docs/           Plan, Phasen-Aufgaben, ADRs
 `pnpm dev` · `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:seed`
 Lokale DB: Postgres 17 über Homebrew (`brew services start postgresql@17`), Datenbanken `profitbash` und `profitbash_test`.
 Auth-Schema neu erzeugen (nach Änderungen an `apps/api/src/auth.ts`): `pnpm --filter @profitbash/api auth:schema`, dann `pnpm db:generate`.
-Migrationen nie von Hand schreiben oder nachträglich ändern, sondern mit `pnpm db:generate` erzeugen.
+Migrationen mit `pnpm db:generate` erzeugen, nie nachträglich ändern (vor dem ersten Deploy einmal zu `0000_init` zusammengefasst).
+Regeln für generierte better-auth-Tabellen als eigene SQL-Migration (`drizzle-kit generate --custom`), nie in `schema/auth.ts`.
 
 ## Arbeitsweise
 - Aufgaben in der Reihenfolge der Phasen-Datei abarbeiten. Nach jedem Schritt: Tests grün, kleiner Commit, Häkchen setzen.
@@ -38,7 +40,9 @@ Migrationen nie von Hand schreiben oder nachträglich ändern, sondern mit `pnpm
 
 ## Regeln im Code
 - TypeScript `strict`, kein `any` ohne Begründung. Eingaben an allen Grenzen mit zod validieren (HTTP, Env, externe APIs).
-- **Mandanten:** Jede Query läuft im Org-Kontext. Profil-Zugriffe ausschließlich über `packages/db/src/access.ts`.
+- **Mandanten (ADR 002):** Daten gehören der Agentur-Org. Jede Query läuft im Org-Kontext. Profil-Zugriffe ausschließlich über
+  `packages/db/src/access.ts`, nie direkt nach `organization_id` filtern.
+- **Begriffe:** `profileId` = interne UUID, `amazonProfileId` = Amazons ID (analog für spätere Entities).
 - **Amazon-IDs sind Strings.** JSON von Amazon verlustfrei parsen, nie als `number` behandeln.
 - **Geld nie als Float:** `numeric` in der DB, Decimal-Strings in der API, Rechnen mit einer Decimal-Library.
 - **Zeit:** Speicherung in UTC. Perioden (Tag, Monat) in der Zeitzone des Profils berechnen.
@@ -48,10 +52,12 @@ Migrationen nie von Hand schreiben oder nachträglich ändern, sondern mit `pnpm
 - Fehlerformat der API: `{ error: { code, message } }`.
 - Externe APIs in Tests mit msw mocken. Kein Test spricht mit echten Amazon-Endpunkten.
 - DB-Tests nutzen `createTestDatabase()` aus `@profitbash/db/testing` (eigene Datenbank je Testdatei, parallel sicher).
+  `DATABASE_URL_TEST` muss auf `_test` enden; die Test-Einrichtung löscht diese Datenbank.
 
 ## Frontend
 - UI-Sprache Deutsch, alle Texte über vue-i18n-Keys.
 - Design-Tokens aus `design/theme.js` → PrimeVue-Preset in `apps/web/src/theme/`. Keine Farben/Größen hart codieren.
+- Aus `@profitbash/shared` nur die Wurzel und `/access-control` importieren, nie `/env` oder `/crypto`.
 - Zahlen immer in JetBrains Mono mit tabellarischen Ziffern, formatiert über die Helper aus `packages/shared`.
 - Jede Datenansicht hat Loading- (Skeleton), Empty- und Error-Zustand. Ein fehlerhaftes Widget legt nie die ganze Seite lahm.
 - Formularfelder haben sichtbare Labels, Icon-Buttons ein `aria-label`.
