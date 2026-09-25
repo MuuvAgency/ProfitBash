@@ -7,8 +7,11 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
  * Format: `v1:<keyId>:<iv>:<tag>:<ciphertext>` (base64url), AES-256-GCM.
  * - `keyId` erlaubt Schlüsselrotation: Neue Werte nutzen den aktuellen Schlüssel, alte werden mit
  *   den vorherigen Schlüsseln entschlüsselt und können neu verschlüsselt werden.
- * - Die AAD bindet den Ciphertext an seinen Ort (z. B. Organisation + Connection). Ein kopierter Wert
- *   lässt sich an keiner anderen Stelle entschlüsseln.
+ * - Die AAD bindet den Ciphertext an seinen Ort (z. B. den natürlichen Schlüssel einer Connection).
+ *   Ein kopierter Wert lässt sich an keiner anderen Stelle entschlüsseln.
+ *
+ * Fehlerarten: `KeyringError` (Konfiguration), `DecryptionError` (Daten), `TypeError` (Programmierfehler
+ * wie leere AAD). Keine Meldung enthält Schlüssel, Klartext oder ungeprüfte Werte aus dem Ciphertext.
  */
 
 const VERSION = 'v1';
@@ -45,12 +48,22 @@ export class KeyringError extends Error {
   }
 }
 
-/** Entschlüsseln fehlgeschlagen. Meldungen enthalten nie Klartext oder Schlüssel. */
+/** Entschlüsseln fehlgeschlagen. Meldungen enthalten nie Klartext, Schlüssel oder ungeprüfte Werte. */
 export class DecryptionError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'DecryptionError';
   }
+}
+
+/**
+ * Dekodiert Base64/Base64url streng: Nur wenn das Neu-Kodieren exakt denselben String ergibt, ist der
+ * Wert gültig. Node ignoriert sonst fremde Zeichen und ungenutzte Bits, sodass verschiedene Strings
+ * denselben Wert ergäben.
+ */
+function decodeStrict(value: string, encoding: 'base64' | 'base64url'): Buffer | null {
+  const decoded = Buffer.from(value, encoding);
+  return decoded.toString(encoding) === value ? decoded : null;
 }
 
 function parseKey(id: string, base64Key: string, source: string): EncryptionKey {
@@ -59,7 +72,10 @@ function parseKey(id: string, base64Key: string, source: string): EncryptionKey 
       `${source}: ungültige Schlüssel-ID (erlaubt: A-Z, a-z, 0-9, _ und -, höchstens 32 Zeichen).`,
     );
   }
-  const key = Buffer.from(base64Key.trim(), 'base64');
+  const key = decodeStrict(base64Key.trim(), 'base64');
+  if (key === null) {
+    throw new KeyringError(`${source}: Schlüssel "${id}" ist kein gültiges Base64.`);
+  }
   if (key.length !== KEY_BYTES) {
     throw new KeyringError(
       `${source}: Schlüssel "${id}" muss genau ${KEY_BYTES} Byte lang sein (openssl rand -base64 32).`,
@@ -99,19 +115,35 @@ export function parseKeyring(env: KeyringEnv): Keyring {
   return { current, previous };
 }
 
-/** AAD für den Refresh-Token einer Connection. IDs ohne `:`, damit die Bindung eindeutig bleibt. */
-export function connectionTokenAad(organizationId: string, connectionId: string): string {
-  for (const id of [organizationId, connectionId]) {
-    if (!id || id.includes(':')) {
-      throw new Error('AAD-IDs dürfen nicht leer sein und keinen Doppelpunkt enthalten.');
-    }
+/** Natürlicher Schlüssel einer Connection. Vor dem Einfügen bekannt und stabil bei Upserts. */
+export interface ConnectionAadInput {
+  organizationId: string;
+  provider: string;
+  region: string | null;
+  externalAccountId: string;
+}
+
+/**
+ * AAD für den Refresh-Token einer Connection. Bindet an den natürlichen Schlüssel
+ * (Organisation, Anbieter, Region, externes Konto) statt an die Zeilen-ID: Die ID vergibt die DB erst
+ * beim Einfügen, und beim erneuten Verbinden landet der Token per Upsert auf der bestehenden Zeile.
+ * Teile dürfen nicht leer sein und keinen `:` enthalten, damit die Bindung eindeutig bleibt.
+ */
+export function connectionTokenAad(input: ConnectionAadInput): string {
+  const region = input.region ?? '-';
+  const parts = [input.organizationId, input.provider, region, input.externalAccountId];
+  if (input.region === '-' || parts.some((part) => !part || part.includes(':'))) {
+    throw new TypeError(
+      'connectionTokenAad: Teile dürfen nicht leer sein und keinen Doppelpunkt enthalten.',
+    );
   }
-  return `connection:${organizationId}:${connectionId}`;
+  return `connection:${parts.join(':')}`;
 }
 
 function requireAad(aad: string): Buffer {
-  if (!aad)
-    throw new Error('AAD darf nicht leer sein (Ciphertext muss an seinen Ort gebunden sein).');
+  if (!aad) {
+    throw new TypeError('AAD darf nicht leer sein (Ciphertext muss an seinen Ort gebunden sein).');
+  }
   return Buffer.from(aad, 'utf8');
 }
 
@@ -119,6 +151,7 @@ export function encrypt(
   plaintext: string,
   { keyring, aad }: { keyring: Keyring; aad: string },
 ): string {
+  if (!plaintext) throw new TypeError('Leere Werte werden nicht verschlüsselt.');
   const aadBytes = requireAad(aad);
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALGORITHM, keyring.current.key, iv, { authTagLength: TAG_BYTES });
@@ -144,20 +177,33 @@ interface ParsedCiphertext {
 function parseCiphertext(ciphertext: string): ParsedCiphertext {
   const parts = ciphertext.split(':');
   if (parts.length !== 5) throw new DecryptionError('Unbekanntes Ciphertext-Format.');
-  const [version, keyId, iv, tag, data] = parts as [string, string, string, string, string];
-  if (version !== VERSION) {
-    throw new DecryptionError(`Nicht unterstützte Ciphertext-Version "${version}".`);
+  const [version, keyId, ivText, tagText, dataText] = parts as [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
+  // Werte aus dem Ciphertext erst nach Prüfung in Meldungen verwenden (Log-Injection).
+  if (version !== VERSION) throw new DecryptionError('Nicht unterstützte Ciphertext-Version.');
+  if (!KEY_ID_PATTERN.test(keyId)) {
+    throw new DecryptionError('Ungültige Schlüssel-ID im Ciphertext.');
   }
-  const parsed = {
-    keyId,
-    iv: Buffer.from(iv, 'base64url'),
-    tag: Buffer.from(tag, 'base64url'),
-    data: Buffer.from(data, 'base64url'),
-  };
-  if (parsed.iv.length !== IV_BYTES || parsed.tag.length !== TAG_BYTES) {
+
+  const iv = decodeStrict(ivText, 'base64url');
+  const tag = decodeStrict(tagText, 'base64url');
+  const data = decodeStrict(dataText, 'base64url');
+  if (
+    iv === null ||
+    tag === null ||
+    data === null ||
+    iv.length !== IV_BYTES ||
+    tag.length !== TAG_BYTES ||
+    data.length === 0
+  ) {
     throw new DecryptionError('Unbekanntes Ciphertext-Format.');
   }
-  return parsed;
+  return { keyId, iv, tag, data };
 }
 
 export function decrypt(
@@ -182,7 +228,10 @@ export function decrypt(
   }
 }
 
-/** Wurde der Wert nicht mit dem aktuellen Schlüssel verschlüsselt? (für das Rotations-Skript) */
+/**
+ * Wurde der Wert nicht mit dem aktuellen Schlüssel verschlüsselt? (für das Rotations-Skript)
+ * Wirft `DecryptionError` bei kaputten Werten: Das Skript soll solche Zeilen melden und überspringen.
+ */
 export function needsReencryption(ciphertext: string, keyring: Keyring): boolean {
   return parseCiphertext(ciphertext).keyId !== keyring.current.id;
 }

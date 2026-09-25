@@ -108,9 +108,15 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Format `v1:<keyId>:<iv>:<tag>:<cipher>` (base64url). Aktueller Schlüssel aus `ENCRYPTION_KEY` (32 Byte, base64) mit `ENCRYPTION_KEY_ID`, geprüft über `parseKeyring()`.
   - Schlüsselrotation: `ENCRYPTION_KEYS_PREVIOUS` (`id:key,id:key`) nur zum Entschlüsseln; `needsReencryption()` erkennt alte Werte.
     Das Rotations-Skript über alle Connections folgt mit 0.9 (`docs/deploy.md`).
-  - **AAD** = `connectionTokenAad(organizationId, connectionId)` → `connection:<org>:<conn>` (IDs ohne `:`, nicht leer).
-- [x] Tests (TDD): Roundtrip, zufällige IV, Format ohne Klartext, falscher Key, manipulierter Ciphertext und Tag, falsche AAD,
-  leere AAD, unbekannte `keyId`, kaputte Formate, Rotation, Schlüsselprüfung ohne Schlüssel in Fehlermeldungen.
+  - **AAD** = `connectionTokenAad({ organizationId, provider, region, externalAccountId })` →
+    `connection:<org>:<provider>:<region|->:<externalAccountId>`. Gebunden an den **natürlichen Schlüssel** statt an die Zeilen-ID:
+    Die ID vergibt die DB erst beim Einfügen, und beim Neu-Verbinden landet der Token per Upsert auf der bestehenden Zeile (Review-Befund).
+  - Strenge Eingabeprüfung: kanonisches Base64 für Schlüssel und Ciphertext, feste Längen für IV und Tag (Schutz vor GCM-Truncation),
+    keine ungeprüften Werte aus dem Ciphertext in Fehlermeldungen, keine leeren Werte.
+  - Fehlerarten: `KeyringError` (Konfiguration), `DecryptionError` (Daten), `TypeError` (Programmierfehler).
+- [x] Tests (TDD, 26): Roundtrip, zufällige IV, Format ohne Klartext, falscher Key, manipulierter und abgeschnittener Tag,
+  manipulierter Ciphertext, falsche und leere AAD, unbekannte `keyId`, kaputte Formate, Log-Injection, Rotation,
+  strenge Schlüsselprüfung ohne Schlüssel in Fehlermeldungen. Der Tag-Längen-Test ist per Mutation geprüft.
 - [ ] Einbindung in die Env-Validierung der Apps mit dem ersten Nutzer (0.6: Connection anlegen).
 
 ### 0.4 Auth & `/api/me` (`apps/api`)
@@ -159,7 +165,8 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - die Nonce ist **einmal verwendbar** (in `verifications` gespeichert und beim Callback gelöscht)
 - [ ] `GET /api/amazon/oauth/callback`:
   - verlangt eine Session: `session.userId == state.userId`, und der Nutzer ist weiterhin Admin von `state.orgId`
-  - Code tauschen, Identität holen, Connection per **Upsert** auf (`organization_id`, `provider`, `region`, `external_account_id`) anlegen bzw. aktualisieren (Token verschlüsselt, `status = active`)
+  - Code tauschen, Identität holen, Connection per **Upsert** auf (`organization_id`, `provider`, `region`, `external_account_id`) anlegen bzw. aktualisieren
+    (Token verschlüsselt mit `connectionTokenAad` über genau diesen natürlichen Schlüssel, `status = active`)
   - `profiles-sync` sofort enqueuen, Redirect auf `${APP_URL}/admin/connections`. Fehler landen als Hinweis auf der Seite.
 - [ ] Connections und Clients:
   - `GET /api/connections`, `POST /api/connections/:id/sync`
@@ -167,7 +174,8 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - `PATCH /api/profiles/:id` (`client_id`, `is_hidden`); `client_id` muss zur selben Organisation gehören (die DB erzwingt es zusätzlich)
   - `GET /api/clients`, `POST /api/clients`, `PATCH /api/clients/:id`
 - [ ] Jede schreibende Aktion erzeugt ein `audit_event`.
-- [ ] Tests: fremde Session am Callback, abgelaufener und wiederverwendeter `state`, Neu-Verbinden aktualisiert statt dupliziert.
+- [ ] Tests: fremde Session am Callback, abgelaufener und wiederverwendeter `state`, Neu-Verbinden aktualisiert statt dupliziert
+  **und der gespeicherte Token lässt sich danach entschlüsseln**.
 
 ### 0.7 Worker & Jobs (`apps/worker`)
 - [ ] pg-boss-Setup, Job-Wrapper `runJob(name, scope, fn)`:
@@ -218,7 +226,9 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
 - [ ] Railway-Postgres mit Backups; falls der Hobby-Plan keine enthält: nächtlicher `pg_dump` per GitHub Action in einen privaten Speicher.
 - [ ] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
-- [ ] Rotations-Skript: verschlüsselt alle Tokens, bei denen `needsReencryption()` greift, mit dem aktuellen Schlüssel neu.
+- [ ] Rotations-Skript: verschlüsselt alle Tokens, bei denen `needsReencryption()` greift, mit dem aktuellen Schlüssel neu;
+  Zeilen mit kaputtem Wert (`DecryptionError`) melden und überspringen, nicht abbrechen.
+  Betriebsregel: Ein neuer Schlüssel bekommt immer eine **neue** `ENCRYPTION_KEY_ID`. Dieselbe ID mit neuem Schlüssel macht alle alten Werte unlesbar, und der Code kann das nicht erkennen.
 
 ## `.env.example`
 

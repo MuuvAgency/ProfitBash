@@ -15,20 +15,33 @@ const KEY_A = Buffer.alloc(32, 0xa1).toString('base64');
 const KEY_B = Buffer.alloc(32, 0xb2).toString('base64');
 
 const keyringA: Keyring = parseKeyring({ ENCRYPTION_KEY: KEY_A, ENCRYPTION_KEY_ID: 'k1' });
-const aad = connectionTokenAad('org-1', 'conn-1');
+const connection = {
+  organizationId: 'org-1',
+  provider: 'amazon_ads',
+  region: 'eu',
+  externalAccountId: 'amzn1.account.A',
+} as const;
+const aad = connectionTokenAad(connection);
 
 describe('connectionTokenAad', () => {
   // Fängt: falsches oder vertauschtes Bindungsformat → Ciphertexte wären nicht mehr zuordenbar.
-  it('bindet Organisation und Connection in festem Format', () => {
-    expect(connectionTokenAad('org-1', 'conn-1')).toBe('connection:org-1:conn-1');
+  // Gebunden wird an den natürlichen Schlüssel der Connection (vor dem Einfügen bekannt, stabil beim Upsert).
+  it('bindet Organisation, Anbieter, Region und externes Konto in festem Format', () => {
+    expect(connectionTokenAad(connection)).toBe('connection:org-1:amazon_ads:eu:amzn1.account.A');
+    expect(connectionTokenAad({ ...connection, region: null })).toBe(
+      'connection:org-1:amazon_ads:-:amzn1.account.A',
+    );
   });
 
-  // Fängt: mehrdeutige Bindung (Org „a:b“ + Connection „c“ = Org „a“ + Connection „b:c“).
-  it('lehnt leere IDs und IDs mit Doppelpunkt ab', () => {
-    expect(() => connectionTokenAad('a:b', 'c')).toThrow();
-    expect(() => connectionTokenAad('a', 'b:c')).toThrow();
-    expect(() => connectionTokenAad('', 'conn-1')).toThrow();
-    expect(() => connectionTokenAad('org-1', '')).toThrow();
+  // Fängt: mehrdeutige Bindung (z. B. Org „a:b“ + … = Org „a“ + …) und vergessene Felder.
+  it('lehnt leere Teile und Teile mit Doppelpunkt als Programmierfehler ab', () => {
+    expect(() => connectionTokenAad({ ...connection, organizationId: 'a:b' })).toThrow(TypeError);
+    expect(() => connectionTokenAad({ ...connection, externalAccountId: 'x:y' })).toThrow(
+      TypeError,
+    );
+    expect(() => connectionTokenAad({ ...connection, organizationId: '' })).toThrow(TypeError);
+    expect(() => connectionTokenAad({ ...connection, externalAccountId: '' })).toThrow(TypeError);
+    expect(() => connectionTokenAad({ ...connection, region: '-' })).toThrow(TypeError);
   });
 });
 
@@ -83,7 +96,7 @@ describe('encrypt / decrypt', () => {
   // Fängt: AAD wird nicht verwendet → Token ließe sich in eine fremde Zeile/Org kopieren.
   it('scheitert, wenn der Ciphertext zu einer anderen Connection gehört', () => {
     const ciphertext = encrypt('token', { keyring: keyringA, aad });
-    const otherAad = connectionTokenAad('org-2', 'conn-1');
+    const otherAad = connectionTokenAad({ ...connection, externalAccountId: 'amzn1.account.B' });
     expect(() => decrypt(ciphertext, { keyring: keyringA, aad: otherAad })).toThrow(
       DecryptionError,
     );
@@ -91,9 +104,9 @@ describe('encrypt / decrypt', () => {
 
   // Fängt: versehentlich vergessene Bindung (leere AAD würde still „funktionieren").
   it('verlangt eine nicht leere AAD beim Ver- und Entschlüsseln', () => {
-    expect(() => encrypt('token', { keyring: keyringA, aad: '' })).toThrow();
+    expect(() => encrypt('token', { keyring: keyringA, aad: '' })).toThrow(TypeError);
     const ciphertext = encrypt('token', { keyring: keyringA, aad });
-    expect(() => decrypt(ciphertext, { keyring: keyringA, aad: '' })).toThrow();
+    expect(() => decrypt(ciphertext, { keyring: keyringA, aad: '' })).toThrow(TypeError);
   });
 
   // Fängt: unbekannte Schlüssel-IDs werden mit dem aktuellen Schlüssel „probiert“ oder stürzen unklar ab.
@@ -115,6 +128,54 @@ describe('encrypt / decrypt', () => {
     ]) {
       expect(() => decrypt(bad, { keyring: keyringA, aad })).toThrow(DecryptionError);
     }
+  });
+});
+
+describe('Robustheit gegen manipulierte oder kaputte Eingaben', () => {
+  const parts = () =>
+    encrypt('token', { keyring: keyringA, aad }).split(':') as [
+      string,
+      string,
+      string,
+      string,
+      string,
+    ];
+
+  // Fängt: fehlende Tag-Längenprüfung → GCM-Truncation-Angriff (Node akzeptiert kurze Tags sonst).
+  it('lehnt einen abgeschnittenen Auth-Tag ab', () => {
+    const [version, keyId, iv, tag, cipher] = parts();
+    const shortTag = Buffer.from(tag, 'base64url').subarray(0, 4).toString('base64url');
+    expect(() =>
+      decrypt([version, keyId, iv, shortTag, cipher].join(':'), { keyring: keyringA, aad }),
+    ).toThrow(DecryptionError);
+  });
+
+  // Fängt: nachsichtiges Base64-Decoding → mehrere Strings ergeben denselben Wert.
+  it('lehnt Zeichen außerhalb von base64url im Ciphertext ab', () => {
+    const [version, keyId, iv, tag, cipher] = parts();
+    expect(() =>
+      decrypt([version, keyId, iv, tag, `${cipher}!`].join(':'), { keyring: keyringA, aad }),
+    ).toThrow(DecryptionError);
+  });
+
+  // Fängt: ungeprüfte Werte aus dem Ciphertext in Fehlermeldungen (Log-Injection).
+  it('übernimmt keine ungeprüften Werte aus dem Ciphertext in Fehlermeldungen', () => {
+    const [version, , iv, tag, cipher] = parts();
+    const injected = [version, 'k1\nFAKE LOG LINE', iv, tag, cipher].join(':');
+    let error: unknown;
+    try {
+      decrypt(injected, { keyring: keyringA, aad });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(DecryptionError);
+    expect((error as Error).message).not.toContain('FAKE LOG LINE');
+    expect((error as Error).message).not.toContain('\n');
+  });
+
+  // Fängt: leere Tokens werden durch einen Fehler weiter oben still gespeichert.
+  it('verschlüsselt keinen leeren Text', () => {
+    expect(() => encrypt('', { keyring: keyringA, aad })).toThrow(TypeError);
   });
 });
 
@@ -143,9 +204,22 @@ describe('Schlüsselrotation', () => {
     expect(needsReencryption(oldCiphertext, rotated)).toBe(true);
     expect(needsReencryption(newCiphertext, rotated)).toBe(false);
   });
+
+  // Fängt: das Rotations-Skript bekommt bei kaputten Werten still ein falsches Ergebnis.
+  it('meldet kaputte Werte bei der Rotationsprüfung als DecryptionError', () => {
+    expect(() => needsReencryption('kein-ciphertext', rotated)).toThrow(DecryptionError);
+  });
 });
 
 describe('parseKeyring', () => {
+  // Fängt: nachsichtiges Base64 → ein falsch eingefügter Wert wird still als Schlüssel akzeptiert.
+  it('akzeptiert nur sauberes Base64 als Schlüssel', () => {
+    const withJunk = `${KEY_A.slice(0, 10)}!${KEY_A.slice(10)}`;
+    expect(() => parseKeyring({ ENCRYPTION_KEY: withJunk, ENCRYPTION_KEY_ID: 'k1' })).toThrow(
+      KeyringError,
+    );
+  });
+
   // Fängt: ungeprüfte Schlüssellänge (z. B. 16 statt 32 Byte → AES-128 oder Absturz später).
   it('verlangt genau 32 Byte Schlüssellänge', () => {
     const shortKey = Buffer.alloc(16, 1).toString('base64');
