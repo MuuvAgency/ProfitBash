@@ -27,7 +27,7 @@ und um weitere Marktplätze erweiterbar.
 | Tests | Vitest, HTTP-Mocks mit msw |
 | CI | GitHub Actions, Postgres als Service-Container |
 | Hosting | Railway |
-| Datenbank | Dev/Branches: Neon (Free) oder lokal Docker. **Prod: Railway-Postgres** |
+| Datenbank | Postgres 17. Lokal: Homebrew. Dev-Branches: Neon (Free). CI: Service-Container. **Prod: Railway-Postgres** |
 | Monitoring | Healthchecks.io (Job-Heartbeats) |
 
 ### Deploy-Topologie
@@ -57,7 +57,7 @@ Bitte die aktuellen Konditionen der Anbieter vor Start prüfen. Die Zahlen sind 
 
 | Stufe | Wann | Setup | Kosten |
 |---|---|---|---|
-| **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Docker-Postgres) oder Neon Free, GitHub Actions (Free-Kontingent), Healthchecks.io Free. Kein Hosting nötig. Railway-Trial-Guthaben für einen ersten Deploy-Test | **0 €** |
+| **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Homebrew-Postgres) oder Neon Free, GitHub Actions (Free-Kontingent), Healthchecks.io Free. Kein Hosting nötig. Railway-Trial-Guthaben für einen ersten Deploy-Test | **0 €** |
 | **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres mit Backups, `*.up.railway.app`-Domain | **ca. 5–10 $/Monat** |
 | **C – Wachstum** | mehr Kunden/Daten | Worker separat, mehr DB-Ressourcen, eigene Domain, ggf. Neon Paid für Prod-Branches | nach Bedarf |
 

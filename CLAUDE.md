@@ -24,7 +24,7 @@ docs/           Plan, Phasen-Aufgaben, ADRs
 
 ## Befehle
 `pnpm dev` · `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm db:generate` · `pnpm db:migrate` · `pnpm db:seed`
-Lokale DB: `docker compose up -d`.
+Lokale DB: Postgres 17 über Homebrew (`brew services start postgresql@17`), Datenbanken `profitbash` und `profitbash_test`.
 
 ## Arbeitsweise
 - Aufgaben in der Reihenfolge der Phasen-Datei abarbeiten. Nach jedem Schritt: Tests grün, kleiner Commit, Häkchen setzen.

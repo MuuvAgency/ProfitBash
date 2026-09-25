@@ -12,7 +12,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 
 ## Definition of Done
 
-- [ ] `pnpm dev` startet api, worker und web lokal (Postgres per `docker compose`); `pnpm test`, `pnpm typecheck` und `pnpm lint` sind grün.
+- [ ] `pnpm dev` startet api, worker und web lokal (lokales Postgres 17 über Homebrew); `pnpm test`, `pnpm typecheck` und `pnpm lint` sind grün.
 - [ ] CI (GitHub Actions) läuft bei jedem Push: typecheck, lint, test, build.
 - [ ] Railway-Service `app` (API + Web auf einer Origin, `WORKER_MODE=inline`) ist erreichbar und nutzt Railway-Postgres. Neon-Projekt mit Branch `dev` existiert für Entwicklung.
 - [ ] Login mit E-Mail/Passwort. Der Seed legt einen Admin an (Org-Admin von „Muuv" und Plattform-Superadmin). Öffentliche Registrierung ist deaktiviert.
@@ -52,7 +52,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 ### 0.1 Monorepo & Tooling
 - [ ] pnpm-Workspace mit `apps/{api,worker,web}` und `packages/{db,amazon-ads,engine,shared}`. Package-Scope `@profitbash/*`.
 - [ ] Gemeinsame `tsconfig.base.json` (`strict`, `noUncheckedIndexedAccess`), ESLint + Prettier, Vitest.
-- [ ] `docker-compose.yml` mit Postgres 16 für die lokale Entwicklung.
+- [ ] Lokale DB ist eingerichtet: Postgres 17 (Homebrew), Rolle `profitbash`, Datenbanken `profitbash` und `profitbash_test`. Tests nutzen `DATABASE_URL_TEST`. CI nutzt einen Postgres-17-Service-Container.
 - [ ] Root-Skripte: `dev`, `build`, `test`, `typecheck`, `lint`, `db:generate`, `db:migrate`, `db:seed`.
 - [ ] GitHub-Actions-Workflow; Postgres für Tests als Service-Container.
 - [ ] `.env.example` mit allen Variablen (siehe unten); Env-Validierung per zod beim Start jeder App.
@@ -183,6 +183,7 @@ WORKER_MODE=inline                 # inline | separate
 
 DATABASE_URL=postgres://profitbash:profitbash@localhost:5432/profitbash
 DATABASE_URL_DIRECT=postgres://profitbash:profitbash@localhost:5432/profitbash   # für pg-boss und Migrationen
+DATABASE_URL_TEST=postgres://profitbash:profitbash@localhost:5432/profitbash_test # nur für Tests
 
 BETTER_AUTH_SECRET=                # openssl rand -base64 32
 ENCRYPTION_KEY=                    # openssl rand -base64 32  (genau 32 Byte)
