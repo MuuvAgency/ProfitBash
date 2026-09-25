@@ -41,7 +41,14 @@ Regeln für generierte better-auth-Tabellen als eigene SQL-Migration (`drizzle-k
   - Neue Logik und Bugfixes mit `superpowers:test-driven-development`: Test zuerst, Fehlschlag (RED) prüfen, dann Code.
   - Nach jeder abgeschlossenen Aufgabe `superpowers:requesting-code-review` (unabhängiger Reviewer), Befunde fixen oder begründet zurückweisen.
   - Vor jeder „fertig"-Meldung `superpowers:verification-before-completion`: gesamte Suite, typecheck, lint, build.
-- Pro Phase eine frische Session. Der Stand steht im Repo (`docs/`), nicht im Chat.
+- **Eine frische Session je sinnvollem Aufgabenpunkt** (z. B. 0.4, 0.8 Teil 1), nicht erst je Phase.
+  Der Stand steht im Repo (`docs/`), nicht im Chat.
+- **Übergabe am Ende jeder Session:** Nach Commit und Häkchen den fertigen Prompt für die nächste Session
+  als Codeblock ausgeben, zum direkten Einfügen. Er nennt:
+  - die nächste Aufgabe laut Reihenfolge in der Phasen-Datei
+  - die zu lesenden Dateien
+  - offene Punkte, Entscheidungen oder Voraussetzungen aus dieser Session, die nicht im Repo stehen
+  - die Arbeitsweise (TDD, Review nach der Aufgabe, Verifikation vor dem Commit)
 
 ## Regeln im Code
 - TypeScript `strict`, kein `any` ohne Begründung. Eingaben an allen Grenzen mit zod validieren (HTTP, Env, externe APIs).
