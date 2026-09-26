@@ -4,12 +4,14 @@ import { z } from 'zod';
 /**
  * Beträge und Währungen aus Amazon-Antworten (ADR 003).
  *
- * Beträge kommen am besten als Quelltext-String aus `parseJsonLossless(text, { decimals: 'string' })`.
- * Sichere Zahlen werden auch angenommen (z. B. aus Antworten, die ohne die Option geparst wurden).
+ * Beträge kommen als Quelltext-String aus `parseJsonLossless(text, { decimals: 'string' })`. Als Zahl werden nur
+ * sichere Ganzzahlen angenommen: Eine Zahl mit Nachkommastellen hieße, dass die Parser-Option fehlt und der Wert
+ * schon über `number` gerundet sein kann. Dann lieber als ungültige Zeile auffallen als still falsch speichern.
  * Ergebnis ist ein normalisierter Decimal-String: exakt, ohne Exponent, ohne überflüssige Nullen, `-0` als `0`.
  */
 
-const DECIMAL_SOURCE = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
+// Exponent höchstens vierstellig: Größere lässt decimal.js zu `Infinity` bzw. still zu `0` werden.
+const DECIMAL_SOURCE = /^-?\d+(\.\d+)?([eE][+-]?\d{1,4})?$/;
 
 /**
  * Größte Zehnerpotenz, die ein Betrag haben darf (in beide Richtungen). Amazon-Beträge liegen weit darunter;
@@ -19,17 +21,16 @@ const MAX_DECIMAL_EXPONENT = 40;
 
 function toDecimalString(value: string | number, ctx: z.RefinementCtx): string {
   if (typeof value === 'number') {
-    if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER) {
-      ctx.addIssue({ code: 'custom', message: 'Betrag ist keine sichere Zahl' });
+    if (!Number.isSafeInteger(value)) {
+      ctx.addIssue({ code: 'custom', message: 'Betrag als Zahl nur als sichere Ganzzahl' });
       return z.NEVER;
     }
   } else if (!DECIMAL_SOURCE.test(value)) {
     ctx.addIssue({ code: 'custom', message: 'Betrag ist keine Dezimalzahl' });
     return z.NEVER;
   }
-  // Bei `number` ist `String(value)` die kürzeste Darstellung, die genau diese Zahl ergibt.
   const decimal = new Decimal(typeof value === 'number' ? String(value) : value);
-  if (!decimal.isZero() && Math.abs(decimal.e) > MAX_DECIMAL_EXPONENT) {
+  if (!decimal.isFinite() || (!decimal.isZero() && Math.abs(decimal.e) > MAX_DECIMAL_EXPONENT)) {
     ctx.addIssue({ code: 'custom', message: 'Betrag liegt außerhalb des erlaubten Bereichs' });
     return z.NEVER;
   }

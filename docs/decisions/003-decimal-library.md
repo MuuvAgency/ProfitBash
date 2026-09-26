@@ -38,8 +38,10 @@ Anforderungen:
 ## Konsequenzen
 
 - Neue Abhängigkeit in `packages/amazon-ads` (jetzt) und `packages/engine` (mit der ersten Berechnung).
-- Exponenten müssen begrenzt werden: `new Decimal('1e-1000000').toFixed()` ergibt einen String mit einer Million Zeichen.
-  `amazonDecimalSchema` lehnt Werte mit zu großem Exponenten ab.
+- Exponenten müssen begrenzt werden: `new Decimal('1e-1000000').toFixed()` ergibt einen String mit einer Million Zeichen, noch
+  größere Exponenten macht decimal.js zu `Infinity` bzw. still zu `0`. `amazonDecimalSchema` lehnt solche Werte ab.
+- Beträge als JSON-Zahl mit Nachkommastellen sind schon über `number` gelaufen und womöglich gerundet. `amazonDecimalSchema`
+  nimmt als Zahl deshalb nur sichere Ganzzahlen an; Beträge kommen über `parseJsonLossless(text, { decimals: 'string' })`.
 - `numeric` ohne feste Skala in der DB speichert, was ankommt; Drizzle liefert `numeric` als String (Konvention in
   `docs/tasks/phase-1.md`, 1.1 „Umsetzung“).
 
@@ -47,10 +49,9 @@ Anforderungen:
 
 - **`big.js`** (vom selben Autor, kleiner): konstruiert ebenso exakt, hat aber weniger Funktionen (vier statt neun Rundungsmodi,
   Potenzen nur mit ganzzahligem Exponenten, keine Logarithmen). Für Geld reicht das heute, aber der Wechsel später wäre teurer
-  als der Mehrumfang jetzt.
-  Der Größenvorteil zählt nur im Browser, wo wir nicht rechnen.
-- **`dinero.js`**: Geld-Objekte mit eigener Währungs- und Skalenlogik (Ganzzahlen in kleinster Einheit). Passt nicht zu Beträgen
-  mit mehr Nachkommastellen als die Währung (Gebote, CPC) und bringt Währungslogik mit, die wir getrennt halten
-  (Betrag + `currency_code`, Wechselkurse ab Phase 2).
+  als der Mehrumfang jetzt. Der Größenvorteil zählt nur im Browser, wo wir nicht rechnen.
+- **`dinero.js`**: Geld-Objekte als Ganzzahl plus Skala und Währung. Die Skala muss an jedem Wert mitgeführt und angeglichen werden
+  (Gebote und CPC haben mehr Nachkommastellen als die Währung), der Standard-Rechner arbeitet mit `number` (über 2^53 nur mit dem
+  `bigint`-Rechner), und die Kopplung an die Währung halten wir bewusst getrennt (Betrag + `currency_code`, Wechselkurse ab Phase 2).
 - **`bigint` in kleinster Einheit selbst verwalten:** Skala je Feld müsste überall mitgeführt werden, fehleranfällig bei Division
   (ACoS, CPC) und bei Werten mit mehr Nachkommastellen.

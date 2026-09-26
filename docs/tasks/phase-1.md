@@ -135,7 +135,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
       und formatiert sie (Formatierungs-Helper in `@profitbash/shared` auf Strings erweitern, nicht auf `number`).
 - [x] `parseJsonLossless(text, { decimals: 'string' })`: Dezimalzahlen (und Zahlen in Exponentialschreibweise) kommen als **Quelltext-String**,
       nicht über `String(number)`. Standard bleibt wie heute (Profile, Tokens). Tests: `0.1`, `1234567.89`, `1e-7`, `-0.00`, sehr lange Nachkommastellen.
-- [x] zod-Bausteine in `packages/amazon-ads`: `amazonDecimalSchema` (String oder sichere Zahl → normalisierter Decimal-String),
+- [x] zod-Bausteine in `packages/amazon-ads`: `amazonDecimalSchema` (String oder sichere Ganzzahl → normalisierter Decimal-String),
       `currencyCodeSchema` (ISO 4217, drei Großbuchstaben). Unbekannte Währungen durchreichen und loggen, nicht verwerfen.
 - [x] Konvention für die DB festhalten (in dieser Datei unter „Umsetzung“): Beträge von Amazon als `numeric` **ohne** feste Skala
       (speichert exakt, was Amazon liefert, rundet nie still; Gebote/CPC haben teils mehr als 2 Nachkommastellen). Gerundet wird erst beim
@@ -147,11 +147,17 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     ersten Berechnung, dann als **eine** konfigurierte Kopie (`Decimal.clone`), nie über die globale Konfiguration.
   - `parseJsonLossless(text, { decimals: 'string' })`: jede Zahl mit Nachkommastellen oder Exponent kommt als Quelltext-String
     (`1.50` bleibt `'1.50'`, `1e3` wird `'1e3'`), sichere Ganzzahlen ohne Exponent bleiben `number` (Zähler), unsichere wie bisher String.
-    Standard unverändert. `http.ts` nutzt weiter den Standard; Report- und Export-Downloads (1.4/1.6) rufen den Parser mit der Option auf.
+    Standard unverändert. Report- und Export-Downloads (1.4/1.6) rufen den Parser mit der Option auf. **Offen für 1.6:** `request()` in
+    `http.ts` parst mit dem Standard; Endpunkte mit Beträgen (z. B. `POST /portfolios/list`, Budgets) brauchen die Option, also
+    `request()` um eine Parse-Option erweitern. Ohne sie scheitert `amazonDecimalSchema` laut (siehe unten), statt still zu runden.
+    Mit der Option kommen **alle** gebrochenen Werte als String, auch Raten (CTR, ACoS, ROAS): Zeilen-Schemas nutzen für jede
+    gebrochene Spalte `amazonDecimalSchema`, nie `z.number()`.
   - `packages/amazon-ads/src/money.ts`:
-    - `amazonDecimalSchema`: String nach JSON-Zahlgrammatik (auch mit führenden Nullen, ohne `+`, Leerzeichen, Komma) oder endliche
-      Zahl mit Betrag ≤ `MAX_SAFE_INTEGER` → `Decimal#toFixed()`: exakt, ohne Exponent, ohne überflüssige Nullen, `-0` → `0`.
-      Zehnerpotenz auf ±40 begrenzt (`1e-1000000` würde sonst einen String mit einer Million Zeichen erzeugen).
+    - `amazonDecimalSchema`: String nach JSON-Zahlgrammatik (auch mit führenden Nullen, ohne `+`, Leerzeichen, Komma) oder sichere
+      Ganzzahl → `Decimal#toFixed()`: exakt, ohne Exponent, ohne überflüssige Nullen, `-0` → `0`. Zahlen mit Nachkommastellen werden
+      abgelehnt (fehlende Parser-Option, Wert womöglich schon über `number` gerundet). Exponent in der Eingabe höchstens vierstellig
+      (größere macht decimal.js zu `Infinity` bzw. still zu `0`), Zehnerpotenz des Werts höchstens ±40 (`1e-1000000` ergäbe sonst
+      einen String mit einer Million Zeichen).
       Ungültige Werte scheitern in zod; die Zeile zählt dann als ungültig (1.4).
     - `currencyCodeSchema`: nur Format (`^[A-Z]{3}$`). `isKnownCurrencyCode(code)` prüft gegen `Intl.supportedValuesOf('currency')`;
       die Normalisierung (1.6) loggt unbekannte Codes wie unbekannte Enum-Werte (`amazon_ads.unknown_enum_value`) und reicht sie durch.
@@ -298,7 +304,9 @@ Endpunkte nach F1 (a), siehe ADR 004.
 - [ ] Portfolios: `listPortfolios(profile)` mit Paginierung.
 - [ ] Reports: `requestReport(profile, { reportTypeId, adProduct, groupBy, columns, startDate, endDate })`, `getReport(id)`,
       `downloadReport(url)`. 425 als eigener Fehler mit Hinweis „läuft bereits“.
-- [ ] Normalisierung in ein eigenes Modell (`AmazonAdsCampaign` …) mit zod; IDs und Beträge als Strings. Unbekannte Enum-Werte durchreichen und loggen.
+- [ ] Normalisierung in ein eigenes Modell (`AmazonAdsCampaign` …) mit zod; IDs und Beträge als Strings (Beträge und alle gebrochenen
+      Werte über `amazonDecimalSchema`, Währungen über `currencyCodeSchema`). Unbekannte Enum-Werte und unbekannte Währungscodes
+      (`isKnownCurrencyCode`) durchreichen und loggen.
 - [ ] Download-Hosts: S3-URLs aus Amazon-Antworten nur per `https` und **ohne** Authorization-Header abrufen (Tokens gehen nie an fremde Hosts,
       Regel aus 0.5). Erlaubte Host-Muster als Konstante.
 - [ ] Mock-Anbieter erweitern: Entities für die Test-Profile (inkl. großer IDs, Beträge mit vielen Nachkommastellen, archivierter Kampagne,
