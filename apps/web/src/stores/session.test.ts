@@ -5,6 +5,8 @@ import { json, stubFetch } from '../test/fetch-stub';
 import { meFixture } from '../test/fixtures';
 import { useSessionStore } from './session';
 
+const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 const unauthorized = () => json({ error: { code: 'UNAUTHORIZED', message: 'x' } }, 401);
 
 beforeEach(() => {
@@ -168,28 +170,112 @@ describe('session store', () => {
     });
   });
 
-  it('speichert nacheinander: eine spätere Änderung überholt keine frühere', async () => {
-    const releases: (() => void)[] = [];
-    const { requests } = stubFetch({
+  /** PUT-Antworten auf Anweisung: `respond(i, ok)` beantwortet den i-ten Request. */
+  function deferredSettings() {
+    const pending: ((ok: boolean) => void)[] = [];
+    const stub = stubFetch({
       'GET /api/me': json(meFixture()),
+      'POST /api/auth/sign-out': json({ success: true }),
       'PUT /api/settings': ({ body }) =>
-        new Promise<Response>((resolve) => releases.push(() => resolve(json(body)))),
+        new Promise<Response>((resolve) =>
+          pending.push((ok) =>
+            resolve(
+              ok ? json(body) : json({ error: { code: 'INTERNAL_ERROR', message: 'x' } }, 500),
+            ),
+          ),
+        ),
     });
+    const puts = () => stub.requests.filter((r) => r.method === 'PUT').map((r) => r.body);
+    async function respond(index: number, ok: boolean) {
+      await vi.waitFor(() => expect(pending.length).toBeGreaterThan(index));
+      pending[index]!(ok);
+    }
+    return { puts, respond };
+  }
+
+  it('speichert nacheinander: eine spätere Änderung überholt keine frühere', async () => {
+    const { puts, respond } = deferredSettings();
     const session = useSessionStore();
     await session.ensureLoaded();
     const first = session.updatePreferences({ theme: 'dark' });
+    await vi.waitFor(() => expect(puts()).toHaveLength(1));
     const second = session.updatePreferences({ locale: 'en-US' });
-    await vi.waitFor(() => expect(releases).toHaveLength(1));
-    // Der zweite Request startet erst, wenn der erste beantwortet ist, mit dem dann aktuellen Stand.
-    expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(1);
-    releases[0]!();
-    await vi.waitFor(() => expect(releases).toHaveLength(2));
-    releases[1]!();
+    await flushMicrotasks();
+    // Der zweite Request startet erst, wenn der erste beantwortet ist.
+    expect(puts()).toHaveLength(1);
+    await respond(0, true);
+    await respond(1, true);
     await Promise.all([first, second]);
-    const puts = requests.filter((r) => r.method === 'PUT');
-    expect(puts).toHaveLength(2);
-    // Der zuletzt gesendete Request trägt den Endstand beider Änderungen.
-    expect(puts.at(-1)?.body).toEqual({ theme: 'dark', locale: 'en-US', density: 'comfortable' });
+    expect(puts()).toEqual([
+      { theme: 'dark', locale: 'de-DE', density: 'comfortable' },
+      { theme: 'dark', locale: 'en-US', density: 'comfortable' },
+    ]);
+  });
+
+  it('fällt auf den gespeicherten Stand zurück, wenn mehrere Änderungen desselben Felds scheitern', async () => {
+    const { respond } = deferredSettings();
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    // Sofort abwarten, sonst gelten die Fehler als unbehandelt.
+    const results = Promise.allSettled([
+      session.updatePreferences({ theme: 'dark' }),
+      session.updatePreferences({ theme: 'light' }),
+    ]);
+    await respond(0, false);
+    await respond(1, false);
+    expect((await results).map((r) => r.status)).toEqual(['rejected', 'rejected']);
+    // Nicht „dark“ (war nie gespeichert), sondern der Stand des Servers.
+    expect(session.preferences.theme).toBe('system');
+    expect(localStorage.getItem('profitbash.theme')).toBe('system');
+  });
+
+  it('behält die letzte Wahl, wenn ein früherer Request scheitert (A → B → A)', async () => {
+    const { puts, respond } = deferredSettings();
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    const first = session.updatePreferences({ theme: 'dark' });
+    const firstResult = first.catch((error: unknown) => error);
+    await vi.waitFor(() => expect(puts()).toHaveLength(1));
+    const rest = Promise.all([
+      session.updatePreferences({ theme: 'light' }),
+      session.updatePreferences({ theme: 'dark' }),
+    ]);
+    await respond(0, false);
+    await respond(1, true);
+    expect(await firstResult).toMatchObject({ code: 'INTERNAL_ERROR' });
+    await rest;
+    expect(session.preferences.theme).toBe('dark');
+    expect(puts().at(-1)).toMatchObject({ theme: 'dark' });
+  });
+
+  it('sendet keinen weiteren Request, wenn der Stand schon gespeichert ist', async () => {
+    const { puts, respond } = deferredSettings();
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    const saves = [session.updatePreferences({ theme: 'dark' })];
+    await vi.waitFor(() => expect(puts()).toHaveLength(1));
+    saves.push(session.updatePreferences({ locale: 'en-US' }));
+    saves.push(session.updatePreferences({ density: 'compact' }));
+    await respond(0, true);
+    await respond(1, true);
+    await Promise.all(saves);
+    // Der zweite Request trägt beide wartenden Änderungen, ein dritter wäre identisch.
+    expect(puts()).toHaveLength(2);
+    expect(puts()[1]).toEqual({ theme: 'dark', locale: 'en-US', density: 'compact' });
+  });
+
+  it('speichert nach dem Abmelden nichts mehr für den bisherigen Nutzer', async () => {
+    const { puts, respond } = deferredSettings();
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    const saves = [session.updatePreferences({ theme: 'dark' })];
+    await vi.waitFor(() => expect(puts()).toHaveLength(1));
+    saves.push(session.updatePreferences({ locale: 'en-US' }));
+    session.markSignedOut();
+    await respond(0, true);
+    await Promise.allSettled(saves);
+    await flushMicrotasks();
+    expect(puts()).toHaveLength(1);
   });
 
   it('nimmt bei einem Fehler nur die eigenen Felder zurück', async () => {

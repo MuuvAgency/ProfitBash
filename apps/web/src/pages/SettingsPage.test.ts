@@ -108,6 +108,31 @@ describe('SettingsPage', () => {
     expect(preview(wrapper).Zahl).toBe('1,234,567.89');
   });
 
+  it('meldet einen gescheiterten Save auch dann, wenn ein späterer klappt', async () => {
+    let calls = 0;
+    let failFirst!: () => void;
+    stubFetch(
+      routes(({ body }) =>
+        ++calls === 1
+          ? new Promise<Response>((resolve) => (failFirst = () => resolve(serverError())))
+          : json(body),
+      ),
+    );
+    const { wrapper, session } = await mountPage();
+    // Die zweite Änderung kommt, während der erste Save noch läuft.
+    await radio(wrapper, 'Dunkel').setValue(true);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await chooseLocale(wrapper, 'Englisch (USA)');
+    failFirst();
+    await vi.waitFor(() => expect(calls).toBe(2));
+    await flushPromises();
+    expect(session.preferences).toMatchObject({ theme: 'system', locale: 'en-US' });
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'Die Einstellung konnte nicht gespeichert werden.',
+    );
+    expect(wrapper.get('[role="status"]').text()).toBe('');
+  });
+
   it('meldet einen Speicherfehler und zeigt wieder den gespeicherten Wert', async () => {
     stubFetch(routes(serverError));
     const { wrapper, session } = await mountPage();
