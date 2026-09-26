@@ -42,10 +42,11 @@ das Root-Skript `build` aus. Zur Laufzeit setzt Railpack selbst `NODE_ENV=produc
 > Der Server nennt `NODE_ENV` in seiner Startzeile (`API läuft auf … (production, …)`). Steht dort nicht `production`,
 > ist u. a. das Rate-Limit von better-auth aus.
 
-**Offen (Dominik):** Railway liest `railway.json`/`railway.toml` (Config as Code) für **neue** Services nicht mehr
-(abgekündigt, endgültig ab 2026-12-01). Nachfolger ist „Infrastructure as Code“ (`.railway/railway.ts`, npm-Paket
-`railway`, Railway-CLI, optional GitHub Action mit `RAILWAY_TOKEN`). Bis zur Entscheidung gelten die
-Dashboard-Einstellungen unten; sie stehen nur hier im Repo.
+**Entschieden (Dominik, 2026-09-26): Dashboard-Einstellungen.** Railway liest `railway.json`/`railway.toml` (Config as
+Code) für **neue** Services nicht mehr (abgekündigt, endgültig ab 2026-12-01). Der Nachfolger „Infrastructure as Code“
+(`.railway/railway.ts`, npm-Paket `railway`, Railway-CLI) lohnt sich für den Pilot mit einem Service nicht. Die
+Einstellungen unten werden im Dashboard gesetzt; dieses Dokument ist ihre Quelle im Repo. Bei Änderungen im Dashboard
+hier nachziehen. Wiedervorlage bei Stufe C (zweiter Service).
 
 ## Railway einrichten (einmalig)
 

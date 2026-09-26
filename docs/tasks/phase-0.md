@@ -463,8 +463,8 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
     SIGTERM. Läuft in der CI nach `pnpm build` gegen die CI-Datenbank. Lokal mit eigener DB (`profitbash_smoke`, Owner
     `profitbash`).
   - **Railway (Stand 2026-09-26):** `railway.json`/`railway.toml` (Config as Code) liest Railway für neue Services nicht
-    mehr; Nachfolger ist Infrastructure as Code (`.railway/railway.ts`). Bis Dominik entscheidet, stehen die
-    Service-Einstellungen in `docs/deploy.md` und werden im Dashboard gesetzt. `railpack.json` ist Railpack-Konfiguration
+    mehr; Nachfolger ist Infrastructure as Code (`.railway/railway.ts`). Entschieden (Dominik, 2026-09-26): vorerst
+    Dashboard-Einstellungen nach `docs/deploy.md`, IaC erst bei Bedarf (z. B. Stufe C). `railpack.json` ist Railpack-Konfiguration
     (nicht abgekündigt), aber mangels Railpack-CLI lokal ungeprüft.
   - **Backups:** Laut Railway-Preisübersicht sind DB-Backups erst ab Pro enthalten, nicht im Hobby-Plan. Der nächtliche
     `pg_dump` ist also nötig; Ziel-Speicher und Ausführungsort entscheidet Dominik (Optionen in `docs/deploy.md`).
