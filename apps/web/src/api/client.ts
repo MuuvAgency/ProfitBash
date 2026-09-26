@@ -2,6 +2,8 @@ import type {
   AmazonOAuthStart,
   Client,
   Connection,
+  JobRun,
+  JobRunListQuery,
   MeResponse,
   Profile,
   ProfilePatch,
@@ -148,6 +150,10 @@ export function createApi(options: ApiOptions = {}) {
 
     createClient: (input: { name: string }): Promise<Client> =>
       unwrap(client.POST('/api/clients', { body: input })),
+
+    /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */
+    listJobRuns: async (query: JobRunListQuery = {}): Promise<JobRun[]> =>
+      (await unwrap(client.GET('/api/job-runs', { params: { query } }))).jobRuns,
 
     auth: {
       signIn: (input: SignInInput) => postAuth<unknown>('sign-in/email', input),

@@ -10,7 +10,7 @@ import {
   markConnectionReauthRequired,
   type Db,
 } from '@profitbash/db';
-import type { Logger } from '@profitbash/shared';
+import type { ConnectionJobName, Logger } from '@profitbash/shared';
 import { z } from 'zod';
 import { JobFailure } from '../run-job';
 
@@ -32,7 +32,8 @@ export const connectionJobDataSchema = z.object({
 
 export type ConnectionJobData = z.infer<typeof connectionJobDataSchema>;
 
-export type ConnectionQueue = 'token-refresh' | 'profiles-sync';
+/** Queue-Namen = Jobnamen in `job_runs`; der Sync-Status filtert danach (`CONNECTION_JOB_NAMES`). */
+export type ConnectionQueue = ConnectionJobName;
 
 export interface ScheduledRetry {
   queue: ConnectionQueue;

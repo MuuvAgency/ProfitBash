@@ -164,3 +164,19 @@ describe('Connections, Profile und Clients', () => {
     ]);
   });
 });
+
+describe('Sync-Status', () => {
+  it('liest die Jobläufe und übergibt nur gesetzte Filter', async () => {
+    const run = { id: '44444444-4444-4444-8444-444444444444', job: 'profiles-sync' };
+    const { requests } = stubFetch({ 'GET /api/job-runs': json({ jobRuns: [run] }) });
+    const api = createApi();
+    await expect(api.listJobRuns()).resolves.toEqual([run]);
+    await api.listJobRuns({ job: 'token-refresh' });
+    await api.listJobRuns({ job: 'profiles-sync', status: 'failed' });
+    expect(requests.map((r) => r.search)).toEqual([
+      '',
+      '?job=token-refresh',
+      '?job=profiles-sync&status=failed',
+    ]);
+  });
+});

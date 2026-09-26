@@ -713,6 +713,106 @@
           }
         },
         "additionalProperties": false
+      },
+      "JobRunList": {
+        "type": "object",
+        "properties": {
+          "jobRuns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobRun"
+            }
+          }
+        },
+        "required": [
+          "jobRuns"
+        ]
+      },
+      "JobRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "job": {
+            "type": "string"
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connection": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "externalAccountId": {
+                "type": "string"
+              },
+              "externalAccountEmail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "externalAccountId",
+              "externalAccountEmail"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "success",
+              "failed"
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "counters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "job",
+          "scope",
+          "connection",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "error",
+          "counters"
+        ]
       }
     },
     "parameters": {}
@@ -1516,6 +1616,83 @@
           },
           "409": {
             "description": "Slug in der Organisation vergeben.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/job-runs": {
+      "get": {
+        "tags": [
+          "Betrieb"
+        ],
+        "summary": "Letzte 100 Jobläufe der aktiven Organisation (Sync-Status, nur Admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "token-refresh",
+                "profiles-sync"
+              ]
+            },
+            "required": false,
+            "name": "job",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "running",
+                "success",
+                "failed"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jobläufe, neueste zuerst.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRunList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültiger Filter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
             "content": {
               "application/json": {
                 "schema": {
