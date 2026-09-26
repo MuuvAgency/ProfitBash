@@ -51,7 +51,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Stand 2026-09-26: GitHub-Repo erledigt (`MuuvAgency/ProfitBash`), erster echter CI-Lauf grün (PR #1). Railway und Healthchecks.io fehlen noch.
   - Abweichung von ADR 001: Das Repo ist **öffentlich**, weil Auto-Merge für private Repos im aktuellen GitHub-Plan nicht verfügbar ist.
     Folgen: Keine Secrets ins Repo. Nichts Sensibles in öffentliche Actions-Logs oder -Artefakte (gilt besonders für den `pg_dump` aus 0.9).
-    `main` ist nicht geschützt, Auto-Merge wartet daher nicht auf CI. Offen: ADR 001 anpassen oder später zurück auf privat.
+    `main` ist per Ruleset geschützt: Merge nur mit grünem `ci`-Check, kein Force-Push, kein Löschen. Auto-Merge wartet auf die CI. Offen: ADR 001 anpassen oder später zurück auf privat.
 - [ ] **0.0g Secrets bereitstellen** (siehe `.env.example` unten).
 
 ## Aufgaben
