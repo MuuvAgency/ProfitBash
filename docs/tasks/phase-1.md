@@ -3,7 +3,7 @@
 > Vor Beginn lesen: `CLAUDE.md`, `docs/plan.md` (§5 „Festlegungen für Phase 1 und später“), `docs/tasks/phase-0.md`
 > (Umsetzungsnotizen 0.5–0.7), `docs/decisions/` (001 Stack, 002 Mandanten-Modell).
 >
-> **Status: Entwurf (2026-09-26), in Abstimmung mit Dominik.** Entscheidungen stehen als **F1–F12** unter
+> **Status: Entwurf (2026-09-26), in Abstimmung mit Dominik.** Entscheidungen stehen als **F1–F14** unter
 > „Fragen an Dominik“. Entschieden: F1, F2, F4, F6. Noch zu bestätigen: F3, F5, F7–F11, F13, F14 (je mit Empfehlung). Offen: F12.
 > Aufgaben, die von einer Frage abhängen, verweisen darauf. 1.1 beginnt, sobald F3, F5, F7–F11, F13 und F14 bestätigt sind.
 
@@ -23,7 +23,8 @@ Für jedes verbundene Profil liegen die Werbe-Entities und die täglichen Kennza
 - [ ] Beträge kommen ohne Umweg über `number` in die DB (Test mit Werten wie `0.1`, `1234567.89`, `0.005`).
       IDs größer als `Number.MAX_SAFE_INTEGER` kommen unverändert an.
 - [ ] Neue Jobs laufen über `runJob`, schreiben `job_runs` mit Zählern, erscheinen im Sync-Status (i18n-Keys) und pingen Healthchecks (außer `amazon-requests-poll`, siehe 1.7).
-- [ ] Jede neue Tabelle trägt `organization_id` und `profile_id`; die DB verhindert Verknüpfungen über Org-Grenzen (zusammengesetzte FKs).
+- [ ] Jede neue Tabelle trägt `organization_id`, jede Tabelle mit Profildaten zusätzlich `profile_id` (die Lease-Tabelle aus 1.3 gilt je
+      Connection); die DB verhindert Verknüpfungen über Org- und Profilgrenzen (zusammengesetzte FKs).
 - [ ] Connections speichern den Zeitpunkt der Einwilligung; die Connections-Seite zeigt, wann der Refresh-Token abläuft.
 - [ ] ADR 003 (Decimal-Library) ist angenommen. ADR 004 (Amazon-API-Generation, F1) ist angenommen und nach dem ersten echten Lauf abgeglichen.
 - [ ] Nach der Ads-API-Freigabe: ein echter Lauf gegen ein Profil der Agentur, Abweichungen zum Mock sind nachgezogen.
@@ -148,11 +149,14 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
       Plan §5 verlangt „Jobs je Connection laufen nacheinander“.
 - [ ] **Sperre je Connection für die Amazon-Datenjobs** (`profiles-sync`, `entities-sync`, `reports-sync`, `amazon-requests-poll`;
       `token-refresh` nicht, der Token-Store serialisiert LWA bereits über die Zeilensperre). Empfehlung: **Lease-Zeile** in der DB
-      (`connection_job_leases`: `connection_id` unique, `job`, `job_run_id`, `expires_at`), per `INSERT … ON CONFLICT … WHERE expires_at < now()`
+      (`connection_job_leases`: `organization_id`, `connection_id` unique, `job`, `job_run_id`, `expires_at`; zusammengesetzter FK
+      (`connection_id`, `organization_id`) → `connections`), per `INSERT … ON CONFLICT … WHERE expires_at < now()`
       genommen und am Ende freigegeben. Übersteht Abstürze (läuft ab), ist in der DB sichtbar und braucht keine langen Transaktionen
       (session-weite Advisory-Locks sind mit dem Verbindungspool von postgres.js unzuverlässig). Ist die Lease belegt, plant sich der Job mit
       `startAfter` (z. B. 60 s) neu ein und zählt `deferred`. Die Lease-Dauer liegt über der Job-Laufzeit (kurze Jobs, siehe 1.7); längere
-      Schritte verlängern sie. Die Entscheidung (Lease oder Alternative) hier unter „Umsetzung“ festhalten.
+      Schritte verlängern sie. Das Neu-Einplanen hat keine Obergrenze (anders als `Retry-After`: max. 3-mal, 1 h), belegt aber den einzigen
+      Warteplatz der Connection in dieser Queue: Ein Cron-Einplanen währenddessen fällt als Duplikat weg, der wartende Job erledigt dieselbe
+      Arbeit. Die Entscheidung (Lease oder Alternative) hier unter „Umsetzung“ festhalten.
 - [ ] **Anfrage-Budget je Profil** im Amazon-Client: Token-Bucket je **Profil** (nicht je Connection und Profil: ein Profil kann die
       Connection wechseln) im Prozess, Standard z. B. 2 Anfragen/s, konfigurierbar. Bei einem 429 halbiert sich die Rate des Profils
       (Untergrenze z. B. 0,2/s), je erfolgreicher Anfrage steigt sie additiv um einen kleinen Schritt bis zum Standard (AIMD).
@@ -177,7 +181,8 @@ Client-Methoden kommen in 1.6, Jobs und Dispatcher in 1.7.
   - Unique (`profile_id`, `kind`, `ad_product`, `report_type`, `start_date`, `end_date`) mit **`NULLS NOT DISTINCT`** als partieller Index auf
     offene Aufträge (`status` nicht `imported`/`failed`): kein doppelter offener Auftrag, auch bei Exports (Daten leer) und nach Neustart.
 - [ ] **Erst schreiben, dann anfordern:** Zeile mit `pending_request` anlegen, dann Amazon aufrufen, dann `amazon_request_id` speichern.
-      Stirbt der Prozess dazwischen, findet der nächste Lauf die Zeile ohne ID und fordert erneut an. Antwortet Amazon dann mit 425
+      Stirbt der Prozess dazwischen, findet der nächste `amazon-requests-poll` die Zeile ohne ID (sie zählt als offener Auftrag, auch für den
+      Dispatcher in 1.7) und fordert erneut an. Antwortet Amazon dann mit 425
       (identische Anfrage läuft noch): die Report-ID aus der Fehlerantwort übernehmen, falls Amazon sie liefert (beim Umsetzen prüfen),
       sonst `next_poll_at` in 15 Min. und dann erneut anfordern.
 - [ ] **Abbruchregel:** `failed` erst, wenn Amazon bei einer Abfrage noch `PENDING`/`PROCESSING` meldet und der Auftrag älter als 4 h ist,
@@ -186,12 +191,14 @@ Client-Methoden kommen in 1.6, Jobs und Dispatcher in 1.7.
       über den ganzen Text (der Parser arbeitet nicht auf Streams). Der Deckel schützt den Speicher bei `WORKER_MODE=inline`; bei Bedarf
       später ein verlustfreier Streaming-Parser (neue Abhängigkeit, ADR-Notiz). zod-Validierung je Zeile; ungültige Zeilen zählen
       (`invalid_row_count`) und ohne Werte loggen.
-- [ ] **Import:** je Auftrag in **einer** Transaktion (Regeln in 1.5), danach `imported`. Scheitert der Import, bleibt der Auftrag
+- [ ] **Import:** Reports je Auftrag in **einer** Transaktion (Regeln in 1.5), danach `imported`. **Ausnahme Exports:** Sie werden je
+      `batch_id` gemeinsam importiert, Importversuche zählen je Batch (Regeln in 1.7). Scheitert der Import, bleibt der Auftrag
       `completed` und wird beim nächsten Poll erneut geladen; nach 3 Importversuchen `failed` (sonst lädt ein Fehler die Datei endlos).
       Ist die URL abgelaufen, frisch per Status-Abfrage holen; liefert Amazon die Datei nicht mehr, neu anfordern.
-- [ ] **Reihenfolge:** Ein Report-Auftrag wird nicht importiert, wenn für dasselbe Profil, denselben Ad-Typ und Report-Typ ein **später
-      angeforderter** Auftrag mit überlappendem Zeitraum schon importiert ist (sonst überschrieben ältere Werte neuere). Er gilt dann als
-      erledigt mit Zähler `superseded`.
+- [ ] **Reihenfolge:** Ein Report-Auftrag importiert nur die Tage, die kein **später angeforderter**, schon importierter Auftrag desselben
+      Profils, Ad-Typs und Report-Typs abdeckt (sonst überschrieben ältere Werte neuere); das Ersetzen des Ausschnitts (1.5) gilt dann nur für
+      diese Tage. Deckt ein neuerer Auftrag alle Tage ab, endet der Auftrag als `imported` mit Zähler `superseded` (seine Tage sind ja durch den
+      neueren importiert; für den Historien-Merker in 1.7 zählt er als importiert).
 - [ ] Wartung: `job-runs-cleanup` löscht abgeschlossene Aufträge älter als 30 Tage (F5).
 - [ ] Tests (gegen die Fake-Schnittstelle): Absturz vor und nach dem Anfordern, 425 mit und ohne ID, 429 beim Status, `FAILURE`,
       abgelaufene URL, Datei über dem Deckel, kaputte Zeile, dreimal scheiternder Import, überholter Auftrag.
@@ -205,8 +212,12 @@ Allgemeine Regeln für alle Tabellen dieser Aufgabe:
 - Jede Entity-Tabelle bekommt unique (`id`, `profile_id`). Interne FKs zur Elternebene (`campaign_id`, `ad_group_id`) und von den
   Kennzahlen zur Entity sind zusammengesetzt mit `profile_id` (z. B. (`campaign_id`, `profile_id`) → `amazon_ads_campaigns`): So kann eine
   Ad Group nicht auf die Kampagne eines anderen Profils zeigen. Die Org ist über den Profil-FK festgelegt.
-- `ON DELETE RESTRICT` auf allen Verweisen dieser Tabellen: Historie ist nicht wiederbeschaffbar (F5). Hinweis: `amazon_ads_profiles.connection_id`
-  hat heute `ON DELETE CASCADE`; ein künftiges „Connection löschen“ muss das berücksichtigen (Profile entkoppeln, nicht löschen).
+- Verweise auf Profile und Elternebenen mit `ON DELETE NO ACTION` (Drizzle-Standard), nicht `CASCADE`: Historie ist nicht
+  wiederbeschaffbar (F5), ein einzelnes Profil oder eine Kampagne darf sie nicht mitreißen. Nicht `RESTRICT`: Das prüft sofort und kann das
+  Löschen einer ganzen Organisation scheitern lassen, wenn deren Kaskade (`organization_id` → `organizations`, `CASCADE` wie überall) Eltern
+  vor Kindern erreicht; `NO ACTION` prüft erst am Ende der Anweisung. Test: Organisation mit Daten löschen gelingt, einzelnes Profil mit
+  Daten löschen scheitert. Hinweis: `amazon_ads_profiles.connection_id` hat heute `ON DELETE CASCADE`; ein künftiges „Connection löschen“
+  muss das berücksichtigen (Profile entkoppeln, nicht löschen).
 - `extra` (jsonb): produktspezifische Felder, die (noch) keine eigene Spalte haben. Nie Beträge, die wir rechnen (die bekommen Spalten).
 - `amazon_updated_at` (falls geliefert), `synced_at`, `removed_at` (Amazon liefert die Entity nicht mehr; wie bei Profilen umkehrbar, nie löschen).
 
@@ -265,18 +276,27 @@ Endpunkte nach F1 (a), siehe ADR 004.
 Alle Datenjobs nehmen die Lease der Connection (1.3) und bleiben **kurz**: Ein Lauf erledigt eine begrenzte Menge Arbeit und plant bei
 Bedarf den nächsten ein. `expireInSeconds` bleibt deshalb niedrig (ein verwaister aktiver Job blockiert bei `stately` die Queue der
 Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
-- [ ] `entities-sync` je Connection: für jedes aktive, nicht entfernte Profil (F14) je Ad-Typ vier Exports mit gemeinsamer `batch_id`
-      anfordern (über 1.4) und Portfolios lesen. Der Job endet nach dem Anfordern; das Importieren übernimmt der Poll.
-- [ ] **Import eines Entity-Batches:** erst wenn **alle** Exports des Batches heruntergeladen sind, in **einer** Transaktion in
-      Hierarchie-Reihenfolge (Portfolios → Kampagnen → Ad Groups → Targets, Negatives, Product Ads). `removed_at` nur für Entities desselben
-      (Profil, Ad-Typ, Entity-Typ), die schon **vor** dem Anfordern des Batches existierten und im Batch fehlen (Platzhalter, die währenddessen
-      aus Reports entstanden, bleiben). Zähler: `profiles`, `created`, `updated`, `removed`, `placeholders_filled`.
+- [ ] `entities-sync` je Connection: für jedes aktive, nicht entfernte Profil (F14) Portfolios lesen und **direkt** upserten (synchroner
+      List-Aufruf, eigene Transaktion), dann je Ad-Typ vier Exports mit gemeinsamer `batch_id` anfordern (über 1.4). Der Job endet nach dem
+      Anfordern; das Importieren übernimmt der Poll.
+- [ ] **Import eines Entity-Batches:** sobald Amazon **alle** Exports des Batches als fertig meldet (`completed`), lädt ein Poll-Lauf alle
+      herunter und importiert sie in **einer** Transaktion in Hierarchie-Reihenfolge (Kampagnen → Ad Groups → Targets, Negatives, Product Ads).
+      Speicher: bis zu 4 Dateien gleichzeitig, der Größendeckel aus 1.4 gilt je Datei. `removed_at` nur für Entities desselben (Profil, Ad-Typ,
+      Entity-Typ), die schon **vor** dem Anfordern des Batches existierten und im Batch fehlen (Platzhalter, die währenddessen aus Reports
+      entstanden, bleiben). Zähler: `profiles`, `created`, `updated`, `removed`, `placeholders_filled`.
+- [ ] **Scheitert ein Export des Batches** (`FAILURE`, abgelaufen, Import nach 3 Versuchen fehlgeschlagen), wird der **ganze Batch** `failed`:
+      kein Import, kein `removed_at`. Einzelne Exports werden nicht neu angefordert (sonst mischten sich Stände verschiedener Zeitpunkte);
+      der nächste `entities-sync` startet einen neuen Batch.
 - [ ] `reports-sync` je Connection: je Profil, Ad-Typ (F2) und Ebene (F6) einen Report über das rollierende Fenster (F3, F9) anfordern.
-      Zähler: `requested`, `reused` (425), `imported`, `rows`, `superseded`, `failed`.
-- [ ] **Historie (F4) mit festem Merker:** Tabelle `amazon_ads_backfills` (`profile_id`, `ad_product`, `report_type`, `from_date`,
-      `completed_at`), unique (`profile_id`, `ad_product`, `report_type`). `reports-sync` fordert für jede Kombination ohne `completed_at` die
-      fehlenden 31-Tage-Stücke an; `completed_at` wird erst gesetzt, wenn alle Stücke importiert sind. So holt auch 1.9 (SB/SD für schon
-      synchronisierte Profile) die Historie nach, und verlorene Stücke werden wiederholt, solange Amazon sie noch vorhält.
+      Zähler: `requested`, `reused` (425), `failed_since_last_run` (Aufträge des Profils, die seit dem letzten `reports-sync` auf `failed`
+      gingen; so werden Fehler aus dem Poll in einem Lauf mit Healthcheck sichtbar).
+- [ ] **Historie (F4) mit festem Merker:** Tabelle `amazon_ads_backfills` (`organization_id`, `profile_id`, `ad_product`, `report_type`,
+      `from_date`, `completed_at`; zusammengesetzter FK (`profile_id`, `organization_id`)), unique (`profile_id`, `ad_product`, `report_type`).
+      `reports-sync` fordert für jede Kombination ohne `completed_at` die fehlenden 31-Tage-Stücke an. Die Stücke enden am Tag **vor** dem
+      Beginn des rollierenden Fensters, damit sie sich nicht mit ihm überschneiden. `completed_at` wird erst gesetzt, wenn alle Stücke
+      `imported` sind (auch als `superseded`, siehe 1.4). So holt auch 1.9 (SB/SD für schon synchronisierte Profile) die Historie nach, und
+      verlorene Stücke werden wiederholt, solange Amazon sie noch vorhält.
+- [ ] Der Poll zählt `imported`, `rows`, `superseded`, `failed`.
 - [ ] `amazon-requests-poll` je Connection: fragt fällige Aufträge ab (`next_poll_at <= now()`, Backoff 1 → 2 → 5 → 10 → 15 Min.), lädt
       und importiert höchstens eine begrenzte Zahl je Lauf (z. B. 5) und plant sich neu ein, solange Aufträge offen sind.
 - [ ] Cron-Auslöser `entities-sync-all` und `reports-sync-all` (F9), wie `profiles-sync-all` nur für aktive Connections. Dazu
@@ -288,16 +308,18 @@ Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
 - [ ] Bestehende Queues mit geänderten Optionen über `boss.updateQueue` (siehe `createQueues`).
 - [ ] Neue Namen in `CONNECTION_JOB_NAMES`, i18n-Keys `sync.job.*` und `sync.counter.*`, Reihenfolge in `COUNTER_ORDER`.
 - [ ] Healthchecks: `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPORTS_SYNC_URL` (optional, https), in `.env.example` und `docs/deploy.md`.
-      `amazon-requests-poll` pingt nicht (läuft oft und kurz); scheiternde Aufträge zeigen sich im Zähler `failed` von `reports-sync` und im Sync-Status.
+      `amazon-requests-poll` pingt nicht (läuft oft und kurz); scheiternde Aufträge zeigen sich im Zähler `failed_since_last_run` von
+      `reports-sync` und im Sync-Status.
 - [ ] `reauth_required`-Connections überspringen. Ausgeblendete Profile nach F14, entfernte Profile nicht.
 
 ### 1.8 Sichtbares (`apps/api`, `apps/web`)
 Nach F11.
 - [ ] Sync-Status zeigt die neuen Jobs und Zähler.
-- [ ] Connections-Seite: Ablauf der Einwilligung (1.2); Profiltabelle mit Spalte „Daten bis“ = `end_date` des zuletzt importierten
-      Kampagnen-Reports des Profils (nicht `max(date)` der Kennzahlen: ein pausiertes Profil hätte sonst ein altes Datum), über einen Endpunkt,
-      der die Profile über `visibleProfilesScope` begrenzt.
-- [ ] Optional aus dem Review-Backlog: Sync-Status „läuft seit“ für laufende Jobs (passt, weil Import-Jobs länger laufen).
+- [ ] Connections-Seite: Ablauf der Einwilligung (1.2); Profiltabelle mit Spalte „Daten bis“ aus einer neuen Spalte
+      `amazon_ads_profiles.metrics_imported_through` (date), die der Import eines Kampagnen-Reports auf `max(end_date)` setzt (nicht
+      `max(date)` der Kennzahlen: ein pausiertes Profil hätte sonst ein altes Datum; nicht aus den Auftragszeilen: die werden nach 30 Tagen
+      gelöscht). Endpunkt begrenzt die Profile über `visibleProfilesScope`.
+- [ ] Optional aus dem Review-Backlog: Sync-Status „läuft seit“ für laufende Jobs (hilft beim Erkennen hängender Jobs und belegter Leases).
 
 ### 1.9 Weitere Ad-Typen (nach F2)
 - [ ] SB: Entities (Exports decken SB ab) und Reports (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`); Hinweis auf die v3-Preview-Lücke
