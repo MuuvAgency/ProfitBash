@@ -66,7 +66,9 @@ encrypted="$work/profitbash.dump.age"
 key="db/profitbash-$(date -u +%Y%m%dT%H%M%SZ).dump.age"
 
 echo "→ pg_dump"
-pg_dump --format=custom --no-owner --no-privileges --dbname="$DATABASE_URL" --file="$dump"
+# Eigentümer und Rechte bleiben im Archiv; ob sie gelten, entscheidet erst pg_restore. Wartet pg_dump länger als
+# 5 Min. auf eine Sperre (z. B. Migration), bricht es ab, statt den nächsten Cron-Lauf zu blockieren.
+pg_dump --format=custom --lock-wait-timeout=5min --dbname="$DATABASE_URL" --file="$dump"
 
 # Lesbarkeit prüfen, bevor verschlüsselt wird: Das Inhaltsverzeichnis muss Tabellendaten enthalten.
 pg_restore --list "$dump" >"$work/toc.txt"

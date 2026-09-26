@@ -158,15 +158,23 @@ assert_clean_output "$work/fail.out" "backup.sh (Fehlerfall)"
 [ "$(find "$work/objects" -type f | wc -l | tr -d ' ')" = 1 ] || fail "Der Fehlerfall hat ein Objekt hinterlassen."
 echo "  fehlender Bucket → Exit ≠ 0, Ping /fail"
 
-if BACKUP_S3_ENDPOINT=http://example.com run "${backup_cmd[@]}" >"$work/http.out" 2>&1; then
+# Nicht auflösbarer Host (.invalid): Auch ohne https-Prüfung ginge keine Anfrage nach außen.
+if BACKUP_S3_ENDPOINT=http://backup.invalid run "${backup_cmd[@]}" >"$work/http.out" 2>&1; then
   fail "backup.sh akzeptiert einen http-Endpunkt außerhalb von localhost."
 fi
-echo "  http-Endpunkt abgelehnt"
+assert_clean_output "$work/http.out" "backup.sh (http-Endpunkt)"
+grep -qF 'BACKUP_S3_ENDPOINT muss mit https:// beginnen' "$work/http.out" ||
+  fail "backup.sh lehnt den http-Endpunkt nicht bei der Prüfung ab: $(cat "$work/http.out")"
+if grep -qF 'pg_dump' "$work/http.out"; then fail "backup.sh startet pg_dump trotz ungültigem Endpunkt."; fi
+echo "  http-Endpunkt vor dem Dump abgelehnt"
 
 if RESTORE_DATABASE_URL="$SMOKE_DATABASE_URL" run "${restore_cmd[@]}" "$backup" >"$work/guard.out" 2>&1; then
   fail "restore-test.sh spielt in eine Datenbank ohne _restore ein."
 fi
-[ "$(query "$SMOKE_DATABASE_URL" "select count(*) from organizations")" != 0 ] || fail "Die Quelle wurde verändert."
-echo "  Restore-Ziel ohne _restore abgelehnt"
+assert_clean_output "$work/guard.out" "restore-test.sh (Ziel ohne _restore)"
+grep -qF 'endet nicht auf _restore' "$work/guard.out" ||
+  fail "restore-test.sh lehnt das Ziel nicht über die Namensprüfung ab: $(cat "$work/guard.out")"
+if grep -qF 'leeren' "$work/guard.out"; then fail "restore-test.sh hat die Zieldatenbank angefasst."; fi
+echo "  Restore-Ziel ohne _restore abgelehnt, bevor etwas geleert wird"
 
 echo "Smoke-Test Backup/Restore bestanden."

@@ -437,8 +437,9 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - [x] Im Repo: `ops/db-backup/` (Dockerfile, `backup.sh`, `restore-test.sh`), Smoke-Test `scripts/smoke-db-backup.sh`
     mit Fake-S3 (`scripts/fake-s3.mjs`), in der CI gegen das gebaute Image. Anleitung in `docs/deploy.md` („Backups“), ADR 001 nachgezogen.
   - [ ] Auf Railway eingerichtet, erster Upload nach R2 und erster Test-Restore geprüft (braucht Konten: Railway, R2, Healthchecks.io).
-    Offen bis dahin: Nimmt R2 die SigV4-Signatur von curl an (der Fake-S3 prüft nur Form und Prüfsumme)? Hauptversion des
-    Railway-Postgres = 17 (sonst Basis-Image anheben)?
+    Offen bis dahin: Nimmt R2 die SigV4-Signatur von curl an (der Fake-S3 prüft nur Form und Prüfsumme; erst ein Dump
+    über 1 MiB nutzt `Expect: 100-continue`)? Hauptversion des Railway-Postgres = 17 (sonst Basis-Image anheben)?
+    Ernstfall-Restore (`docs/deploy.md`) einmal gegen eine Wegwerf-Datenbank durchspielen. R2-Bucket-Lock (7 Tage) setzen.
 - [x] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
   - [x] Einrichtung, Variablen, Seed, Healthchecks.io, Graceful Shutdown, Backups (offen), `WORKER_MODE=separate`, Rotationsregel.
   - [x] Anleitung zum Rotations-Skript (mit dem Skript).
@@ -467,7 +468,11 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - `restore-test.sh` spielt nur in Datenbanken `*_restore` ein und löscht dort vorher alle Schemas (auch `drizzle`, `pgboss`).
     Stichproben: Migrationen, Organisationen, Nutzer > 0, dazu Zahlen zu Connections, Profilen, Jobläufen.
   - Smoke-Test: `docker run --user` mit der UID des Runners, Variablen per Name (`-e NAME`), Werte nie in der Kommandozeile.
-    Lokal braucht er `age` (`brew install age`); `shellcheck` ist für die Skripte sauber (nicht in der CI).
+    Lokal braucht er `age` (`brew install age`). Die CI prüft alle Shell-Skripte mit `shellcheck`.
+  - Nach Review: Die Fehlerfälle prüfen die Meldung (sonst bestünde der http-Test auch ohne https-Prüfung, per Mutation
+    geprüft). `pg_dump` ohne `--no-owner`/`--no-privileges` (im Archiv wirkungslos bzw. verlustbehaftet), mit
+    `--lock-wait-timeout=5min`. Der Test-Restore zeigt den jüngsten Eintrag. `docs/deploy.md`: Ernstfall-Restore, alte
+    `ENCRYPTION_KEY`s aufbewahren (Backups enthalten Tokens mit dem damaligen Schlüssel), Bucket Lock.
 - [x] Umsetzung Bundles und Web-Auslieferung (Stand für die restlichen 0.9-Punkte):
   - **Bundles:** `apps/api/tsup.config.ts` baut `dist/index.js` (Server), `dist/migrate.js` (Einstieg
     `packages/db/src/migrate-cli.ts`) und `dist/seed.js` und kopiert `packages/db/drizzle` nach `dist/drizzle`.
