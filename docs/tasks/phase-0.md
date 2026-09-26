@@ -23,7 +23,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Profile lassen sich ausblenden. Profile, die Amazon nicht mehr liefert, sind als „entfernt" markiert.
   - Erneutes Verbinden desselben Amazon-Kontos aktualisiert die bestehende Connection, statt eine zweite anzulegen.
 - [x] Die Jobs `token-refresh` und `profiles-sync` laufen über pg-boss, schreiben `job_runs` und pingen Healthchecks.io.
-- [ ] *Betrieb → Sync-Status* zeigt die letzten Jobläufe mit Status und Fehlertext.
+- [x] *Betrieb → Sync-Status* zeigt die letzten Jobläufe mit Status und Fehlertext.
 - [ ] Die Settings-Seite speichert Locale (Zahlenformat) und Theme serverseitig.
 - [x] Die UI nutzt die Design-Tokens aus `design/theme.js` (Login und Shell im Kinetic-Bento-Look).
 - [ ] ADRs `docs/decisions/001-stack.md` und `002-tenancy.md` sind aktuell.
@@ -315,8 +315,8 @@ Ein deploytes Grundgerüst mit folgendem Stand:
     („Abgebrochen …“), und löscht abgelaufene OAuth-Nonces (`AMAZON_ADS_OAUTH_NONCE_PREFIX`, jetzt in `@profitbash/db`).
   - **Gemeinsam genutzt:** Logger (`Logger`, `consoleLogger`) liegt in `@profitbash/shared`; Amazon-Client aus der Konfiguration über
     `createAmazonAdsClientFromConfig` (`@profitbash/amazon-ads`); Pfad der Mock-Einwilligungsseite `AMAZON_ADS_MOCK_CONSENT_PATH` (`@profitbash/shared`).
-  - **Offen für 0.8 Teil 2:** API-Endpunkt für *Sync-Status* (letzte 100 `job_runs` der aktiven Org; plattformweite Läufe mit `organization_id`
-    null gehören zur Plattform-Sicht, nicht zur Org-Sicht).
+  - **Offen für 0.8 Teil 2 (erledigt, siehe 0.8 „Umsetzung Sync-Status“):** API-Endpunkt für *Sync-Status* (letzte 100 `job_runs` der
+    aktiven Org; plattformweite Läufe mit `organization_id` null gehören zur Plattform-Sicht, nicht zur Org-Sicht).
   - **Offen für 0.9:** Railway: `DATABASE_URL_DIRECT` setzen; bei `WORKER_MODE=separate` zweiter Service mit `node apps/worker/dist/main.js`
     und denselben Variablen (ohne `BETTER_AUTH_SECRET`/`OAUTH_STATE_SECRET`). Healthchecks.io: Check „token-refresh“ Periode 1 h,
     „profiles-sync“ Periode 1 Tag (Karenzzeit großzügig, Connection-Jobs laufen kurz nach dem Auslöser). Graceful Shutdown wartet bis 30 s auf
@@ -366,7 +366,28 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
     AG Grid macht den Seiten-Chunk ca. 820 KB groß (lazy Route); `chunkSizeWarningLimit` ist deshalb auf 1000 KB gesetzt.
   - **Flaggen:** `flag-icons` (MIT) als SVG, keine Emoji-Flaggen (DESIGN.md). Lazy-Glob mit `?no-inline`: jede Flagge eine eigene Datei, geladen
     wird nur die angezeigte. Amazon liefert `UK` statt ISO `GB` (`isoCountryCode`).
-- [ ] **Sync-Status:** letzte 100 `job_runs`, filterbar nach Job und Status, Fehlertext aufklappbar.
+- [x] **Sync-Status:** letzte 100 `job_runs`, filterbar nach Job und Status, Fehlertext aufklappbar.
+- [x] Umsetzung Sync-Status (Stand für Settings/0.9):
+  - **API:** `GET /api/job-runs` (`apps/api/src/routes/job-runs.ts`, nur Org-Admin): neueste `JOB_RUN_LIST_LIMIT` (100) Läufe der aktiven Org,
+    nach `started_at` absteigend (Index `job_runs_org_started_idx`). Filter `job`/`status` als Query-Parameter (je ein Enum-Wert, unbekannte → 400);
+    das Limit gilt nach dem Filter. Die Connection hinter `scope` kommt nur aus derselben Org (Join über `connections.id::text = scope` **und**
+    Org), sonst `connection: null`. Jobläufe sind keine Profildaten: Der Org-Filter ist hier die Zugriffsregel (wie bei Connections).
+  - **Gemeinsame Namen:** `CONNECTION_JOB_NAMES` und `JOB_RUN_STATUSES` in `@profitbash/shared`; die Worker-Queues (`CONNECTION_QUEUES`,
+    `ConnectionQueue`) leiten sich davon ab. Ein neuer Connection-Job braucht dort einen Eintrag und einen i18n-Key `sync.job.<name>`
+    (ohne Key erscheint der Name roh). Neue Zähler analog `sync.counter.<key>`, Reihenfolge in `COUNTER_ORDER` (`src/sync/labels.ts`;
+    `jsonb` sortiert Keys nach Länge).
+  - **Formatierung:** `formatDateTime` (Datum + Uhrzeit mit Sekunden, Zeitzone des Browsers) und `formatDuration` (Einheiten der Locale,
+    z. B. „3 Min. 12 Sek.“) in `@profitbash/shared`. Zahlen der Zähler in `font-data`.
+  - **Seite** `src/pages/SyncStatusPage.vue`, Bausteine in `src/sync/` (Grid, Zellen, Labels, Queries). Filter stehen in der URL (`?job=&status=`),
+    unbekannte Werte gelten als „Alle“. Der Hinweis „Sync eingeplant …“ verlinkt auf `/ops/sync?job=profiles-sync`.
+  - **Fehlertext:** in der Spalte „Ergebnis“ unter den Zählern (eigene Spalte lag bei 1440 px außerhalb des sichtbaren Bereichs), eingeklappt
+    erste Zeile, aufgeklappt ganzer Text (`RowAutoHeightModule`, Zeile wächst mit).
+  - **Aktualität:** Query mit `staleTime: 0`. Gepollt wird alle 3 s, solange ein Lauf `running` ist (jünger als 1 h, ältere gelten als
+    abgebrochen) oder bis 60 s nach „Jetzt synchronisieren“/Verbinden (`useMarkSyncRequested`: Zeitstempel im Query-Cache je Org; der Job hat
+    erst eine `job_runs`-Zeile, wenn der Worker ihn abholt). Beim Filterwechsel bleibt die alte Tabelle als Platzhalter stehen, nie über einen
+    Org-Wechsel hinweg. Scheitert das Nachladen, bleibt der letzte Stand mit Hinweis stehen.
+  - `useActiveOrgId()` liegt jetzt in `src/stores/session.ts` (für alle Query-Keys mit Org). `themeStyleContainer` wird als Funktion übergeben
+    (die Prop von `ag-grid-vue3` erwartet eine Funktion).
 - [ ] **Settings:** Locale mit Formatvorschau (Zahl, Währung, Prozent), Theme.
 - [x] Gemeinsame Komponenten: `EmptyState`, `InlineError`, `PageHeader`, `SkeletonBlock`; Formatierungs-Helper (Zahl, Währung, Prozent) aus `packages/shared`.
 - [x] Umsetzung Teil 1 (Stand für Teil 2):
