@@ -3,6 +3,7 @@ import {
   type Client,
   type Connection,
   type FeatureKey,
+  type JobRun,
   type MeResponse,
   type OrgRole,
   type Profile,
@@ -94,6 +95,29 @@ export function clientFixture(overrides: Partial<Client> = {}): Client {
     slug: 'soapi',
     createdAt: '2026-09-21T09:00:00.000Z',
     updatedAt: '2026-09-21T09:00:00.000Z',
+    ...overrides,
+  };
+}
+
+let jobRunCounter = 0;
+
+/** Erfolgreicher Profil-Sync der Fixture-Connection; `overrides` für Status, Fehler usw. */
+export function jobRunFixture(overrides: Partial<JobRun> = {}): JobRun {
+  jobRunCounter += 1;
+  return {
+    id: `9a8b7c6d-1e2f-4a3b-8c4d-${String(jobRunCounter).padStart(12, '0')}`,
+    job: 'profiles-sync',
+    scope: CONNECTION_ID,
+    connection: {
+      id: CONNECTION_ID,
+      externalAccountId: 'amzn1.account.MOCK',
+      externalAccountEmail: 'ads@muuv.test',
+    },
+    status: 'success',
+    startedAt: '2026-09-26T03:00:00.000Z',
+    finishedAt: '2026-09-26T03:00:04.200Z',
+    error: null,
+    counters: { profiles: 4, created: 0, reassigned: 0, removed: 0, removalDeferred: 0 },
     ...overrides,
   };
 }

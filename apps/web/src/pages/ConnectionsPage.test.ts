@@ -233,7 +233,11 @@ describe('ConnectionsPage', () => {
     await button(wrapper, 'Jetzt synchronisieren').trigger('click');
     await flushPromises();
     expect(requests.some((r) => r.method === 'POST' && r.path === SYNC_PATH)).toBe(true);
-    expect(wrapper.get('[role="status"]').text()).toContain('Sync eingeplant.');
+    const status = wrapper.get('[role="status"]');
+    expect(status.text()).toContain('Sync eingeplant.');
+    // Der Hinweis verlinkt auf den Sync-Status, gefiltert auf den Profil-Sync.
+    expect(status.get('a').text()).toBe('Sync-Status');
+    expect(status.get('a').attributes('href')).toBe('/ops/sync?job=profiles-sync');
   });
 
   it('lädt die Connections neu, wenn der Sync ein Neu-Verbinden verlangt', async () => {
