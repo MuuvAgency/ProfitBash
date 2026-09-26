@@ -97,7 +97,7 @@ for path in / /admin/connections; do
     exit 1
   fi
 done
-asset="$(cd "$web_dist" && find assets -name '*.js' | head -n 1)"
+asset="$(cd "$web_dist" && find assets -name '*.js' -print -quit)"
 if ! curl -fsS -o /dev/null "$base/$asset"; then
   echo "::error::GET /$asset liefert das Asset nicht." >&2
   exit 1
