@@ -1,6 +1,6 @@
 import type { Client, Profile, ProfilePatch } from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
-import { computed, toValue, type MaybeRefOrGetter } from 'vue';
+import { computed, onBeforeUnmount, readonly, ref, toValue, type MaybeRefOrGetter } from 'vue';
 import { api } from '../api';
 import { useSessionStore } from '../stores/session';
 
@@ -21,22 +21,50 @@ function useActiveOrgId() {
   return computed(() => session.me?.activeOrganizationId ?? null);
 }
 
-export function useConnectionsQuery() {
+/** Abstand der Abfragen, solange ein Sync läuft (siehe `useSyncPolling`). */
+export const SYNC_POLL_INTERVAL_MS = 3_000;
+
+const pollInterval = (polling: MaybeRefOrGetter<boolean>) =>
+  computed(() => (toValue(polling) ? SYNC_POLL_INTERVAL_MS : false));
+
+export function useConnectionsQuery(polling: MaybeRefOrGetter<boolean> = false) {
   const orgId = useActiveOrgId();
   return useQuery({
     queryKey: computed(() => connectionKeys.connections(orgId.value)),
     queryFn: () => api.listConnections(),
     enabled: computed(() => orgId.value !== null),
+    refetchInterval: pollInterval(polling),
   });
 }
 
-export function useProfilesQuery(connectionId: MaybeRefOrGetter<string>) {
+export function useProfilesQuery(
+  connectionId: MaybeRefOrGetter<string>,
+  polling: MaybeRefOrGetter<boolean> = false,
+) {
   const orgId = useActiveOrgId();
   return useQuery({
     queryKey: computed(() => connectionKeys.profiles(orgId.value, toValue(connectionId))),
     queryFn: () => api.listProfiles(toValue(connectionId)),
     enabled: computed(() => orgId.value !== null),
+    refetchInterval: pollInterval(polling),
   });
+}
+
+/**
+ * Nach dem Verbinden oder „Jetzt synchronisieren“ läuft der Profil-Sync im Hintergrund. So lange
+ * (höchstens `windowMs`) fragen Connections und Profile regelmäßig nach, damit das Ergebnis ohne
+ * Neuladen erscheint. Der genaue Fortschritt steht im Sync-Status.
+ */
+export function useSyncPolling(windowMs = 60_000) {
+  const polling = ref(false);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  function start() {
+    polling.value = true;
+    clearTimeout(timer);
+    timer = setTimeout(() => (polling.value = false), windowMs);
+  }
+  onBeforeUnmount(() => clearTimeout(timer));
+  return { polling: readonly(polling), start };
 }
 
 export function useClientsQuery() {
@@ -59,11 +87,21 @@ export function useRefreshConnections() {
     ]);
 }
 
-type ProfileLists = [readonly unknown[], Profile[] | undefined][];
+type PatchedFields = Partial<Pick<Profile, keyof ProfilePatch>>;
+
+/** Nur die Felder, die der Patch ändert (für Rollback und Server-Antwort). */
+function patchedFields(profile: Profile, patch: ProfilePatch): PatchedFields {
+  const fields: PatchedFields = {};
+  if (patch.clientId !== undefined) fields.clientId = profile.clientId;
+  if (patch.isHidden !== undefined) fields.isHidden = profile.isHidden;
+  return fields;
+}
 
 /**
  * Profil ändern. Die Änderung erscheint sofort (optimistisch) und wird bei einem Fehler
  * zurückgenommen, damit Schalter und Auswahl nie einen ungespeicherten Stand zeigen.
+ * Rollback und Server-Antwort betreffen nur die Felder dieses Patches: Laufen zwei Änderungen am
+ * selben Profil gleichzeitig (ausblenden, Client wählen), überschreibt keine die andere.
  */
 export function useUpdateProfile() {
   const orgId = useActiveOrgId();
@@ -79,17 +117,20 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: ({ profile, patch }: { profile: Profile; patch: ProfilePatch }) =>
       api.updateProfile(profile.id, patch),
-    onMutate: async ({ profile, patch }): Promise<{ snapshot: ProfileLists }> => {
-      const filters = { queryKey: connectionKeys.allProfiles(orgId.value) };
-      await queryClient.cancelQueries(filters);
-      const snapshot = queryClient.getQueriesData<Profile[]>(filters);
-      replaceProfile(profile.id, (current) => ({ ...current, ...patch }));
-      return { snapshot };
+    onMutate: async ({ profile, patch }): Promise<{ previous: PatchedFields }> => {
+      await queryClient.cancelQueries({ queryKey: connectionKeys.allProfiles(orgId.value) });
+      let previous = patchedFields(profile, patch);
+      replaceProfile(profile.id, (current) => {
+        previous = patchedFields(current, patch);
+        return { ...current, ...patch };
+      });
+      return { previous };
     },
-    onError: (_error, _variables, context) => {
-      context?.snapshot.forEach(([key, list]) => queryClient.setQueryData(key, list));
+    onError: (_error, { profile }, context) => {
+      if (context) replaceProfile(profile.id, (current) => ({ ...current, ...context.previous }));
     },
-    onSuccess: (updated) => replaceProfile(updated.id, () => updated),
+    onSuccess: (updated, { patch }) =>
+      replaceProfile(updated.id, (current) => ({ ...current, ...patchedFields(updated, patch) })),
   });
 }
 

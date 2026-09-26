@@ -2,7 +2,7 @@
 import type { Client, Connection, Profile, ProfilePatch } from '@profitbash/shared';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { api, ApiError } from '../api';
@@ -14,14 +14,23 @@ import { browserNavigation } from '../connections/browser-navigation';
 import ConnectionCard from '../connections/ConnectionCard.vue';
 import CreateClientDialog from '../connections/CreateClientDialog.vue';
 import { oauthNotice } from '../connections/oauth-notice';
-import { useClientsQuery, useConnectionsQuery, useUpdateProfile } from '../connections/queries';
+import {
+  useClientsQuery,
+  useConnectionsQuery,
+  useSyncPolling,
+  useUpdateProfile,
+} from '../connections/queries';
 import { errorMessageKey } from '../i18n';
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
-const connectionsQuery = useConnectionsQuery();
+const syncPolling = useSyncPolling();
+// Nach dem Verbinden läuft der erste Profil-Sync schon (vom Callback eingeplant).
+if (route.query.oauth === 'connected') syncPolling.start();
+
+const connectionsQuery = useConnectionsQuery(syncPolling.polling);
 const clientsQuery = useClientsQuery();
 const updateProfile = useUpdateProfile();
 
@@ -45,6 +54,13 @@ function dismissNotice() {
 
 /** `'new'` = neue Connection, sonst die ID der Connection, die neu verbunden wird. */
 const redirecting = ref<string | null>(null);
+
+/** „Zurück“ von Amazon stellt die Seite aus dem bfcache wieder her: Buttons wieder freigeben. */
+function onPageShow(event: PageTransitionEvent) {
+  if (event.persisted) redirecting.value = null;
+}
+onMounted(() => window.addEventListener('pageshow', onPageShow));
+onBeforeUnmount(() => window.removeEventListener('pageshow', onPageShow));
 const actionErrorKey = ref<string | null>(null);
 
 function isHttpUrl(value: string) {
@@ -146,6 +162,13 @@ function onClientCreated(client: Client) {
     </div>
 
     <InlineError v-if="actionErrorKey" :message="t(actionErrorKey)" />
+    <InlineError
+      v-if="clientsQuery.isError.value"
+      :message="t('connections.clientsLoadError')"
+      retryable
+      :retrying="clientsQuery.isFetching.value"
+      @retry="clientsQuery.refetch()"
+    />
 
     <div
       v-if="connectionsQuery.isPending.value"
@@ -189,9 +212,12 @@ function onClientCreated(client: Client) {
         :key="connection.id"
         :connection="connection"
         :clients="clients"
+        :clients-ready="clientsQuery.isSuccess.value"
         :show-removed="showRemoved"
+        :polling="syncPolling.polling.value"
         :reconnecting="redirecting === connection.id"
         @reconnect="startOAuth"
+        @synced="syncPolling.start()"
         @patch="patchProfile"
         @create-client="(profile) => (clientDialogProfile = profile)"
       />

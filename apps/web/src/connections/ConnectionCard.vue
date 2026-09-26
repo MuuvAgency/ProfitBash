@@ -8,7 +8,7 @@ import {
 } from '@profitbash/shared';
 import { useMutation } from '@tanstack/vue-query';
 import Button from 'primevue/button';
-import { computed, onBeforeUnmount } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, ApiError } from '../api';
 import InlineError from '../components/common/InlineError.vue';
@@ -21,12 +21,17 @@ import { useProfilesQuery, useRefreshConnections } from './queries';
 const props = defineProps<{
   connection: Connection;
   clients: Client[];
+  clientsReady: boolean;
   showRemoved: boolean;
+  /** Ein Sync läuft: Profile regelmäßig nachladen. */
+  polling: boolean;
   /** „Neu verbinden“ läuft gerade (Weiterleitung zu Amazon). */
   reconnecting: boolean;
 }>();
 const emit = defineEmits<{
   reconnect: [connection: Connection];
+  /** Sync eingeplant: Die Seite lädt eine Weile nach. */
+  synced: [];
   patch: [profile: Profile, patch: ProfilePatch];
   createClient: [profile: Profile];
 }>();
@@ -35,7 +40,10 @@ const { t } = useI18n();
 const session = useSessionStore();
 const refresh = useRefreshConnections();
 
-const profilesQuery = useProfilesQuery(() => props.connection.id);
+const profilesQuery = useProfilesQuery(
+  () => props.connection.id,
+  () => props.polling,
+);
 const allProfiles = computed(() => profilesQuery.data.value ?? []);
 const profiles = computed(() =>
   props.showRemoved ? allProfiles.value : allProfiles.value.filter((p) => !p.removedAt),
@@ -45,17 +53,9 @@ const activeCount = computed(() => allProfiles.value.filter((p) => !p.removedAt)
 const needsReauth = computed(() => props.connection.status === 'reauth_required');
 const locale = computed(() => session.preferences.locale);
 
-/** Der Sync läuft im Hintergrund; nach kurzer Zeit einmal nachladen, dann zeigt die Tabelle das Ergebnis. */
-const REFRESH_AFTER_SYNC_MS = 5_000;
-let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-onBeforeUnmount(() => clearTimeout(refreshTimer));
-
 const sync = useMutation({
   mutationFn: () => api.syncConnection(props.connection.id),
-  onSuccess: () => {
-    clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => void refresh(), REFRESH_AFTER_SYNC_MS);
-  },
+  onSuccess: () => emit('synced'),
   onError: (error) => {
     // Der Status hat sich auf dem Server geändert: Karte zeigt danach „Neu verbinden“.
     if (error instanceof ApiError && error.status === 409) void refresh();
@@ -119,8 +119,14 @@ const statusDot = computed(
           </div>
           <p class="flex flex-wrap gap-x-space-md gap-y-space-xs text-body-sm text-ink-secondary">
             <span>
-              Amazon Ads ·
-              {{ connection.region ? t(`connections.region.${connection.region}`) : '' }}
+              {{
+                [
+                  t(`connections.provider.${connection.provider}`),
+                  connection.region && t(`connections.region.${connection.region}`),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              }}
             </span>
             <span>
               {{ t('connections.lastRefreshed') }}:
@@ -186,6 +192,7 @@ const statusDot = computed(
           : t('connections.profiles.emptyFiltered')
       }}
     </p>
+    <!-- Mindestbreite = Summe der Mindestbreiten der Spalten (ProfileGrid): darunter scrollt die Tabelle in der Kachel. -->
     <div
       v-else
       class="-mx-space-lg overflow-x-auto"
@@ -196,6 +203,7 @@ const statusDot = computed(
         class="min-w-[1090px]"
         :profiles="profiles"
         :clients="clients"
+        :clients-ready="clientsReady"
         @patch="(profile, patch) => emit('patch', profile, patch)"
         @create-client="(profile) => emit('createClient', profile)"
       />

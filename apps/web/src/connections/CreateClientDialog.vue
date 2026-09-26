@@ -51,6 +51,8 @@ async function submit() {
   <Dialog
     :visible="accountName !== null"
     modal
+    :closable="!createClient.isPending.value"
+    :close-on-escape="!createClient.isPending.value"
     :header="t('connections.clientDialog.title')"
     :style="{ width: 'min(28rem, calc(100vw - 2rem))' }"
     @update:visible="(visible) => !visible && emit('close')"
@@ -80,6 +82,7 @@ async function submit() {
           :label="t('connections.clientDialog.cancel')"
           severity="secondary"
           variant="text"
+          :disabled="createClient.isPending.value"
           @click="emit('close')"
         />
         <Button

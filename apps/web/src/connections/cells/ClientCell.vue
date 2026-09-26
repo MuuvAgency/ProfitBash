@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { MISSING_VALUE } from '@profitbash/shared';
 import Select from 'primevue/select';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -39,8 +40,14 @@ function onChange(value: string | null) {
     :options="options"
     option-label="label"
     option-value="value"
-    :placeholder="t('connections.profiles.noClient')"
-    :aria-label="t('connections.profiles.clientFor', { account: params.data.accountName })"
+    :placeholder="params.context.clientsReady ? t('connections.profiles.noClient') : MISSING_VALUE"
+    :disabled="!params.context.clientsReady"
+    :aria-label="
+      t('connections.profiles.clientFor', {
+        account: params.data.accountName,
+        country: params.data.countryCode,
+      })
+    "
     size="small"
     fluid
     @update:model-value="onChange"
