@@ -40,6 +40,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Shell-Skripte prüfen (shellcheck ist auf ubuntu-latest vorinstalliert)
+        run: shellcheck scripts/*.sh ops/db-backup/*.sh
       - name: Auth-Schema und Migrationen passen zum Code
         run: |
           pnpm --filter @profitbash/api run auth:schema

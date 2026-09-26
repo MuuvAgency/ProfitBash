@@ -149,8 +149,10 @@ Prüfsumme):
 
 - Upload per `curl --aws-sigv4 "aws:amz:auto:s3"` mit `x-amz-content-sha256` = SHA-256 der Datei (R2 verlangt den Header und
   prüft damit die Unversehrtheit). Zugangsdaten gehen per `--config -` an curl, nicht über die Kommandozeile.
-- Ausgabe ohne Verbindungsdaten, Schlüssel und Ping-URLs (per Smoke-Test geprüft). Ein fehlgeschlagener Ping lässt das
-  Backup nicht scheitern.
+- Die Skripte geben Verbindungsdaten, Schlüssel und Ping-URLs nie aus. Der Smoke-Test prüft das für die Verbindungs-URLs,
+  den Secret Key und die Ping-URLs. Ein fehlgeschlagener Ping lässt das Backup nicht scheitern.
+- `pg_dump` wartet höchstens 5 Min. auf Sperren (`--lock-wait-timeout`), sonst Abbruch und `/fail`. Eigentümer und Rechte
+  bleiben im Archiv; `restore-test.sh` spielt ohne sie ein (`--no-owner --no-privileges`).
 - **Smoke-Test** `scripts/smoke-db-backup.sh` gegen einen Fake-S3 (`scripts/fake-s3.mjs`): Upload, Verschlüsselung, Pings,
   zweimaliger Restore mit Zeilenvergleich zur Quelle, Fehlerfälle (fehlender Bucket → `/fail`, http-Endpunkt, Ziel ohne
   `_restore`). In der CI gegen das gebaute Image, lokal mit `pg_dump`/`age` vom PATH (`brew install age`):
@@ -175,6 +177,10 @@ Prüfsumme):
    API-Token unter *R2 → API Tokens → Manage*: Berechtigung **Object Read & Write**, nur für diesen Bucket. Access Key ID
    und Secret Access Key erscheinen nur einmal.
    Endpunkt: `https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com` (ohne EU-Jurisdiktion ohne `.eu`).
+   Empfohlen: unter *Settings → Bucket lock rules → Add rule* eine Sperre für Präfix `db/` über **7 Tage** (kürzer als die
+   Lifecycle-Regel). Der Token auf Railway darf Objekte schreiben und löschen; mit der Sperre kann auch ein kompromittierter
+   Railway-Zugang die Backups der letzten Woche nicht löschen. (Solange eine Sperre besteht, lässt sich der Bucket nicht
+   leeren.)
 3. **Healthchecks.io:** Checks „db-backup“ und „db-restore-test“ (siehe Abschnitt Healthchecks.io).
 4. **Railway-Service `db-backup`** im selben Projekt, aus dem Repo `MuuvAgency/ProfitBash`, Branch `main`:
 
@@ -202,7 +208,8 @@ Prüfsumme):
    | `HEALTHCHECKS_DB_BACKUP_URL` | Ping-URL des Checks „db-backup“ |
 
 5. **Postgres-Version prüfen:** `pg_dump` im Image ist 17. Ist das Railway-Postgres neuer, bricht `pg_dump` ab (Versionskonflikt):
-   dann das Basis-Image auf dieselbe Hauptversion heben (Tag und Digest im `Dockerfile`).
+   dann das Basis-Image auf dieselbe Hauptversion heben (Tag und Digest im `Dockerfile`) und die lokalen Werkzeuge für den
+   Test-Restore ebenso (Homebrew-`postgresql@<version>`): Ein älteres `pg_restore` liest neuere Archive nicht.
 6. **Erster Lauf:** im Service *Deploy* auslösen (bzw. Cron abwarten). Log: `Backup hochgeladen: db/profitbash-….dump.age (… Bytes).`,
    das Objekt liegt im Bucket, Healthchecks zeigt „up“. Danach gleich den ersten Test-Restore (unten).
 
@@ -222,9 +229,40 @@ Lokal mit Homebrew-Postgres 17 und `age`:
    ops/db-backup/restore-test.sh ~/Downloads/profitbash-<UTC>.dump.age
    ```
 
-   Ergebnis: `Test-Restore ok: N Migrationen, N Organisationen, …`. Die Zahlen grob mit der App vergleichen.
+   Ergebnis: `Test-Restore ok: N Migrationen, N Organisationen, …, jüngster Eintrag <Zeitpunkt>`. Die Zahlen grob mit
+   der App vergleichen; der jüngste Eintrag (Audit-Log oder Joblauf) sollte kurz vor dem Backup liegen.
 4. Den Dump und die Restore-Datenbank danach nicht herumliegen lassen (`dropdb profitbash_restore` oder beim nächsten
    Lauf überschreiben), sie enthalten Produktionsdaten.
+
+### Ernstfall-Restore (Produktion)
+
+Noch nie geübt (Stand 2026-09-26). Beim ersten echten Deploy einmal gegen eine Wegwerf-Datenbank auf Railway
+durchspielen und diese Anleitung dann nachziehen.
+
+1. **Ursache klären und entscheiden,** welches Backup gilt (R2, Präfix `db/`, Zeitstempel in UTC). Alles nach dem
+   Backup geht verloren.
+2. **App anhalten:** Service `app` herunterskalieren bzw. Deployment entfernen, damit weder API noch Worker schreiben.
+   Beim Cron-Service `db-backup` den Zeitplan vorübergehend leeren: Ein Lauf während des Restores sichert einen halben
+   Stand (überschrieben wird nichts, jedes Backup hat einen eigenen Namen).
+3. **Zugang zur Datenbank:** vorübergehend den öffentlichen TCP-Proxy des Postgres-Service aktivieren
+   (Verbindungs-URL `DATABASE_PUBLIC_URL`), oder per `railway ssh` in einen Service mit `pg_restore` 17.
+4. **Einspielen** (lokal, mit dem Backup und dem privaten age-Schlüssel):
+
+   ```bash
+   age --decrypt --identity ~/pfad/zu/profitbash-backup.key --output profitbash.dump profitbash-<UTC>.dump.age
+   pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction \
+     --dbname="$DATABASE_PUBLIC_URL" profitbash.dump
+   ```
+
+   `--clean --if-exists` ersetzt die vorhandenen Objekte einschließlich `drizzle` (Migrationsstand) und `pgboss`
+   (Warteschlangen, Zeitpläne). Wartende Jobs aus dem Backup laufen danach erneut; das ist unkritisch, weil
+   Token-Refresh und Profil-Sync wiederholbar sind.
+5. **Schlüssel prüfen:** Das Backup enthält Refresh-Tokens, verschlüsselt mit dem damals gültigen `ENCRYPTION_KEY`.
+   Wurde der Schlüssel seitdem gewechselt, den alten Schlüssel wieder in `ENCRYPTION_KEYS_PREVIOUS` eintragen
+   (siehe Schlüsselrotation, alte Schlüssel werden aufbewahrt), sonst sind alle Connections unlesbar.
+6. **App wieder starten** (der Pre-Deploy-Command spielt fehlende Migrationen ein), Healthcheck, Login und
+   *Betrieb → Sync-Status* prüfen. Bei geändertem Schlüssel danach das Rotations-Skript laufen lassen.
+7. **Aufräumen:** TCP-Proxy wieder abschalten, `db-backup` fortsetzen, lokalen Dump (`profitbash.dump`) löschen.
 
 ## Umstellung auf `WORKER_MODE=separate` (Stufe C)
 
@@ -273,3 +311,6 @@ macht alle alten Werte unlesbar, und der Code kann das nicht erkennen.
      Es ist wiederholbar und überspringt bereits neu verschlüsselte Werte.
 3. Das Skript erneut ausführen. Erst wenn es `0 neu verschlüsselt, 0 nicht lesbar` meldet (Exit-Code 0), den alten
    Schlüssel aus `ENCRYPTION_KEYS_PREVIOUS` entfernen und deployen.
+4. **Den alten Schlüssel nicht wegwerfen:** mit ID offline neben dem privaten age-Schlüssel aufbewahren, mindestens so
+   lange wie die Backups (14 Tage, besser dauerhaft). Backups aus der Zeit davor enthalten Tokens mit dem alten
+   Schlüssel; ohne ihn sind die Connections nach einem Restore unlesbar (siehe Ernstfall-Restore).

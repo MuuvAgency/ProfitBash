@@ -80,10 +80,13 @@ users="$(sql 'select count(*) from users')"
 connections="$(sql 'select count(*) from connections')"
 profiles="$(sql 'select count(*) from amazon_ads_profiles')"
 job_runs="$(sql 'select count(*) from job_runs')"
+# Jüngster Zeitstempel im Backup: zeigt, ob der Dump aktuell ist.
+newest="$(sql "select coalesce(to_char(greatest((select max(created_at) from audit_events),
+  (select max(started_at) from job_runs)) at time zone 'UTC', 'YYYY-MM-DD HH24:MI \"UTC\"'), '–')")"
 [ "$migrations" -gt 0 ] || fail "Keine Migrationen im Backup."
 [ "$organizations" -gt 0 ] || fail "Keine Organisationen im Backup."
 [ "$users" -gt 0 ] || fail "Keine Nutzer im Backup."
 
 finished=true
-echo "Test-Restore ok: $migrations Migrationen, $organizations Organisationen, $users Nutzer, $connections Connections, $profiles Profile, $job_runs Jobläufe."
+echo "Test-Restore ok: $migrations Migrationen, $organizations Organisationen, $users Nutzer, $connections Connections, $profiles Profile, $job_runs Jobläufe, jüngster Eintrag $newest."
 ping_healthchecks ""
