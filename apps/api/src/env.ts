@@ -32,6 +32,11 @@ export const apiEnvSchema = nodeEnvSchema
   .extend(amazonAdsEnvSchema.shape)
   .extend(healthchecksEnvSchema.shape)
   .extend({
+    /** Von Railway gesetzt; hat Vorrang vor `API_PORT`. Leer gilt als nicht gesetzt. */
+    PORT: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().int().min(1).max(65535).optional(),
+    ),
     /** Von Railway gesetzt; dient als Version in `/api/health`. */
     RAILWAY_GIT_COMMIT_SHA: z.string().optional(),
   })
@@ -59,5 +64,5 @@ export type ApiEnv = ReturnType<typeof loadApiEnv>;
 export function loadApiEnv(options?: LoadEnvOptions) {
   const env = loadEnv(apiEnvSchema, options);
   // Bereits im Schema geprüft (refineKeyring), wirft hier also nicht mehr.
-  return { ...env, keyring: parseKeyring(env) };
+  return { ...env, keyring: parseKeyring(env), port: env.PORT ?? env.API_PORT };
 }

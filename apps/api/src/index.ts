@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createDb } from '@profitbash/db';
 import { healthcheckUrls, startJobQueue, startWorker } from '@profitbash/worker';
@@ -6,6 +7,7 @@ import { createApp } from './app';
 import { createAuth } from './auth';
 import { loadApiEnv } from './env';
 import { consoleLogger } from './logger';
+import { createServerApp } from './web';
 
 const env = loadApiEnv();
 const { db, close: closeDb } = createDb(env.DATABASE_URL);
@@ -42,7 +44,15 @@ const app = createApp({
   jobs: background.jobs,
 });
 
-const server = serve({ fetch: app.fetch, port: env.API_PORT }, (info) => {
+// Produktion: dieselbe Origin liefert das gebaute Web (apps/web/dist, relativ zu apps/api/dist/index.js).
+// Entwicklung: Vite liefert das Web und leitet /api hierher weiter.
+const webDistDir =
+  env.NODE_ENV === 'production'
+    ? fileURLToPath(new URL('../../web/dist', import.meta.url))
+    : undefined;
+const server = createServerApp({ api: app, webDistDir });
+
+const httpServer = serve({ fetch: server.fetch, port: env.port }, (info) => {
   const mode = env.AMAZON_ADS_USE_MOCK ? 'Amazon-Mock' : 'Amazon';
   console.log(
     `API läuft auf http://localhost:${info.port} (${env.NODE_ENV}, ${mode}, Worker ${env.WORKER_MODE})`,
@@ -55,7 +65,7 @@ function shutdown(signal: NodeJS.Signals) {
   stopping = true;
   console.log(`${signal} empfangen, API fährt herunter …`);
   // Erst keine neuen Anfragen, dann laufende Jobs abwarten, zuletzt die Datenbank schließen.
-  server.close(() => {
+  httpServer.close(() => {
     background
       .stop()
       .then(() => closeDb())
