@@ -22,7 +22,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Jedem Profil lässt sich ein **Client** zuordnen (auswählen oder neu anlegen).
   - Profile lassen sich ausblenden. Profile, die Amazon nicht mehr liefert, sind als „entfernt" markiert.
   - Erneutes Verbinden desselben Amazon-Kontos aktualisiert die bestehende Connection, statt eine zweite anzulegen.
-- [ ] Die Jobs `token-refresh` und `profiles-sync` laufen über pg-boss, schreiben `job_runs` und pingen Healthchecks.io.
+- [x] Die Jobs `token-refresh` und `profiles-sync` laufen über pg-boss, schreiben `job_runs` und pingen Healthchecks.io.
 - [ ] *Betrieb → Sync-Status* zeigt die letzten Jobläufe mit Status und Fehlertext.
 - [ ] Die Settings-Seite speichert Locale (Zahlenformat) und Theme serverseitig.
 - [x] Die UI nutzt die Design-Tokens aus `design/theme.js` (Login und Shell im Kinetic-Bento-Look).
@@ -117,7 +117,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] Tests (TDD, 26): Roundtrip, zufällige IV, Format ohne Klartext, falscher Key, manipulierter und abgeschnittener Tag,
   manipulierter Ciphertext, falsche und leere AAD, unbekannte `keyId`, kaputte Formate, Log-Injection, Rotation,
   strenge Schlüsselprüfung ohne Schlüssel in Fehlermeldungen. Der Tag-Längen-Test ist per Mutation geprüft.
-- [x] Einbindung in die Env-Validierung der Apps mit dem ersten Nutzer (0.6: Connection anlegen). Die API prüft den Keyring beim Start (`refineKeyring`); der Worker folgt mit 0.7.
+- [x] Einbindung in die Env-Validierung der Apps mit dem ersten Nutzer (0.6: Connection anlegen). API und Worker (0.7) prüfen den Keyring beim Start (`refineKeyring`).
 
 ### 0.4 Auth & `/api/me` (`apps/api`)
 - [x] Hono-Server, better-auth gemountet unter `/api/auth/*`, E-Mail/Passwort, Organization-Plugin mit eigenen Rollen, Admin-Plugin, Signup deaktiviert, `trustedOrigins` = `APP_URL`.
@@ -244,7 +244,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - **Rechte:** Alle Connection-, Profil- und Client-Endpunkte sind in Phase 0 admin-only, per Middleware je Route (`orgAdminOnly`), nicht per
     Pfad-Präfix. Profile laufen über den Access-Layer, der dafür `includeRemoved` (nur Admins) bekommen hat.
   - **Fehler-Log:** Fehlgeschlagene Drizzle-Abfragen werden ohne Parameterwerte geloggt (`errorLogFields`: SQL mit Platzhaltern, Postgres-Code, Constraint).
-  - **Offen für 0.7:**
+  - **Offen für 0.7 (erledigt, siehe 0.7 „Umsetzung“):**
     - `JobQueue` (`apps/api/src/jobs.ts`) mit pg-boss umsetzen; `createUnavailableJobQueue` in `index.ts` ersetzen (loggt heute nur `jobs.not_available`,
       `POST /api/connections/:id/sync` antwortet trotzdem `202`).
     - `POST /api/connections/:id/sync` schreibt das Audit-Event und plant den Job in einer Transaktion ein. Mit pg-boss auf eigener Verbindung
@@ -255,22 +255,68 @@ Ein deploytes Grundgerüst mit folgendem Stand:
     Lesezugriff von Kunden-Orgs auf Clients Helfer in `packages/db/src/access.ts` ergänzen (ADR 002 §5).
 
 ### 0.7 Worker & Jobs (`apps/worker`)
-- [ ] pg-boss-Setup, Job-Wrapper `runJob(name, scope, fn)`:
+- [x] pg-boss-Setup, Job-Wrapper `runJob(name, scope, fn)`:
   - schreibt `job_runs` (running → success/failed, mit `organization_id`)
   - fängt Fehler ab
   - pingt Healthchecks (Start/Erfolg/Fehler), wenn eine URL konfiguriert ist
-- [ ] Worker exportiert `startWorker()`. `WORKER_MODE=inline` startet ihn im API-Prozess, `separate` als eigenen Prozess.
+- [x] Worker exportiert `startWorker()`. `WORKER_MODE=inline` startet ihn im API-Prozess, `separate` als eigenen Prozess.
   Der eigenständige Worker-Prozess beendet sich bei `WORKER_MODE=inline` mit einem Hinweis (sonst liefe er in `pnpm dev` doppelt).
-- [ ] Jobs je Connection laufen nicht parallel (pg-boss `singletonKey` = Connection-ID).
-- [ ] `token-refresh`: stündlich; markiert Connections mit ungültigem Token als `status = 'reauth_required'`.
+- [x] Jobs je Connection laufen nicht parallel (pg-boss `singletonKey` = Connection-ID).
+- [x] `token-refresh`: stündlich; markiert Connections mit ungültigem Token als `status = 'reauth_required'`.
   - Aus 0.5: `AmazonAdsReauthRequiredError` → Status in einer **eigenen** Anweisung nach dem Rollback setzen (die Store-Transaktion rollt zurück).
   - Connections mit `reauth_required` nicht mehr refreshen (auch der Store ruft LWA bisher unabhängig vom Status auf).
   - `AmazonAdsHttpError.retryAfterMs` für das Neu-Planen nutzen.
-- [ ] `profiles-sync`: täglich 05:00 Europe/Berlin und on demand.
+- [x] `profiles-sync`: täglich 05:00 Europe/Berlin und on demand.
   - Profile upserten über (`organization_id`, `amazon_profile_id`); `connection_id` auf die synchronisierende Connection setzen; `removed_at` zurücksetzen, wenn ein Profil wieder auftaucht.
   - Profile, die Amazon über keine Connection der Org mehr liefert, bekommen `removed_at = now()`. Nichts wird gelöscht, `is_hidden` bleibt unberührt.
-- [ ] `job-runs-cleanup`: täglich, löscht `job_runs` älter als 90 Tage.
-- [ ] Graceful Shutdown.
+- [x] `job-runs-cleanup`: täglich, löscht `job_runs` älter als 90 Tage.
+- [x] Graceful Shutdown.
+- [x] Umsetzung (Stand für 0.8 Teil 2/0.9):
+  - **Paket:** `@profitbash/worker` exportiert `startWorker`, `startJobQueue`, `healthcheckUrls` und die Typen `JobQueue`/`ProfilesSyncJob`
+    (`src/index.ts`); der eigenständige Prozess ist `src/main.ts` (tsup-Einstieg, `dist/main.js`). pg-boss 12 nutzt `DATABASE_URL_DIRECT`
+    (jetzt auch Pflicht in der API-Env).
+  - **API:** `WORKER_MODE=inline` → `startWorker` im API-Prozess (teilt sich den Amazon-Client samt Token-Cache); `separate` → `startJobQueue`
+    (pg-boss ohne Wartung und Zeitpläne, nur Einplanen). Herunterfahren: HTTP schließen → laufende Jobs abwarten (max. 30 s) → DB schließen.
+  - **Queues (Policy `stately`, `retryLimit` 0, Ablauf 10 Min.):** `token-refresh` und `profiles-sync` je Connection (`singletonKey` =
+    Connection-ID: höchstens ein wartender und ein laufender Job **je Queue**; `token-refresh` und `profiles-sync` derselben Connection
+    können gleichzeitig laufen, z. B. um 05:00, das ist unkritisch: der Token-Store serialisiert LWA über die Zeilensperre); Cron-Auslöser `token-refresh-all` (stündlich, `0 * * * *` UTC),
+    `profiles-sync-all` (05:00 Europe/Berlin) planen je **aktiver** Connection einen Job ein; `job-runs-cleanup` 03:30 Europe/Berlin.
+  - **Einplanen in der Transaktion des Aufrufers:** `enqueueProfilesSync(job, { tx })` schreibt über `fromDrizzle(tx, sql)` von pg-boss.
+    `POST /api/connections/:id/sync` plant so in derselben Transaktion wie das Audit-Event ein (Rollback → kein Job). Der OAuth-Callback plant
+    weiterhin nach dem Commit ein (Fehler → `connected_sync_failed`).
+  - **`runJob`:** eine `job_runs`-Zeile je Lauf; der Cron-Auslöser schreibt einen plattformweiten Lauf (`organization_id` null, Zähler
+    `connections`/`queued`), jeder Connection-Job einen eigenen (Org + `scope` = Connection-ID). Fehlertexte: `JobFailure`-Meldung, bei
+    fehlgeschlagenen Abfragen nur „Datenbankabfrage fehlgeschlagen.“ (`errorLogFields`/`isDbQueryError` liegen jetzt in `@profitbash/db`),
+    sonst die Fehlermeldung (gekürzt auf 1000 Zeichen).
+  - **Healthchecks:** `HEALTHCHECKS_TOKEN_REFRESH_URL` / `HEALTHCHECKS_PROFILES_SYNC_URL` (nur https, leer = aus). Auslöser und Connection-Jobs
+    pingen dieselbe URL mit `rid` = `job_runs.id`; ein fehlgeschlagener Connection-Job setzt den Check auf „down“, der nächste erfolgreiche Lauf
+    wieder auf „up“ (bewusst akzeptiert: eine dauerhaft scheiternde Connection erzeugt stündlich ein Down/Up-Paar; `reauth_required`-Connections
+    scheiden nach dem ersten Fehlschlag aus). `JobFailure` mit `alert: false` (nach `Retry-After` neu eingeplant) pingt Erfolg statt `/fail`.
+    Ping-Fehler lassen keinen Job scheitern, die URL wird nie geloggt. Cleanup pingt nicht.
+  - **Fehler von Amazon:** `invalid_grant` → `markConnectionReauthRequired` (eigene Transaktion, nur von `active` und nur, solange noch der
+    Token gespeichert ist, den der Job beim Start vorfand: ein während des Refreshes committetes Neu-Verbinden bleibt aktiv; Audit-Event
+    `connection.reauth_required` ohne Akteur). Der Token-Store wirft bei `reauth_required` `ConnectionReauthRequiredError`, ohne LWA aufzurufen
+    (gilt auch für die API). `Retry-After` → derselbe Job wird mit `startAfter` neu eingeplant, höchstens 3-mal (`retryAttempt` in den Jobdaten)
+    und nur bis 1 h Wartezeit (sonst belegte der wartende Job den einzigen Warteplatz der Connection), danach holt es der nächste reguläre Lauf nach. Andere Fehler (z. B. 5xx nach den Client-Retries) → Lauf `failed`, kein pg-boss-Retry.
+  - **`token-refresh`:** verwirft das gecachte Access-Token und erzwingt einen Refresh über den Store (`last_refreshed_at`).
+  - **`profiles-sync`:** Lese- und Schreibzugriffe der Jobs liegen als Systemzugriff ohne Nutzerkontext in `packages/db/src/system-access.ts` (Sichtbarkeit für
+    Nutzer bleibt in `access.ts`). Ablauf: Profile der Connection holen (doppelte IDs zusammengefasst) → Profile der Connection bestimmen, die
+    fehlen → nur dann die **übrigen aktiven** Connections der Org abfragen → in einer Transaktion upserten, fehlende an die Connection hängen,
+    die sie noch liefert, sonst `removed_at` setzen. Lässt sich eine andere Connection nicht abfragen, bleibt alles stehen (`removalDeferred`,
+    Warnung `profiles_sync.removal_deferred`). Updates greifen nur auf Profile, die noch an der Connection hängen (parallele Syncs).
+    Zähler: `profiles`, `created`, `reassigned`, `removed`, `removalDeferred`. Liefert Amazon eine leere Liste, gelten die Profile als entfernt,
+    sofern keine andere Connection sie liefert (bewusst: Zugriff entzogen ist ein gültiger Fall, `removed_at` ist umkehrbar).
+  - **`job-runs-cleanup`:** löscht `job_runs` älter als 90 Tage, setzt Läufe, die seit über 6 h auf `running` stehen, auf `failed`
+    („Abgebrochen …“), und löscht abgelaufene OAuth-Nonces (`AMAZON_ADS_OAUTH_NONCE_PREFIX`, jetzt in `@profitbash/db`).
+  - **Gemeinsam genutzt:** Logger (`Logger`, `consoleLogger`) liegt in `@profitbash/shared`; Amazon-Client aus der Konfiguration über
+    `createAmazonAdsClientFromConfig` (`@profitbash/amazon-ads`); Pfad der Mock-Einwilligungsseite `AMAZON_ADS_MOCK_CONSENT_PATH` (`@profitbash/shared`).
+  - **Offen für 0.8 Teil 2:** API-Endpunkt für *Sync-Status* (letzte 100 `job_runs` der aktiven Org; plattformweite Läufe mit `organization_id`
+    null gehören zur Plattform-Sicht, nicht zur Org-Sicht).
+  - **Offen für 0.9:** Railway: `DATABASE_URL_DIRECT` setzen; bei `WORKER_MODE=separate` zweiter Service mit `node apps/worker/dist/main.js`
+    und denselben Variablen (ohne `BETTER_AUTH_SECRET`/`OAUTH_STATE_SECRET`). Healthchecks.io: Check „token-refresh“ Periode 1 h,
+    „profiles-sync“ Periode 1 Tag (Karenzzeit großzügig, Connection-Jobs laufen kurz nach dem Auslöser). Graceful Shutdown wartet bis 30 s auf
+    laufende Jobs: Railways Drain-Zeit (`RAILWAY_DEPLOYMENT_DRAINING_SECONDS`) auf mindestens 35 s setzen. Geänderte Queue-Optionen erreichen
+    bestehende Queues nur über `boss.updateQueue` (siehe `createQueues`).
 
 ### 0.8 Frontend-Grundgerüst (`apps/web`)
 

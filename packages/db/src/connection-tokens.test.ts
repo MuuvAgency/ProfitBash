@@ -2,8 +2,13 @@ import { randomBytes } from 'node:crypto';
 import { connectionTokenAad, decrypt, encrypt, parseKeyring } from '@profitbash/shared/crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ConnectionNotFoundError, createConnectionTokenStore } from './connection-tokens';
-import { amazonAdsProfiles, connections, organizations } from './schema';
+import {
+  ConnectionNotFoundError,
+  ConnectionReauthRequiredError,
+  createConnectionTokenStore,
+  markConnectionReauthRequired,
+} from './connection-tokens';
+import { amazonAdsProfiles, auditEvents, connections, organizations } from './schema';
 import { createTestDatabase, type TestDatabase } from './testing';
 
 let testDb: TestDatabase;
@@ -159,6 +164,23 @@ describe('createConnectionTokenStore', () => {
     ).rejects.toBeInstanceOf(ConnectionNotFoundError);
   });
 
+  it('ruft bei reauth_required den Refresh nicht mehr auf', async () => {
+    await testDb.db
+      .update(connections)
+      .set({ status: 'reauth_required' })
+      .where(eq(connections.id, connectionId));
+    const store = createConnectionTokenStore({ db: testDb.db, keyring });
+    let called = false;
+    await expect(
+      store.withRefreshToken(ref(), () => {
+        called = true;
+        return Promise.resolve({ result: 'x', rotatedRefreshToken: null });
+      }),
+    ).rejects.toBeInstanceOf(ConnectionReauthRequiredError);
+    expect(called).toBe(false);
+    expect((await storedToken()).lastRefreshedAt).toBeNull();
+  });
+
   it('lehnt leere rotierte Tokens ab, statt sie zu speichern', async () => {
     const store = createConnectionTokenStore({ db: testDb.db, keyring });
     await expect(
@@ -246,5 +268,54 @@ describe('createConnectionTokenStore', () => {
     expect(Date.now() - started).toBeLessThan(2_000);
     release();
     await held;
+  });
+});
+
+describe('markConnectionReauthRequired', () => {
+  async function currentCiphertext() {
+    const [row] = await testDb.db
+      .select({ value: connections.refreshTokenEncrypted, status: connections.status })
+      .from(connections)
+      .where(eq(connections.id, connectionId));
+    if (!row) throw new Error('Connection fehlt');
+    return row;
+  }
+
+  it('setzt reauth_required mit Audit-Event, wenn der abgelehnte Token noch gespeichert ist', async () => {
+    await testDb.db.delete(auditEvents);
+    const { value } = await currentCiphertext();
+
+    const changed = await markConnectionReauthRequired(testDb.db, {
+      ...ref(),
+      rejectedRefreshTokenEncrypted: value,
+    });
+
+    expect(changed).toBe(true);
+    expect((await currentCiphertext()).status).toBe('reauth_required');
+    const events = await testDb.db.select().from(auditEvents);
+    expect(events).toMatchObject([
+      { action: 'connection.reauth_required', actorUserId: null, organizationId },
+    ]);
+  });
+
+  it('lässt eine inzwischen neu verbundene Connection aktiv (anderer Token)', async () => {
+    const { value: rejected } = await currentCiphertext();
+    await testDb.db
+      .update(connections)
+      .set({
+        refreshTokenEncrypted: encrypt('Atzr|neu-verbunden', {
+          keyring,
+          aad: connectionTokenAad(naturalKey()),
+        }),
+      })
+      .where(eq(connections.id, connectionId));
+
+    const changed = await markConnectionReauthRequired(testDb.db, {
+      ...ref(),
+      rejectedRefreshTokenEncrypted: rejected,
+    });
+
+    expect(changed).toBe(false);
+    expect((await currentCiphertext()).status).toBe('active');
   });
 });

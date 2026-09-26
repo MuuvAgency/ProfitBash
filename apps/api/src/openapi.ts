@@ -5,7 +5,6 @@ import { createAmazonAdsDeps } from './amazon';
 import { createApp } from './app';
 import { createAuth } from './auth';
 import { AMAZON_OAUTH_CALLBACK_PATH } from './env';
-import { createUnavailableJobQueue } from './jobs';
 
 /**
  * Eingechecktes OpenAPI-Dokument. Quelle für den generierten API-Client im Web
@@ -52,7 +51,10 @@ export async function renderOpenApiDocument(): Promise<string> {
       }),
       keyring,
       oauthStateSecret: 'openapi-export-ohne-echtes-secret-000000',
-      jobs: createUnavailableJobQueue(logger),
+      // Das Dokument plant nie etwas ein.
+      jobs: {
+        enqueueProfilesSync: () => Promise.reject(new Error('Keine Job-Queue beim Export.')),
+      },
     });
     const res = await app.request('/api/openapi.json');
     if (!res.ok) throw new Error(`OpenAPI-Dokument nicht erzeugt: ${res.status}`);

@@ -5,5 +5,6 @@
 export * from './api';
 export * from './features';
 export * from './format';
+export * from './logger';
 export * from './roles';
 export * from './slug';

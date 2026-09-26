@@ -7,6 +7,7 @@ import {
   databaseUrlSchema,
   EnvValidationError,
   findEnvFile,
+  healthchecksEnvSchema,
   loadEnv,
   nodeEnvSchema,
 } from './env';
@@ -92,5 +93,28 @@ describe('findEnvFile', () => {
 
   it('liefert undefined, wenn es keine .env gibt', () => {
     expect(findEnvFile(makeTempDir(), '.env.gibt-es-nicht')).toBeUndefined();
+  });
+});
+
+describe('healthchecksEnvSchema', () => {
+  it('liest die Ping-URLs; leere Werte gelten als nicht gesetzt', () => {
+    const env = loadEnv(healthchecksEnvSchema, {
+      source: {
+        HEALTHCHECKS_TOKEN_REFRESH_URL: 'https://hc-ping.com/abc',
+        HEALTHCHECKS_PROFILES_SYNC_URL: '',
+      },
+    });
+    expect(env).toEqual({
+      HEALTHCHECKS_TOKEN_REFRESH_URL: 'https://hc-ping.com/abc',
+      HEALTHCHECKS_PROFILES_SYNC_URL: undefined,
+    });
+  });
+
+  it('akzeptiert nur https-URLs', () => {
+    expect(() =>
+      loadEnv(healthchecksEnvSchema, {
+        source: { HEALTHCHECKS_TOKEN_REFRESH_URL: 'http://hc-ping.com/abc' },
+      }),
+    ).toThrow(/HEALTHCHECKS_TOKEN_REFRESH_URL/);
   });
 });

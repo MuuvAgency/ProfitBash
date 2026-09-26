@@ -1,7 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 import { AmazonAdsError, renderMockConsentPage } from '@profitbash/amazon-ads';
-import { getOrgRole, recordAuditEvent, schema } from '@profitbash/db';
+import {
+  AMAZON_ADS_OAUTH_NONCE_PREFIX,
+  deleteExpiredOAuthNonces,
+  errorLogFields,
+  getOrgRole,
+  recordAuditEvent,
+  schema,
+} from '@profitbash/db';
 import {
   amazonOAuthRedirectSchema,
   amazonOAuthStartSchema,
@@ -9,12 +16,12 @@ import {
   type AmazonOAuthResult,
 } from '@profitbash/shared';
 import { connectionTokenAad, encrypt } from '@profitbash/shared/crypto';
-import { and, eq, gt, like, lt, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { MOCK_CONSENT_PATH } from '../amazon';
 import type { AppDeps, AppEnv } from '../context';
 import { AMAZON_OAUTH_CALLBACK_PATH } from '../env';
-import { ApiError, errorLogFields, errorResponse } from '../errors';
+import { ApiError, errorResponse } from '../errors';
 import { orgAdminOnly } from '../middleware';
 import {
   MAX_OAUTH_STATE_LENGTH,
@@ -29,7 +36,7 @@ const { connections, verifications } = schema;
 /** Gültigkeit des `state` (Einwilligung bei Amazon inklusive Login). */
 const STATE_TTL_MS = 10 * 60_000;
 /** Präfix der Nonces in `verifications` (die Tabelle teilt sich die App mit better-auth). */
-const NONCE_PREFIX = 'amazon-ads-oauth:';
+const NONCE_PREFIX = AMAZON_ADS_OAUTH_NONCE_PREFIX;
 
 const json = <T>(schema: T) => ({ 'application/json': { schema } });
 
@@ -92,15 +99,8 @@ export function registerAmazonOAuthRoutes(app: OpenAPIHono<AppEnv>, deps: AppDep
       nonce: randomBytes(24).toString('base64url'),
       expiresAt: Date.now() + STATE_TTL_MS,
     };
-    // Abgelaufene Nonces nebenbei aufräumen; nicht eingelöste bleiben sonst liegen.
-    await db
-      .delete(verifications)
-      .where(
-        and(
-          like(verifications.identifier, `${NONCE_PREFIX}%`),
-          lt(verifications.expiresAt, new Date()),
-        ),
-      );
+    // Abgelaufene Nonces nebenbei aufräumen (zusätzlich täglich im Job `job-runs-cleanup`).
+    await deleteExpiredOAuthNonces(db, new Date());
     await db.insert(verifications).values({
       identifier: `${NONCE_PREFIX}${payload.nonce}`,
       value: user.id,

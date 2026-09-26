@@ -1,15 +1,15 @@
 import {
-  createAmazonAdsClient,
-  createMockAmazonAdsClient,
+  createAmazonAdsClientFromConfig,
   type AmazonAdsClient,
   type RefreshTokenStore,
 } from '@profitbash/amazon-ads';
 import { createConnectionTokenStore, type Db } from '@profitbash/db';
+import { AMAZON_ADS_MOCK_CONSENT_PATH } from '@profitbash/shared';
 import type { Keyring } from '@profitbash/shared/crypto';
 import type { Logger } from './logger';
 
 /** Simulierte Einwilligungsseite, nur bei `AMAZON_ADS_USE_MOCK=true` gemountet. */
-export const MOCK_CONSENT_PATH = '/api/amazon/oauth/mock-consent';
+export const MOCK_CONSENT_PATH = AMAZON_ADS_MOCK_CONSENT_PATH;
 
 export interface AmazonAdsDeps {
   client: AmazonAdsClient;
@@ -25,6 +25,17 @@ export interface AmazonAdsEnv {
   AMAZON_ADS_CLIENT_SECRET?: string | undefined;
 }
 
+/** Konfiguration des Amazon-Clients aus der Umgebung. */
+function amazonAdsClientConfig(env: AmazonAdsEnv) {
+  return {
+    useMock: env.AMAZON_ADS_USE_MOCK,
+    clientId: env.AMAZON_ADS_CLIENT_ID,
+    clientSecret: env.AMAZON_ADS_CLIENT_SECRET,
+    redirectUri: env.AMAZON_ADS_REDIRECT_URI,
+    mockConsentUrl: new URL(MOCK_CONSENT_PATH, env.APP_URL).toString(),
+  };
+}
+
 /** Wählt Mock oder echten Amazon-Client und verbindet ihn mit dem Token-Store der Datenbank. */
 export function createAmazonAdsDeps(options: {
   env: AmazonAdsEnv;
@@ -38,33 +49,12 @@ export function createAmazonAdsDeps(options: {
     db: options.db,
     keyring: options.keyring,
   });
-  const redirectUri = env.AMAZON_ADS_REDIRECT_URI;
-
-  if (env.AMAZON_ADS_USE_MOCK) {
-    const consentUrl = new URL(MOCK_CONSENT_PATH, env.APP_URL).toString();
-    return {
-      client: createMockAmazonAdsClient({
-        redirectUri,
-        consentUrl,
-        store,
-        ...(logger && { logger }),
-      }),
-      mockConsent: { redirectUri },
-    };
-  }
-
-  const { AMAZON_ADS_CLIENT_ID: clientId, AMAZON_ADS_CLIENT_SECRET: clientSecret } = env;
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      'AMAZON_ADS_CLIENT_ID und AMAZON_ADS_CLIENT_SECRET fehlen (oder AMAZON_ADS_USE_MOCK=true setzen).',
-    );
-  }
   return {
-    client: createAmazonAdsClient({
-      credentials: { clientId, clientSecret, redirectUri },
+    client: createAmazonAdsClientFromConfig({
+      config: amazonAdsClientConfig(env),
       store,
       ...(logger && { logger }),
     }),
-    mockConsent: null,
+    mockConsent: env.AMAZON_ADS_USE_MOCK ? { redirectUri: env.AMAZON_ADS_REDIRECT_URI } : null,
   };
 }

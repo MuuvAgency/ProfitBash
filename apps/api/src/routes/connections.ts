@@ -185,7 +185,8 @@ export function registerConnectionRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
         'Die Connection muss zuerst neu verbunden werden.',
       );
     }
-    // Scheitert das Einplanen, rollt die Transaktion das Audit-Event zurück.
+    // Audit-Event und Job in einer Transaktion (pg-boss schreibt über `tx`): Scheitert das
+    // Einplanen, fehlt auch das Audit-Event, und ein Job ohne Audit-Event kann nicht entstehen.
     await db.transaction(async (tx) => {
       await recordAuditEvent(tx, {
         organizationId,
@@ -193,7 +194,7 @@ export function registerConnectionRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
         action: 'connection.sync_request',
         target: { type: 'connection', id: connection.id },
       });
-      await deps.jobs.enqueueProfilesSync({ organizationId, connectionId: connection.id });
+      await deps.jobs.enqueueProfilesSync({ organizationId, connectionId: connection.id }, { tx });
     });
     return c.json({ status: 'queued' as const }, 202);
   });

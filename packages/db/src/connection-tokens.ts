@@ -1,5 +1,6 @@
 import { connectionTokenAad, decrypt, encrypt, type Keyring } from '@profitbash/shared/crypto';
 import { and, eq, sql } from 'drizzle-orm';
+import { recordAuditEvent } from './audit';
 import type { Db } from './client';
 import { connections } from './schema';
 
@@ -16,6 +17,17 @@ export class ConnectionNotFoundError extends Error {
   }
 }
 
+/**
+ * Die Connection wartet auf eine neue Einwilligung (`status = 'reauth_required'`). Der Store ruft den
+ * Anbieter dann nicht mehr auf: Der Refresh-Token wurde bereits abgelehnt.
+ */
+export class ConnectionReauthRequiredError extends Error {
+  constructor() {
+    super('Die Connection muss neu verbunden werden.');
+    this.name = 'ConnectionReauthRequiredError';
+  }
+}
+
 export interface ConnectionTokenRefreshOutcome<T> {
   result: T;
   /** Neuer Refresh-Token nach Rotation, sonst `null`. */
@@ -27,7 +39,8 @@ export interface ConnectionTokenStore {
    * Führt `refresh` unter einer Zeilensperre der Connection aus. Ein rotierter Token wird verschlüsselt
    * gespeichert, bevor die Sperre fällt; so überschreiben sich API und Worker nie gegenseitig einen
    * rotierten Token. `last_refreshed_at` wird bei Erfolg gesetzt. Scheitert `refresh`, bleibt die Zeile
-   * unverändert.
+   * unverändert. Bei `status = 'reauth_required'` wird `refresh` nicht aufgerufen
+   * (`ConnectionReauthRequiredError`).
    */
   withRefreshToken<T>(
     connection: { id: string; organizationId: string },
@@ -67,6 +80,7 @@ export function createConnectionTokenStore(
             region: connections.region,
             externalAccountId: connections.externalAccountId,
             refreshTokenEncrypted: connections.refreshTokenEncrypted,
+            status: connections.status,
           })
           .from(connections)
           .where(
@@ -77,6 +91,7 @@ export function createConnectionTokenStore(
           )
           .for('no key update');
         if (!row) throw new ConnectionNotFoundError();
+        if (row.status === 'reauth_required') throw new ConnectionReauthRequiredError();
 
         const aad = connectionTokenAad(row);
         const refreshToken = decrypt(row.refreshTokenEncrypted, { keyring, aad });
@@ -102,4 +117,41 @@ export function createConnectionTokenStore(
       });
     },
   };
+}
+
+/**
+ * Setzt `status = 'reauth_required'` (Amazon hat den Refresh-Token abgelehnt) und schreibt ein
+ * Audit-Event ohne handelnden Nutzer. Eigene Transaktion: Die Transaktion des Token-Stores ist zu
+ * diesem Zeitpunkt bereits zurückgerollt.
+ *
+ * Nur, solange noch der abgelehnte Token gespeichert ist: Ein Neu-Verbinden, das während des
+ * Refreshes auf die Zeilensperre gewartet hat, ist danach bereits committet und bleibt aktiv.
+ * Liefert `false`, wenn nichts geändert wurde.
+ */
+export async function markConnectionReauthRequired(
+  db: Db,
+  connection: { id: string; organizationId: string; rejectedRefreshTokenEncrypted: string },
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(connections)
+      .set({ status: 'reauth_required' })
+      .where(
+        and(
+          eq(connections.id, connection.id),
+          eq(connections.organizationId, connection.organizationId),
+          eq(connections.status, 'active'),
+          eq(connections.refreshTokenEncrypted, connection.rejectedRefreshTokenEncrypted),
+        ),
+      )
+      .returning({ id: connections.id });
+    if (!row) return false;
+    await recordAuditEvent(tx, {
+      organizationId: connection.organizationId,
+      actorUserId: null,
+      action: 'connection.reauth_required',
+      target: { type: 'connection', id: connection.id },
+    });
+    return true;
+  });
 }

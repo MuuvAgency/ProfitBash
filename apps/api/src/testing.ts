@@ -9,7 +9,7 @@ import { createApp } from './app';
 import { createAuth, type Auth } from './auth';
 import type { AppDeps } from './context';
 import { AMAZON_OAUTH_CALLBACK_PATH } from './env';
-import type { JobQueue, ProfilesSyncJob } from './jobs';
+import type { JobQueue, ProfilesSyncJob } from '@profitbash/worker';
 import type { LogEntry } from './logger';
 import { seed, type SeedResult } from './seed';
 
@@ -21,19 +21,23 @@ export const TEST_REDIRECT_URI = `${TEST_APP_URL}${AMAZON_OAUTH_CALLBACK_PATH}`;
 /** Job-Queue für Tests: merkt sich eingeplante Jobs; `failNext` lässt den nächsten Aufruf scheitern. */
 export interface RecordingJobQueue extends JobQueue {
   profilesSync: ProfilesSyncJob[];
+  /** Je eingeplantem Job: lief das Einplanen in der Transaktion des Aufrufers? */
+  enqueuedInTransaction: boolean[];
   failNext: boolean;
 }
 
 function createRecordingJobQueue(): RecordingJobQueue {
   const queue: RecordingJobQueue = {
     profilesSync: [],
+    enqueuedInTransaction: [],
     failNext: false,
-    enqueueProfilesSync(job) {
+    enqueueProfilesSync(job, options) {
       if (queue.failNext) {
         queue.failNext = false;
         return Promise.reject(new Error('Queue nicht erreichbar'));
       }
       queue.profilesSync.push(job);
+      queue.enqueuedInTransaction.push(options?.tx !== undefined);
       return Promise.resolve();
     },
   };

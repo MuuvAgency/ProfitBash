@@ -3,4 +3,7 @@ export * as schema from './schema';
 export * from './access';
 export * from './audit';
 export * from './connection-tokens';
+export * from './errors';
+export * from './maintenance';
+export * from './system-access';
 export { runMigrations } from './migrate';

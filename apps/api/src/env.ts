@@ -3,8 +3,10 @@ import {
   amazonAdsEnvSchema,
   appUrlSchema,
   authSecretSchema,
+  databaseDirectUrlSchema,
   databaseUrlSchema,
   encryptionEnvSchema,
+  healthchecksEnvSchema,
   loadEnv,
   nodeEnvSchema,
   oauthStateSecretSchema,
@@ -22,10 +24,13 @@ export const apiEnvSchema = nodeEnvSchema
   .extend(appUrlSchema.shape)
   .extend(workerModeSchema.shape)
   .extend(databaseUrlSchema.shape)
+  // pg-boss (Einplanen und bei WORKER_MODE=inline der Worker) braucht die direkte Verbindung.
+  .extend(databaseDirectUrlSchema.shape)
   .extend(authSecretSchema.shape)
   .extend(encryptionEnvSchema.shape)
   .extend(oauthStateSecretSchema.shape)
   .extend(amazonAdsEnvSchema.shape)
+  .extend(healthchecksEnvSchema.shape)
   .extend({
     /** Von Railway gesetzt; dient als Version in `/api/health`. */
     RAILWAY_GIT_COMMIT_SHA: z.string().optional(),

@@ -124,6 +124,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await ctx.testDb.db.delete(auditEvents);
   ctx.jobs.profilesSync.length = 0;
+  ctx.jobs.enqueuedInTransaction.length = 0;
 });
 
 async function errorCode(res: Response): Promise<string> {
@@ -185,6 +186,8 @@ describe('POST /api/connections/:id/sync', () => {
     expect(ctx.jobs.profilesSync).toEqual([
       { organizationId: orgId, connectionId: ids.connection },
     ]);
+    // Eingeplant in der Transaktion des Audit-Events: kein Job ohne Audit-Event.
+    expect(ctx.jobs.enqueuedInTransaction).toEqual([true]);
 
     const events = await ctx.testDb.db.select().from(auditEvents);
     expect(events).toMatchObject([

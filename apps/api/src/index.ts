@@ -1,10 +1,10 @@
 import { serve } from '@hono/node-server';
 import { createDb } from '@profitbash/db';
+import { healthcheckUrls, startJobQueue, startWorker } from '@profitbash/worker';
 import { createAmazonAdsDeps } from './amazon';
 import { createApp } from './app';
 import { createAuth } from './auth';
 import { loadApiEnv } from './env';
-import { createUnavailableJobQueue } from './jobs';
 import { consoleLogger } from './logger';
 
 const env = loadApiEnv();
@@ -15,31 +15,54 @@ const auth = createAuth({
   baseURL: env.APP_URL,
   trustedOrigins: [new URL(env.APP_URL).origin],
 });
+const amazonAds = createAmazonAdsDeps({ env, db, keyring: env.keyring, logger: consoleLogger });
+
+// inline: Der Worker läuft in diesem Prozess (ein Railway-Service) und teilt sich den Amazon-Client.
+// separate: Die API plant Jobs nur ein, ausgeführt werden sie im eigenen Worker-Prozess.
+const background =
+  env.WORKER_MODE === 'inline'
+    ? await startWorker({
+        connectionString: env.DATABASE_URL_DIRECT,
+        db,
+        amazonAds: amazonAds.client,
+        logger: consoleLogger,
+        healthchecks: healthcheckUrls(env),
+      })
+    : await startJobQueue({ connectionString: env.DATABASE_URL_DIRECT, logger: consoleLogger });
+
 const app = createApp({
   db,
   auth,
   appUrl: env.APP_URL,
   version: env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12) || 'dev',
   logger: consoleLogger,
-  amazonAds: createAmazonAdsDeps({ env, db, keyring: env.keyring, logger: consoleLogger }),
+  amazonAds,
   keyring: env.keyring,
   oauthStateSecret: env.OAUTH_STATE_SECRET,
-  // pg-boss folgt in 0.7; bis dahin wird der Profil-Sync nur im Log gemeldet.
-  jobs: createUnavailableJobQueue(consoleLogger),
+  jobs: background.jobs,
 });
 
 const server = serve({ fetch: app.fetch, port: env.API_PORT }, (info) => {
   const mode = env.AMAZON_ADS_USE_MOCK ? 'Amazon-Mock' : 'Amazon';
-  console.log(`API läuft auf http://localhost:${info.port} (${env.NODE_ENV}, ${mode})`);
+  console.log(
+    `API läuft auf http://localhost:${info.port} (${env.NODE_ENV}, ${mode}, Worker ${env.WORKER_MODE})`,
+  );
 });
 
+let stopping = false;
 function shutdown(signal: NodeJS.Signals) {
+  if (stopping) return;
+  stopping = true;
   console.log(`${signal} empfangen, API fährt herunter …`);
+  // Erst keine neuen Anfragen, dann laufende Jobs abwarten, zuletzt die Datenbank schließen.
   server.close(() => {
-    closeDb().then(
-      () => process.exit(0),
-      () => process.exit(1),
-    );
+    background
+      .stop()
+      .then(() => closeDb())
+      .then(
+        () => process.exit(0),
+        () => process.exit(1),
+      );
   });
 }
 

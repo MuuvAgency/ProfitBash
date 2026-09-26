@@ -98,6 +98,18 @@ export function refineAmazonAdsCredentials(
   }
 }
 
+/** Leere Werte gelten als nicht gesetzt; sonst eine https-URL. */
+const optionalHttpsUrl = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.url({ protocol: /^https$/ }).optional(),
+);
+
+/** Ping-URLs von Healthchecks.io je Job. Ohne URL pingt der Job nicht. */
+export const healthchecksEnvSchema = z.object({
+  HEALTHCHECKS_TOKEN_REFRESH_URL: optionalHttpsUrl,
+  HEALTHCHECKS_PROFILES_SYNC_URL: optionalHttpsUrl,
+});
+
 export class EnvValidationError extends Error {
   constructor(public readonly issues: string[]) {
     super(`Ungültige Umgebungsvariablen:\n${issues.map((issue) => `  - ${issue}`).join('\n')}`);

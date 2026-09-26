@@ -1,16 +1,4 @@
-import { loadWorkerEnv } from './env';
-
-const env = loadWorkerEnv();
-console.log(`Worker bereit (${env.NODE_ENV}). Jobs folgen in Aufgabe 0.7.`);
-
-// Hält den Prozess am Leben, bis pg-boss in 0.7 diese Aufgabe übernimmt.
-const keepAlive = setInterval(() => {}, 60_000);
-
-function shutdown(signal: NodeJS.Signals) {
-  console.log(`${signal} empfangen, Worker fährt herunter …`);
-  clearInterval(keepAlive);
-  process.exit(0);
-}
-
-process.once('SIGINT', shutdown);
-process.once('SIGTERM', shutdown);
+// Einstieg für die API (`WORKER_MODE=inline` bzw. nur Einplanen). Der eigenständige Prozess ist `main.ts`.
+export { healthcheckUrls } from './env';
+export type { EnqueueOptions, JobQueue, ProfilesSyncJob } from './queues';
+export { startJobQueue, startWorker, type StartWorkerOptions, type Worker } from './worker';

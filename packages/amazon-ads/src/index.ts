@@ -11,6 +11,7 @@ export {
   type AmazonAdsClient,
   type AmazonAdsClientOptions,
 } from './client';
+export { createAmazonAdsClientFromConfig, type AmazonAdsClientConfig } from './configure';
 export {
   AmazonAdsError,
   AmazonAdsHttpError,

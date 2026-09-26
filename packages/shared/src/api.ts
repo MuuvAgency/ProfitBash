@@ -187,6 +187,12 @@ export const amazonOAuthRedirectSchema = z
   .meta({ id: 'AmazonOAuthRedirect' });
 
 /**
+ * Simulierte Einwilligungsseite (nur bei `AMAZON_ADS_USE_MOCK=true`). API und Worker bauen daraus die
+ * Authorize-URL des Mock-Clients.
+ */
+export const AMAZON_ADS_MOCK_CONSENT_PATH = '/api/amazon/oauth/mock-consent';
+
+/**
  * Ergebnis des OAuth-Callbacks. Die API leitet auf `/admin/connections?oauth=<Ergebnis>` zurück,
  * die Seite zeigt es als Hinweis an.
  */

@@ -9,6 +9,7 @@ const previousKey = randomBytes(32).toString('base64');
 const base = {
   APP_URL: 'http://localhost:5173',
   DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
+  DATABASE_URL_DIRECT: 'postgres://user:pass@localhost:5432/db',
   BETTER_AUTH_SECRET: 'a'.repeat(32),
   ENCRYPTION_KEY: key,
   ENCRYPTION_KEY_ID: 'k1',
@@ -32,6 +33,18 @@ function messageOf(fn: () => unknown): string {
 }
 
 describe('loadApiEnv', () => {
+  it('verlangt die direkte Datenbank-URL für pg-boss', () => {
+    expect(messageOf(() => load({ ...base, DATABASE_URL_DIRECT: undefined }))).toMatch(
+      /DATABASE_URL_DIRECT/,
+    );
+  });
+
+  it('liest die Healthcheck-URLs für den Worker im API-Prozess', () => {
+    const env = load({ ...base, HEALTHCHECKS_PROFILES_SYNC_URL: 'https://hc-ping.com/p' });
+    expect(env.HEALTHCHECKS_PROFILES_SYNC_URL).toBe('https://hc-ping.com/p');
+    expect(env.HEALTHCHECKS_TOKEN_REFRESH_URL).toBeUndefined();
+  });
+
   it('baut den Keyring aus ENCRYPTION_* (inkl. vorheriger Schlüssel)', () => {
     const env = load({ ...base, ENCRYPTION_KEYS_PREVIOUS: `k0:${previousKey}` });
     expect(env.keyring.current.id).toBe('k1');

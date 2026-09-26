@@ -1,10 +1,10 @@
 import type { Db, Membership } from '@profitbash/db';
 import type { OrgRole, PlatformRole } from '@profitbash/shared';
 import type { Keyring } from '@profitbash/shared/crypto';
+import type { JobQueue } from '@profitbash/worker';
 import type { RequestIdVariables } from 'hono/request-id';
 import type { AmazonAdsDeps } from './amazon';
 import type { Auth } from './auth';
-import type { JobQueue } from './jobs';
 import type { Logger } from './logger';
 
 /** Abhängigkeiten der App. Werden beim Start (bzw. im Test) übergeben, nie global importiert. */
