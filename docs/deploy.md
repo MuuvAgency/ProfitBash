@@ -71,6 +71,7 @@ Voraussetzung: Railway-Konto (0.0f), Hobby-Plan erst zum ersten echten Deploy.
 
 4. **Variablen** setzen (nächster Abschnitt), dann deployen.
 5. **Seed** einmalig (siehe „Erster Deploy“).
+6. **Backup-Service `db-backup`** (Cron) einrichten, siehe „Backups“.
 
 ## Variablen (Service `app`)
 
@@ -108,14 +109,18 @@ Nicht setzen: `NODE_ENV` (siehe oben), `PORT` (setzt Railway; hat in Produktion 
 
 ## Healthchecks.io
 
-Zwei Checks anlegen, Ping-URLs als Variablen eintragen (nur https):
+Vier Checks anlegen, Ping-URLs als Variablen eintragen (nur https). Die Ping-URLs sind geheim (wer sie kennt, kann
+falsche Erfolge melden):
 
 | Check | Periode | Karenzzeit | Variable |
 |---|---|---|---|
 | token-refresh | 1 Stunde | großzügig (z. B. 30 Min.) | `HEALTHCHECKS_TOKEN_REFRESH_URL` |
 | profiles-sync | 1 Tag | großzügig (z. B. 2 Std.) | `HEALTHCHECKS_PROFILES_SYNC_URL` |
+| db-backup | 1 Tag | 2 Std. | `HEALTHCHECKS_DB_BACKUP_URL` (Service `db-backup`) |
+| db-restore-test | 31 Tage | 3 Tage | `HEALTHCHECKS_DB_RESTORE_URL` (lokal beim Test-Restore) |
 
-Auslöser und Connection-Jobs pingen dieselbe URL (Details in `phase-0.md`, 0.7).
+Auslöser und Connection-Jobs pingen dieselbe URL (Details in `phase-0.md`, 0.7). Backup und Test-Restore pingen `/start`,
+Erfolg und `/fail`. Bleibt der monatliche Test-Restore aus, meldet sich „db-restore-test“.
 
 ## Graceful Shutdown
 
@@ -132,18 +137,94 @@ DB-Zugang), Dump mit `age` für einen öffentlichen Schlüssel verschlüsselt (p
 Upload nach Cloudflare R2 (Lifecycle-Regel 14 Tage), Healthchecks.io-Check „db-backup“, monatlicher Test-Restore.
 R2-Konto und Bucket legt Dominik an.
 
-Geplante Umsetzung (in Arbeit, Branch `ops/db-backup`):
+Umsetzung in `ops/db-backup/` (Stand 2026-09-26: Code und Smoke-Test fertig; **offen:** erster echter Lauf gegen R2
+auf Railway, erst mit Dominiks Konten prüfbar. Die SigV4-Signatur rechnet curl, der Fake-S3 im Test prüft nur Form und
+Prüfsumme):
 
-- `ops/db-backup/Dockerfile` auf `postgres:17.10-alpine3.24` (per Digest gepinnt) plus `age` und `curl` aus Alpine.
-  Railway baut es über `RAILWAY_DOCKERFILE_PATH`; Cron-Zeitplan in UTC, Mindestabstand 5 Min., der Prozess muss enden
-  (läuft der vorige Lauf noch, überspringt Railway den nächsten).
-- `backup.sh`: `pg_dump --format=custom` → `pg_restore --list` als Lesbarkeitsprüfung → `age -r` → Upload per
-  `curl --aws-sigv4 "aws:amz:auto:s3"` mit explizitem `x-amz-content-sha256` (R2 verlangt den Header), Zugangsdaten
-  per `--config -` statt auf der Kommandozeile. Pings `/start`, Erfolg, `/fail`. Keine Verbindungsdaten in Logs.
-- `restore-test.sh`: entschlüsseln, in eine frische Datenbank einspielen, Stichproben (Migrationen, Organisationen);
-  pingt einen eigenen Check (Periode 31 Tage), damit ein vergessener Test-Restore auffällt.
-- Smoke-Test mit Fake-S3 (Node) lokal und in der CI (dort gegen das gebaute Image).
-- `pg_dump` muss mindestens die Hauptversion des Railway-Postgres haben (beim Einrichten prüfen).
+| Datei | Zweck |
+|---|---|
+| `Dockerfile` | `postgres:17.10-alpine3.24` (per Digest gepinnt) + `bash`, `curl`, `age` 1.3. Start: `backup.sh` |
+| `backup.sh` | `pg_dump --format=custom` → `pg_restore --list` (Lesbarkeit) → `age` für den öffentlichen Schlüssel → Upload `db/profitbash-<UTC>.dump.age` |
+| `restore-test.sh` | Test-Restore: entschlüsseln, in eine `*_restore`-Datenbank einspielen (vorher geleert), Stichproben |
+
+- Upload per `curl --aws-sigv4 "aws:amz:auto:s3"` mit `x-amz-content-sha256` = SHA-256 der Datei (R2 verlangt den Header und
+  prüft damit die Unversehrtheit). Zugangsdaten gehen per `--config -` an curl, nicht über die Kommandozeile.
+- Ausgabe ohne Verbindungsdaten, Schlüssel und Ping-URLs (per Smoke-Test geprüft). Ein fehlgeschlagener Ping lässt das
+  Backup nicht scheitern.
+- **Smoke-Test** `scripts/smoke-db-backup.sh` gegen einen Fake-S3 (`scripts/fake-s3.mjs`): Upload, Verschlüsselung, Pings,
+  zweimaliger Restore mit Zeilenvergleich zur Quelle, Fehlerfälle (fehlender Bucket → `/fail`, http-Endpunkt, Ziel ohne
+  `_restore`). In der CI gegen das gebaute Image, lokal mit `pg_dump`/`age` vom PATH (`brew install age`):
+
+  ```bash
+  SMOKE_DATABASE_URL=postgres://profitbash:profitbash@localhost:5432/profitbash_smoke \
+  SMOKE_RESTORE_DATABASE_URL=postgres://profitbash:profitbash@localhost:5432/profitbash_smoke_restore \
+  scripts/smoke-db-backup.sh
+  ```
+
+  Die Quelle muss migriert und geseedet sein (vorher `scripts/smoke-bundles.sh`).
+
+### Einrichten (einmalig, Dominik)
+
+1. **age-Schlüsselpaar** lokal erzeugen: `age-keygen -o profitbash-backup.key`. Die Datei ist der **private** Schlüssel:
+   in den Passwort-Manager und an einen zweiten Ort offline, nie auf Railway oder ins Repo. Ohne ihn ist jedes Backup
+   wertlos. Der öffentliche Schlüssel (`age1…`, steht in der Datei und kommt aus `age-keygen -y profitbash-backup.key`)
+   wird zu `BACKUP_AGE_RECIPIENT`.
+2. **Cloudflare R2:** Bucket `profitbash-backups` anlegen, Standort **EU-Jurisdiktion** (die Dumps enthalten Nutzerdaten;
+   die Jurisdiktion lässt sich später nicht ändern). Unter *Settings → Object Lifecycle Rules* eine Regel: Präfix `db/`,
+   Objekte nach **14 Tagen** löschen (R2 löscht meist innerhalb von 24 h nach Ablauf).
+   API-Token unter *R2 → API Tokens → Manage*: Berechtigung **Object Read & Write**, nur für diesen Bucket. Access Key ID
+   und Secret Access Key erscheinen nur einmal.
+   Endpunkt: `https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com` (ohne EU-Jurisdiktion ohne `.eu`).
+3. **Healthchecks.io:** Checks „db-backup“ und „db-restore-test“ (siehe Abschnitt Healthchecks.io).
+4. **Railway-Service `db-backup`** im selben Projekt, aus dem Repo `MuuvAgency/ProfitBash`, Branch `main`:
+
+   | Einstellung | Wert |
+   |---|---|
+   | Root Directory | `ops/db-backup` (Build-Kontext; Railway nimmt das `Dockerfile` dort) |
+   | Watch Paths | `/ops/db-backup/**` (Muster gelten ab Repo-Root, auch mit Root Directory) |
+   | Cron Schedule | `0 1 * * *` (**UTC**, also 02:00 Winter- bzw. 03:00 Sommerzeit in Berlin, vor `job-runs-cleanup` 03:30 und `profiles-sync` 05:00) |
+   | Start/Pre-Deploy Command, Healthcheck Path, Domain | leer bzw. keine |
+   | Restart Policy | Never (ein fehlgeschlagener Lauf meldet sich über Healthchecks, der nächste kommt per Cron) |
+
+   Railway startet Cron-Services in UTC, frühestens alle 5 Minuten, und überspringt einen Lauf, solange der vorige noch
+   aktiv ist. Das Skript beendet sich nach dem Upload.
+
+   Variablen:
+
+   | Variable | Wert |
+   |---|---|
+   | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (privates Netz) |
+   | `BACKUP_AGE_RECIPIENT` | öffentlicher age-Schlüssel (`age1…`) |
+   | `BACKUP_S3_ENDPOINT` | `https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com` |
+   | `BACKUP_S3_BUCKET` | `profitbash-backups` |
+   | `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` | aus dem R2-API-Token |
+   | `BACKUP_S3_REGION` | nicht setzen (Standard `auto`, für R2 richtig) |
+   | `HEALTHCHECKS_DB_BACKUP_URL` | Ping-URL des Checks „db-backup“ |
+
+5. **Postgres-Version prüfen:** `pg_dump` im Image ist 17. Ist das Railway-Postgres neuer, bricht `pg_dump` ab (Versionskonflikt):
+   dann das Basis-Image auf dieselbe Hauptversion heben (Tag und Digest im `Dockerfile`).
+6. **Erster Lauf:** im Service *Deploy* auslösen (bzw. Cron abwarten). Log: `Backup hochgeladen: db/profitbash-….dump.age (… Bytes).`,
+   das Objekt liegt im Bucket, Healthchecks zeigt „up“. Danach gleich den ersten Test-Restore (unten).
+
+### Test-Restore (monatlich)
+
+Lokal mit Homebrew-Postgres 17 und `age`:
+
+1. Neuestes Objekt unter `db/` im R2-Dashboard herunterladen.
+2. Einmalig `createdb profitbash_restore`. Das Skript leert diese Datenbank bei jedem Lauf und verweigert Namen ohne
+   `_restore`.
+3. Ausführen:
+
+   ```bash
+   BACKUP_AGE_IDENTITY_FILE=~/pfad/zu/profitbash-backup.key \
+   RESTORE_DATABASE_URL=postgres://profitbash:profitbash@localhost:5432/profitbash_restore \
+   HEALTHCHECKS_DB_RESTORE_URL=<Ping-URL db-restore-test> \
+   ops/db-backup/restore-test.sh ~/Downloads/profitbash-<UTC>.dump.age
+   ```
+
+   Ergebnis: `Test-Restore ok: N Migrationen, N Organisationen, …`. Die Zahlen grob mit der App vergleichen.
+4. Den Dump und die Restore-Datenbank danach nicht herumliegen lassen (`dropdb profitbash_restore` oder beim nächsten
+   Lauf überschreiben), sie enthalten Produktionsdaten.
 
 ## Umstellung auf `WORKER_MODE=separate` (Stufe C)
 
