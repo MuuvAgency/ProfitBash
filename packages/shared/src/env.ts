@@ -43,6 +43,12 @@ const optionalString = z.preprocess(
 );
 
 /**
+ * Ordner mit den drizzle-Migrationen. Optional: Ohne Angabe sucht `resolveMigrationsFolder`
+ * neben dem Bundle bzw. in `packages/db/drizzle`.
+ */
+export const migrationsDirSchema = z.object({ MIGRATIONS_DIR: optionalString });
+
+/**
  * Schlüssel für verschlüsselte Secrets (`@profitbash/shared/crypto`). Nur die Form wird hier geprüft;
  * den Inhalt prüft `refineKeyring` über `parseKeyring`.
  */
