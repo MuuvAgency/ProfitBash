@@ -233,5 +233,10 @@ export function decrypt(
  * Wirft `DecryptionError` bei kaputten Werten: Das Skript soll solche Zeilen melden und überspringen.
  */
 export function needsReencryption(ciphertext: string, keyring: Keyring): boolean {
-  return parseCiphertext(ciphertext).keyId !== keyring.current.id;
+  return ciphertextKeyId(ciphertext) !== keyring.current.id;
+}
+
+/** Geprüfte Schlüssel-ID eines Ciphertexts (z. B. fürs Audit der Rotation). Wirft `DecryptionError`. */
+export function ciphertextKeyId(ciphertext: string): string {
+  return parseCiphertext(ciphertext).keyId;
 }

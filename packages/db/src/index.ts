@@ -4,6 +4,7 @@ export * from './access';
 export * from './audit';
 export * from './connection-tokens';
 export * from './errors';
+export * from './key-rotation';
 export * from './maintenance';
 export * from './system-access';
 export { runMigrations } from './migrate';

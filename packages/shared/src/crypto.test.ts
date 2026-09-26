@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ciphertextKeyId,
   connectionTokenAad,
   decrypt,
   DecryptionError,
@@ -208,6 +209,17 @@ describe('Schlüsselrotation', () => {
   // Fängt: das Rotations-Skript bekommt bei kaputten Werten still ein falsches Ergebnis.
   it('meldet kaputte Werte bei der Rotationsprüfung als DecryptionError', () => {
     expect(() => needsReencryption('kein-ciphertext', rotated)).toThrow(DecryptionError);
+  });
+
+  // Fängt: das Rotations-Skript protokolliert eine falsche Herkunft (Audit „von Schlüssel … nach …“).
+  it('nennt die Schlüssel-ID eines Ciphertexts', () => {
+    expect(ciphertextKeyId(encrypt('alt', { keyring: keyringA, aad }))).toBe('k1');
+    expect(ciphertextKeyId(encrypt('neu', { keyring: rotated, aad }))).toBe('k2');
+  });
+
+  // Fängt: ungeprüfte Werte aus kaputten Ciphertexten landen in Audit oder Log.
+  it('meldet kaputte Werte bei der Schlüssel-ID als DecryptionError', () => {
+    expect(() => ciphertextKeyId('v1:k\n1:a:b:c')).toThrow(DecryptionError);
   });
 });
 
