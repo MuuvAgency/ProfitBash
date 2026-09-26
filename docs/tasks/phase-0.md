@@ -388,7 +388,17 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
     Org-Wechsel hinweg. Scheitert das Nachladen, bleibt der letzte Stand mit Hinweis stehen.
   - `useActiveOrgId()` liegt jetzt in `src/stores/session.ts` (für alle Query-Keys mit Org). `themeStyleContainer` wird als Funktion übergeben
     (die Prop von `ag-grid-vue3` erwartet eine Funktion).
-- [ ] **Settings:** Locale mit Formatvorschau (Zahl, Währung, Prozent), Theme.
+- [x] **Settings:** Locale mit Formatvorschau (Zahl, Währung, Prozent), Theme.
+- [x] Umsetzung Settings (Stand für 0.9 und später):
+  - Seite `src/pages/SettingsPage.vue` (Route `settings` direkt im Router, kein Menüeintrag). Theme als Radiogruppe, Locale als Auswahl,
+    Vorschau aus `src/settings/preview.ts` (Zahl, Betrag EUR/GBP, Prozent, Datum/Uhrzeit, fester Beispielzeitpunkt). `density` steht in der
+    API, wird aber bewusst nicht angeboten (kein Punkt im Plan); bei Bedarf dieselbe Mechanik nutzen.
+  - Änderungen gelten sofort und werden gleich gespeichert (`session.updatePreferences(patch)`, `setTheme` nutzt es auch für das
+    Account-Menü). Weil `PUT /api/settings` alles ersetzt, laufen die Saves nacheinander; jeder sendet den Stand beim Senden. Schon
+    gespeicherte Stände werden nicht erneut gesendet. Nach Abmelden oder neu geladenem `/api/me` entfällt ein wartender Save.
+  - Scheitert ein Save, gilt für seine Felder wieder der **vom Server bestätigte** Wert (aus `/api/me` bzw. der letzten `PUT`-Antwort),
+    nur solange das Feld seither nicht erneut geändert wurde (Versionszähler je Feld). Die Seite zeigt den Fehler, bis der Nutzer wieder
+    etwas ändert, auch wenn ein späterer Save klappt. „Gespeichert.“ steht in einer dauerhaften Statusregion im Seitenkopf.
 - [x] Gemeinsame Komponenten: `EmptyState`, `InlineError`, `PageHeader`, `SkeletonBlock`; Formatierungs-Helper (Zahl, Währung, Prozent) aus `packages/shared`.
 - [x] Umsetzung Teil 1 (Stand für Teil 2):
   - **PrimeVue 4.x (MIT)**, nicht 5.x: Ab 5.x kommerzielle Lizenz, siehe ADR 001.
