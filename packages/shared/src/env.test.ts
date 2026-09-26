@@ -9,6 +9,7 @@ import {
   findEnvFile,
   healthchecksEnvSchema,
   loadEnv,
+  migrationsDirSchema,
   nodeEnvSchema,
 } from './env';
 
@@ -116,5 +117,17 @@ describe('healthchecksEnvSchema', () => {
         source: { HEALTHCHECKS_TOKEN_REFRESH_URL: 'http://hc-ping.com/abc' },
       }),
     ).toThrow(/HEALTHCHECKS_TOKEN_REFRESH_URL/);
+  });
+});
+
+describe('migrationsDirSchema', () => {
+  it('liest MIGRATIONS_DIR; leer oder fehlend gilt als nicht gesetzt', () => {
+    expect(loadEnv(migrationsDirSchema, { source: { MIGRATIONS_DIR: '/app/drizzle' } })).toEqual({
+      MIGRATIONS_DIR: '/app/drizzle',
+    });
+    expect(loadEnv(migrationsDirSchema, { source: { MIGRATIONS_DIR: '' } })).toEqual({
+      MIGRATIONS_DIR: undefined,
+    });
+    expect(loadEnv(migrationsDirSchema, { source: {} })).toEqual({ MIGRATIONS_DIR: undefined });
   });
 });
