@@ -93,8 +93,9 @@ describe('formatDateTime', () => {
     expect(formatDateTime('2026-09-26T08:15:03.000Z', 'de-DE', berlin)).toBe(
       '26.09.2026, 10:15:03',
     );
-    expect(formatDateTime('2026-09-26T08:15:03.000Z', 'en-GB', berlin)).toBe(
-      '26 Sept 2026, 10:15:03',
+    // en-US: Monatskürzel stabil über ICU-Versionen (en-GB wechselte von „Sep“ zu „Sept“).
+    expect(formatDateTime('2026-09-26T08:15:03.000Z', 'en-US', berlin)).toBe(
+      'Sep 26, 2026, 10:15:03 AM',
     );
   });
 

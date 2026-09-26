@@ -2,7 +2,8 @@ import { formatDateTime, type JobRun } from '@profitbash/shared';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch } from '../test/fetch-stub';
-import { jobRunFixture, meFixture } from '../test/fixtures';
+import { JOB_RUNS_POLL_INTERVAL_MS } from '../sync/queries';
+import { CONNECTION_ID, connectionFixture, jobRunFixture, meFixture } from '../test/fixtures';
 import { cleanupMounted, mountWithApp } from '../test/mount';
 
 // Key-Reihenfolge wie aus Postgres (`jsonb` sortiert nach Länge), nicht wie geschrieben.
@@ -60,6 +61,10 @@ function button(wrapper: Wrapper, label: string) {
   expect(found, `Button „${label}“`).toHaveLength(1);
   return found[0]!;
 }
+
+/** PrimeVue (ohne Styles) markiert den Ladezustand in `data-p`. */
+const isLoading = (b: ReturnType<typeof button>) =>
+  (b.attributes('data-p') ?? '').split(' ').includes('loading');
 
 /** Filter-Auswahl über ihr sichtbares Label (PrimeVue-Select, Overlay am <body>). */
 function filter(wrapper: Wrapper, label: string) {
@@ -120,6 +125,12 @@ describe('SyncStatusPage', () => {
     }
     // Bekannte Zähler in fester Reihenfolge, Nullwerte fehlen.
     expect(success.get('[col-id="result"]').text()).toBe('4 Profile · 1 neu · 2 entfernt');
+    // Zahlen in Mono.
+    expect(success.findAll('[col-id="result"] .font-data').map((n) => n.text())).toEqual([
+      '4',
+      '1',
+      '2',
+    ]);
     // Zeitstempel und Dauer in Mono.
     const started = success.get('[col-id="startedAt"]');
     expect(started.classes()).toContain('font-data');
@@ -205,6 +216,36 @@ describe('SyncStatusPage', () => {
     expect(wrapper.find('[aria-busy="true"]').exists()).toBe(true);
   });
 
+  it('zeigt nach „Jetzt synchronisieren“ über den Link den neuen Lauf, sobald er startet', async () => {
+    const syncPath = `/api/connections/${CONNECTION_ID}/sync`;
+    let started = false;
+    const { requests } = stubFetch({
+      ...routes(() => json({ jobRuns: started ? [running, failed] : [failed] })),
+      'GET /api/connections': json({ connections: [connectionFixture()] }),
+      [`GET /api/connections/${CONNECTION_ID}/profiles`]: json({ profiles: [] }),
+      'GET /api/clients': json({ clients: [] }),
+      [`POST ${syncPath}`]: json({ status: 'queued' }, 202),
+    });
+    // Die Seite war schon einmal offen: Ihre Daten liegen im Cache.
+    const { wrapper, router } = await mountPage('/ops/sync?job=profiles-sync');
+    await waitForRow(wrapper, failed);
+    await router.push('/admin/connections');
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Jetzt synchronisieren'));
+
+    await button(wrapper, 'Jetzt synchronisieren').trigger('click');
+    await vi.waitFor(() => expect(wrapper.find('[role="status"] a').exists()).toBe(true));
+    await wrapper.get('[role="status"] a').trigger('click');
+    await waitForRow(wrapper, failed);
+    const before = jobRunRequests(requests).length;
+
+    // Der Worker startet den Lauf erst nach dem Klick; die Seite fragt von selbst nach.
+    started = true;
+    await vi.waitFor(() => expect(row(wrapper, running).exists()).toBe(true), {
+      timeout: JOB_RUNS_POLL_INTERVAL_MS + 2_000,
+    });
+    expect(jobRunRequests(requests).length).toBeGreaterThan(before);
+  }, 15_000);
+
   it('ignoriert unbekannte Filterwerte in der URL', async () => {
     const { requests } = stubFetch(routes());
     const { wrapper } = await mountPage('/ops/sync?job=job-runs-cleanup&status=egal');
@@ -219,6 +260,44 @@ describe('SyncStatusPage', () => {
     await waitForRow(wrapper, failed);
     await button(wrapper, 'Aktualisieren').trigger('click');
     await vi.waitFor(() => expect(jobRunRequests(requests)).toHaveLength(2));
+  });
+
+  it('zeigt den Ladezustand am Button nur beim Aktualisieren, nicht beim Nachfragen im Hintergrund', async () => {
+    let calls = 0;
+    stubFetch(routes(() => (++calls === 1 ? json({ jobRuns: [failed] }) : pending())));
+    const { wrapper, queryClient } = await mountPage();
+    await waitForRow(wrapper, failed);
+
+    // Hintergrund (wie beim Nachfragen alle paar Sekunden).
+    void queryClient.refetchQueries({ queryKey: ['job-runs'] });
+    await vi.waitFor(() => expect(calls).toBe(2));
+    await flushPromises();
+    expect(isLoading(button(wrapper, 'Aktualisieren'))).toBe(false);
+
+    await button(wrapper, 'Aktualisieren').trigger('click');
+    await flushPromises();
+    expect(isLoading(button(wrapper, 'Aktualisieren'))).toBe(true);
+  });
+
+  it('lässt die Tabelle stehen, wenn das Nachladen scheitert', async () => {
+    let fail = false;
+    stubFetch(
+      routes(() =>
+        fail
+          ? json({ error: { code: 'INTERNAL_ERROR', message: 'x' } }, 500)
+          : json({ jobRuns: [failed] }),
+      ),
+    );
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, failed);
+    fail = true;
+    await button(wrapper, 'Aktualisieren').trigger('click');
+    await vi.waitFor(() =>
+      expect(wrapper.get('[role="alert"]').text()).toContain(
+        'Die Jobläufe konnten nicht aktualisiert werden.',
+      ),
+    );
+    expect(row(wrapper, failed).exists()).toBe(true);
   });
 
   it('zeigt einen Ladezustand', async () => {

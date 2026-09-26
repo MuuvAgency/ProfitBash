@@ -204,14 +204,17 @@ export const de = {
   },
   sync: {
     eyebrow: 'Betrieb',
+    /** `{limit}` = `JOB_RUN_LIST_LIMIT`. */
     description:
-      'Die letzten 100 Jobläufe dieser Organisation: Token-Refresh und Profil-Sync je Amazon-Konto.',
+      'Die letzten {limit} Jobläufe dieser Organisation: Token-Refresh und Profil-Sync je Amazon-Konto.',
     refresh: 'Aktualisieren',
     label: 'Jobläufe',
     loadError: 'Die Jobläufe konnten nicht geladen werden.',
+    refreshError:
+      'Die Jobläufe konnten nicht aktualisiert werden. Angezeigt wird der letzte Stand.',
     emptyTitle: 'Noch keine Jobläufe',
     emptyText:
-      'Sobald ein Token-Refresh oder Profil-Sync gelaufen ist, erscheint er hier. Beides startet nach dem Verbinden eines Amazon-Kontos.',
+      'Nach dem Verbinden eines Amazon-Kontos erscheint hier zuerst der Profil-Sync, danach stündlich der Token-Refresh.',
     emptyFiltered: 'Keine Jobläufe für diesen Filter.',
     filter: {
       job: 'Job',

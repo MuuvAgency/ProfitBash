@@ -21,14 +21,23 @@ import {
   useUpdateProfile,
 } from '../connections/queries';
 import { errorMessageKey } from '../i18n';
+import { useMarkSyncRequested } from '../sync/queries';
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 
 const syncPolling = useSyncPolling();
+const markSyncRequested = useMarkSyncRequested();
+
+/** Ein Sync ist eingeplant: Diese Seite und der Sync-Status fragen eine Weile nach. */
+function onSyncQueued() {
+  syncPolling.start();
+  markSyncRequested();
+}
+
 // Nach dem Verbinden läuft der erste Profil-Sync schon (vom Callback eingeplant).
-if (route.query.oauth === 'connected') syncPolling.start();
+if (route.query.oauth === 'connected') onSyncQueued();
 
 const connectionsQuery = useConnectionsQuery(syncPolling.polling);
 const clientsQuery = useClientsQuery();
@@ -217,7 +226,7 @@ function onClientCreated(client: Client) {
         :polling="syncPolling.polling.value"
         :reconnecting="redirecting === connection.id"
         @reconnect="startOAuth"
-        @synced="syncPolling.start()"
+        @synced="onSyncQueued"
         @patch="patchProfile"
         @create-client="(profile) => (clientDialogProfile = profile)"
       />
