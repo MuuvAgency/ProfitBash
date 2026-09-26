@@ -15,6 +15,7 @@
   | `apps/api/dist/index.js` | Server (API + Web, Worker bei `inline`) |
   | `apps/api/dist/migrate.js` | Migrationen, als Pre-Deploy-Command |
   | `apps/api/dist/seed.js` | Seed (Admin + Org „Muuv“), einmalig |
+  | `apps/api/dist/rotate-keys.js` | Schlüsselrotation, nur bei Bedarf (siehe unten) |
   | `apps/worker/dist/main.js` | eigenständiger Worker, nur bei `WORKER_MODE=separate` |
 
   Die Migrationen liegen als Kopie in `apps/api/dist/drizzle/` (tsup `onSuccess`). `MIGRATIONS_DIR` überschreibt den Ort.
@@ -153,9 +154,31 @@ Reine Konfiguration, kein Code-Umbau:
 Betriebsregel: Ein neuer Schlüssel bekommt **immer eine neue `ENCRYPTION_KEY_ID`**. Dieselbe ID mit neuem Schlüssel
 macht alle alten Werte unlesbar, und der Code kann das nicht erkennen.
 
-1. Neuen Schlüssel erzeugen. `ENCRYPTION_KEYS_PREVIOUS` = `<alte-id>:<alter-schlüssel>` (bei mehreren kommagetrennt),
-   `ENCRYPTION_KEY` = neuer Schlüssel, `ENCRYPTION_KEY_ID` = neue ID. Deployen: Neue Werte werden mit dem neuen
+1. Neuen Schlüssel erzeugen (`openssl rand -base64 32`). `ENCRYPTION_KEYS_PREVIOUS` = `<alte-id>:<alter-schlüssel>`
+   (bei mehreren kommagetrennt), `ENCRYPTION_KEY` = neuer Schlüssel, `ENCRYPTION_KEY_ID` = neue ID (z. B. `k2`).
+   Bei `WORKER_MODE=separate` in **beiden** Services gleich setzen. Deployen: Neue Werte werden mit dem neuen
    Schlüssel geschrieben, alte bleiben lesbar.
-2. Bestehende Tokens neu verschlüsseln. Das Rotations-Skript folgt als eigene Aufgabe in 0.9; die Anleitung dazu
-   ergänzt dieser Abschnitt dann.
-3. Erst danach den alten Schlüssel aus `ENCRYPTION_KEYS_PREVIOUS` entfernen.
+2. Bestehende Tokens mit dem Rotations-Skript neu verschlüsseln, **im Service `app`** (dort stehen die Variablen und
+   das private Netz zur Datenbank). **Erst wenn der Deploy aus Schritt 1 in allen Services (`app`, ggf. `worker`) live
+   und gesund ist**, nie im selben Deploy wie der Schlüsselwechsel: Ein Prozess, der nur den alten Schlüssel kennt,
+   kann neu verschlüsselte Tokens nicht lesen, und jeder Refresh scheitert.
+
+   ```bash
+   node apps/api/dist/rotate-keys.js
+   ```
+
+   Weg auf Railway (beim ersten Einsatz prüfen und hier nachziehen): per `railway ssh` in den laufenden Service, oder
+   vorübergehend als Pre-Deploy-Command `node apps/api/dist/migrate.js && node apps/api/dist/rotate-keys.js` und neu
+   deployen (danach zurücksetzen, wie beim Seed). Die App darf dabei weiterlaufen: Das Skript sperrt jede Connection
+   einzeln wie ein Token-Refresh und überschreibt keinen gerade rotierten Token.
+
+   Ausgabe: `Schlüsselrotation (aktueller Schlüssel k2): N Connections geprüft, M neu verschlüsselt, F nicht lesbar.`
+   - Jede neu verschlüsselte Connection bekommt ein Audit-Event `connection.token_reencrypt` (von/nach Schlüssel-ID).
+   - **Nicht lesbare** Werte werden mit Connection- und Organisations-ID gemeldet, übersprungen und nicht verändert;
+     der Exit-Code ist dann 1 (als Pre-Deploy-Command schlägt der Deploy fehl, die laufende Version bleibt).
+     „Unbekannte Schlüssel-ID“: Ein früherer Schlüssel fehlt in `ENCRYPTION_KEYS_PREVIOUS`, wieder eintragen.
+     Andere Meldungen: Der Wert ist verloren; die Connection neu verbinden (überschreibt den Token) oder löschen.
+   - Bricht das Skript mit einem anderen Fehler ab (z. B. Datenbank, Sperre länger als 30 s), einfach erneut starten:
+     Es ist wiederholbar und überspringt bereits neu verschlüsselte Werte.
+3. Das Skript erneut ausführen. Erst wenn es `0 neu verschlüsselt, 0 nicht lesbar` meldet (Exit-Code 0), den alten
+   Schlüssel aus `ENCRYPTION_KEYS_PREVIOUS` entfernen und deployen.

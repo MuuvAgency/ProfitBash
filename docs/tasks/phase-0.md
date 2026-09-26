@@ -114,7 +114,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] `encrypt(plaintext, { keyring, aad })` / `decrypt(ciphertext, { keyring, aad })` mit AES-256-GCM.
   - Format `v1:<keyId>:<iv>:<tag>:<cipher>` (base64url). Aktueller Schlüssel aus `ENCRYPTION_KEY` (32 Byte, base64) mit `ENCRYPTION_KEY_ID`, geprüft über `parseKeyring()`.
   - Schlüsselrotation: `ENCRYPTION_KEYS_PREVIOUS` (`id:key,id:key`) nur zum Entschlüsseln; `needsReencryption()` erkennt alte Werte.
-    Das Rotations-Skript über alle Connections folgt mit 0.9 (`docs/deploy.md`).
+    Das Rotations-Skript über alle Connections: 0.9 (`pnpm db:rotate-keys`, Anleitung in `docs/deploy.md`).
   - **AAD** = `connectionTokenAad({ organizationId, provider, region, externalAccountId })` →
     `connection:<org>:<provider>:<region|->:<externalAccountId>`. Gebunden an den **natürlichen Schlüssel** statt an die Zeilen-ID:
     Die ID vergibt die DB erst beim Einfügen, und beim Neu-Verbinden landet der Token per Upsert auf der bestehenden Zeile (Review-Befund).
@@ -433,12 +433,25 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - [ ] Service auf Railway eingerichtet und erreichbar (Einstellungen in `docs/deploy.md`, braucht Konto 0.0f).
 - [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
 - [ ] Railway-Postgres mit Backups; falls der Hobby-Plan keine enthält: nächtlicher `pg_dump` per GitHub Action in einen privaten Speicher.
-- [ ] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
+- [x] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
   - [x] Einrichtung, Variablen, Seed, Healthchecks.io, Graceful Shutdown, Backups (offen), `WORKER_MODE=separate`, Rotationsregel.
-  - [ ] Anleitung zum Rotations-Skript (mit dem Skript).
-- [ ] Rotations-Skript: verschlüsselt alle Tokens, bei denen `needsReencryption()` greift, mit dem aktuellen Schlüssel neu;
+  - [x] Anleitung zum Rotations-Skript (mit dem Skript).
+- [x] Rotations-Skript: verschlüsselt alle Tokens, bei denen `needsReencryption()` greift, mit dem aktuellen Schlüssel neu;
   Zeilen mit kaputtem Wert (`DecryptionError`) melden und überspringen, nicht abbrechen.
   Betriebsregel: Ein neuer Schlüssel bekommt immer eine **neue** `ENCRYPTION_KEY_ID`. Dieselbe ID mit neuem Schlüssel macht alle alten Werte unlesbar, und der Code kann das nicht erkennen.
+  - **Umsetzung:** `reencryptConnectionTokens` (`packages/db/src/key-rotation.ts`), CLI `packages/db/src/rotate-keys-cli.ts`
+    (`pnpm db:rotate-keys`, gebündelt als `apps/api/dist/rotate-keys.js`, im Smoke-Test). Plattformweit über alle
+    Connections (auch `reauth_required`), je Connection eine Transaktion mit `FOR NO KEY UPDATE` wie der Token-Store
+    (kein verlorenes Update bei parallelem Refresh; `lock_timeout` 30 s, dann Abbruch). AAD über `connectionTokenAad`.
+    Nur `DecryptionError` wird gemeldet und übersprungen, alles andere bricht ab (wiederholbar). Exit-Code 1 bei
+    nicht lesbaren Werten. Neu in `@profitbash/shared/crypto`: `ciphertextKeyId()`.
+  - **Audit/Jobs:** Je neu verschlüsselter Connection ein `audit_event` `connection.token_reencrypt` (ohne Nutzer,
+    Ziel mit `fromKeyId`/`toKeyId`, nie Tokens) in derselben Transaktion. Kein `job_runs`-Eintrag: Das Skript ist wie
+    `migrate`/`seed` ein manuell gestarteter Betriebsbefehl, keine Hintergrundarbeit (`runJob` gehört zum Worker und
+    zur Sync-Status-Ansicht).
+  - Nebenwirkung: Verschlüsselt die Rotation eine Connection zwischen Jobstart und einer Ablehnung (`invalid_grant`)
+    neu, greift `markConnectionReauthRequired` nicht (anderer Ciphertext); der nächste Lauf markiert sie.
+  - Offen bis zum ersten Einsatz: Weg auf Railway (`railway ssh` oder vorübergehender Pre-Deploy-Command) bestätigen.
 - [x] Umsetzung Bundles und Web-Auslieferung (Stand für die restlichen 0.9-Punkte):
   - **Bundles:** `apps/api/tsup.config.ts` baut `dist/index.js` (Server), `dist/migrate.js` (Einstieg
     `packages/db/src/migrate-cli.ts`) und `dist/seed.js` und kopiert `packages/db/drizzle` nach `dist/drizzle`.
