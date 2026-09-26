@@ -45,6 +45,19 @@ describe('loadApiEnv', () => {
     expect(env.HEALTHCHECKS_TOKEN_REFRESH_URL).toBeUndefined();
   });
 
+  it('lauscht auf PORT (von Railway gesetzt) statt auf API_PORT', () => {
+    expect(load({ ...base, PORT: '3000', API_PORT: '8787' }).port).toBe(3000);
+  });
+
+  it('nutzt API_PORT (Standard 8787), wenn PORT fehlt oder leer ist', () => {
+    expect(load({ ...base, API_PORT: '9000' }).port).toBe(9000);
+    expect(load({ ...base, PORT: '' }).port).toBe(8787);
+  });
+
+  it('lehnt einen ungültigen PORT ab', () => {
+    expect(messageOf(() => load({ ...base, PORT: 'abc' }))).toMatch(/PORT/);
+  });
+
   it('baut den Keyring aus ENCRYPTION_* (inkl. vorheriger Schlüssel)', () => {
     const env = load({ ...base, ENCRYPTION_KEYS_PREVIOUS: `k0:${previousKey}` });
     expect(env.keyring.current.id).toBe('k1');
