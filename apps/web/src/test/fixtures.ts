@@ -1,4 +1,12 @@
-import { FEATURE_KEYS, type FeatureKey, type MeResponse, type OrgRole } from '@profitbash/shared';
+import {
+  FEATURE_KEYS,
+  type Client,
+  type Connection,
+  type FeatureKey,
+  type MeResponse,
+  type OrgRole,
+  type Profile,
+} from '@profitbash/shared';
 
 export interface MeFixtureOptions {
   platformRole?: MeResponse['user']['role'];
@@ -35,5 +43,57 @@ export function meFixture(options: MeFixtureOptions = {}): MeResponse {
       ]),
     ) as MeResponse['features'],
     preferences: { theme: 'system', locale: 'de-DE', density: 'comfortable' },
+  };
+}
+
+export const CONNECTION_ID = '0b9e1c7e-5a1d-4f3e-9c1a-2f6d8e4b7a01';
+
+export function connectionFixture(overrides: Partial<Connection> = {}): Connection {
+  return {
+    id: CONNECTION_ID,
+    provider: 'amazon_ads',
+    region: 'eu',
+    externalAccountId: 'amzn1.account.MOCK',
+    externalAccountEmail: 'ads@muuv.test',
+    status: 'active',
+    lastRefreshedAt: '2026-09-26T08:15:00.000Z',
+    createdAt: '2026-09-20T10:00:00.000Z',
+    updatedAt: '2026-09-26T08:15:00.000Z',
+    ...overrides,
+  };
+}
+
+let profileCounter = 0;
+
+export function profileFixture(overrides: Partial<Profile> = {}): Profile {
+  profileCounter += 1;
+  const suffix = String(profileCounter).padStart(12, '0');
+  return {
+    id: `7c3f2a10-1b2c-4d5e-8f90-${suffix}`,
+    connectionId: CONNECTION_ID,
+    clientId: null,
+    amazonProfileId: `33871${suffix}`,
+    amazonAccountId: 'A2EUQ1WTGCTBG2',
+    accountName: 'Soapi GmbH',
+    countryCode: 'DE',
+    currencyCode: 'EUR',
+    timezone: 'Europe/Berlin',
+    marketplaceId: 'A1PA6795UKMFR9',
+    accountType: 'seller',
+    isHidden: false,
+    removedAt: null,
+    syncedAt: '2026-09-26T03:00:00.000Z',
+    ...overrides,
+  };
+}
+
+export function clientFixture(overrides: Partial<Client> = {}): Client {
+  return {
+    id: '5d1e8a2b-3c4f-4a6b-9d7e-1f2a3b4c5d6e',
+    name: 'Soapi',
+    slug: 'soapi',
+    createdAt: '2026-09-21T09:00:00.000Z',
+    updatedAt: '2026-09-21T09:00:00.000Z',
+    ...overrides,
   };
 }

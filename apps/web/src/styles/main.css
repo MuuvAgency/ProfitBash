@@ -1,8 +1,8 @@
 /*
- * Reihenfolge der Layer: PrimeVue liegt zwischen Tailwind-Basis und -Utilities,
- * damit Utility-Klassen PrimeVue-Styles überschreiben können.
+ * Reihenfolge der Layer: PrimeVue und AG Grid liegen zwischen Tailwind-Basis und -Utilities,
+ * damit Utility-Klassen ihre Styles überschreiben können (AG Grid: `gridStyleOptions` in src/grid/grid.ts).
  */
-@layer theme, base, primevue, components, utilities;
+@layer theme, base, primevue, ag-grid, components, utilities;
 
 @import 'tailwindcss';
 

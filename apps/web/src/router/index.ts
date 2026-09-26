@@ -1,6 +1,7 @@
 import {
   createRouter,
   createWebHistory,
+  type RouteComponent,
   type RouteMeta,
   type RouteRecordRaw,
   type Router,
@@ -28,15 +29,21 @@ function accessMeta(access: Access): RouteMeta {
 
 const PlaceholderPage = () => import('../pages/PlaceholderPage.vue');
 
-/** Bis zur jeweiligen Phase öffnet jeder Menüeintrag eine Platzhalterseite. */
-function placeholderRoute(item: NavItem): RouteRecordRaw {
+/** Fertige Seiten je Menüeintrag (`NavItem.id`). Alle anderen öffnen bis zu ihrer Phase einen Platzhalter. */
+const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteComponent>)>> = {
+  connections: () => import('../pages/ConnectionsPage.vue'),
+};
+
+function navRoute(item: NavItem): RouteRecordRaw {
   const path = item.path.slice(1);
+  const page = PAGES[item.id];
   return {
     // Bereiche mit Unterseiten (`/ads/tools/*`) nehmen beliebige Unterpfade an.
     path: item.hasSubpages ? `${path}/:subpath(.*)*` : path,
     name: item.id,
-    component: PlaceholderPage,
-    props: { itemId: item.id, phase: item.phase },
+    ...(page
+      ? { component: page }
+      : { component: PlaceholderPage, props: { itemId: item.id, phase: item.phase } }),
     meta: { ...accessMeta(item.access), navItemId: item.id, titleKey: item.labelKey },
   };
 }
@@ -56,7 +63,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       // Leitet im Guard auf den ersten sichtbaren Menüeintrag weiter.
       { path: '', name: 'home', component: PlaceholderPage, meta: { home: true } },
-      ...NAVIGATION.flatMap((group) => group.items.map(placeholderRoute)),
+      ...NAVIGATION.flatMap((group) => group.items.map(navRoute)),
       {
         path: SETTINGS_PATH.slice(1),
         name: 'settings',

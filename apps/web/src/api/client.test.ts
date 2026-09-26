@@ -96,3 +96,71 @@ describe('createApi', () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe('Connections, Profile und Clients', () => {
+  const connectionId = '11111111-1111-4111-8111-111111111111';
+  const profileId = '22222222-2222-4222-8222-222222222222';
+  const clientId = '33333333-3333-4333-8333-333333333333';
+
+  it('liest Connections, Profile und Clients aus der Hülle der Antwort', async () => {
+    stubFetch({
+      'GET /api/connections': json({ connections: [{ id: connectionId }] }),
+      [`GET /api/connections/${connectionId}/profiles`]: json({ profiles: [{ id: profileId }] }),
+      'GET /api/clients': json({ clients: [{ id: clientId }] }),
+    });
+    const api = createApi();
+    await expect(api.listConnections()).resolves.toEqual([{ id: connectionId }]);
+    await expect(api.listProfiles(connectionId)).resolves.toEqual([{ id: profileId }]);
+    await expect(api.listClients()).resolves.toEqual([{ id: clientId }]);
+  });
+
+  it('startet das Verbinden und liefert die Einwilligungs-URL', async () => {
+    const { requests } = stubFetch({
+      'POST /api/amazon/oauth/start': json({ url: 'https://eu.account.amazon.com/ap/oa?x=1' }),
+    });
+    const api = createApi();
+    await expect(api.startAmazonOAuth()).resolves.toBe('https://eu.account.amazon.com/ap/oa?x=1');
+    await api.startAmazonOAuth({ connectionId });
+    expect(requests.map((r) => r.body)).toEqual([{}, { connectionId }]);
+  });
+
+  it('plant einen Sync ein und meldet „Neu verbinden nötig“ als Fehlercode', async () => {
+    const { requests } = stubFetch({
+      [`POST /api/connections/${connectionId}/sync`]: json({ status: 'queued' }, 202),
+    });
+    await createApi().syncConnection(connectionId);
+    expect(requests[0]).toMatchObject({
+      method: 'POST',
+      path: `/api/connections/${connectionId}/sync`,
+    });
+
+    stubFetch({
+      [`POST /api/connections/${connectionId}/sync`]: json(
+        { error: { code: 'CONNECTION_REAUTH_REQUIRED', message: 'x' } },
+        409,
+      ),
+    });
+    await expect(createApi().syncConnection(connectionId)).rejects.toMatchObject({
+      status: 409,
+      code: 'CONNECTION_REAUTH_REQUIRED',
+    });
+  });
+
+  it('ändert Profile und legt Clients an', async () => {
+    const { requests } = stubFetch({
+      [`PATCH /api/profiles/${profileId}`]: ({ body }) =>
+        json({ id: profileId, ...(body as object) }),
+      'POST /api/clients': json({ id: clientId, name: 'Soapi', slug: 'soapi' }, 201),
+    });
+    const api = createApi();
+    await expect(api.updateProfile(profileId, { isHidden: true })).resolves.toMatchObject({
+      id: profileId,
+      isHidden: true,
+    });
+    await expect(api.createClient({ name: 'Soapi' })).resolves.toMatchObject({ id: clientId });
+    expect(requests.map((r) => [r.method, r.path, r.body])).toEqual([
+      ['PATCH', `/api/profiles/${profileId}`, { isHidden: true }],
+      ['POST', '/api/clients', { name: 'Soapi' }],
+    ]);
+  });
+});
