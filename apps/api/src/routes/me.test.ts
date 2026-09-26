@@ -110,7 +110,8 @@ describe('GET /api/me', () => {
       organizationId: otherOrgId,
       userId: multi!.id,
       role: 'viewer',
-      createdAt: new Date(),
+      // Ausdrücklich später: Bei gleicher Millisekunde entschiede die (zufällige) Org-ID.
+      createdAt: new Date(Date.now() + 60_000),
     });
     const cookie = await signIn(ctx, 'multi@muuv.test');
     // Beim Login ist die älteste Mitgliedschaft (Muuv) aktiv.
