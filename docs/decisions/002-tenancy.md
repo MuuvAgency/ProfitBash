@@ -1,7 +1,7 @@
 # ADR 002 – Mandanten-Modell
 
 - **Status:** angenommen
-- **Datum:** 2026-09-25
+- **Datum:** 2026-09-25, Geltungsbereich von Punkt 5 am 2026-09-26 dokumentiert (Stand Code Phase 0, vor dem ersten Deploy)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -33,15 +33,44 @@ Diese Frage muss vor den Phase-1-Tabellen (Kampagnen, Metriken) entschieden sein
    Sichtbarkeit. Abfragen filtern **nie direkt** nach `organization_id`, sondern über `visibleProfilesScope()`
    bzw. Nachfolger. Nur so lässt sich Phase 6 ergänzen, ohne jede Abfrage anzufassen.
 
+### Geltungsbereich von Punkt 5 (Stand Phase 0, keine neue Entscheidung)
+
+Punkt 5 regelt die Sichtbarkeit von **Profildaten** (Profile und alles, was an einem Profil hängt; ab Phase 1
+Entities, Metriken, Änderungen) für Nutzer. Solche Abfragen sind mit `visibleProfilesScope()` oder `canSeeProfile()`
+(bzw. Nachfolgern) begrenzt, auch wenn die eigentliche Abfrage in der Route steht (z. B. `routes/connections.ts`).
+
+Daneben filtern heute diese Zugriffe selbst nach Organisation:
+
+- **Verwaltung der Eigentümer-Org** (Clients, Connections, Jobläufe): Die Routen lesen und schreiben in der aktiven
+  Organisation der Session (`auth.activeOrganization`) hinter `orgAdminOnly`. Ausnahme: Der OAuth-Callback
+  (`routes/amazon-oauth.ts`) nimmt die Organisation aus dem signierten `state` und prüft die Admin-Rolle selbst
+  über `getOrgRole()`.
+- **Systemzugriffe ohne Nutzer:** Worker-Jobs, Token-Store, Wartung und Schlüsselrotation
+  (`packages/db/src/system-access.ts`, `connection-tokens.ts`, `maintenance.ts`, `key-rotation.ts`; `job_runs` schreibt
+  `runJob` in `apps/worker`). Zugriffe auf einzelne Connections sind an Organisation und Connection gebunden.
+  Keiner dieser Zugriffe entscheidet über die Sichtbarkeit für Nutzer. Plattformweit arbeiten die Planung der Jobs (`listActiveConnections`), die Wartung
+  (alte und abgebrochene Jobläufe, abgelaufene OAuth-Nonces) und die Schlüsselrotation.
+- **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
+  Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
+  Access-Layer; dazu der Seed.
+
+**Offen für Phase 6:** ob und wie Kunden-Orgs Client-Daten lesen (Punkt 2 hängt Ziele, Budgets und Auswertungen an
+den Client). Dann bekommt der Access-Layer Helfer für Clients (`docs/tasks/phase-0.md`, „Offen für Phase 6“).
+
+Eine nutzerseitige Abfrage von Profildaten, die nicht über den Access-Layer begrenzt ist und keine der Ausnahmen
+oben betrifft, ist ein Review-Befund.
+
 ## Konsequenzen
 
-- Phase-1-Tabellen tragen `organization_id` (Eigentümer) und `profile_id` (interne ID) und werden
-  ausschließlich über den Access-Layer gelesen.
+- Phase-1-Tabellen tragen `organization_id` (Eigentümer) und `profile_id` (interne ID). Nutzerseitige Abfragen
+  sind über den Access-Layer begrenzt (siehe Geltungsbereich).
 - Die Signaturen des Access-Layers (`userId`, `orgId`) bleiben stabil. Phase 6 erweitert nur die interne
   Regel: „Mitglied der Eigentümer-Org" **oder** „Mitglied einer freigegebenen Kunden-Org".
 - Schreibrechte bleiben bei der Agentur-Org. Kunden-Orgs sind in Phase 6 lesend.
 - Die Datenbank erzwingt bereits, dass Profile, Clients und Connections zur selben Org gehören
-  (zusammengesetzte Fremdschlüssel).
+  (zusammengesetzte Fremdschlüssel über `(id, organization_id)`).
+- Der Access-Layer bietet heute für Profile `visibleProfilesScope()` (Unterabfrage für Mengen), `visibleProfileIds()`
+  und `canSeeProfile()`, dazu `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()`. Ausgeblendete und entfernte Profile sehen nur Org-Admins (`includeHidden`, `includeRemoved`).
 
 ## Verworfene Alternativen
 

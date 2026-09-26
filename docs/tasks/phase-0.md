@@ -26,7 +26,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] *Betrieb → Sync-Status* zeigt die letzten Jobläufe mit Status und Fehlertext.
 - [x] Die Settings-Seite speichert Locale (Zahlenformat) und Theme serverseitig.
 - [x] Die UI nutzt die Design-Tokens aus `design/theme.js` (Login und Shell im Kinetic-Bento-Look).
-- [ ] ADRs `docs/decisions/001-stack.md` und `002-tenancy.md` sind aktuell.
+- [x] ADRs `docs/decisions/001-stack.md` und `002-tenancy.md` sind aktuell (abgeglichen am 2026-09-26; bei Änderungen am Stack oder Zugriff nachziehen).
 
 ## Voraussetzungen (manuell, Dominik)
 
@@ -45,11 +45,11 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Das Amazon-Konto, mit dem später der OAuth-Login läuft, muss als User in den Werbekonten aller betreuten Kunden eingeladen sein.
   - Dann deckt eine Connection alle Profile ab.
 - [ ] **0.0e SP-API-Registrierung anstoßen** (wird erst in Phase 7 gebraucht, die Freigabe dauert aber).
-- [ ] **0.0f Accounts anlegen:** Railway, Healthchecks.io (Free), GitHub-Repo `profitbash` (privat). Neon (Free) nur bei Bedarf für geteilte Dev-/Preview-Datenbanken; lokal reicht Homebrew-Postgres.
+- [ ] **0.0f Accounts anlegen:** Railway, Healthchecks.io (Free), GitHub-Repo (ursprünglich privat geplant, jetzt öffentlich: `MuuvAgency/ProfitBash`, siehe unten). Neon (Free) nur bei Bedarf für geteilte Dev-/Preview-Datenbanken; lokal reicht Homebrew-Postgres.
   - Railway-Hobby erst starten, wenn der erste echte Deploy ansteht (das Trial-Guthaben ist zeitlich begrenzt, die Amazon-Freigabe kann Wochen dauern).
-  - Prüfen, ob Backups für Railway-Postgres im Hobby-Plan enthalten sind. Falls nicht: nächtlicher `pg_dump` per GitHub Action (siehe 0.9).
+  - Prüfen, ob Backups für Railway-Postgres im Hobby-Plan enthalten sind. Geprüft (2026-09-26): nicht enthalten, deshalb nächtlicher `pg_dump` (siehe 0.9).
   - Stand 2026-09-26: GitHub-Repo erledigt (`MuuvAgency/ProfitBash`), erster echter CI-Lauf grün (PR #1). Railway und Healthchecks.io fehlen noch.
-  - Abweichung von ADR 001: Das Repo ist **öffentlich**, weil Auto-Merge für private Repos im aktuellen GitHub-Plan nicht verfügbar ist.
+  - Abweichung von ADR 001 (inzwischen dort festgehalten): Das Repo ist **öffentlich**, weil Auto-Merge für private Repos im aktuellen GitHub-Plan nicht verfügbar ist.
     Folgen: Keine Secrets ins Repo. Nichts Sensibles in öffentliche Actions-Logs oder -Artefakte (gilt besonders für den `pg_dump` aus 0.9).
     `main` ist per Ruleset geschützt: Merge nur mit grünem `ci`-Check, kein Force-Push, kein Löschen. Auto-Merge wartet auf die CI.
     Entschieden (Dominik, 2026-09-26): Das Repo bleibt öffentlich, ADR 001 ist angepasst. Keine echten Kundennamen oder
@@ -432,7 +432,7 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - [x] Code: Web-Auslieferung, `PORT`, Healthcheck, gebündelte Migration (siehe Umsetzung unten).
   - [ ] Service auf Railway eingerichtet und erreichbar (Einstellungen in `docs/deploy.md`, braucht Konto 0.0f).
 - [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
-- [ ] Railway-Postgres mit Backups; falls der Hobby-Plan keine enthält: nächtlicher `pg_dump` per GitHub Action in einen privaten Speicher.
+- [ ] Railway-Postgres mit Backups; der Hobby-Plan enthält keine, deshalb nächtlicher `pg_dump` in einen privaten Speicher (Ziel und Ausführungsort offen, `docs/deploy.md`).
 - [x] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
   - [x] Einrichtung, Variablen, Seed, Healthchecks.io, Graceful Shutdown, Backups (offen), `WORKER_MODE=separate`, Rotationsregel.
   - [x] Anleitung zum Rotations-Skript (mit dem Skript).

@@ -1,7 +1,7 @@
 # ADR 001 – Tech-Stack und Hosting
 
 - **Status:** angenommen
-- **Datum:** 2026-09-25
+- **Datum:** 2026-09-25, zuletzt mit dem Code abgeglichen am 2026-09-26 (Stand Code Phase 0, vor dem ersten Deploy)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -16,20 +16,21 @@ und um weitere Marktplätze erweiterbar.
 
 | Bereich | Wahl |
 |---|---|
+| Laufzeit | Node.js **22** (`engines.node` `>=22.13`, auf Railway über `railpack.json` fest) |
 | Sprache | TypeScript **6.0** überall (`strict`, `noUncheckedIndexedAccess`). TypeScript 7 (nativer Compiler) erst, wenn typescript-eslint und vue-tsc es unterstützen (Stand 09/2026: typescript-eslint nur bis 6.0) |
 | Monorepo | pnpm-Workspaces: `apps/{api,worker,web}`, `packages/{db,amazon-ads,engine,shared}` |
 | API | Hono (Node), zod, OpenAPI via `@hono/zod-openapi` |
 | Auth | better-auth: E-Mail/Passwort, Organization-Plugin (eigene Rollen admin/editor/viewer), Admin-Plugin (Superadmin) |
 | DB | Postgres + Drizzle ORM/drizzle-kit, Treiber `postgres` (postgres.js) in allen Umgebungen |
 | Jobs | pg-boss (Queue und Cron in Postgres, kein Redis) |
-| Web | Vue 3 + Vite, **PrimeVue 4.x** (MIT, Styled Mode, eigenes Preset aus `design/theme.js`) mit `@primeuix/themes` 2.x und PrimeIcons 7, Tailwind v4 für Layout, Pinia, Vue Router, TanStack Query, vue-i18n. API-Client: `openapi-fetch` mit Typen aus `openapi-typescript` (generiert aus `/api/openapi.json`). Fonts selbst gehostet über `@fontsource-variable` |
-| Tabellen / Charts | AG Grid **Community**, AG Charts Community |
-| Build | Apps `api`/`worker` mit tsup (bündelt die Workspace-Pakete, die TS-Quellcode exportieren); Web mit Vite. Dev: `tsx watch` |
+| Web | Vue 3 + Vite, **PrimeVue 4.x** (MIT, Styled Mode, Aura-basiertes Preset mit den Tokens aus `design/theme.js`) mit `@primeuix/themes` 2.x und PrimeIcons 7, Tailwind v4 für Layout, Pinia, Vue Router, TanStack Query, vue-i18n. API-Client: `openapi-fetch` mit Typen aus `openapi-typescript` (generiert aus `/api/openapi.json`). Fonts selbst gehostet über `@fontsource-variable` |
+| Tabellen / Charts | AG Grid **Community** (Version exakt gepinnt), AG Charts Community (kommt mit dem ersten Chart, Phase 2) |
+| Build | Apps `api`/`worker` mit tsup (bündelt die Workspace-Pakete, die TS-Quellcode exportieren); Web mit Vite. Dev: `tsx watch`. In Produktion nur `node`, kein tsx: eigene Bundles für Server, Migrationen, Seed, Schlüsselrotation und den Worker bei `WORKER_MODE=separate` (`docs/deploy.md`) |
 | Tests | Vitest, HTTP-Mocks mit msw |
 | Repository | GitHub, **öffentlich** (`MuuvAgency/ProfitBash`), Plan GitHub Free for organizations. Siehe Konsequenzen |
 | CI | GitHub Actions, Postgres als Service-Container |
-| Hosting | Railway |
-| Datenbank | Postgres 17. Lokal: Homebrew. Dev-Branches: Neon (Free). CI: Service-Container. **Prod: Railway-Postgres** |
+| Hosting | Railway, Build mit Railpack (`railpack.json`). Einstellungen im Dashboard nach `docs/deploy.md` (siehe Konsequenzen) |
+| Datenbank | Postgres 17. Lokal: Homebrew. CI: Service-Container. **Prod: Railway-Postgres**. Neon (Free) nur bei Bedarf für geteilte Dev-/Preview-Datenbanken |
 | Monitoring | Healthchecks.io (Job-Heartbeats) |
 
 ### Deploy-Topologie
@@ -39,14 +40,15 @@ und um weitere Marktplätze erweiterbar.
 - **Worker:** Umschaltbar per `WORKER_MODE`:
   - `inline` (Pilot): Der Worker startet im selben Prozess wie die API → **nur ein Railway-Service**.
   - `separate` (Wachstum): eigener Railway-Service `worker`. Kein Code-Umbau nötig.
-- **Migrationen:** Pre-Deploy-Command des `app`-Service.
+- **Migrationen:** Pre-Deploy-Command des `app`-Service (gebündeltes `migrate`).
+- **Healthcheck:** `GET /api/health` (200 nur mit erreichbarer Datenbank).
 
 ### Warum Prod nicht auf Neon
 
 pg-boss fragt die Datenbank im Sekundentakt ab (Queue und Cron-Überwachung). Neon kann dann nie in den
 Ruhezustand wechseln, und die Compute-Kosten laufen rund um die Uhr. Ab Phase 1 wächst außerdem das
 Datenvolumen durch Report-Daten. Railway-Postgres liegt im selben privaten Netz wie die App: planbare Kosten,
-kurze Latenz, direkte Verbindung für pg-boss. Neon bleibt für Dev-Branches, dort darf die DB schlafen.
+kurze Latenz, direkte Verbindung für pg-boss. Neon bleibt bei Bedarf für geteilte Dev-/Preview-Datenbanken, dort darf die DB schlafen.
 
 ### Warum postgres.js statt Neon-Serverless-Treiber
 
@@ -59,7 +61,7 @@ Bitte die aktuellen Konditionen der Anbieter vor Start prüfen. Die Zahlen sind 
 
 | Stufe | Wann | Setup | Kosten |
 |---|---|---|---|
-| **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Homebrew-Postgres), GitHub Actions (Free-Kontingent), Healthchecks.io Free. Neon Free nur bei Bedarf für geteilte Dev-/Preview-Datenbanken. Kein Hosting nötig. Das Railway-Trial-Guthaben ist zeitlich begrenzt: erst nutzen, wenn der erste Deploy ansteht | **0 €** |
+| **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Homebrew-Postgres), GitHub Actions (öffentliches Repo, ohne Minutenlimit), Healthchecks.io Free. Neon Free nur bei Bedarf für geteilte Dev-/Preview-Datenbanken. Kein Hosting nötig. Das Railway-Trial-Guthaben ist zeitlich begrenzt: erst nutzen, wenn der erste Deploy ansteht | **0 €** |
 | **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres, `*.up.railway.app`-Domain. Der Hobby-Plan enthält keine Datenbank-Backups (Stand 2026-09-26), deshalb nächtlicher `pg_dump` (Ziel und Ausführungsort: `docs/deploy.md`) | **ca. 5–10 $/Monat** |
 | **C – Wachstum** | mehr Kunden/Daten | Worker separat, mehr DB-Ressourcen, eigene Domain, ggf. Neon Paid für Prod-Branches | nach Bedarf |
 
@@ -98,6 +100,14 @@ auf einen anderen Postgres-Anbieter.
   Dass der Code einsehbar ist, ist akzeptiert. Regeln: keine Secrets, keine echten Kundennamen oder -daten (Tests und Doku
   nutzen erfundene Namen), nichts Sensibles in Actions-Logs oder -Artefakte (Artefakte öffentlicher Repos kann jeder laden).
   Zurück auf privat ist jederzeit möglich (dann GitHub Team für Ruleset und Auto-Merge).
+- **Railway-Einstellungen im Dashboard, kein Config as Code** (entschieden am 2026-09-26): Railway liest
+  `railway.json`/`railway.toml` für neue Services nicht mehr; der Nachfolger (Infrastructure as Code, `.railway/railway.ts`)
+  lohnt sich für einen Service nicht. `docs/deploy.md` ist die Quelle der Einstellungen im Repo. Wiedervorlage bei Stufe C.
+- **Backups im Pilot selbst:** Der Hobby-Plan enthält keine Datenbank-Backups. Nächtlicher `pg_dump`, vor dem Upload
+  verschlüsselt; Ziel und Ausführungsort sind noch offen (`docs/deploy.md`).
+- **Secrets in der Datenbank** (bestehende Praxis seit 0.3, hier nur festgehalten): Refresh-Tokens mit AES-256-GCM über
+  `node:crypto` (`@profitbash/shared/crypto`), ohne externen Schlüsseldienst. Der Schlüssel kommt aus der Umgebung,
+  Rotation über Schlüssel-IDs und ein Skript (`docs/deploy.md`).
 - **flag-icons 7.x (MIT)** für Länderflaggen als SVG, jede Flagge wird erst bei Bedarf einzeln geladen. Emojis sind im Design
   ausgeschlossen und fehlen unter Windows.
 
