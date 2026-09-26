@@ -212,6 +212,25 @@ describe('visibleProfileIds', () => {
     ).rejects.toBeInstanceOf(AccessDeniedError);
   });
 
+  it('zeigt Admins mit includeRemoved auch entfernte Profile (Admin-Seite „entfernte anzeigen“)', async () => {
+    const admin = { userId: ids.admin, orgId: ids.muuv };
+    const withRemoved = await visibleProfileIds(testDb.db, { ...admin, includeRemoved: true });
+    expect(withRemoved.sort()).toEqual([ids.visible, ids.removed].sort());
+
+    const all = await visibleProfileIds(testDb.db, {
+      ...admin,
+      includeHidden: true,
+      includeRemoved: true,
+    });
+    expect(all.sort()).toEqual([ids.visible, ids.hidden, ids.removed].sort());
+  });
+
+  it('verweigert includeRemoved für Nicht-Admins', async () => {
+    await expect(
+      visibleProfileIds(testDb.db, { userId: ids.viewer, orgId: ids.muuv, includeRemoved: true }),
+    ).rejects.toBeInstanceOf(AccessDeniedError);
+  });
+
   it('liefert nichts für Nutzer ohne Mitgliedschaft', async () => {
     const result = await visibleProfileIds(testDb.db, { userId: ids.outsider, orgId: ids.muuv });
     expect(result).toEqual([]);

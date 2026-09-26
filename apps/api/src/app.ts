@@ -5,6 +5,9 @@ import type { AppDeps, AppEnv } from './context';
 import { ApiError, createErrorHandler, errorResponse, notFoundHandler } from './errors';
 import { consoleLogger } from './logger';
 import { csrfProtection, requestLogger } from './middleware';
+import { registerAmazonOAuthRoutes } from './routes/amazon-oauth';
+import { registerClientRoutes } from './routes/clients';
+import { registerConnectionRoutes } from './routes/connections';
 import { registerHealthRoutes } from './routes/health';
 import { registerMeRoutes } from './routes/me';
 import { registerSettingsRoutes } from './routes/settings';
@@ -69,6 +72,9 @@ export function createApp(options: CreateAppOptions) {
   registerHealthRoutes(app, deps);
   registerMeRoutes(app, deps);
   registerSettingsRoutes(app, deps);
+  registerAmazonOAuthRoutes(app, deps);
+  registerConnectionRoutes(app, deps);
+  registerClientRoutes(app, deps);
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

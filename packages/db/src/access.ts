@@ -7,7 +7,8 @@ import { amazonAdsProfiles, members, orgEntitlements, organizations } from './sc
  * Zentraler Access-Layer. ALLE Profil-Abfragen laufen hierüber (siehe CLAUDE.md).
  *
  * Regel Phase 0: Ein Mitglied sieht alle Profile seiner Organisation, die Amazon noch liefert
- * (`removed_at IS NULL`). Ausgeblendete Profile nur mit `includeHidden`, und das nur für Admins.
+ * (`removed_at IS NULL`). Ausgeblendete Profile nur mit `includeHidden`, entfernte nur mit
+ * `includeRemoved`, beides nur für Admins (Verwaltung unter Admin → Clients & Connections).
  * Profil-Freigaben pro Mitglied (Phase 6) werden hier ergänzt, ohne die Signaturen zu ändern.
  */
 
@@ -23,6 +24,8 @@ export interface ProfileVisibilityInput {
   orgId: string;
   /** Auch ausgeblendete Profile einbeziehen (nur Org-Admins). */
   includeHidden?: boolean;
+  /** Auch Profile einbeziehen, die Amazon nicht mehr liefert (nur Org-Admins). */
+  includeRemoved?: boolean;
 }
 
 /** Rolle des Nutzers in der Organisation oder `null`, wenn er kein Mitglied ist. */
@@ -84,11 +87,12 @@ async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Prom
   if (input.includeHidden && role !== 'admin') {
     throw new AccessDeniedError('Nur Org-Admins dürfen ausgeblendete Profile sehen.');
   }
+  if (input.includeRemoved && role !== 'admin') {
+    throw new AccessDeniedError('Nur Org-Admins dürfen entfernte Profile sehen.');
+  }
 
-  const conditions: SQL[] = [
-    eq(amazonAdsProfiles.organizationId, input.orgId),
-    isNull(amazonAdsProfiles.removedAt),
-  ];
+  const conditions: SQL[] = [eq(amazonAdsProfiles.organizationId, input.orgId)];
+  if (!input.includeRemoved) conditions.push(isNull(amazonAdsProfiles.removedAt));
   if (!input.includeHidden) conditions.push(eq(amazonAdsProfiles.isHidden, false));
   return conditions;
 }

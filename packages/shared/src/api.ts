@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { FEATURE_KEYS, type FeatureKey } from './features';
 import { ORG_ROLES, PLATFORM_ROLES } from './roles';
+import { isSlug, SLUG_MAX_LENGTH } from './slug';
 
 /**
  * zod-Schemas der eigenen API (`/api/*` außer `/api/auth/*`). Die API validiert damit Ein- und
@@ -151,3 +152,175 @@ export const meResponseSchema = z
   })
   .meta({ id: 'Me' });
 export type MeResponse = z.infer<typeof meResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Gemeinsame Bausteine
+// ---------------------------------------------------------------------------
+
+/** Pfad-Parameter `{id}` (interne UUID). */
+export const idParamSchema = z.object({ id: z.uuid() });
+
+const timestamp = z.iso.datetime();
+
+// ---------------------------------------------------------------------------
+// Amazon-OAuth
+// ---------------------------------------------------------------------------
+
+export const CONNECTION_REGIONS = ['eu', 'na', 'fe'] as const;
+export type ConnectionRegion = (typeof CONNECTION_REGIONS)[number];
+
+export const amazonOAuthStartSchema = z
+  .object({
+    /** Standard `eu`. Bei `connectionId` gilt die Region der Connection. */
+    region: z.enum(CONNECTION_REGIONS).optional(),
+    /** „Neu verbinden“: bestehende Connection der aktiven Organisation. */
+    connectionId: z.uuid().optional(),
+  })
+  .meta({ id: 'AmazonOAuthStart' });
+export type AmazonOAuthStart = z.infer<typeof amazonOAuthStartSchema>;
+
+export const amazonOAuthRedirectSchema = z
+  .object({
+    /** Einwilligungsseite von Amazon (bzw. des Mocks). Der Browser navigiert dorthin. */
+    url: z.string(),
+  })
+  .meta({ id: 'AmazonOAuthRedirect' });
+
+/**
+ * Ergebnis des OAuth-Callbacks. Die API leitet auf `/admin/connections?oauth=<Ergebnis>` zurück,
+ * die Seite zeigt es als Hinweis an.
+ */
+export const AMAZON_OAUTH_RESULTS = [
+  'connected',
+  /** Verbunden, aber der Profil-Sync ließ sich nicht einplanen („Jetzt synchronisieren“ nutzen). */
+  'connected_sync_failed',
+  /** Einwilligung bei Amazon abgelehnt. */
+  'access_denied',
+  'invalid_state',
+  'state_expired',
+  'state_used',
+  /** Keine oder eine andere Session als beim Start. */
+  'session_mismatch',
+  /** Nicht (mehr) Admin der Organisation. */
+  'forbidden',
+  'connection_not_found',
+  /** Beim Neu-Verbinden mit einem anderen Amazon-Konto angemeldet. */
+  'account_mismatch',
+  'amazon_error',
+  /** Unerwarteter Fehler in der App (Details im Server-Log unter der Request-ID). */
+  'internal_error',
+] as const;
+export type AmazonOAuthResult = (typeof AMAZON_OAUTH_RESULTS)[number];
+
+// ---------------------------------------------------------------------------
+// Connections
+// ---------------------------------------------------------------------------
+
+export const CONNECTION_STATUSES = ['active', 'reauth_required', 'error'] as const;
+
+export const connectionSchema = z
+  .object({
+    id: z.uuid(),
+    provider: z.enum(['amazon_ads']),
+    region: z.enum(CONNECTION_REGIONS).nullable(),
+    /** Amazon: LWA-User-ID des verbundenen Kontos. */
+    externalAccountId: z.string(),
+    externalAccountEmail: z.string().nullable(),
+    status: z.enum(CONNECTION_STATUSES),
+    lastRefreshedAt: timestamp.nullable(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+  .meta({ id: 'Connection' });
+export type Connection = z.infer<typeof connectionSchema>;
+
+export const connectionListSchema = z
+  .object({ connections: z.array(connectionSchema) })
+  .meta({ id: 'ConnectionList' });
+
+export const syncQueuedSchema = z
+  .object({ status: z.literal('queued') })
+  .meta({ id: 'SyncQueued' });
+
+// ---------------------------------------------------------------------------
+// Amazon-Ads-Profile
+// ---------------------------------------------------------------------------
+
+export const profileSchema = z
+  .object({
+    /** Interne ID (`profileId`). */
+    id: z.uuid(),
+    connectionId: z.uuid(),
+    clientId: z.uuid().nullable(),
+    /** Amazons Profil-ID, immer als String. */
+    amazonProfileId: z.string(),
+    amazonAccountId: z.string().nullable(),
+    accountName: z.string(),
+    countryCode: z.string(),
+    currencyCode: z.string(),
+    timezone: z.string(),
+    marketplaceId: z.string().nullable(),
+    /** `seller` | `vendor` | `agency` oder ein neuer Amazon-Wert. */
+    accountType: z.string(),
+    isHidden: z.boolean(),
+    /** Gesetzt, wenn Amazon das Profil nicht mehr liefert. */
+    removedAt: timestamp.nullable(),
+    syncedAt: timestamp.nullable(),
+  })
+  .meta({ id: 'Profile' });
+export type Profile = z.infer<typeof profileSchema>;
+
+export const profileListSchema = z
+  .object({ profiles: z.array(profileSchema) })
+  .meta({ id: 'ProfileList' });
+
+export const profilePatchSchema = z
+  .strictObject({
+    /** Client derselben Organisation oder `null` (Zuordnung lösen). */
+    clientId: z.uuid().nullable().optional(),
+    isHidden: z.boolean().optional(),
+  })
+  .refine((patch) => patch.clientId !== undefined || patch.isHidden !== undefined, {
+    message: 'mindestens clientId oder isHidden angeben',
+  })
+  .meta({ id: 'ProfilePatch' });
+export type ProfilePatch = z.infer<typeof profilePatchSchema>;
+
+// ---------------------------------------------------------------------------
+// Clients
+// ---------------------------------------------------------------------------
+
+const clientName = z.string().trim().min(1).max(120);
+const clientSlug = z.string().max(SLUG_MAX_LENGTH).refine(isSlug, {
+  message: 'nur Kleinbuchstaben, Ziffern und einzelne Bindestriche',
+});
+
+export const clientSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    slug: z.string(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+  .meta({ id: 'Client' });
+export type Client = z.infer<typeof clientSchema>;
+
+export const clientListSchema = z
+  .object({ clients: z.array(clientSchema) })
+  .meta({ id: 'ClientList' });
+
+export const clientCreateSchema = z
+  .strictObject({
+    name: clientName,
+    /** Standard: aus dem Namen gebildet (`slugify`). */
+    slug: clientSlug.optional(),
+  })
+  .meta({ id: 'ClientCreate' });
+
+export const clientPatchSchema = z
+  .strictObject({ name: clientName.optional(), slug: clientSlug.optional() })
+  .refine((patch) => patch.name !== undefined || patch.slug !== undefined, {
+    message: 'mindestens name oder slug angeben',
+  })
+  .meta({ id: 'ClientPatch' });

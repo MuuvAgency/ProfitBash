@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { KeyringError, parseKeyring, type KeyringEnv } from './crypto';
 
 /**
  * Bausteine für die Env-Schemas der Apps. Jede App setzt daraus ihr Schema zusammen
@@ -34,6 +35,68 @@ export const seedAdminSchema = z.object({
   SEED_ADMIN_EMAIL: z.email(),
   SEED_ADMIN_PASSWORD: z.string().min(12, 'mindestens 12 Zeichen'),
 });
+
+/** Leere Werte aus `.env` (`NAME=`) gelten als nicht gesetzt. */
+const optionalString = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().optional(),
+);
+
+/**
+ * Schlüssel für verschlüsselte Secrets (`@profitbash/shared/crypto`). Nur die Form wird hier geprüft;
+ * den Inhalt prüft `refineKeyring` über `parseKeyring`.
+ */
+export const encryptionEnvSchema = z.object({
+  ENCRYPTION_KEY: z.string().min(1, 'fehlt (openssl rand -base64 32)'),
+  ENCRYPTION_KEY_ID: z.string().min(1, 'fehlt (z. B. k1)'),
+  ENCRYPTION_KEYS_PREVIOUS: optionalString,
+});
+
+/** Prüft die Schlüssel mit `parseKeyring`. Für `superRefine` des App-Schemas. */
+export function refineKeyring(env: KeyringEnv, ctx: z.RefinementCtx): void {
+  try {
+    parseKeyring(env);
+  } catch (error) {
+    // KeyringError-Meldungen nennen die Variable, aber nie Schlüsselmaterial.
+    if (!(error instanceof KeyringError)) throw error;
+    ctx.addIssue({ code: 'custom', path: ['ENCRYPTION_KEY'], message: error.message });
+  }
+}
+
+export const oauthStateSecretSchema = z.object({
+  OAUTH_STATE_SECRET: z.string().min(32, 'mindestens 32 Zeichen (openssl rand -base64 32)'),
+});
+
+/**
+ * Amazon Ads (Login with Amazon). `AMAZON_ADS_USE_MOCK=true` nutzt den Mock-Anbieter, dann sind
+ * Client-ID und Secret nicht nötig (siehe `refineAmazonAdsCredentials`).
+ */
+export const amazonAdsEnvSchema = z.object({
+  AMAZON_ADS_CLIENT_ID: optionalString,
+  AMAZON_ADS_CLIENT_SECRET: optionalString,
+  AMAZON_ADS_REDIRECT_URI: z.url({ protocol: /^https?$/ }),
+  AMAZON_ADS_USE_MOCK: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+});
+
+/** Ohne Mock sind Client-ID und Secret Pflicht. Für `superRefine` des App-Schemas. */
+export function refineAmazonAdsCredentials(
+  env: z.output<typeof amazonAdsEnvSchema>,
+  ctx: z.RefinementCtx,
+): void {
+  if (env.AMAZON_ADS_USE_MOCK) return;
+  for (const name of ['AMAZON_ADS_CLIENT_ID', 'AMAZON_ADS_CLIENT_SECRET'] as const) {
+    if (!env[name]) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [name],
+        message: 'fehlt (Pflicht, solange AMAZON_ADS_USE_MOCK nicht true ist)',
+      });
+    }
+  }
+}
 
 export class EnvValidationError extends Error {
   constructor(public readonly issues: string[]) {

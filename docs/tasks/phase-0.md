@@ -117,7 +117,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] Tests (TDD, 26): Roundtrip, zufällige IV, Format ohne Klartext, falscher Key, manipulierter und abgeschnittener Tag,
   manipulierter Ciphertext, falsche und leere AAD, unbekannte `keyId`, kaputte Formate, Log-Injection, Rotation,
   strenge Schlüsselprüfung ohne Schlüssel in Fehlermeldungen. Der Tag-Längen-Test ist per Mutation geprüft.
-- [ ] Einbindung in die Env-Validierung der Apps mit dem ersten Nutzer (0.6: Connection anlegen).
+- [x] Einbindung in die Env-Validierung der Apps mit dem ersten Nutzer (0.6: Connection anlegen). Die API prüft den Keyring beim Start (`refineKeyring`); der Worker folgt mit 0.7.
 
 ### 0.4 Auth & `/api/me` (`apps/api`)
 - [x] Hono-Server, better-auth gemountet unter `/api/auth/*`, E-Mail/Passwort, Organization-Plugin mit eigenen Rollen, Admin-Plugin, Signup deaktiviert, `trustedOrigins` = `APP_URL`.
@@ -205,28 +205,54 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - msw ist Dev-Abhängigkeit von `packages/amazon-ads`; sein Postinstall (Service-Worker-Datei für Browser) ist in `pnpm-workspace.yaml` abgeschaltet.
 
 ### 0.6 OAuth-Flow & Connections-API (`apps/api`)
-- [ ] `POST /api/amazon/oauth/start` (nur Admin, optional `connectionId` für „Neu verbinden") → Redirect-URL mit `state`:
+- [x] `POST /api/amazon/oauth/start` (nur Admin, optional `connectionId` für „Neu verbinden") → Redirect-URL mit `state`:
   - signiert (HMAC mit `OAUTH_STATE_SECRET`), enthält Org, User, optional Connection, Ablaufzeit 10 Min. und eine Nonce
   - die Nonce ist **einmal verwendbar** (in `verifications` gespeichert und beim Callback gelöscht)
-- [ ] `GET /api/amazon/oauth/callback`:
+- [x] `GET /api/amazon/oauth/callback`:
   - verlangt eine Session: `session.userId == state.userId`, und der Nutzer ist weiterhin Admin von `state.orgId`
   - Code tauschen, Identität holen, Connection per **Upsert** auf (`organization_id`, `provider`, `region`, `external_account_id`) anlegen bzw. aktualisieren
     (Token verschlüsselt mit `connectionTokenAad` über genau diesen natürlichen Schlüssel, `status = active`)
   - `profiles-sync` sofort enqueuen, Redirect auf `${APP_URL}/admin/connections`. Fehler landen als Hinweis auf der Seite.
-- [ ] Connections und Clients:
+- [x] Connections und Clients:
   - `GET /api/connections`, `POST /api/connections/:id/sync`
   - `GET /api/connections/:id/profiles`
   - `PATCH /api/profiles/:id` (`client_id`, `is_hidden`); `client_id` muss zur selben Organisation gehören (die DB erzwingt es zusätzlich)
   - `GET /api/clients`, `POST /api/clients`, `PATCH /api/clients/:id`
-- [ ] Jede schreibende Aktion erzeugt ein `audit_event`.
-- [ ] Tests: fremde Session am Callback, abgelaufener und wiederverwendeter `state`, Neu-Verbinden aktualisiert statt dupliziert
+- [x] Jede schreibende Aktion erzeugt ein `audit_event`.
+- [x] Tests: fremde Session am Callback, abgelaufener und wiederverwendeter `state`, Neu-Verbinden aktualisiert statt dupliziert
   **und der gespeicherte Token lässt sich danach entschlüsseln**.
-- [ ] Offen aus 0.5:
+- [x] Offen aus 0.5:
   - Env-Schema für `AMAZON_ADS_CLIENT_ID`/`_SECRET`/`_REDIRECT_URI`/`_USE_MOCK` und `ENCRYPTION_*` (Keyring) in die API einbinden;
     `AMAZON_ADS_USE_MOCK=true` → `createMockAmazonAdsClient`, sonst `createAmazonAdsClient` (Client-ID/Secret dann Pflicht).
   - Route für die Mock-Einwilligungsseite (`renderMockConsentPage`) nur bei `AMAZON_ADS_USE_MOCK=true` mounten, `consentUrl` darauf zeigen lassen.
   - Beim Verdrahten per Typ prüfen, dass `ConnectionTokenStore` (db) zu `RefreshTokenStore` (amazon-ads) passt (heute strukturell kompatibel).
   - Nach dem Neu-Verbinden `invalidateAccessToken(connectionId)` aufrufen. Callback-Parameter `error=access_denied` als Hinweis anzeigen.
+- [x] Umsetzung (Stand für 0.7/0.8):
+  - **Env:** Bausteine in `@profitbash/shared/env` (`encryptionEnvSchema` + `refineKeyring`, `oauthStateSecretSchema`, `amazonAdsEnvSchema` +
+    `refineAmazonAdsCredentials`), damit der Worker in 0.7 dieselben Regeln nutzt. `AMAZON_ADS_USE_MOCK` ist ohne Angabe `false`;
+    `AMAZON_ADS_REDIRECT_URI` muss genau `${APP_URL}/api/amazon/oauth/callback` sein. `loadApiEnv()` liefert zusätzlich `keyring`.
+  - **Verdrahtung:** `createAmazonAdsDeps({ env, db, keyring, logger })` in `apps/api/src/amazon.ts` wählt Mock oder echten Client
+    (Token-Store per Typ als `RefreshTokenStore` abgesichert). Die Mock-Einwilligungsseite liegt unter `/api/amazon/oauth/mock-consent`
+    (eigene CSP, `no-referrer`), Callback und Mock-Seite stehen bewusst nicht im OpenAPI-Dokument.
+  - **State:** `apps/api/src/oauth-state.ts`, Format `<base64url(JSON)>.<base64url(HMAC-SHA256)>` mit Kontext-Präfix. Nonce in `verifications`
+    mit Präfix `amazon-ads-oauth:` (Wert = User-ID), abgelaufene werden beim nächsten Start aufgeräumt. Der Start selbst schreibt kein
+    Audit-Event (nur technische Nonce); auditiert wird der Upsert (`connection.create` bzw. `connection.reconnect`, `xmax = 0`).
+  - **Callback-Reihenfolge:** Signatur/Ablauf → Session-Nutzer = `state.userId` → Nonce verbrauchen → `error`-Parameter → Admin von `state.orgId`
+    → bei „Neu verbinden“ muss die Connection existieren und das Amazon-Konto gleich sein (`account_mismatch`) → Upsert → `invalidateAccessToken`
+    → Sync einplanen. Ergebnis immer als Redirect `/admin/connections?oauth=<Ergebnis>`, Werte in `AMAZON_OAUTH_RESULTS` (`@profitbash/shared`),
+    auch bei unerwarteten Fehlern (`internal_error`).
+  - **Rechte:** Alle Connection-, Profil- und Client-Endpunkte sind in Phase 0 admin-only, per Middleware je Route (`orgAdminOnly`), nicht per
+    Pfad-Präfix. Profile laufen über den Access-Layer, der dafür `includeRemoved` (nur Admins) bekommen hat.
+  - **Fehler-Log:** Fehlgeschlagene Drizzle-Abfragen werden ohne Parameterwerte geloggt (`errorLogFields`: SQL mit Platzhaltern, Postgres-Code, Constraint).
+  - **Offen für 0.7:**
+    - `JobQueue` (`apps/api/src/jobs.ts`) mit pg-boss umsetzen; `createUnavailableJobQueue` in `index.ts` ersetzen (loggt heute nur `jobs.not_available`,
+      `POST /api/connections/:id/sync` antwortet trotzdem `202`).
+    - `POST /api/connections/:id/sync` schreibt das Audit-Event und plant den Job in einer Transaktion ein. Mit pg-boss auf eigener Verbindung
+      entweder `send` mit derselben Transaktion ausführen oder erst nach dem Commit einplanen (sonst Job ohne Audit-Event möglich).
+  - **Offen für 0.8 Teil 2:** Methoden im Web-Client (`src/api/client.ts`) für die neuen Endpunkte; Hinweis aus `?oauth=` über i18n-Keys je Wert
+    aus `AMAZON_OAUTH_RESULTS`; Start per `POST /api/amazon/oauth/start` und `window.location = url`.
+  - **Offen für Phase 6:** Connections und Clients filtern direkt nach Organisation (keine Profile, daher nicht im Access-Layer). Für den
+    Lesezugriff von Kunden-Orgs auf Clients Helfer in `packages/db/src/access.ts` ergänzen (ADR 002 §5).
 
 ### 0.7 Worker & Jobs (`apps/worker`)
 - [ ] pg-boss-Setup, Job-Wrapper `runJob(name, scope, fn)`:

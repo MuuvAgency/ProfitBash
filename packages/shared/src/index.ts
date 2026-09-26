@@ -6,3 +6,4 @@ export * from './api';
 export * from './features';
 export * from './format';
 export * from './roles';
+export * from './slug';

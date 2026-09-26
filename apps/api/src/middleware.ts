@@ -109,6 +109,15 @@ export function requireRole(minimum: OrgRole): MiddlewareHandler<AppEnv> {
   };
 }
 
+/**
+ * Session und Rolle `admin` in der aktiven Organisation, als Middleware einer einzelnen Route
+ * (`app.openapi({ ...route, middleware: orgAdminOnly(deps) }, …)`). Bewusst je Route statt per
+ * Pfad-Präfix, damit spätere Routen unter demselben Präfix nicht unbemerkt admin-only werden.
+ */
+export function orgAdminOnly(deps: Pick<AppDeps, 'db' | 'auth'>) {
+  return [requireSession(deps), requireRole('admin')];
+}
+
 /** Verlangt die Plattform-Rolle `superadmin`. Nach `requireSession`. */
 export function requireSuperadmin(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {

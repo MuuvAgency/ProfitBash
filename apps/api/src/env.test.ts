@@ -1,0 +1,116 @@
+import { randomBytes } from 'node:crypto';
+import { EnvValidationError } from '@profitbash/shared/env';
+import { describe, expect, it } from 'vitest';
+import { loadApiEnv } from './env';
+
+const key = randomBytes(32).toString('base64');
+const previousKey = randomBytes(32).toString('base64');
+
+const base = {
+  APP_URL: 'http://localhost:5173',
+  DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
+  BETTER_AUTH_SECRET: 'a'.repeat(32),
+  ENCRYPTION_KEY: key,
+  ENCRYPTION_KEY_ID: 'k1',
+  OAUTH_STATE_SECRET: 'o'.repeat(32),
+  AMAZON_ADS_REDIRECT_URI: 'http://localhost:5173/api/amazon/oauth/callback',
+  AMAZON_ADS_USE_MOCK: 'true',
+};
+
+function load(source: Record<string, string | undefined>) {
+  return loadApiEnv({ source });
+}
+
+function messageOf(fn: () => unknown): string {
+  try {
+    fn();
+  } catch (error) {
+    expect(error).toBeInstanceOf(EnvValidationError);
+    return (error as Error).message;
+  }
+  throw new Error('Erwarteter EnvValidationError blieb aus.');
+}
+
+describe('loadApiEnv', () => {
+  it('baut den Keyring aus ENCRYPTION_* (inkl. vorheriger Schlüssel)', () => {
+    const env = load({ ...base, ENCRYPTION_KEYS_PREVIOUS: `k0:${previousKey}` });
+    expect(env.keyring.current.id).toBe('k1');
+    expect(env.keyring.previous.map((k) => k.id)).toEqual(['k0']);
+  });
+
+  it('nennt einen ungültigen Schlüssel, ohne seinen Wert zu zeigen', () => {
+    const shortKey = randomBytes(16).toString('base64');
+    const message = messageOf(() => load({ ...base, ENCRYPTION_KEY: shortKey }));
+    expect(message).toContain('ENCRYPTION_KEY');
+    expect(message).not.toContain(shortKey);
+  });
+
+  it('verlangt ENCRYPTION_KEY, ENCRYPTION_KEY_ID und OAUTH_STATE_SECRET', () => {
+    const message = messageOf(() =>
+      load({
+        ...base,
+        ENCRYPTION_KEY: undefined,
+        ENCRYPTION_KEY_ID: '',
+        OAUTH_STATE_SECRET: 'zu-kurz',
+      }),
+    );
+    expect(message).toContain('ENCRYPTION_KEY');
+    expect(message).toContain('ENCRYPTION_KEY_ID');
+    expect(message).toContain('OAUTH_STATE_SECRET');
+    expect(message).not.toContain('zu-kurz');
+  });
+
+  it('Mock-Modus braucht keine Amazon-Zugangsdaten', () => {
+    const env = load({ ...base, AMAZON_ADS_CLIENT_ID: '', AMAZON_ADS_CLIENT_SECRET: '' });
+    expect(env.AMAZON_ADS_USE_MOCK).toBe(true);
+    expect(env.AMAZON_ADS_CLIENT_ID).toBeUndefined();
+  });
+
+  it('ohne Mock sind Client-ID und Secret Pflicht (Standard ist kein Mock)', () => {
+    const message = messageOf(() => load({ ...base, AMAZON_ADS_USE_MOCK: undefined }));
+    expect(message).toContain('AMAZON_ADS_CLIENT_ID');
+    expect(message).toContain('AMAZON_ADS_CLIENT_SECRET');
+
+    const env = load({
+      ...base,
+      AMAZON_ADS_USE_MOCK: 'false',
+      AMAZON_ADS_CLIENT_ID: 'amzn1.application-oa2-client.x',
+      AMAZON_ADS_CLIENT_SECRET: 'geheim',
+    });
+    expect(env.AMAZON_ADS_USE_MOCK).toBe(false);
+    expect(env.AMAZON_ADS_CLIENT_ID).toBe('amzn1.application-oa2-client.x');
+  });
+
+  it('lehnt andere Werte als true/false für AMAZON_ADS_USE_MOCK ab', () => {
+    expect(messageOf(() => load({ ...base, AMAZON_ADS_USE_MOCK: 'yes' }))).toContain(
+      'AMAZON_ADS_USE_MOCK',
+    );
+  });
+
+  it('verlangt die Callback-URL auf der Origin von APP_URL (Session-Cookie)', () => {
+    const otherOrigin = messageOf(() =>
+      load({
+        ...base,
+        AMAZON_ADS_REDIRECT_URI: 'http://localhost:8787/api/amazon/oauth/callback',
+      }),
+    );
+    expect(otherOrigin).toContain('AMAZON_ADS_REDIRECT_URI');
+
+    const otherPath = messageOf(() =>
+      load({ ...base, AMAZON_ADS_REDIRECT_URI: 'http://localhost:5173/callback' }),
+    );
+    expect(otherPath).toContain('AMAZON_ADS_REDIRECT_URI');
+  });
+
+  it('meldet kaputte URLs als Env-Fehler statt mit einem TypeError abzubrechen', () => {
+    const message = messageOf(() =>
+      load({
+        ...base,
+        APP_URL: 'kaputt',
+        AMAZON_ADS_REDIRECT_URI: 'auch-kaputt',
+      }),
+    );
+    expect(message).toContain('APP_URL');
+    expect(message).toContain('AMAZON_ADS_REDIRECT_URI');
+  });
+});

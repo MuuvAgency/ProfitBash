@@ -1,8 +1,9 @@
 import { createDb, type Db } from '@profitbash/db';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import type { LogEntry } from './logger';
-import { createTestContext, readJson, request, TEST_APP_URL, type TestContext } from './testing';
+import { createTestContext, readJson, request, type TestContext } from './testing';
 
 let ctx: TestContext;
 
@@ -23,13 +24,7 @@ describe('GET /api/health', () => {
 
   it('antwortet mit 503, wenn die Datenbank nicht erreichbar ist', async () => {
     const broken = createDb('postgres://profitbash@127.0.0.1:1/gibt_es_nicht', { max: 1 });
-    const app = createApp({
-      db: broken.db,
-      auth: ctx.auth,
-      appUrl: TEST_APP_URL,
-      version: 'test-version',
-      logger: () => {},
-    });
+    const app = createApp({ ...ctx.deps, db: broken.db, logger: () => {} });
     try {
       const res = await app.request('/api/health');
       expect(res.status).toBe(503);
@@ -41,14 +36,7 @@ describe('GET /api/health', () => {
 
   it('antwortet mit 503, wenn die Datenbank nicht rechtzeitig antwortet', async () => {
     const hangingDb = { execute: () => new Promise(() => {}) } as unknown as Db;
-    const app = createApp({
-      db: hangingDb,
-      auth: ctx.auth,
-      appUrl: TEST_APP_URL,
-      version: 'test-version',
-      logger: () => {},
-      healthTimeoutMs: 50,
-    });
+    const app = createApp({ ...ctx.deps, db: hangingDb, logger: () => {}, healthTimeoutMs: 50 });
     const res = await app.request('/api/health');
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ status: 'error', db: 'error', version: 'test-version' });
@@ -56,6 +44,22 @@ describe('GET /api/health', () => {
 });
 
 describe('Fehlerformat', () => {
+  it('loggt fehlgeschlagene DB-Abfragen ohne Parameterwerte (Secrets, PII)', async () => {
+    const logs: LogEntry[] = [];
+    const app = createApp({ ...ctx.deps, logger: (entry) => logs.push(entry) });
+    app.get('/test-db-fehler', async () => {
+      await ctx.testDb.db.execute(sql`select ${'geheimer-parameter'}::int`);
+      return new Response('unerreichbar');
+    });
+
+    const res = await app.request('/api/test-db-fehler');
+
+    expect(res.status).toBe(500);
+    const errorLog = logs.find((entry) => entry.level === 'error');
+    expect(errorLog).toMatchObject({ dbCode: '22P02' });
+    expect(JSON.stringify(logs)).not.toContain('geheimer-parameter');
+  });
+
   it('unbekannte Routen liefern 404 im Fehlerformat', async () => {
     const res = await request(ctx, '/api/gibt-es-nicht');
     expect(res.status).toBe(404);
@@ -66,13 +70,7 @@ describe('Fehlerformat', () => {
 
   it('unerwartete Fehler liefern 500 ohne interne Details und werden geloggt', async () => {
     const logs: LogEntry[] = [];
-    const app = createApp({
-      db: ctx.testDb.db,
-      auth: ctx.auth,
-      appUrl: TEST_APP_URL,
-      version: 'test-version',
-      logger: (entry) => logs.push(entry),
-    });
+    const app = createApp({ ...ctx.deps, logger: (entry) => logs.push(entry) });
     app.get('/test-unerwarteter-fehler', () => {
       throw new Error('geheimes internes Detail');
     });

@@ -1,20 +1,54 @@
 // Test-Hilfen für die API. Nur aus Tests importieren.
+import { randomBytes } from 'node:crypto';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import { schema } from '@profitbash/db';
 import type { OrgRole, PlatformRole } from '@profitbash/shared';
+import { parseKeyring, type Keyring } from '@profitbash/shared/crypto';
+import { createAmazonAdsDeps } from './amazon';
 import { createApp } from './app';
 import { createAuth, type Auth } from './auth';
+import type { AppDeps } from './context';
+import { AMAZON_OAUTH_CALLBACK_PATH } from './env';
+import type { JobQueue, ProfilesSyncJob } from './jobs';
 import type { LogEntry } from './logger';
 import { seed, type SeedResult } from './seed';
 
 export const TEST_APP_URL = 'http://localhost:5173';
 export const TEST_PASSWORD = 'ein-sicheres-passwort-123';
+export const TEST_OAUTH_STATE_SECRET = 'test-oauth-state-secret-mit-32-zeichen-00';
+export const TEST_REDIRECT_URI = `${TEST_APP_URL}${AMAZON_OAUTH_CALLBACK_PATH}`;
+
+/** Job-Queue für Tests: merkt sich eingeplante Jobs; `failNext` lässt den nächsten Aufruf scheitern. */
+export interface RecordingJobQueue extends JobQueue {
+  profilesSync: ProfilesSyncJob[];
+  failNext: boolean;
+}
+
+function createRecordingJobQueue(): RecordingJobQueue {
+  const queue: RecordingJobQueue = {
+    profilesSync: [],
+    failNext: false,
+    enqueueProfilesSync(job) {
+      if (queue.failNext) {
+        queue.failNext = false;
+        return Promise.reject(new Error('Queue nicht erreichbar'));
+      }
+      queue.profilesSync.push(job);
+      return Promise.resolve();
+    },
+  };
+  return queue;
+}
 
 export interface TestContext {
   testDb: TestDatabase;
   auth: Auth;
   app: ReturnType<typeof createApp>;
+  /** Abhängigkeiten der App, z. B. um eine zweite App mit Abweichungen zu bauen. */
+  deps: AppDeps;
   logs: LogEntry[];
+  jobs: RecordingJobQueue;
+  keyring: Keyring;
   /** Seed-Admin (Superadmin, Org-Admin von Muuv). */
   seeded: SeedResult & { email: string };
   close(): Promise<void>;
@@ -29,16 +63,46 @@ export async function createTestContext(): Promise<TestContext> {
     trustedOrigins: [TEST_APP_URL],
   });
   const logs: LogEntry[] = [];
-  const app = createApp({
+  const logger = (entry: LogEntry) => logs.push(entry);
+  const keyring = parseKeyring({
+    ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+    ENCRYPTION_KEY_ID: 'k1',
+  });
+  const jobs = createRecordingJobQueue();
+  const deps: AppDeps = {
     db: testDb.db,
     auth,
     appUrl: TEST_APP_URL,
     version: 'test-version',
-    logger: (entry) => logs.push(entry),
-  });
+    logger,
+    amazonAds: createAmazonAdsDeps({
+      env: {
+        APP_URL: TEST_APP_URL,
+        AMAZON_ADS_REDIRECT_URI: TEST_REDIRECT_URI,
+        AMAZON_ADS_USE_MOCK: true,
+      },
+      db: testDb.db,
+      keyring,
+      logger,
+    }),
+    keyring,
+    oauthStateSecret: TEST_OAUTH_STATE_SECRET,
+    jobs,
+  };
+  const app = createApp(deps);
   const email = 'admin@muuv.test';
   const seeded = await seed({ db: testDb.db, auth, admin: { email, password: TEST_PASSWORD } });
-  return { testDb, auth, app, logs, seeded: { ...seeded, email }, close: () => testDb.close() };
+  return {
+    testDb,
+    auth,
+    app,
+    deps,
+    logs,
+    jobs,
+    keyring,
+    seeded: { ...seeded, email },
+    close: () => testDb.close(),
+  };
 }
 
 /** Legt einen Nutzer an und fügt ihn optional einer Organisation mit Rolle hinzu. */

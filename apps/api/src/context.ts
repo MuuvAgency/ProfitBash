@@ -1,7 +1,10 @@
 import type { Db, Membership } from '@profitbash/db';
 import type { OrgRole, PlatformRole } from '@profitbash/shared';
+import type { Keyring } from '@profitbash/shared/crypto';
 import type { RequestIdVariables } from 'hono/request-id';
+import type { AmazonAdsDeps } from './amazon';
 import type { Auth } from './auth';
+import type { JobQueue } from './jobs';
 import type { Logger } from './logger';
 
 /** Abhängigkeiten der App. Werden beim Start (bzw. im Test) übergeben, nie global importiert. */
@@ -13,6 +16,13 @@ export interface AppDeps {
   /** Ausgelieferte Version, z. B. Git-Commit. */
   version: string;
   logger: Logger;
+  /** Amazon-Client (echt oder Mock, siehe `createAmazonAdsDeps`). */
+  amazonAds: AmazonAdsDeps;
+  /** Schlüssel für Refresh-Tokens (`ENCRYPTION_*`). */
+  keyring: Keyring;
+  /** HMAC-Secret für den OAuth-`state` (`OAUTH_STATE_SECRET`). */
+  oauthStateSecret: string;
+  jobs: JobQueue;
   /** Zeit bis `/api/health` eine nicht antwortende DB als Fehler meldet (Standard 3 s). */
   healthTimeoutMs?: number;
 }
