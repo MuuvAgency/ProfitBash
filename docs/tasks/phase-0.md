@@ -13,7 +13,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 ## Definition of Done
 
 - [ ] `pnpm dev` startet api, worker und web lokal (lokales Postgres 17 über Homebrew); `pnpm test`, `pnpm typecheck` und `pnpm lint` sind grün.
-- [ ] CI (GitHub Actions) läuft bei jedem Push auf `main` und bei Pull Requests: Schema-/Migrations-Check, typecheck, lint, test, build.
+- [x] CI (GitHub Actions) läuft bei jedem Push auf `main` und bei Pull Requests: Schema-/Migrations-Check, typecheck, lint, test, build.
 - [ ] Railway-Service `app` (API + Web auf einer Origin, `WORKER_MODE=inline`, `NODE_ENV=production`) ist erreichbar und nutzt Railway-Postgres mit Backups.
 - [x] Login mit E-Mail/Passwort. Der Seed legt einen Admin an (Org-Admin von „Muuv" und Plattform-Superadmin). Öffentliche Registrierung ist deaktiviert.
 - [x] Die App-Shell zeigt die komplette Sidebar aus `docs/plan.md` §3. Menüpunkte späterer Phasen öffnen eine Platzhalterseite „Kommt in Phase N".
@@ -339,10 +339,28 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - Account-Menü: Dark Mode, Settings, Shortcuts, Logout
   - Quick-Tools-Popover (nur Platzhalter)
 - [x] Platzhalterseite je späterem Menüpunkt mit Phasenhinweis.
-- [ ] **Clients & Connections:**
+- [x] **Clients & Connections:**
   - Button „Amazon-Account verbinden", Liste der Connections mit Status (inkl. „Neu verbinden" bei `reauth_required`)
   - Profiltabelle (AG Grid Community): Flagge, Land, Account-Name, Typ, Währung, Zeitzone, Client (Auswahl oder neu anlegen), Ausblenden-Toggle, Filter „entfernte anzeigen"
   - Button „Jetzt synchronisieren"
+- [x] Umsetzung Clients & Connections (Stand für Sync-Status/Settings):
+  - Seite `src/pages/ConnectionsPage.vue`, Bausteine in `src/connections/` (Karte je Connection, Profiltabelle, Zellen, Client-Dialog,
+    Query-Hooks). Der Router bekommt fertige Seiten über die Map `PAGES` in `src/router/index.ts` (Key = `NavItem.id`), alle anderen Einträge
+    bleiben Platzhalter.
+  - Query-Keys enthalten die aktive Org (`connectionKeys` in `src/connections/queries.ts`). Profil-Änderungen sind optimistisch und werden bei
+    einem Fehler zurückgenommen (sonst zeigten Schalter/Auswahl einen ungespeicherten Stand).
+  - Verbinden: `POST /api/amazon/oauth/start`, dann `browserNavigation.assign(url)` (nur `http(s)`-URLs; als Objekt, damit Tests es ersetzen).
+    `?oauth=<Ergebnis>` erscheint als Hinweis (`oauthNotice`), Schließen entfernt den Parameter.
+  - Nach „Jetzt synchronisieren“ lädt die Karte Connections und Profile nach 5 s einmal neu. Den Fortschritt zeigt später der Sync-Status.
+  - **AG Grid:** `src/grid/grid.ts` registriert nur die genutzten Community-Module (fehlende meldet in der Entwicklung das `ValidationModule`)
+    und baut das Theme aus den Token-CSS-Variablen (Hell/Dunkel ohne zweites Theme). Grid-CSS liegt im Layer `ag-grid` (Reihenfolge in
+    `src/styles/main.css`) und wird in den `<body>` geschrieben (`gridStyleOptions`), sonst nähme Tailwinds Preflight den Zellen das Padding.
+    Zeilenklassen über `rowClassRules` (nur die wertet AG Grid bei geänderten Daten neu aus, `getRowClass` nicht). Vue-Zellen bekommen
+    Callbacks und Clients über den reaktiven Grid-`context`. Das Grid rendert unter happy-dom, Tests laufen gegen das echte Grid
+    (`domLayout: autoHeight`, keine Spalten-Virtualisierung). PrimeVue-Select-Optionen reagieren auf `mousedown`, nicht auf `click`.
+    AG Grid macht den Seiten-Chunk ca. 820 KB groß (lazy Route); `chunkSizeWarningLimit` ist deshalb auf 1000 KB gesetzt.
+  - **Flaggen:** `flag-icons` (MIT) als SVG, keine Emoji-Flaggen (DESIGN.md). Lazy-Glob mit `?no-inline`: jede Flagge eine eigene Datei, geladen
+    wird nur die angezeigte. Amazon liefert `UK` statt ISO `GB` (`isoCountryCode`).
 - [ ] **Sync-Status:** letzte 100 `job_runs`, filterbar nach Job und Status, Fehlertext aufklappbar.
 - [ ] **Settings:** Locale mit Formatvorschau (Zahl, Währung, Prozent), Theme.
 - [x] Gemeinsame Komponenten: `EmptyState`, `InlineError`, `PageHeader`, `SkeletonBlock`; Formatierungs-Helper (Zahl, Währung, Prozent) aus `packages/shared`.
