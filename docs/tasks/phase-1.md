@@ -1,11 +1,11 @@
 # Phase 1 – Daten
 
 > Vor Beginn lesen: `CLAUDE.md`, `docs/plan.md` (§5 „Festlegungen für Phase 1 und später“), `docs/tasks/phase-0.md`
-> (Umsetzungsnotizen 0.5–0.7), `docs/decisions/` (001 Stack, 002 Mandanten-Modell).
+> (Umsetzungsnotizen 0.5–0.7), `docs/decisions/` (001 Stack, 002 Mandanten-Modell, 003 Decimal-Library, 004 Amazon-API).
 >
-> **Status: Entwurf (2026-09-26), in Abstimmung mit Dominik.** Entscheidungen stehen als **F1–F14** unter
-> „Fragen an Dominik“. Entschieden: F1, F2, F4, F6. Noch zu bestätigen: F3, F5, F7–F11, F13, F14 (je mit Empfehlung). Offen: F12.
-> Aufgaben, die von einer Frage abhängen, verweisen darauf. 1.1 beginnt, sobald F3, F5, F7–F11, F13 und F14 bestätigt sind.
+> **Status: abgestimmt (2026-09-26), in Umsetzung.** Entscheidungen stehen als **F1–F14** unter „Fragen an Dominik“.
+> Entschieden: F1–F11, F13, F14. Offen: F12 (betrifft nur die Doku in `phase-0.md`, nicht den Code).
+> Aufgaben, die von einer Frage abhängen, verweisen darauf.
 
 ## Ziel
 
@@ -87,6 +87,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   **Entschieden (Dominik, 2026-09-26): SP zuerst vollständig, SB und SD danach in Phase 1 (1.9).**
 - **F3 – Rollierendes Fenster.** Wie viele Tage lädt der tägliche Import neu? Empfehlung: **30 Tage** (passt in eine Anfrage mit
   max. 31 Tagen, deckt das 14-Tage-Attributionsfenster mit Reserve ab; mehr Tage kosten keine zusätzliche Anfrage).
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F4 – Historie beim ersten Sync.** Wie weit zurück beim ersten Import eines Profils? Empfehlung: **so weit v3 erlaubt**
   (SP 95, SB 60, SD 65 Tage, in 31-Tage-Stücken). Mehr Historie ginge nur über Reporting v1 (Beta) oder Bulk-Downloads aus der Konsole
   (nicht geplant).
@@ -94,28 +95,36 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 - **F5 – Aufbewahrung.** Wie lange bleiben Tageskennzahlen in unserer DB? Empfehlung: **unbegrenzt** (Pilot-Volumen klein,
   Amazon selbst hält nur 60–95 Tage vor, also ist unsere DB die einzige Historie). Wiedervorlage bei Stufe C. Report-Anfragen
   (`amazon_ads_report_requests`) nach 30 Tagen löschen. Heruntergeladene Rohdateien werden nicht gespeichert.
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F6 – Report-Ebenen.** Plan: Kampagne, Ad Group, Target, Product Ad. Zusätzlich **Suchbegriffe** (`spSearchTerm`) und
   **Placements** (`spCampaigns` mit `campaignPlacement`)? Empfehlung: Suchbegriffe **ja** (Grundlage für Negatives und Regeln in
   Phase 3/5, und Amazon hält sie nur 95 Tage vor: was wir nicht sammeln, fehlt später), Placements **nein** (erst mit Bedarf).
   **Entschieden (Dominik, 2026-09-26): Suchbegriffe ja, Placements erst bei Bedarf.**
 - **F7 – Attributionsfenster.** Welche SP-Spalten speichern? Empfehlung: Umsatz, Bestellungen und Einheiten für **7 und 14 Tage**,
   jeweils gesamt und „same SKU“. 1 und 30 Tage nicht (auf Nachfrage per jsonb nachrüstbar, siehe 1.5).
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F8 – Wechselkurse.** Plan §5: Tageskurse (z. B. EZB) in einer eigenen Tabelle. Empfehlung: **erst in Phase 2** mit dem ersten
   Verbraucher (Dashboard-Summen in EUR). Phase 1 speichert nur Originalwährung + Währungscode.
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F9 – Zeitplan.** Empfehlung: Entity-Sync und Report-Anforderung täglich **06:00 Europe/Berlin** (nach dem Profil-Sync um 05:00),
   „Gestern“ jeweils in der Zeitzone des Profils; das Fenster ist `[gestern − (F3 − 1), gestern]`, der laufende Tag nie (unvollständig).
   Zusätzlich manuell über „Jetzt synchronisieren“ (Profile → Entities → Reports).
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F10 – Archivierte Entities.** Empfehlung: **mit** synchronisieren (Kennzahlen der Vergangenheit verweisen auf sie; im Explorer
   später per Filter ausgeblendet).
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F11 – Sichtbares in Phase 1.** Empfehlung: keine Datenansichten (Explorer/Dashboard = Phase 2). Nur Sync-Status (neue Jobs,
   Zähler), auf der Connections-Seite der Ablauf der Einwilligung und je Profil „Daten bis“ (letzter importierter Tag).
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F12 – Antragsweg Ads-API.** Der Übergabe-Prompt beschreibt den Weg „als Partner im Amazon Ads Partner Network → Request API Access“.
   In einer früheren Session hieß es, das Partner Network nehme nur juristische Personen (Muuv ist Einzelunternehmen). Welcher Weg gilt?
   (Betrifft nur die Doku in `phase-0.md` 0.0b/0.0c, nicht den Code.)
   **Stand (Dominik, 2026-09-26): noch offen, wird erst geklärt.** Bis dahin bleibt `phase-0.md` 0.0c unverändert.
 - **F13 – Decimal-Library (ADR 003).** Empfehlung `decimal.js` (Begründung und Alternativen in 1.1).
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F14 – Ausgeblendete Profile.** Synchronisieren? Empfehlung **ja**: Ausblenden ist Darstellung, keine Datenentscheidung, und
   Amazon hält Kennzahlen nur 60–95 Tage vor (später wieder eingeblendete Profile hätten sonst Lücken). Entfernte Profile nicht.
+  **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 
 ## Aufgaben
 
@@ -352,7 +361,7 @@ Neu in Phase 1 (Vorschlag): `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPO
 
 ## Reihenfolge für Claude Code
 
-Bestätigung F3, F5, F7–F11, F13, F14 → 1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 (SP) → 1.7 → 1.8 → 1.9 (nach F2) → 1.10 (nach der Freigabe).
+1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 (SP) → 1.7 → 1.8 → 1.9 (nach F2) → 1.10 (nach der Freigabe).
 
 Eine frische Session je Aufgabe (1.5 und 1.6 ggf. in Entities und Reports geteilt). Nach jedem Schritt: Tests grün, kleiner Commit,
 Häkchen in dieser Datei, Umsetzungsnotizen unter der Aufgabe („Umsetzung (Stand für …)“ wie in Phase 0).
