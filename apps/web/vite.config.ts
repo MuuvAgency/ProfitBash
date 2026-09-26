@@ -25,6 +25,11 @@ export default defineConfig(({ mode }) => {
         '/api': { target: `http://localhost:${apiPort}` },
       },
     },
+    build: {
+      // AG Grid Community ist auch mit einzeln registrierten Modulen rund 800 KB groß (ca. 220 KB gzip).
+      // Es lädt nur mit den Seiten, die eine Tabelle zeigen (lazy Routen), nicht mit der Shell.
+      chunkSizeWarningLimit: 1000,
+    },
     test: {
       environment: 'happy-dom',
     },

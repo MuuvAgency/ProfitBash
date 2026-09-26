@@ -79,4 +79,16 @@ describe('AppShell', () => {
       expect(wrapper.find('button[aria-label="Seitenleiste ausklappen"]').exists()).toBe(true),
     );
   });
+
+  it('öffnet unter Clients & Connections die echte Seite statt des Platzhalters', async () => {
+    stubFetch({
+      'GET /api/me': json(meFixture()),
+      ...noUiState,
+      'GET /api/connections': json({ connections: [] }),
+      'GET /api/clients': json({ clients: [] }),
+    });
+    const { wrapper } = await mountWithApp(undefined, { path: '/admin/connections' });
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Noch kein Amazon-Konto verbunden'));
+    expect(wrapper.text()).not.toContain('Folgt in Kürze');
+  });
 });

@@ -122,6 +122,82 @@ export const de = {
       settings: 'Zahlenformat und Design einstellen.',
     },
   },
+  connections: {
+    eyebrow: 'Admin',
+    description:
+      'Amazon-Konten verbinden, Profile Clients zuordnen und nicht benötigte ausblenden.',
+    connect: 'Amazon-Account verbinden',
+    reconnect: 'Neu verbinden',
+    sync: 'Jetzt synchronisieren',
+    syncQueued: 'Sync eingeplant. Den Fortschritt zeigt der Sync-Status.',
+    loadError: 'Die Connections konnten nicht geladen werden.',
+    emptyTitle: 'Noch kein Amazon-Konto verbunden',
+    emptyText:
+      'Verbinde das Amazon-Konto, über das die Agentur Zugriff auf die Werbekonten ihrer Kunden hat. Danach erscheinen die Profile hier.',
+    region: { eu: 'Europa', na: 'Nordamerika', fe: 'Fernost' },
+    status: {
+      active: 'Aktiv',
+      reauth_required: 'Neu verbinden nötig',
+      error: 'Fehler',
+    },
+    reauthHint:
+      'Amazon akzeptiert die Freigabe nicht mehr. Bitte mit demselben Amazon-Konto neu verbinden.',
+    lastRefreshed: 'Token erneuert',
+    never: 'noch nie',
+    profileCount: 'Profile',
+    oauth: {
+      dismiss: 'Hinweis schließen',
+      connected: 'Amazon-Konto verbunden. Die Profile werden jetzt synchronisiert.',
+      connected_sync_failed:
+        'Amazon-Konto verbunden, der Sync konnte aber nicht eingeplant werden. Bitte „Jetzt synchronisieren“ nutzen.',
+      access_denied: 'Die Freigabe wurde bei Amazon abgelehnt. Es wurde nichts verbunden.',
+      invalid_state: 'Die Rückmeldung von Amazon war ungültig. Bitte erneut verbinden.',
+      state_expired: 'Das Verbinden hat zu lange gedauert. Bitte erneut starten.',
+      state_used: 'Dieser Link wurde bereits verwendet. Bitte erneut verbinden.',
+      session_mismatch:
+        'Das Verbinden wurde in einer anderen Sitzung gestartet. Bitte hier erneut starten.',
+      forbidden: 'Zum Verbinden brauchst du die Admin-Rolle in dieser Organisation.',
+      connection_not_found: 'Die Connection gibt es nicht mehr. Bitte neu verbinden.',
+      account_mismatch:
+        'Du hast dich bei Amazon mit einem anderen Konto angemeldet. Zum Neu-Verbinden bitte dasselbe Konto verwenden.',
+      amazon_error: 'Amazon hat nicht wie erwartet geantwortet. Bitte später erneut versuchen.',
+      internal_error: 'Beim Verbinden ist ein Fehler aufgetreten. Bitte erneut versuchen.',
+    },
+    profiles: {
+      label: 'Profile von {account}',
+      showRemoved: 'Entfernte anzeigen',
+      empty:
+        'Amazon liefert für dieses Konto noch keine Profile. Nach dem Sync erscheinen sie hier.',
+      emptyFiltered:
+        'Alle Profile dieses Kontos sind entfernt. „Entfernte anzeigen“ blendet sie ein.',
+      loadError: 'Die Profile konnten nicht geladen werden.',
+      removed: 'Entfernt',
+      removedHint: 'Amazon liefert dieses Profil nicht mehr.',
+      column: {
+        country: 'Land',
+        accountName: 'Account-Name',
+        type: 'Typ',
+        currency: 'Währung',
+        timezone: 'Zeitzone',
+        client: 'Client',
+        hidden: 'Ausblenden',
+      },
+      accountType: { seller: 'Seller', vendor: 'Vendor', agency: 'Agentur' },
+      clientFor: 'Client für {account}',
+      noClient: 'Kein Client',
+      newClient: 'Neuen Client anlegen …',
+      hideFor: '{account} ausblenden',
+      updateFailed: 'Das Profil konnte nicht gespeichert werden.',
+    },
+    clientDialog: {
+      title: 'Neuen Client anlegen',
+      name: 'Name',
+      hint: 'Zum Beispiel der Markenname. Das Profil {account} wird dem neuen Client zugeordnet.',
+      submit: 'Anlegen und zuordnen',
+      cancel: 'Abbrechen',
+      required: 'Bitte einen Namen eingeben.',
+    },
+  },
   forbidden: {
     title: 'Kein Zugriff',
     text: 'Für diese Seite fehlen dir die Rechte, oder deine Organisation hat das Feature nicht gebucht.',
@@ -137,6 +213,13 @@ export const de = {
     VALIDATION_ERROR: 'Die Eingaben sind unvollständig oder ungültig.',
     NO_ACTIVE_ORGANIZATION: 'Keine Organisation ausgewählt. Bitte wähle eine Organisation.',
     TOO_MANY_REQUESTS: 'Zu viele Versuche. Bitte warte kurz und versuche es dann erneut.',
+    CONNECTION_REAUTH_REQUIRED:
+      'Die Connection muss zuerst neu verbunden werden. Nutze „Neu verbinden“.',
+    CONNECTION_NOT_FOUND: 'Die Connection gibt es nicht mehr. Bitte lade die Seite neu.',
+    PROFILE_NOT_FOUND: 'Das Profil gibt es nicht mehr. Bitte lade die Seite neu.',
+    CLIENT_NOT_FOUND: 'Den Client gibt es nicht mehr. Bitte lade die Seite neu.',
+    CLIENT_SLUG_TAKEN:
+      'Einen Client mit diesem Namen gibt es schon. Bitte wähle ihn aus der Liste.',
     NETWORK_ERROR: 'Der Server ist nicht erreichbar. Prüfe deine Verbindung.',
     SERVER: 'Auf dem Server ist ein Fehler aufgetreten. Bitte versuche es später erneut.',
     UNKNOWN: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',

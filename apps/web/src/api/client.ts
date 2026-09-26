@@ -1,4 +1,12 @@
-import type { MeResponse, Settings } from '@profitbash/shared';
+import type {
+  AmazonOAuthStart,
+  Client,
+  Connection,
+  MeResponse,
+  Profile,
+  ProfilePatch,
+  Settings,
+} from '@profitbash/shared';
 import createClient, { type Middleware } from 'openapi-fetch';
 import { ApiError, toApiError } from './errors';
 import type { paths } from './schema.gen';
@@ -108,6 +116,38 @@ export function createApi(options: ApiOptions = {}) {
         }),
       );
     },
+
+    listConnections: async (): Promise<Connection[]> =>
+      (await unwrap(client.GET('/api/connections'))).connections,
+
+    /** Liefert die Einwilligungs-URL; der Browser navigiert danach dorthin. */
+    startAmazonOAuth: async (input: AmazonOAuthStart = {}): Promise<string> =>
+      (await unwrap(client.POST('/api/amazon/oauth/start', { body: input }))).url,
+
+    /** Plant den Profil-Sync ein. `409 CONNECTION_REAUTH_REQUIRED`: erst neu verbinden. */
+    async syncConnection(connectionId: string): Promise<void> {
+      await unwrap(
+        client.POST('/api/connections/{id}/sync', { params: { path: { id: connectionId } } }),
+      );
+    },
+
+    /** Profile einer Connection inkl. ausgeblendeter und entfernter. */
+    listProfiles: async (connectionId: string): Promise<Profile[]> =>
+      (
+        await unwrap(
+          client.GET('/api/connections/{id}/profiles', { params: { path: { id: connectionId } } }),
+        )
+      ).profiles,
+
+    updateProfile: (profileId: string, patch: ProfilePatch): Promise<Profile> =>
+      unwrap(
+        client.PATCH('/api/profiles/{id}', { params: { path: { id: profileId } }, body: patch }),
+      ),
+
+    listClients: async (): Promise<Client[]> => (await unwrap(client.GET('/api/clients'))).clients,
+
+    createClient: (input: { name: string }): Promise<Client> =>
+      unwrap(client.POST('/api/clients', { body: input })),
 
     auth: {
       signIn: (input: SignInInput) => postAuth<unknown>('sign-in/email', input),

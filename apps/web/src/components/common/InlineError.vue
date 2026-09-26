@@ -30,5 +30,6 @@ const { t } = useI18n();
       class="-my-1 shrink-0"
       @click="emit('retry')"
     />
+    <slot name="action" />
   </div>
 </template>
