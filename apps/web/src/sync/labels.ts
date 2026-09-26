@@ -57,18 +57,27 @@ export function useJobRunLabels() {
     return formatDuration(Date.parse(run.finishedAt) - Date.parse(run.startedAt), locale.value);
   }
 
-  /** z. B. „4 Profile · 1 neu“. */
-  function counters(run: JobRun) {
+  /** Zähler als Zahl (formatiert) und Bezeichnung, z. B. `{ value: '4', label: 'Profile' }`. */
+  function counterParts(run: JobRun) {
     return Object.entries(run.counters)
       .filter(([key, value]) => value !== 0 || ALWAYS_SHOWN.has(key))
       .sort(([a], [b]) => counterRank(a) - counterRank(b) || a.localeCompare(b))
       .map(([key, value]) => {
         const labelKey = `sync.counter.${key}`;
-        const label = te(labelKey) ? t(labelKey, value) : key;
-        return `${formatNumber(value, locale.value)} ${label}`;
-      })
+        return {
+          key,
+          value: formatNumber(value, locale.value),
+          label: te(labelKey) ? t(labelKey, value) : key,
+        };
+      });
+  }
+
+  /** z. B. „4 Profile · 1 neu“. */
+  function counters(run: JobRun) {
+    return counterParts(run)
+      .map(({ value, label }) => `${value} ${label}`)
       .join(' · ');
   }
 
-  return { job, connection, startedAt, duration, counters };
+  return { job, connection, startedAt, duration, counterParts, counters };
 }

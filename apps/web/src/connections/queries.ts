@@ -2,7 +2,7 @@ import type { Client, Profile, ProfilePatch } from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onBeforeUnmount, readonly, ref, toValue, type MaybeRefOrGetter } from 'vue';
 import { api } from '../api';
-import { useSessionStore } from '../stores/session';
+import { useActiveOrgId } from '../stores/session';
 
 /**
  * Query-Keys enthalten die aktive Organisation: Nach einem Org-Wechsel gehören die Daten
@@ -15,11 +15,6 @@ export const connectionKeys = {
     ['profiles', orgId, connectionId] as const,
   clients: (orgId: string | null) => ['clients', orgId] as const,
 };
-
-function useActiveOrgId() {
-  const session = useSessionStore();
-  return computed(() => session.me?.activeOrganizationId ?? null);
-}
 
 /** Abstand der Abfragen, solange ein Sync läuft (siehe `useSyncPolling`). */
 export const SYNC_POLL_INTERVAL_MS = 3_000;

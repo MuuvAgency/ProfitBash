@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   CONNECTION_JOB_NAMES,
+  JOB_RUN_LIST_LIMIT,
   JOB_RUN_STATUSES,
   type ConnectionJobName,
   type JobRunListQuery,
@@ -8,7 +9,7 @@ import {
 } from '@profitbash/shared';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter, type LocationQueryValue } from 'vue-router';
 import EmptyState from '../components/common/EmptyState.vue';
@@ -68,6 +69,19 @@ const statusOptions = computed(() => [
 
 const runsQuery = useJobRunsQuery(filters);
 const runs = computed(() => runsQuery.data.value ?? []);
+/** Nur Daten dieses Filters (Platzhalter aus dem vorigen Filter gibt es im Fehlerfall nicht). */
+const hasData = computed(() => runsQuery.data.value !== undefined);
+
+/** Nur „Aktualisieren“ zeigt den Ladezustand, das Nachfragen im Hintergrund nicht. */
+const refreshing = ref(false);
+async function refresh() {
+  refreshing.value = true;
+  try {
+    await runsQuery.refetch();
+  } finally {
+    refreshing.value = false;
+  }
+}
 </script>
 
 <template>
@@ -75,7 +89,7 @@ const runs = computed(() => runsQuery.data.value ?? []);
     <PageHeader
       :title="t('nav.sync')"
       :eyebrow="t('sync.eyebrow')"
-      :description="t('sync.description')"
+      :description="t('sync.description', { limit: JOB_RUN_LIST_LIMIT })"
     >
       <template #actions>
         <Button
@@ -83,9 +97,9 @@ const runs = computed(() => runsQuery.data.value ?? []);
           icon="pi pi-refresh"
           severity="secondary"
           variant="outlined"
-          :loading="runsQuery.isFetching.value && !runsQuery.isPending.value"
+          :loading="refreshing"
           :disabled="runsQuery.isPending.value"
-          @click="runsQuery.refetch()"
+          @click="refresh"
         />
       </template>
     </PageHeader>
@@ -125,12 +139,21 @@ const runs = computed(() => runsQuery.data.value ?? []);
       </div>
     </div>
 
+    <!-- Bereits geladene Läufe bleiben stehen, wenn das Nachladen scheitert. -->
+    <InlineError
+      v-if="runsQuery.isError.value && hasData"
+      :message="t('sync.refreshError')"
+      retryable
+      :retrying="runsQuery.isFetching.value"
+      @retry="runsQuery.refetch()"
+    />
+
     <div v-if="runsQuery.isPending.value" aria-busy="true">
       <SkeletonBlock shape="tile" height="16rem" />
     </div>
 
     <InlineError
-      v-else-if="runsQuery.isError.value"
+      v-else-if="runsQuery.isError.value && !hasData"
       :message="t('sync.loadError')"
       retryable
       :retrying="runsQuery.isFetching.value"

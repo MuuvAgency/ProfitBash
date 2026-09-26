@@ -148,3 +148,9 @@ export const useSessionStore = defineStore('session', () => {
     markSignedOut,
   };
 });
+
+/** Aktive Organisation (`null` ohne Organisation). Gehört in jeden Query-Key mit Org-Daten. */
+export function useActiveOrgId() {
+  const session = useSessionStore();
+  return computed(() => session.me?.activeOrganizationId ?? null);
+}
