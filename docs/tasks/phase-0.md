@@ -432,7 +432,13 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - [x] Code: Web-Auslieferung, `PORT`, Healthcheck, gebündelte Migration (siehe Umsetzung unten).
   - [ ] Service auf Railway eingerichtet und erreichbar (Einstellungen in `docs/deploy.md`, braucht Konto 0.0f).
 - [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
-- [ ] Railway-Postgres mit Backups; der Hobby-Plan enthält keine, deshalb nächtlicher `pg_dump` in einen privaten Speicher (Ziel und Ausführungsort offen, `docs/deploy.md`).
+- [ ] Railway-Postgres mit Backups; der Hobby-Plan enthält keine, deshalb nächtlicher `pg_dump` in einen privaten Speicher.
+  - [x] Entscheidung (Dominik, 2026-09-26): Railway-Cron-Service, age, Cloudflare R2 (Lifecycle 14 Tage), Healthchecks, monatlicher Test-Restore.
+  - [x] Im Repo: `ops/db-backup/` (Dockerfile, `backup.sh`, `restore-test.sh`), Smoke-Test `scripts/smoke-db-backup.sh`
+    mit Fake-S3 (`scripts/fake-s3.mjs`), in der CI gegen das gebaute Image. Anleitung in `docs/deploy.md` („Backups“), ADR 001 nachgezogen.
+  - [ ] Auf Railway eingerichtet, erster Upload nach R2 und erster Test-Restore geprüft (braucht Konten: Railway, R2, Healthchecks.io).
+    Offen bis dahin: Nimmt R2 die SigV4-Signatur von curl an (der Fake-S3 prüft nur Form und Prüfsumme)? Hauptversion des
+    Railway-Postgres = 17 (sonst Basis-Image anheben)?
 - [x] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
   - [x] Einrichtung, Variablen, Seed, Healthchecks.io, Graceful Shutdown, Backups (offen), `WORKER_MODE=separate`, Rotationsregel.
   - [x] Anleitung zum Rotations-Skript (mit dem Skript).
@@ -452,6 +458,16 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - Nebenwirkung: Verschlüsselt die Rotation eine Connection zwischen Jobstart und einer Ablehnung (`invalid_grant`)
     neu, greift `markConnectionReauthRequired` nicht (anderer Ciphertext); der nächste Lauf markiert sie.
   - Offen bis zum ersten Einsatz: Weg auf Railway (`railway ssh` oder vorübergehender Pre-Deploy-Command) bestätigen.
+- [x] Umsetzung Backup (Stand für den ersten Deploy):
+  - **Warum Shell statt TypeScript:** `pg_dump` muss als Binary in der passenden Hauptversion im Image liegen; das offizielle
+    Postgres-Alpine-Image bringt es mit. `age` und `curl` (SigV4) kommen aus Alpine, keine npm-Abhängigkeit, kein AWS-SDK.
+  - `backup.sh` prüft zuerst die Variablen (https-Endpunkt, Bucket-Name, `age1…`-Schlüssel), dann Dump → `pg_restore --list`
+    (muss `TABLE DATA` enthalten) → age → Upload mit `x-amz-content-sha256`. Pings `/start` vor der Prüfung, damit auch
+    Konfigurationsfehler als `/fail` ankommen.
+  - `restore-test.sh` spielt nur in Datenbanken `*_restore` ein und löscht dort vorher alle Schemas (auch `drizzle`, `pgboss`).
+    Stichproben: Migrationen, Organisationen, Nutzer > 0, dazu Zahlen zu Connections, Profilen, Jobläufen.
+  - Smoke-Test: `docker run --user` mit der UID des Runners, Variablen per Name (`-e NAME`), Werte nie in der Kommandozeile.
+    Lokal braucht er `age` (`brew install age`); `shellcheck` ist für die Skripte sauber (nicht in der CI).
 - [x] Umsetzung Bundles und Web-Auslieferung (Stand für die restlichen 0.9-Punkte):
   - **Bundles:** `apps/api/tsup.config.ts` baut `dist/index.js` (Server), `dist/migrate.js` (Einstieg
     `packages/db/src/migrate-cli.ts`) und `dist/seed.js` und kopiert `packages/db/drizzle` nach `dist/drizzle`.

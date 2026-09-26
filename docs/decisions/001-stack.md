@@ -31,7 +31,8 @@ und um weitere Marktplätze erweiterbar.
 | CI | GitHub Actions, Postgres als Service-Container |
 | Hosting | Railway, Build mit Railpack (`railpack.json`). Einstellungen im Dashboard nach `docs/deploy.md` (siehe Konsequenzen) |
 | Datenbank | Postgres 17. Lokal: Homebrew. CI: Service-Container. **Prod: Railway-Postgres**. Neon (Free) nur bei Bedarf für geteilte Dev-/Preview-Datenbanken |
-| Monitoring | Healthchecks.io (Job-Heartbeats) |
+| Monitoring | Healthchecks.io (Job-Heartbeats, Backup und Test-Restore) |
+| Backups (Pilot) | Railway-Cron-Service `db-backup` (Docker-Image aus `ops/db-backup`, offizielles Postgres-Alpine-Image): `pg_dump`, verschlüsselt mit **age** (öffentlicher Schlüssel auf Railway, privater nur offline), Upload per curl (SigV4) nach **Cloudflare R2** (EU-Jurisdiktion, Lifecycle 14 Tage). Monatlicher Test-Restore lokal |
 
 ### Deploy-Topologie
 
@@ -62,7 +63,7 @@ Bitte die aktuellen Konditionen der Anbieter vor Start prüfen. Die Zahlen sind 
 | Stufe | Wann | Setup | Kosten |
 |---|---|---|---|
 | **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Homebrew-Postgres), GitHub Actions (öffentliches Repo, ohne Minutenlimit), Healthchecks.io Free. Neon Free nur bei Bedarf für geteilte Dev-/Preview-Datenbanken. Kein Hosting nötig. Das Railway-Trial-Guthaben ist zeitlich begrenzt: erst nutzen, wenn der erste Deploy ansteht | **0 €** |
-| **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres, `*.up.railway.app`-Domain. Der Hobby-Plan enthält keine Datenbank-Backups (Stand 2026-09-26), deshalb nächtlicher `pg_dump` (Ziel und Ausführungsort: `docs/deploy.md`) | **ca. 5–10 $/Monat** |
+| **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres, `*.up.railway.app`-Domain. Der Hobby-Plan enthält keine Datenbank-Backups (Stand 2026-09-26), deshalb nächtlicher `pg_dump` als Cron-Service nach Cloudflare R2 (`docs/deploy.md`; R2 kostenlos bis 10 GB) | **ca. 5–10 $/Monat** |
 | **C – Wachstum** | mehr Kunden/Daten | Worker separat, mehr DB-Ressourcen, eigene Domain, ggf. Neon Paid für Prod-Branches | nach Bedarf |
 
 **Was dauerhaft kostenlos ist:** Amazon Ads API und SP-API, GitHub (öffentliches Repo: Rulesets, Auto-Merge und Actions ohne Minutenlimit), Healthchecks.io (bis 20 Checks),
@@ -103,8 +104,12 @@ auf einen anderen Postgres-Anbieter.
 - **Railway-Einstellungen im Dashboard, kein Config as Code** (entschieden am 2026-09-26): Railway liest
   `railway.json`/`railway.toml` für neue Services nicht mehr; der Nachfolger (Infrastructure as Code, `.railway/railway.ts`)
   lohnt sich für einen Service nicht. `docs/deploy.md` ist die Quelle der Einstellungen im Repo. Wiedervorlage bei Stufe C.
-- **Backups im Pilot selbst:** Der Hobby-Plan enthält keine Datenbank-Backups. Nächtlicher `pg_dump`, vor dem Upload
-  verschlüsselt; Ziel und Ausführungsort sind noch offen (`docs/deploy.md`).
+- **Backups im Pilot selbst** (entschieden von Dominik am 2026-09-26): Der Hobby-Plan enthält keine Datenbank-Backups.
+  Nächtlicher `pg_dump` als eigener Railway-Cron-Service im privaten Netz (kein öffentlicher DB-Zugang, keine
+  Actions-Artefakte im öffentlichen Repo), verschlüsselt mit age vor dem Upload nach Cloudflare R2, 14 Tage Aufbewahrung,
+  Healthchecks für Backup und monatlichen Test-Restore. Werkzeuge bewusst minimal (Shell, curl mit SigV4 statt AWS-CLI
+  oder SDK). Verworfen: GitHub Action (bräuchte einen öffentlichen TCP-Proxy auf die Datenbank), Railway-Pro-Backups
+  (Plan-Kosten), unverschlüsselte Dumps. Einrichtung und Test-Restore: `docs/deploy.md`.
 - **Secrets in der Datenbank** (bestehende Praxis seit 0.3, hier nur festgehalten): Refresh-Tokens mit AES-256-GCM über
   `node:crypto` (`@profitbash/shared/crypto`), ohne externen Schlüsseldienst. Der Schlüssel kommt aus der Umgebung,
   Rotation über Schlüssel-IDs und ein Skript (`docs/deploy.md`).
