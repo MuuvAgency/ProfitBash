@@ -151,6 +151,64 @@ describe('session store', () => {
     expect(localStorage.getItem('profitbash.theme')).toBe('system');
   });
 
+  it('ändert die Locale sofort und speichert sie mit den übrigen Einstellungen', async () => {
+    const { requests } = stubFetch({
+      'GET /api/me': json(meFixture()),
+      'PUT /api/settings': ({ body }) => json(body),
+    });
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    const saving = session.updatePreferences({ locale: 'en-GB' });
+    expect(session.preferences.locale).toBe('en-GB');
+    await saving;
+    expect(requests.at(-1)?.body).toEqual({
+      theme: 'system',
+      locale: 'en-GB',
+      density: 'comfortable',
+    });
+  });
+
+  it('speichert nacheinander: eine spätere Änderung überholt keine frühere', async () => {
+    const releases: (() => void)[] = [];
+    const { requests } = stubFetch({
+      'GET /api/me': json(meFixture()),
+      'PUT /api/settings': ({ body }) =>
+        new Promise<Response>((resolve) => releases.push(() => resolve(json(body)))),
+    });
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    const first = session.updatePreferences({ theme: 'dark' });
+    const second = session.updatePreferences({ locale: 'en-US' });
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    // Der zweite Request startet erst, wenn der erste beantwortet ist, mit dem dann aktuellen Stand.
+    expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(1);
+    releases[0]!();
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    releases[1]!();
+    await Promise.all([first, second]);
+    const puts = requests.filter((r) => r.method === 'PUT');
+    expect(puts).toHaveLength(2);
+    // Der zuletzt gesendete Request trägt den Endstand beider Änderungen.
+    expect(puts.at(-1)?.body).toEqual({ theme: 'dark', locale: 'en-US', density: 'comfortable' });
+  });
+
+  it('nimmt bei einem Fehler nur die eigenen Felder zurück', async () => {
+    let calls = 0;
+    stubFetch({
+      'GET /api/me': json(meFixture()),
+      'PUT /api/settings': ({ body }) =>
+        ++calls === 1 ? json({ error: { code: 'INTERNAL_ERROR', message: 'x' } }, 500) : json(body),
+    });
+    const session = useSessionStore();
+    await session.ensureLoaded();
+    const theme = session.updatePreferences({ theme: 'dark' });
+    const locale = session.updatePreferences({ locale: 'en-GB' });
+    await expect(theme).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+    await locale;
+    expect(session.preferences).toMatchObject({ theme: 'system', locale: 'en-GB' });
+    expect(localStorage.getItem('profitbash.theme')).toBe('system');
+  });
+
   it('nutzt vor dem Login das zuletzt gespeicherte Theme', () => {
     localStorage.setItem('profitbash.theme', 'dark');
     expect(useSessionStore().preferences.theme).toBe('dark');

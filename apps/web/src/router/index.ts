@@ -68,8 +68,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: SETTINGS_PATH.slice(1),
         name: 'settings',
-        component: PlaceholderPage,
-        props: { itemId: 'settings', phase: 0 },
+        component: () => import('../pages/SettingsPage.vue'),
         meta: { titleKey: 'nav.settings' },
       },
       {

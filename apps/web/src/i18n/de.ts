@@ -253,6 +253,38 @@ export const de = {
     /** Zugänglicher Name des Schalters, beginnt mit dem sichtbaren Text. */
     errorToggleLabel: '{action}: {job}, gestartet {startedAt}',
   },
+  settings: {
+    eyebrow: 'Konto',
+    description: 'Gilt nur für dein Konto, in allen Organisationen.',
+    saved: 'Gespeichert.',
+    saveFailed:
+      'Die Einstellung konnte nicht gespeichert werden. Es gilt wieder der vorherige Wert.',
+    theme: {
+      title: 'Design',
+      hint: '„Wie System“ folgt der Einstellung deines Betriebssystems.',
+      system: 'Wie System',
+      light: 'Hell',
+      dark: 'Dunkel',
+    },
+    locale: {
+      title: 'Zahlen- und Datumsformat',
+      hint: 'Gilt für Zahlen, Beträge, Prozente und Zeitangaben. Die Sprache der Oberfläche bleibt Deutsch.',
+      label: 'Format',
+      options: {
+        'de-DE': 'Deutsch (Deutschland)',
+        'en-GB': 'Englisch (Vereinigtes Königreich)',
+        'en-US': 'Englisch (USA)',
+      },
+      previewTitle: 'Vorschau',
+      preview: {
+        number: 'Zahl',
+        currencyEur: 'Betrag (EUR)',
+        currencyGbp: 'Betrag (GBP)',
+        percent: 'Prozent',
+        dateTime: 'Datum und Uhrzeit',
+      },
+    },
+  },
   forbidden: {
     title: 'Kein Zugriff',
     text: 'Für diese Seite fehlen dir die Rechte, oder deine Organisation hat das Feature nicht gebucht.',

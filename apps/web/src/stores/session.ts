@@ -110,27 +110,53 @@ export const useSessionStore = defineStore('session', () => {
     await reload();
   }
 
-  /** Setzt das Theme sofort und speichert es; scheitert das Speichern, gilt wieder der alte Wert. */
-  async function setTheme(theme: Theme) {
-    const current = me.value;
-    if (!current) {
-      cachedTheme.value = theme;
-      writeCachedTheme(theme);
-      return;
-    }
-    const before = current.preferences;
-    const next = { ...before, theme };
-    current.preferences = next;
+  /**
+   * Speichern läuft nacheinander: `PUT /api/settings` ersetzt alle Einstellungen, ein späterer Request
+   * darf keinen früheren überholen. Jeder Request sendet den Stand zum Zeitpunkt des Sendens.
+   */
+  let saveQueue: Promise<void> = Promise.resolve();
+
+  function setCachedTheme(theme: Theme) {
     cachedTheme.value = theme;
     writeCachedTheme(theme);
-    try {
-      await api.updateSettings(next);
-    } catch (error) {
-      current.preferences = before;
-      cachedTheme.value = before.theme;
-      writeCachedTheme(before.theme);
-      throw error;
+  }
+
+  /**
+   * Ändert Einstellungen sofort und speichert sie. Scheitert das Speichern, gelten für die Felder dieses
+   * Patches wieder die alten Werte, sofern sie inzwischen niemand anders geändert hat.
+   */
+  async function updatePreferences(patch: Partial<Settings>) {
+    const current = me.value;
+    if (!current) {
+      // Vor dem Login gibt es nur das Theme (aus dem Browser-Cache).
+      if (patch.theme) setCachedTheme(patch.theme);
+      return;
     }
+    const keys = Object.keys(patch) as (keyof Settings)[];
+    const before = current.preferences;
+    current.preferences = { ...before, ...patch };
+    if (patch.theme) setCachedTheme(patch.theme);
+
+    const job = saveQueue.then(async () => {
+      try {
+        await api.updateSettings(current.preferences);
+      } catch (error) {
+        const reverted = { ...current.preferences };
+        for (const key of keys) {
+          if (reverted[key] === patch[key]) Object.assign(reverted, { [key]: before[key] });
+        }
+        current.preferences = reverted;
+        setCachedTheme(reverted.theme);
+        throw error;
+      }
+    });
+    saveQueue = job.catch(() => undefined);
+    await job;
+  }
+
+  /** Setzt das Theme sofort und speichert es; scheitert das Speichern, gilt wieder der alte Wert. */
+  function setTheme(theme: Theme) {
+    return updatePreferences({ theme });
   }
 
   return {
@@ -145,6 +171,7 @@ export const useSessionStore = defineStore('session', () => {
     signOut,
     switchOrganization,
     setTheme,
+    updatePreferences,
     markSignedOut,
   };
 });
