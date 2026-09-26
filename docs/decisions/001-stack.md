@@ -26,6 +26,7 @@ und um weitere Marktplätze erweiterbar.
 | Tabellen / Charts | AG Grid **Community**, AG Charts Community |
 | Build | Apps `api`/`worker` mit tsup (bündelt die Workspace-Pakete, die TS-Quellcode exportieren); Web mit Vite. Dev: `tsx watch` |
 | Tests | Vitest, HTTP-Mocks mit msw |
+| Repository | GitHub, **öffentlich** (`MuuvAgency/ProfitBash`), Plan GitHub Free for organizations. Siehe Konsequenzen |
 | CI | GitHub Actions, Postgres als Service-Container |
 | Hosting | Railway |
 | Datenbank | Postgres 17. Lokal: Homebrew. Dev-Branches: Neon (Free). CI: Service-Container. **Prod: Railway-Postgres** |
@@ -59,10 +60,10 @@ Bitte die aktuellen Konditionen der Anbieter vor Start prüfen. Die Zahlen sind 
 | Stufe | Wann | Setup | Kosten |
 |---|---|---|---|
 | **A – Bauen** | jetzt bis Ads-API-Freigabe | Lokal (Homebrew-Postgres), GitHub Actions (Free-Kontingent), Healthchecks.io Free. Neon Free nur bei Bedarf für geteilte Dev-/Preview-Datenbanken. Kein Hosting nötig. Das Railway-Trial-Guthaben ist zeitlich begrenzt: erst nutzen, wenn der erste Deploy ansteht | **0 €** |
-| **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres, `*.up.railway.app`-Domain. Backups prüfen: Sind sie im Hobby-Plan nicht enthalten, nächtlicher `pg_dump` per GitHub Action | **ca. 5–10 $/Monat** |
+| **B – Pilot** | 1–2 Kunden live | Railway Hobby: 1 Service `app` (`WORKER_MODE=inline`) + Railway-Postgres, `*.up.railway.app`-Domain. Der Hobby-Plan enthält keine Datenbank-Backups (Stand 2026-09-26), deshalb nächtlicher `pg_dump` (Ziel und Ausführungsort: `docs/deploy.md`) | **ca. 5–10 $/Monat** |
 | **C – Wachstum** | mehr Kunden/Daten | Worker separat, mehr DB-Ressourcen, eigene Domain, ggf. Neon Paid für Prod-Branches | nach Bedarf |
 
-**Was dauerhaft kostenlos ist:** Amazon Ads API und SP-API, GitHub (privat), Healthchecks.io (bis 20 Checks),
+**Was dauerhaft kostenlos ist:** Amazon Ads API und SP-API, GitHub (öffentliches Repo: Rulesets, Auto-Merge und Actions ohne Minutenlimit), Healthchecks.io (bis 20 Checks),
 Neon Free für Dev, AG Grid/AG Charts Community.
 
 **Was nicht (sinnvoll) kostenlos geht:**
@@ -91,6 +92,14 @@ auf einen anderen Postgres-Anbieter.
   kleine Organisationen (< 1 Mio. $ Umsatz, < 5 Entwickler, < 10 Mitarbeitende, jährliche Bestätigung), sonst 599–799 $ je Entwickler.
   4.x ist MIT und deckt alles ab, was die App braucht (Tabellen kommen aus AG Grid). Nachteil: 4.x bekommt keine neuen Features mehr.
   Ein Umstieg auf 5 ist eine eigene Entscheidung (Lizenz + Anpassung des Presets). Entschieden am 2026-09-25.
+
+- **Öffentliches Repo** (entschieden am 2026-09-26, ursprünglich privat geplant): Im Gratis-Plan gibt es Rulesets (Schutz von
+  `main`: grüner `ci`-Check, kein Force-Push) und Auto-Merge nur für öffentliche Repos; privat bräuchte GitHub Team.
+  Dass der Code einsehbar ist, ist akzeptiert. Regeln: keine Secrets, keine echten Kundennamen oder -daten (Tests und Doku
+  nutzen erfundene Namen), nichts Sensibles in Actions-Logs oder -Artefakte (Artefakte öffentlicher Repos kann jeder laden).
+  Zurück auf privat ist jederzeit möglich (dann GitHub Team für Ruleset und Auto-Merge).
+- **flag-icons 7.x (MIT)** für Länderflaggen als SVG, jede Flagge wird erst bei Bedarf einzeln geladen. Emojis sind im Design
+  ausgeschlossen und fehlen unter Windows.
 
 - Nur ein Datenbanktyp (Postgres) für Daten, Jobs und Sessions.
 - Code bleibt anbieterneutral. Hosting- und DB-Wechsel sind Konfiguration.

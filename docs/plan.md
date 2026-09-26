@@ -81,7 +81,7 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 
 ## 5. Architektur-Leitplanken für Erweiterbarkeit
 
-1. **`clients` ist die zentrale Geschäftseinheit.** Ein Client (z. B. „Soapi") bündelt später Amazon-Ads-Profile,
+1. **`clients` ist die zentrale Geschäftseinheit.** Ein Client (z. B. die Marke „Nordwind") bündelt später Amazon-Ads-Profile,
    SP-API-Seller-Konten, Otto-/eBay-/Shopify-Konten, Ziele und Budgets. Deshalb ist er eine eigene Tabelle,
    kein Freitextfeld am Profil.
 2. **Connections haben einen `provider`** (`amazon_ads` jetzt, später `amazon_sp`, `otto`, …).

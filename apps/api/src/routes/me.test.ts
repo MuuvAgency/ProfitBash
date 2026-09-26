@@ -18,7 +18,7 @@ beforeAll(async () => {
   ctx = await createTestContext();
   const [other] = await ctx.testDb.db
     .insert(schema.organizations)
-    .values({ name: 'Kunde Soapi', slug: 'soapi', type: 'client', createdAt: new Date() })
+    .values({ name: 'Kunde Nordwind', slug: 'nordwind', type: 'client', createdAt: new Date() })
     .returning({ id: schema.organizations.id });
   otherOrgId = other!.id;
   await ctx.testDb.db

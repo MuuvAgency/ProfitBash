@@ -6,7 +6,7 @@
 
 ## Kontext
 
-ProfitBash wird zuerst von der Agentur Muuv genutzt. Später sollen Kunden (z. B. Soapi) eigene Logins bekommen
+ProfitBash wird zuerst von der Agentur Muuv genutzt. Später sollen Kunden (z. B. ein Markenkunde der Agentur) eigene Logins bekommen
 und ihre Daten sehen. Bisher gibt es zwei Begriffe für „Kunde":
 - `clients` – die Geschäftseinheit innerhalb der Agentur, die Profile bündelt
 - Organisationen mit `type = client` – ein möglicher Kunden-Login

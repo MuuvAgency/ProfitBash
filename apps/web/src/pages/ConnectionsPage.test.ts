@@ -16,17 +16,17 @@ import ConnectionsPage from './ConnectionsPage.vue';
 const PROFILES_PATH = `/api/connections/${CONNECTION_ID}/profiles`;
 const SYNC_PATH = `/api/connections/${CONNECTION_ID}/sync`;
 
-const soapi = clientFixture();
-const soapiDe = profileFixture({ accountName: 'Soapi GmbH' });
-const soapiUk = profileFixture({
-  accountName: 'Soapi UK Ltd',
+const nordwind = clientFixture();
+const nordwindDe = profileFixture({ accountName: 'Nordwind GmbH' });
+const nordwindUk = profileFixture({
+  accountName: 'Nordwind UK Ltd',
   countryCode: 'UK',
   currencyCode: 'GBP',
   timezone: 'Europe/London',
-  clientId: soapi.id,
+  clientId: nordwind.id,
 });
-const aliseoSe = profileFixture({
-  accountName: 'Aliseo Nordic AB',
+const lindenhofSe = profileFixture({
+  accountName: 'Lindenhof Nordic AB',
   countryCode: 'SE',
   currencyCode: 'SEK',
   timezone: 'Europe/Stockholm',
@@ -41,8 +41,8 @@ function routes(overrides: Parameters<typeof stubFetch>[0] = {}) {
   return {
     'GET /api/me': json(meFixture()),
     'GET /api/connections': json({ connections: [connectionFixture()] }),
-    [`GET ${PROFILES_PATH}`]: json({ profiles: [soapiDe, soapiUk, aliseoSe] }),
-    'GET /api/clients': json({ clients: [soapi] }),
+    [`GET ${PROFILES_PATH}`]: json({ profiles: [nordwindDe, nordwindUk, lindenhofSe] }),
+    'GET /api/clients': json({ clients: [nordwind] }),
     ...overrides,
   };
 }
@@ -110,7 +110,7 @@ describe('ConnectionsPage', () => {
   it('zeigt die Connection mit Status und ihre Profile', async () => {
     stubFetch(routes());
     const { wrapper } = await mountPage();
-    const de = await waitForRow(wrapper, 'Soapi GmbH');
+    const de = await waitForRow(wrapper, 'Nordwind GmbH');
 
     expect(wrapper.get('h1').text()).toBe('Clients & Connections');
     expect(wrapper.text()).toContain('ads@muuv.test');
@@ -119,22 +119,22 @@ describe('ConnectionsPage', () => {
     for (const text of ['Deutschland', 'Seller', 'EUR', 'Europe/Berlin']) {
       expect(de.text()).toContain(text);
     }
-    const uk = row(wrapper, 'Soapi UK Ltd')!;
+    const uk = row(wrapper, 'Nordwind UK Ltd')!;
     expect(uk.text()).toContain('Vereinigtes Königreich');
     await vi.waitFor(() => expect(uk.find('img[src*="gb.svg"]').exists()).toBe(true));
-    expect(uk.get('[role="combobox"]').text()).toBe('Soapi');
+    expect(uk.get('[role="combobox"]').text()).toBe('Nordwind');
   });
 
   it('blendet entfernte Profile nur mit dem Filter „Entfernte anzeigen“ ein', async () => {
     stubFetch(routes());
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    expect(row(wrapper, 'Aliseo Nordic AB')).toBeUndefined();
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    expect(row(wrapper, 'Lindenhof Nordic AB')).toBeUndefined();
 
     const toggle = wrapper.get('input[role="switch"]#connections-show-removed');
     expect(wrapper.get('label[for="connections-show-removed"]').text()).toBe('Entfernte anzeigen');
     await toggle.setValue(true);
-    const removed = await waitForRow(wrapper, 'Aliseo Nordic AB');
+    const removed = await waitForRow(wrapper, 'Lindenhof Nordic AB');
     expect(removed.text()).toContain('Entfernt');
     expect(removed.text()).toContain('Vendor');
   });
@@ -167,7 +167,7 @@ describe('ConnectionsPage', () => {
     );
     fail = false;
     await button(wrapper, 'Erneut versuchen').trigger('click');
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
   });
 
   it('lässt einen Fehler beim Laden der Profile nicht die ganze Seite scheitern', async () => {
@@ -184,7 +184,7 @@ describe('ConnectionsPage', () => {
     const url = 'https://eu.account.amazon.com/ap/oa?state=abc';
     const { requests } = stubFetch(routes({ 'POST /api/amazon/oauth/start': json({ url }) }));
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     await button(wrapper, 'Amazon-Account verbinden').trigger('click');
     await flushPromises();
     expect(requests.find((r) => r.path === '/api/amazon/oauth/start')?.body).toEqual({});
@@ -194,7 +194,7 @@ describe('ConnectionsPage', () => {
   it('folgt keinen Weiterleitungen außer http(s)', async () => {
     stubFetch(routes({ 'POST /api/amazon/oauth/start': json({ url: 'javascript:alert(1)' }) }));
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     await button(wrapper, 'Amazon-Account verbinden').trigger('click');
     await flushPromises();
     expect(assign).not.toHaveBeenCalled();
@@ -212,7 +212,7 @@ describe('ConnectionsPage', () => {
       }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     expect(wrapper.text()).toContain('Neu verbinden nötig');
     expect(wrapper.findAll('button').some((b) => b.text() === 'Jetzt synchronisieren')).toBe(false);
 
@@ -229,7 +229,7 @@ describe('ConnectionsPage', () => {
       routes({ [`POST ${SYNC_PATH}`]: json({ status: 'queued' }, 202) }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     await button(wrapper, 'Jetzt synchronisieren').trigger('click');
     await flushPromises();
     expect(requests.some((r) => r.method === 'POST' && r.path === SYNC_PATH)).toBe(true);
@@ -252,7 +252,7 @@ describe('ConnectionsPage', () => {
       }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     await button(wrapper, 'Jetzt synchronisieren').trigger('click');
     await flushPromises();
     await vi.waitFor(() => expect(wrapper.text()).toContain('Neu verbinden nötig'));
@@ -283,13 +283,13 @@ describe('ConnectionsPage', () => {
   it('blendet ein Profil aus', async () => {
     const { requests } = stubFetch(
       routes({
-        [`PATCH /api/profiles/${soapiDe.id}`]: ({ body }) =>
-          json({ ...soapiDe, ...(body as Partial<Profile>) }),
+        [`PATCH /api/profiles/${nordwindDe.id}`]: ({ body }) =>
+          json({ ...nordwindDe, ...(body as Partial<Profile>) }),
       }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    const toggle = () => wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]');
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    const toggle = () => wrapper.get('input[aria-label="Nordwind GmbH (DE) ausblenden"]');
     expect((toggle().element as HTMLInputElement).checked).toBe(false);
     await toggle().setValue(true);
     await flushPromises();
@@ -298,30 +298,30 @@ describe('ConnectionsPage', () => {
   });
 
   it('graut ausgeblendete Profile aus und nimmt das beim Einblenden zurück', async () => {
-    const hidden = { ...soapiDe, isHidden: true };
+    const hidden = { ...nordwindDe, isHidden: true };
     stubFetch(
       routes({
-        [`GET ${PROFILES_PATH}`]: json({ profiles: [hidden, soapiUk] }),
-        [`PATCH /api/profiles/${soapiDe.id}`]: ({ body }) =>
+        [`GET ${PROFILES_PATH}`]: json({ profiles: [hidden, nordwindUk] }),
+        [`PATCH /api/profiles/${nordwindDe.id}`]: ({ body }) =>
           json({ ...hidden, ...(body as Partial<Profile>) }),
       }),
     );
     const { wrapper } = await mountPage();
-    const dimmed = () => row(wrapper, 'Soapi GmbH')!.classes('text-ink-secondary');
-    await waitForRow(wrapper, 'Soapi GmbH');
+    const dimmed = () => row(wrapper, 'Nordwind GmbH')!.classes('text-ink-secondary');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     expect(dimmed()).toBe(true);
-    expect(row(wrapper, 'Soapi UK Ltd')!.classes('text-ink-secondary')).toBe(false);
+    expect(row(wrapper, 'Nordwind UK Ltd')!.classes('text-ink-secondary')).toBe(false);
 
-    await wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').setValue(false);
+    await wrapper.get('input[aria-label="Nordwind GmbH (DE) ausblenden"]').setValue(false);
     await flushPromises();
     await vi.waitFor(() => expect(dimmed()).toBe(false));
   });
 
   it('meldet einen Fehler beim Speichern eines Profils', async () => {
-    stubFetch(routes({ [`PATCH /api/profiles/${soapiDe.id}`]: serverError }));
+    stubFetch(routes({ [`PATCH /api/profiles/${nordwindDe.id}`]: serverError }));
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    await wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').setValue(true);
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await wrapper.get('input[aria-label="Nordwind GmbH (DE) ausblenden"]').setValue(true);
     await flushPromises();
     await vi.waitFor(() =>
       expect(wrapper.get('[role="alert"]').text()).toContain(
@@ -329,7 +329,7 @@ describe('ConnectionsPage', () => {
       ),
     );
     expect(
-      (wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').element as HTMLInputElement)
+      (wrapper.get('input[aria-label="Nordwind GmbH (DE) ausblenden"]').element as HTMLInputElement)
         .checked,
     ).toBe(false);
   });
@@ -337,40 +337,40 @@ describe('ConnectionsPage', () => {
   it('ordnet ein Profil einem bestehenden Client zu', async () => {
     const { requests } = stubFetch(
       routes({
-        [`PATCH /api/profiles/${soapiDe.id}`]: ({ body }) =>
-          json({ ...soapiDe, ...(body as Partial<Profile>) }),
+        [`PATCH /api/profiles/${nordwindDe.id}`]: ({ body }) =>
+          json({ ...nordwindDe, ...(body as Partial<Profile>) }),
       }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Soapi');
-    expect(requests.find((r) => r.method === 'PATCH')?.body).toEqual({ clientId: soapi.id });
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await choose(wrapper, 'Client für Nordwind GmbH (DE)', 'Nordwind');
+    expect(requests.find((r) => r.method === 'PATCH')?.body).toEqual({ clientId: nordwind.id });
     await vi.waitFor(() =>
-      expect(row(wrapper, 'Soapi GmbH')!.get('[role="combobox"]').text()).toBe('Soapi'),
+      expect(row(wrapper, 'Nordwind GmbH')!.get('[role="combobox"]').text()).toBe('Nordwind'),
     );
   });
 
   it('legt einen neuen Client an und ordnet das Profil zu', async () => {
-    const aliseo = clientFixture({
+    const lindenhof = clientFixture({
       id: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',
-      name: 'Aliseo',
-      slug: 'aliseo',
+      name: 'Lindenhof',
+      slug: 'lindenhof',
     });
-    let clients = [soapi];
+    let clients = [nordwind];
     const { requests } = stubFetch(
       routes({
         'GET /api/clients': () => json({ clients }),
         'POST /api/clients': () => {
-          clients = [aliseo, soapi];
-          return json(aliseo, 201);
+          clients = [lindenhof, nordwind];
+          return json(lindenhof, 201);
         },
-        [`PATCH /api/profiles/${soapiDe.id}`]: ({ body }) =>
-          json({ ...soapiDe, ...(body as Partial<Profile>) }),
+        [`PATCH /api/profiles/${nordwindDe.id}`]: ({ body }) =>
+          json({ ...nordwindDe, ...(body as Partial<Profile>) }),
       }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Neuen Client anlegen …');
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await choose(wrapper, 'Client für Nordwind GmbH (DE)', 'Neuen Client anlegen …');
 
     const form = dialog();
     expect(form?.text()).toContain('Neuen Client anlegen');
@@ -379,19 +379,19 @@ describe('ConnectionsPage', () => {
 
     const input = form!.get('input');
     expect(form!.get(`label[for="${input.attributes('id')}"]`).text()).toBe('Name');
-    await input.setValue(' Aliseo ');
+    await input.setValue(' Lindenhof ');
     await form!.get('form').trigger('submit');
     await flushPromises();
 
     expect(
       requests.filter((r) => r.method !== 'GET').map((r) => [r.method, r.path, r.body]),
     ).toEqual([
-      ['POST', '/api/clients', { name: 'Aliseo' }],
-      ['PATCH', `/api/profiles/${soapiDe.id}`, { clientId: aliseo.id }],
+      ['POST', '/api/clients', { name: 'Lindenhof' }],
+      ['PATCH', `/api/profiles/${nordwindDe.id}`, { clientId: lindenhof.id }],
     ]);
     await vi.waitFor(() => expect(dialog()).toBeNull());
     await vi.waitFor(() =>
-      expect(row(wrapper, 'Soapi GmbH')!.get('[role="combobox"]').text()).toBe('Aliseo'),
+      expect(row(wrapper, 'Nordwind GmbH')!.get('[role="combobox"]').text()).toBe('Lindenhof'),
     );
   });
 
@@ -402,10 +402,10 @@ describe('ConnectionsPage', () => {
       }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Neuen Client anlegen …');
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await choose(wrapper, 'Client für Nordwind GmbH (DE)', 'Neuen Client anlegen …');
     const form = dialog()!;
-    await form.get('input').setValue('Soapi');
+    await form.get('input').setValue('Nordwind');
     await form.get('form').trigger('submit');
     await flushPromises();
     await vi.waitFor(() =>
@@ -416,20 +416,20 @@ describe('ConnectionsPage', () => {
   it('zeigt Zuordnungen nicht als „Kein Client“, solange die Clients fehlen', async () => {
     let fail = true;
     stubFetch(
-      routes({ 'GET /api/clients': () => (fail ? serverError() : json({ clients: [soapi] })) }),
+      routes({ 'GET /api/clients': () => (fail ? serverError() : json({ clients: [nordwind] })) }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi UK Ltd');
+    await waitForRow(wrapper, 'Nordwind UK Ltd');
     await vi.waitFor(() =>
       expect(wrapper.text()).toContain('Die Clients konnten nicht geladen werden.'),
     );
-    const combobox = () => row(wrapper, 'Soapi UK Ltd')!.get('[role="combobox"]');
+    const combobox = () => row(wrapper, 'Nordwind UK Ltd')!.get('[role="combobox"]');
     expect(combobox().text()).not.toBe('Kein Client');
     expect(combobox().attributes('aria-disabled')).toBe('true');
 
     fail = false;
     await button(wrapper, 'Erneut versuchen').trigger('click');
-    await vi.waitFor(() => expect(combobox().text()).toBe('Soapi'));
+    await vi.waitFor(() => expect(combobox().text()).toBe('Nordwind'));
     expect(combobox().attributes('aria-disabled')).not.toBe('true');
   });
 
@@ -437,13 +437,13 @@ describe('ConnectionsPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let synced = false;
     stubFetch(
-      routes({ [`GET ${PROFILES_PATH}`]: () => json({ profiles: synced ? [soapiDe] : [] }) }),
+      routes({ [`GET ${PROFILES_PATH}`]: () => json({ profiles: synced ? [nordwindDe] : [] }) }),
     );
     const { wrapper } = await mountPage('/admin/connections?oauth=connected');
     await vi.waitFor(() => expect(wrapper.text()).toContain('noch keine Profile'));
     synced = true;
     await vi.advanceTimersByTimeAsync(5_000);
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
   });
 
   it('lädt nach „Jetzt synchronisieren“ eine Weile nach und hört dann auf', async () => {
@@ -452,7 +452,7 @@ describe('ConnectionsPage', () => {
       routes({ [`POST ${SYNC_PATH}`]: json({ status: 'queued' }, 202) }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     const profileLoads = () => requests.filter((r) => r.path === PROFILES_PATH).length;
     const before = profileLoads();
 
@@ -471,27 +471,29 @@ describe('ConnectionsPage', () => {
     const hide = deferred();
     stubFetch(
       routes({
-        [`PATCH /api/profiles/${soapiDe.id}`]: ({ body }) =>
+        [`PATCH /api/profiles/${nordwindDe.id}`]: ({ body }) =>
           'isHidden' in (body as object)
             ? hide.promise
-            : json({ ...soapiDe, ...(body as Partial<Profile>) }),
+            : json({ ...nordwindDe, ...(body as Partial<Profile>) }),
       }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    await wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').setValue(true);
-    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Soapi');
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await wrapper.get('input[aria-label="Nordwind GmbH (DE) ausblenden"]').setValue(true);
+    await choose(wrapper, 'Client für Nordwind GmbH (DE)', 'Nordwind');
     await flushPromises();
 
     hide.resolve(serverError());
     await flushPromises();
     await vi.waitFor(() =>
       expect(
-        (wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').element as HTMLInputElement)
-          .checked,
+        (
+          wrapper.get('input[aria-label="Nordwind GmbH (DE) ausblenden"]')
+            .element as HTMLInputElement
+        ).checked,
       ).toBe(false),
     );
-    expect(row(wrapper, 'Soapi GmbH')!.get('[role="combobox"]').text()).toBe('Soapi');
+    expect(row(wrapper, 'Nordwind GmbH')!.get('[role="combobox"]').text()).toBe('Nordwind');
   });
 
   it('gibt den Verbinden-Button frei, wenn der Browser von Amazon zurückkehrt', async () => {
@@ -499,7 +501,7 @@ describe('ConnectionsPage', () => {
       routes({ 'POST /api/amazon/oauth/start': json({ url: 'https://eu.account.amazon.com/' }) }),
     );
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
+    await waitForRow(wrapper, 'Nordwind GmbH');
     await button(wrapper, 'Amazon-Account verbinden').trigger('click');
     await flushPromises();
     expect(button(wrapper, 'Amazon-Account verbinden').attributes('disabled')).toBeDefined();
@@ -515,13 +517,13 @@ describe('ConnectionsPage', () => {
     const create = deferred();
     stubFetch(routes({ 'POST /api/clients': () => create.promise }));
     const { wrapper } = await mountPage();
-    await waitForRow(wrapper, 'Soapi GmbH');
-    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Neuen Client anlegen …');
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await choose(wrapper, 'Client für Nordwind GmbH (DE)', 'Neuen Client anlegen …');
     const form = dialog()!;
     const closeButton = () =>
       form.find('button[aria-label="Close"], button[aria-label="Schließen"]').exists();
     expect(closeButton()).toBe(true);
-    await form.get('input').setValue('Aliseo');
+    await form.get('input').setValue('Lindenhof');
     await form.get('form').trigger('submit');
     await flushPromises();
 

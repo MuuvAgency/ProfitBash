@@ -42,7 +42,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Nach der Freigabe die Security-Profile-ID in der Partner-Network-Konsole verknüpfen.
   - Die Freigabe kann mehrere Wochen dauern. Bis dahin arbeitet Claude Code gegen Mocks, der echte OAuth-Test kommt zuletzt.
 - [ ] **0.0d Zugriff auf die Kunden-Werbekonten sicherstellen**
-  - Das Amazon-Konto, mit dem später der OAuth-Login läuft, muss als User in den Werbekonten von Soapi, Aliseo und Evertag eingeladen sein.
+  - Das Amazon-Konto, mit dem später der OAuth-Login läuft, muss als User in den Werbekonten aller betreuten Kunden eingeladen sein.
   - Dann deckt eine Connection alle Profile ab.
 - [ ] **0.0e SP-API-Registrierung anstoßen** (wird erst in Phase 7 gebraucht, die Freigabe dauert aber).
 - [ ] **0.0f Accounts anlegen:** Railway, Healthchecks.io (Free), GitHub-Repo `profitbash` (privat). Neon (Free) nur bei Bedarf für geteilte Dev-/Preview-Datenbanken; lokal reicht Homebrew-Postgres.
@@ -51,7 +51,9 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Stand 2026-09-26: GitHub-Repo erledigt (`MuuvAgency/ProfitBash`), erster echter CI-Lauf grün (PR #1). Railway und Healthchecks.io fehlen noch.
   - Abweichung von ADR 001: Das Repo ist **öffentlich**, weil Auto-Merge für private Repos im aktuellen GitHub-Plan nicht verfügbar ist.
     Folgen: Keine Secrets ins Repo. Nichts Sensibles in öffentliche Actions-Logs oder -Artefakte (gilt besonders für den `pg_dump` aus 0.9).
-    `main` ist per Ruleset geschützt: Merge nur mit grünem `ci`-Check, kein Force-Push, kein Löschen. Auto-Merge wartet auf die CI. Offen: ADR 001 anpassen oder später zurück auf privat.
+    `main` ist per Ruleset geschützt: Merge nur mit grünem `ci`-Check, kein Force-Push, kein Löschen. Auto-Merge wartet auf die CI.
+    Entschieden (Dominik, 2026-09-26): Das Repo bleibt öffentlich, ADR 001 ist angepasst. Keine echten Kundennamen oder
+    -daten im Repo (Tests und Doku nutzen erfundene Namen wie „Nordwind“, „Lindenhof“, „Kranich“).
 - [ ] **0.0g Secrets bereitstellen** (siehe `.env.example` unten).
 
 ## Aufgaben

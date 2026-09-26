@@ -66,7 +66,7 @@ const PROFILES_JSON = `[
       "marketplaceStringId": "A1PA6795UKMFR9",
       "id": "A2EXAMPLESELLER",
       "type": "seller",
-      "name": "Soapi DE",
+      "name": "Nordwind DE",
       "validPaymentMethod": true
     }
   },
@@ -79,7 +79,7 @@ const PROFILES_JSON = `[
       "marketplaceStringId": "A1F83G8C2ARO7P",
       "id": "ENTITY2EXAMPLE",
       "type": "vendor",
-      "name": "Aliseo UK",
+      "name": "Lindenhof UK",
       "validPaymentMethod": false
     }
   }
@@ -254,7 +254,7 @@ describe('listProfiles', () => {
       {
         amazonProfileId: '9007199254740993',
         amazonAccountId: 'A2EXAMPLESELLER',
-        accountName: 'Soapi DE',
+        accountName: 'Nordwind DE',
         countryCode: 'DE',
         currencyCode: 'EUR',
         timezone: 'Europe/Paris',
@@ -264,7 +264,7 @@ describe('listProfiles', () => {
       {
         amazonProfileId: '3456789012345',
         amazonAccountId: 'ENTITY2EXAMPLE',
-        accountName: 'Aliseo UK',
+        accountName: 'Lindenhof UK',
         countryCode: 'UK',
         currencyCode: 'GBP',
         timezone: 'Europe/London',

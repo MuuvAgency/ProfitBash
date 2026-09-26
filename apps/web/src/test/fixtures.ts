@@ -75,7 +75,7 @@ export function profileFixture(overrides: Partial<Profile> = {}): Profile {
     clientId: null,
     amazonProfileId: `33871${suffix}`,
     amazonAccountId: 'A2EUQ1WTGCTBG2',
-    accountName: 'Soapi GmbH',
+    accountName: 'Nordwind GmbH',
     countryCode: 'DE',
     currencyCode: 'EUR',
     timezone: 'Europe/Berlin',
@@ -91,8 +91,8 @@ export function profileFixture(overrides: Partial<Profile> = {}): Profile {
 export function clientFixture(overrides: Partial<Client> = {}): Client {
   return {
     id: '5d1e8a2b-3c4f-4a6b-9d7e-1f2a3b4c5d6e',
-    name: 'Soapi',
-    slug: 'soapi',
+    name: 'Nordwind',
+    slug: 'nordwind',
     createdAt: '2026-09-21T09:00:00.000Z',
     updatedAt: '2026-09-21T09:00:00.000Z',
     ...overrides,

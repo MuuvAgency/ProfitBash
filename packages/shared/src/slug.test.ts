@@ -3,9 +3,9 @@ import { isSlug, slugify } from './slug';
 
 describe('slugify', () => {
   it('macht aus einem Namen einen kleingeschriebenen Slug mit Bindestrichen', () => {
-    expect(slugify('Soapi')).toBe('soapi');
-    expect(slugify('Evertag GmbH & Co. KG')).toBe('evertag-gmbh-co-kg');
-    expect(slugify('  Aliseo  Home  ')).toBe('aliseo-home');
+    expect(slugify('Nordwind')).toBe('nordwind');
+    expect(slugify('Kranich GmbH & Co. KG')).toBe('kranich-gmbh-co-kg');
+    expect(slugify('  Lindenhof  Home  ')).toBe('lindenhof-home');
   });
 
   it('schreibt Umlaute und ß aus und entfernt übrige Akzente', () => {
@@ -28,11 +28,11 @@ describe('slugify', () => {
 
 describe('isSlug', () => {
   it('akzeptiert nur Slugs im Format von slugify', () => {
-    expect(isSlug('soapi')).toBe(true);
-    expect(isSlug('evertag-2')).toBe(true);
+    expect(isSlug('nordwind')).toBe(true);
+    expect(isSlug('kranich-2')).toBe(true);
     expect(isSlug('')).toBe(false);
-    expect(isSlug('Soapi')).toBe(false);
-    expect(isSlug('-soapi')).toBe(false);
+    expect(isSlug('Nordwind')).toBe(false);
+    expect(isSlug('-nordwind')).toBe(false);
     expect(isSlug('so--api')).toBe(false);
     expect(isSlug('a'.repeat(65))).toBe(false);
   });
