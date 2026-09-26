@@ -12,7 +12,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 
 ## Definition of Done
 
-- [ ] `pnpm dev` startet api, worker und web lokal (lokales Postgres 17 über Homebrew); `pnpm test`, `pnpm typecheck` und `pnpm lint` sind grün.
+- [x] `pnpm dev` startet api, worker und web lokal (lokales Postgres 17 über Homebrew); `pnpm test`, `pnpm typecheck` und `pnpm lint` sind grün.
 - [x] CI (GitHub Actions) läuft bei jedem Push auf `main` und bei Pull Requests: Schema-/Migrations-Check, typecheck, lint, test, build.
 - [ ] Railway-Service `app` (API + Web auf einer Origin, `WORKER_MODE=inline`, `NODE_ENV=production`) ist erreichbar und nutzt Railway-Postgres mit Backups.
 - [x] Login mit E-Mail/Passwort. Der Seed legt einen Admin an (Org-Admin von „Muuv" und Plattform-Superadmin). Öffentliche Registrierung ist deaktiviert.
@@ -24,7 +24,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
   - Erneutes Verbinden desselben Amazon-Kontos aktualisiert die bestehende Connection, statt eine zweite anzulegen.
 - [x] Die Jobs `token-refresh` und `profiles-sync` laufen über pg-boss, schreiben `job_runs` und pingen Healthchecks.io.
 - [x] *Betrieb → Sync-Status* zeigt die letzten Jobläufe mit Status und Fehlertext.
-- [ ] Die Settings-Seite speichert Locale (Zahlenformat) und Theme serverseitig.
+- [x] Die Settings-Seite speichert Locale (Zahlenformat) und Theme serverseitig.
 - [x] Die UI nutzt die Design-Tokens aus `design/theme.js` (Login und Shell im Kinetic-Bento-Look).
 - [ ] ADRs `docs/decisions/001-stack.md` und `002-tenancy.md` sind aktuell.
 
@@ -415,27 +415,55 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
   - Tests im Web: Komponenten- und Router-Tests mit `mountWithApp()` und `stubFetch()` aus `src/test/`.
 
 ### 0.9 Deployment
-- [ ] Produktionsfähige Einstiegspunkte mit tsup bündeln: `apps/api` (Server), `migrate` und `seed` als eigene Bundles.
+- [x] Produktionsfähige Einstiegspunkte mit tsup bündeln: `apps/api` (Server), `migrate` und `seed` als eigene Bundles.
   Kein `tsx` in Produktion. Der Migrationsordner ist konfigurierbar (`MIGRATIONS_DIR`) bzw. wird neben das Bundle kopiert
   (der Pfad über `import.meta.url` stimmt nach dem Bündeln nicht mehr).
 - [ ] Build installiert inklusive Dev-Abhängigkeiten (tsup, vite); zur Laufzeit gilt `NODE_ENV=production` (aktiviert u. a. das Rate-Limit von better-auth).
+  - [x] Im Repo: `railpack.json` (Node 22, Start mit `node`), Regel „`NODE_ENV` nicht als Railway-Variable setzen“ in `docs/deploy.md`.
+  - [ ] Auf Railway bestätigt (erster Deploy, braucht Konto 0.0f).
 - [ ] Railway-Service `app`:
   - Hono liefert `apps/web/dist` aus, `/api/*` bleibt API (gleiche Origin), SPA-Fallback auf `index.html` für alle übrigen Pfade
   - Port aus `PORT` (von Railway gesetzt), Fallback `API_PORT`
   - Pre-Deploy-Command: gebündelte Migration
   - Healthcheck `GET /api/health`
   - `WORKER_MODE=inline`
+  - [x] Code: Web-Auslieferung, `PORT`, Healthcheck, gebündelte Migration (siehe Umsetzung unten).
+  - [ ] Service auf Railway eingerichtet und erreichbar (Einstellungen in `docs/deploy.md`, braucht Konto 0.0f).
 - [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
 - [ ] Railway-Postgres mit Backups; falls der Hobby-Plan keine enthält: nächtlicher `pg_dump` per GitHub Action in einen privaten Speicher.
 - [ ] Doku in `docs/deploy.md`: Umstellung auf `WORKER_MODE=separate` mit zweitem Service, Secrets, Schlüsselrotation.
+  - [x] Einrichtung, Variablen, Seed, Healthchecks.io, Graceful Shutdown, Backups (offen), `WORKER_MODE=separate`, Rotationsregel.
+  - [ ] Anleitung zum Rotations-Skript (mit dem Skript).
 - [ ] Rotations-Skript: verschlüsselt alle Tokens, bei denen `needsReencryption()` greift, mit dem aktuellen Schlüssel neu;
   Zeilen mit kaputtem Wert (`DecryptionError`) melden und überspringen, nicht abbrechen.
   Betriebsregel: Ein neuer Schlüssel bekommt immer eine **neue** `ENCRYPTION_KEY_ID`. Dieselbe ID mit neuem Schlüssel macht alle alten Werte unlesbar, und der Code kann das nicht erkennen.
+- [x] Umsetzung Bundles und Web-Auslieferung (Stand für die restlichen 0.9-Punkte):
+  - **Bundles:** `apps/api/tsup.config.ts` baut `dist/index.js` (Server), `dist/migrate.js` (Einstieg
+    `packages/db/src/migrate-cli.ts`) und `dist/seed.js` und kopiert `packages/db/drizzle` nach `dist/drizzle`.
+    `resolveMigrationsFolder` (`packages/db/src/migrate.ts`): `MIGRATIONS_DIR` (zod, leer = nicht gesetzt; kein
+    Ausweichen, wenn es kein Migrationsordner ist) → `drizzle/` neben dem Modul (Bundle) → `../drizzle` (Quellcode).
+  - **Server:** `createServerApp` (`apps/api/src/web.ts`): `/api/*` → API-App; in Produktion liefert es `apps/web/dist`
+    (Pfad relativ zu `apps/api/dist/index.js`, fehlt `index.html` → Start bricht ab). `/assets/*` mit
+    `Cache-Control: public, max-age=31536000, immutable`, sonst `no-cache`. SPA-Fallback auf `index.html` nur für GET/HEAD
+    und Pfade ohne Dateiendung; fehlende Dateien und andere Methoden bekommen das JSON-404 der API. In der Entwicklung
+    geht alles an die API (Vite liefert das Web).
+  - **Port:** `PORT` gilt nur bei `NODE_ENV=production` (Railway), sonst `API_PORT`: Dev-Werkzeuge setzen `PORT` oft für
+    den Web-Server (die Preview setzt `PORT=5173`, dann lauschte die API auf dem Vite-Port).
+  - **Smoke-Test:** `scripts/smoke-bundles.sh` startet migrate, seed und Server mit `node`, `NODE_ENV=production` und
+    `PORT` aus einem fremden Arbeitsverzeichnis, prüft `/api/health`, `/`, eine Client-Route, ein Asset und das Beenden per
+    SIGTERM. Läuft in der CI nach `pnpm build` gegen die CI-Datenbank. Lokal mit eigener DB (`profitbash_smoke`, Owner
+    `profitbash`).
+  - **Railway (Stand 2026-09-26):** `railway.json`/`railway.toml` (Config as Code) liest Railway für neue Services nicht
+    mehr; Nachfolger ist Infrastructure as Code (`.railway/railway.ts`). Bis Dominik entscheidet, stehen die
+    Service-Einstellungen in `docs/deploy.md` und werden im Dashboard gesetzt. `railpack.json` ist Railpack-Konfiguration
+    (nicht abgekündigt), aber mangels Railpack-CLI lokal ungeprüft.
+  - **Backups:** Laut Railway-Preisübersicht sind DB-Backups erst ab Pro enthalten, nicht im Hobby-Plan. Der nächtliche
+    `pg_dump` ist also nötig; Ziel-Speicher und Ausführungsort entscheidet Dominik (Optionen in `docs/deploy.md`).
 
 ## `.env.example`
 
 Die Datei `.env.example` im Repo-Root ist die Quelle. Neue Variablen in den Aufgaben oben:
-`ENCRYPTION_KEY_ID`, `ENCRYPTION_KEYS_PREVIOUS` (0.3), `PORT` (0.9, von Railway gesetzt).
+`ENCRYPTION_KEY_ID`, `ENCRYPTION_KEYS_PREVIOUS` (0.3), `PORT` (0.9, von Railway gesetzt, nur in Produktion), `MIGRATIONS_DIR` (0.9, optional).
 `AMAZON_ADS_REDIRECT_URI` zeigt über den Vite-Proxy auf `APP_URL`, damit Callback und Session auf derselben Origin liegen.
 
 ## Bewusst nicht in Phase 0
