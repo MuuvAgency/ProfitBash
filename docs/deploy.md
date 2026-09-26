@@ -127,13 +127,23 @@ Datenbank. Railways Draining Time muss deshalb **mindestens 35 s** betragen, son
 Laut Railway-Preisübersicht (Stand 2026-09-26) sind die eingebauten Datenbank-/Volume-Backups erst ab dem
 **Pro-Plan** enthalten, nicht im Hobby-Plan. Deshalb ist ein nächtlicher `pg_dump` nötig (Aufgabe in 0.9).
 
-**Offen (Dominik), vor der Umsetzung zu entscheiden:**
+**Entschieden (Dominik, 2026-09-26):** Railway-Cron-Service `db-backup` im privaten Netz (kein öffentlicher
+DB-Zugang), Dump mit `age` für einen öffentlichen Schlüssel verschlüsselt (privater Schlüssel nur offline bei Dominik),
+Upload nach Cloudflare R2 (Lifecycle-Regel 14 Tage), Healthchecks.io-Check „db-backup“, monatlicher Test-Restore.
+R2-Konto und Bucket legt Dominik an.
 
-- **Ziel-Speicher** (privat, außerhalb der öffentlichen Actions-Artefakte), z. B. ein S3-kompatibler Bucket
-  (Cloudflare R2, Backblaze B2 oder ein Railway-Bucket).
-- **Wo der Dump läuft:** GitHub Action (braucht einen öffentlichen TCP-Proxy auf die Datenbank) oder ein Railway-Cron-Service
-  im privaten Netz (kein öffentlicher DB-Zugang).
-- Das Repo ist öffentlich: Der Dump wird **vor** dem Upload verschlüsselt, Logs enthalten keine Verbindungsdaten.
+Geplante Umsetzung (in Arbeit, Branch `ops/db-backup`):
+
+- `ops/db-backup/Dockerfile` auf `postgres:17.10-alpine3.24` (per Digest gepinnt) plus `age` und `curl` aus Alpine.
+  Railway baut es über `RAILWAY_DOCKERFILE_PATH`; Cron-Zeitplan in UTC, Mindestabstand 5 Min., der Prozess muss enden
+  (läuft der vorige Lauf noch, überspringt Railway den nächsten).
+- `backup.sh`: `pg_dump --format=custom` → `pg_restore --list` als Lesbarkeitsprüfung → `age -r` → Upload per
+  `curl --aws-sigv4 "aws:amz:auto:s3"` mit explizitem `x-amz-content-sha256` (R2 verlangt den Header), Zugangsdaten
+  per `--config -` statt auf der Kommandozeile. Pings `/start`, Erfolg, `/fail`. Keine Verbindungsdaten in Logs.
+- `restore-test.sh`: entschlüsseln, in eine frische Datenbank einspielen, Stichproben (Migrationen, Organisationen);
+  pingt einen eigenen Check (Periode 31 Tage), damit ein vergessener Test-Restore auffällt.
+- Smoke-Test mit Fake-S3 (Node) lokal und in der CI (dort gegen das gebaute Image).
+- `pg_dump` muss mindestens die Hauptversion des Railway-Postgres haben (beim Einrichten prüfen).
 
 ## Umstellung auf `WORKER_MODE=separate` (Stufe C)
 
