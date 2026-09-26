@@ -3,6 +3,7 @@
 - **Status:** angenommen
 - **Datum:** 2026-09-26 (vor Beginn von Phase 1, Doku-Stand vom selben Tag)
 - **Beteiligte:** Dominik
+- **Hinweis:** ADR 003 ist für die Decimal-Library reserviert (`docs/tasks/phase-1.md`, 1.1 und F13).
 
 ## Kontext
 
