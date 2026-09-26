@@ -111,6 +111,25 @@ describe('createServerApp mit gebautem Web', () => {
     expect(res.headers.get('content-type')).toMatch(/^application\/json/);
   });
 
+  it('beantwortet HEAD wie GET, ohne Body', async () => {
+    const res = await app().request('/admin/connections', { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/^text\/html/);
+    expect(await res.text()).toBe('');
+  });
+
+  it('leitet /api ohne Schrägstrich an die API weiter', async () => {
+    const res = await app().request('/api');
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-type')).toMatch(/^application\/json/);
+  });
+
+  it('liefert für einen Ordner wie /assets index.html (SPA), nicht dessen Inhalt', async () => {
+    const res = await app().request('/assets');
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(INDEX_HTML);
+  });
+
   it('bricht beim Start ab, wenn index.html fehlt', () => {
     const empty = mkdtempSync(join(tmpdir(), 'pb-web-empty-'));
     try {
@@ -120,6 +139,26 @@ describe('createServerApp mit gebautem Web', () => {
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }
+  });
+});
+
+describe('Security-Header', () => {
+  const app = () => createServerApp({ api: createStubApi(), webDistDir });
+
+  it('setzt sie auf Seiten, Assets und API-Antworten', async () => {
+    for (const path of ['/', '/admin/connections', '/assets/index-abc123.js', '/api/health']) {
+      const res = await app().request(path);
+      expect(res.headers.get('x-frame-options'), path).toBe('DENY');
+      expect(res.headers.get('x-content-type-options'), path).toBe('nosniff');
+      expect(res.headers.get('strict-transport-security'), path).toMatch(/max-age=\d+/);
+    }
+  });
+
+  it('behält den Origin-Header für Same-Origin-POSTs (kein no-referrer)', async () => {
+    // Mit `no-referrer` senden Browser bei Same-Origin-POSTs `Origin: null`; dann schlagen die
+    // CSRF-Prüfung der API und die Origin-Prüfung von better-auth fehl.
+    const res = await app().request('/');
+    expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
   });
 });
 

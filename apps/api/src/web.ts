@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
+import { secureHeaders } from 'hono/secure-headers';
 
 /** Alles, was eine `fetch`-Methode hat, z. B. die API-App aus `createApp`. */
 export interface FetchHandler {
@@ -38,6 +39,14 @@ function looksLikeFile(path: string): boolean {
  */
 export function createServerApp({ api, webDistDir }: ServerAppOptions) {
   const app = new Hono();
+  app.use(
+    secureHeaders({
+      xFrameOptions: 'DENY',
+      // Nicht `no-referrer` (Hono-Standard): Dann senden Browser bei Same-Origin-POSTs `Origin: null`,
+      // und die CSRF-Prüfung der API sowie die Origin-Prüfung von better-auth lehnen ab.
+      referrerPolicy: 'strict-origin-when-cross-origin',
+    }),
+  );
   const toApi = (c: Context) => api.fetch(c.req.raw, c.env);
 
   if (webDistDir) {
