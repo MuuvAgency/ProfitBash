@@ -3,6 +3,8 @@ import { vi } from 'vitest';
 export interface RecordedRequest {
   method: string;
   path: string;
+  /** Query-String inkl. `?` (leer ohne Parameter). */
+  search: string;
   headers: Headers;
   body: unknown;
   credentials: RequestCredentials;
@@ -26,9 +28,11 @@ export function stubFetch(routes: Record<string, Responder | Response>) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
     const text = await request.text();
+    const url = new URL(request.url);
     const recorded: RecordedRequest = {
       method: request.method,
-      path: new URL(request.url).pathname,
+      path: url.pathname,
+      search: url.search,
       headers: request.headers,
       body: text ? (JSON.parse(text) as unknown) : undefined,
       credentials: request.credentials,

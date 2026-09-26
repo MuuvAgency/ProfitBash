@@ -330,3 +330,57 @@ export const clientPatchSchema = z
     message: 'mindestens name oder slug angeben',
   })
   .meta({ id: 'ClientPatch' });
+
+// ---------------------------------------------------------------------------
+// Sync-Status (Jobläufe)
+// ---------------------------------------------------------------------------
+
+/**
+ * Jobs je Connection (Worker-Queues). Nur ihre Läufe gehören einer Organisation; Cron-Auslöser und
+ * Cleanup laufen plattformweit (`organization_id` null) und fehlen in der Org-Sicht.
+ */
+export const CONNECTION_JOB_NAMES = ['token-refresh', 'profiles-sync'] as const;
+export type ConnectionJobName = (typeof CONNECTION_JOB_NAMES)[number];
+
+export const JOB_RUN_STATUSES = ['running', 'success', 'failed'] as const;
+export type JobRunStatus = (typeof JOB_RUN_STATUSES)[number];
+
+/** So viele Läufe zeigt der Sync-Status höchstens (die neuesten). */
+export const JOB_RUN_LIST_LIMIT = 100;
+
+/** Filter als Query-Parameter (je ein Enum-Wert). */
+export const jobRunListQuerySchema = z.object({
+  job: z.enum(CONNECTION_JOB_NAMES).optional(),
+  status: z.enum(JOB_RUN_STATUSES).optional(),
+});
+export type JobRunListQuery = z.infer<typeof jobRunListQuerySchema>;
+
+export const jobRunSchema = z
+  .object({
+    id: z.uuid(),
+    /** Name des Jobs; neue Jobs erscheinen unverändert. */
+    job: z.string(),
+    /** Worauf sich der Lauf bezieht, bei Connection-Jobs die Connection-ID. */
+    scope: z.string().nullable(),
+    /** Connection der Organisation, auf die `scope` zeigt, sonst `null`. */
+    connection: z
+      .object({
+        id: z.uuid(),
+        externalAccountId: z.string(),
+        externalAccountEmail: z.string().nullable(),
+      })
+      .nullable(),
+    status: z.enum(JOB_RUN_STATUSES),
+    startedAt: timestamp,
+    finishedAt: timestamp.nullable(),
+    /** Für die Anzeige gedachter Fehlertext (ohne Secrets, gekürzt). */
+    error: z.string().nullable(),
+    /** Zähler des Laufs, z. B. `profiles`, `created`, `removed`. */
+    counters: z.record(z.string(), z.number()),
+  })
+  .meta({ id: 'JobRun' });
+export type JobRun = z.infer<typeof jobRunSchema>;
+
+export const jobRunListSchema = z
+  .object({ jobRuns: z.array(jobRunSchema) })
+  .meta({ id: 'JobRunList' });

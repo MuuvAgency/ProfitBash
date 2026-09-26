@@ -9,6 +9,7 @@ import { registerAmazonOAuthRoutes } from './routes/amazon-oauth';
 import { registerClientRoutes } from './routes/clients';
 import { registerConnectionRoutes } from './routes/connections';
 import { registerHealthRoutes } from './routes/health';
+import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMeRoutes } from './routes/me';
 import { registerSettingsRoutes } from './routes/settings';
 
@@ -75,6 +76,7 @@ export function createApp(options: CreateAppOptions) {
   registerAmazonOAuthRoutes(app, deps);
   registerConnectionRoutes(app, deps);
   registerClientRoutes(app, deps);
+  registerJobRunRoutes(app, deps);
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

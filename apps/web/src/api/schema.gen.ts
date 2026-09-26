@@ -852,6 +852,72 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/job-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Letzte 100 Jobläufe der aktiven Organisation (Sync-Status, nur Admin) */
+        get: {
+            parameters: {
+                query?: {
+                    job?: "token-refresh" | "profiles-sync";
+                    status?: "running" | "success" | "failed";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Jobläufe, neueste zuerst. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JobRunList"];
+                    };
+                };
+                /** @description Ungültiger Filter. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1039,6 +1105,31 @@ export interface components {
         ClientPatch: {
             name?: string;
             slug?: string;
+        };
+        JobRunList: {
+            jobRuns: components["schemas"]["JobRun"][];
+        };
+        JobRun: {
+            /** Format: uuid */
+            id: string;
+            job: string;
+            scope: string | null;
+            connection: {
+                /** Format: uuid */
+                id: string;
+                externalAccountId: string;
+                externalAccountEmail: string | null;
+            } | null;
+            /** @enum {string} */
+            status: "running" | "success" | "failed";
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+            error: string | null;
+            counters: {
+                [key: string]: number;
+            };
         };
     };
     responses: never;

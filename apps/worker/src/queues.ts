@@ -1,15 +1,12 @@
 import type { DbOrTx } from '@profitbash/db';
-import type { Logger } from '@profitbash/shared';
+import { CONNECTION_JOB_NAMES, type Logger } from '@profitbash/shared';
 import { errorLogFields } from '@profitbash/db';
 import { sql } from 'drizzle-orm';
 import { fromDrizzle, PgBoss, type Queue } from 'pg-boss';
 import type { ConnectionJobData, ConnectionQueue } from './jobs/connection-job';
 
 /** Jobs je Connection. `stately`: je Connection höchstens ein wartender und ein laufender Job. */
-export const CONNECTION_QUEUES = [
-  'token-refresh',
-  'profiles-sync',
-] as const satisfies ConnectionQueue[];
+export const CONNECTION_QUEUES: readonly ConnectionQueue[] = CONNECTION_JOB_NAMES;
 
 /** Cron-Auslöser, die für jede aktive Connection einen Job der Ziel-Queue einplanen. */
 export const DISPATCH_QUEUES = {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { settingsSchema, uiStateParamsSchema, uiStatePutSchema } from './api';
+import {
+  jobRunListQuerySchema,
+  settingsSchema,
+  uiStateParamsSchema,
+  uiStatePutSchema,
+} from './api';
 
 describe('settingsSchema', () => {
   const valid = { theme: 'dark', locale: 'en-US', density: 'compact' };
@@ -50,5 +55,23 @@ describe('uiStatePutSchema', () => {
   it('lehnt Werte über 16 KB ab', () => {
     const big = { value: 'x'.repeat(16 * 1024) };
     expect(uiStatePutSchema.safeParse(big).success).toBe(false);
+  });
+});
+
+describe('jobRunListQuerySchema', () => {
+  it('akzeptiert keine, eine oder beide Filter', () => {
+    expect(jobRunListQuerySchema.parse({})).toEqual({});
+    expect(jobRunListQuerySchema.parse({ job: 'profiles-sync', status: 'failed' })).toEqual({
+      job: 'profiles-sync',
+      status: 'failed',
+    });
+  });
+
+  it.each([
+    ['job', 'job-runs-cleanup'],
+    ['job', 'unbekannt'],
+    ['status', 'done'],
+  ])('lehnt %s=%j ab (plattformweite Jobs gehören nicht zur Org-Sicht)', (field, value) => {
+    expect(jobRunListQuerySchema.safeParse({ [field]: value }).success).toBe(false);
   });
 });
