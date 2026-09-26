@@ -48,6 +48,10 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [ ] **0.0f Accounts anlegen:** Railway, Healthchecks.io (Free), GitHub-Repo `profitbash` (privat). Neon (Free) nur bei Bedarf für geteilte Dev-/Preview-Datenbanken; lokal reicht Homebrew-Postgres.
   - Railway-Hobby erst starten, wenn der erste echte Deploy ansteht (das Trial-Guthaben ist zeitlich begrenzt, die Amazon-Freigabe kann Wochen dauern).
   - Prüfen, ob Backups für Railway-Postgres im Hobby-Plan enthalten sind. Falls nicht: nächtlicher `pg_dump` per GitHub Action (siehe 0.9).
+  - Stand 2026-09-26: GitHub-Repo erledigt (`MuuvAgency/ProfitBash`), erster echter CI-Lauf grün (PR #1). Railway und Healthchecks.io fehlen noch.
+  - Abweichung von ADR 001: Das Repo ist **öffentlich**, weil Auto-Merge für private Repos im aktuellen GitHub-Plan nicht verfügbar ist.
+    Folgen: Keine Secrets ins Repo. Nichts Sensibles in öffentliche Actions-Logs oder -Artefakte (gilt besonders für den `pg_dump` aus 0.9).
+    `main` ist nicht geschützt, Auto-Merge wartet daher nicht auf CI. Offen: ADR 001 anpassen oder später zurück auf privat.
 - [ ] **0.0g Secrets bereitstellen** (siehe `.env.example` unten).
 
 ## Aufgaben
@@ -57,7 +61,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] Gemeinsame `tsconfig.base.json` (`strict`, `noUncheckedIndexedAccess`), ESLint + Prettier, Vitest.
 - [x] Lokale DB ist eingerichtet: Postgres 17 (Homebrew), Rolle `profitbash`, Datenbanken `profitbash` und `profitbash_test`. Tests nutzen `DATABASE_URL_TEST`. CI nutzt einen Postgres-17-Service-Container.
 - [x] Root-Skripte: `dev`, `build`, `test`, `typecheck`, `lint`, `db:generate`, `db:migrate`, `db:seed`.
-- [x] GitHub-Actions-Workflow; Postgres für Tests als Service-Container. (Lokal verifiziert; erster echter Lauf nach dem Push ins GitHub-Repo, siehe 0.0f.)
+- [x] GitHub-Actions-Workflow; Postgres für Tests als Service-Container. (Erster echter Lauf auf GitHub grün, siehe 0.0f.)
   App-URLs in CI zeigen auf `profitbash`, nur `DATABASE_URL_TEST` auf `profitbash_test` (sonst greift die Schutzprüfung aus 0.2).
 - [x] `.env.example` mit allen Variablen (siehe unten); Env-Validierung per zod beim Start jeder App (`loadEnv` in `packages/shared`; das Web ist eine statische SPA und bekommt nur `VITE_*`-Variablen).
 - [x] Vite-Dev-Server leitet `/api` an `http://localhost:8787` weiter. So laufen alle Browser-Requests über eine Origin.
