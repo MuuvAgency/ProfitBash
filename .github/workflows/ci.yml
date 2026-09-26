@@ -57,3 +57,11 @@ jobs:
         run: scripts/smoke-bundles.sh
         env:
           SMOKE_DATABASE_URL: postgres://profitbash:profitbash@localhost:5432/profitbash
+      - name: Backup-Image bauen (Railway-Cron-Service db-backup)
+        run: docker build -t profitbash-db-backup ops/db-backup
+      - name: Backup und Test-Restore im Image (Fake-S3)
+        run: scripts/smoke-db-backup.sh
+        env:
+          SMOKE_DATABASE_URL: postgres://profitbash:profitbash@localhost:5432/profitbash
+          SMOKE_RESTORE_DATABASE_URL: postgres://profitbash:profitbash@localhost:5432/profitbash_restore
+          SMOKE_BACKUP_IMAGE: profitbash-db-backup
