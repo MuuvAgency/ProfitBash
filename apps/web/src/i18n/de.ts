@@ -129,7 +129,8 @@ export const de = {
     connect: 'Amazon-Account verbinden',
     reconnect: 'Neu verbinden',
     sync: 'Jetzt synchronisieren',
-    syncQueued: 'Sync eingeplant. Den Fortschritt zeigt der Sync-Status.',
+    /** `{link}` = Link „Sync-Status“ (`nav.sync`). */
+    syncQueued: 'Sync eingeplant. Den Fortschritt zeigt der {link}.',
     loadError: 'Die Connections konnten nicht geladen werden.',
     clientsLoadError:
       'Die Clients konnten nicht geladen werden. Die Zuordnung ist so lange gesperrt.',
@@ -200,6 +201,54 @@ export const de = {
       cancel: 'Abbrechen',
       required: 'Bitte einen Namen eingeben.',
     },
+  },
+  sync: {
+    eyebrow: 'Betrieb',
+    description:
+      'Die letzten 100 Jobläufe dieser Organisation: Token-Refresh und Profil-Sync je Amazon-Konto.',
+    refresh: 'Aktualisieren',
+    label: 'Jobläufe',
+    loadError: 'Die Jobläufe konnten nicht geladen werden.',
+    emptyTitle: 'Noch keine Jobläufe',
+    emptyText:
+      'Sobald ein Token-Refresh oder Profil-Sync gelaufen ist, erscheint er hier. Beides startet nach dem Verbinden eines Amazon-Kontos.',
+    emptyFiltered: 'Keine Jobläufe für diesen Filter.',
+    filter: {
+      job: 'Job',
+      status: 'Status',
+      all: 'Alle',
+      reset: 'Filter zurücksetzen',
+    },
+    job: {
+      'token-refresh': 'Token-Refresh',
+      'profiles-sync': 'Profil-Sync',
+    },
+    status: {
+      running: 'Läuft',
+      success: 'Erfolgreich',
+      failed: 'Fehlgeschlagen',
+    },
+    column: {
+      status: 'Status',
+      job: 'Job',
+      connection: 'Amazon-Konto',
+      startedAt: 'Gestartet',
+      duration: 'Dauer',
+      result: 'Ergebnis',
+    },
+    /** Zähler der Läufe; unbekannte erscheinen mit ihrem Namen. */
+    counter: {
+      refreshed: 'Token erneuert | Token erneuert',
+      profiles: 'Profil | Profile',
+      created: 'neu | neu',
+      reassigned: 'umgehängt | umgehängt',
+      removed: 'entfernt | entfernt',
+      removalDeferred: 'Entfernen zurückgestellt | Entfernen zurückgestellt',
+    },
+    showError: 'Fehler anzeigen',
+    hideError: 'Fehler ausblenden',
+    /** Zugänglicher Name des Schalters, beginnt mit dem sichtbaren Text. */
+    errorToggleLabel: '{action}: {job}, gestartet {startedAt}',
   },
   forbidden: {
     title: 'Kein Zugriff',

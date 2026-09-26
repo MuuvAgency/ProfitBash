@@ -67,3 +67,43 @@ export function formatPercent(
     maximumFractionDigits: fractionDigits,
   });
 }
+
+/**
+ * Zeitpunkt mit Datum und Uhrzeit (Sekunden), z. B. `26.09.2026, 10:15:03`. Ohne `timeZone` in der
+ * Zeitzone des Browsers.
+ */
+export function formatDateTime(
+  value: string | Date | null | undefined,
+  locale: Locale,
+  { timeZone }: { timeZone?: string } = {},
+): string {
+  if (value === null || value === undefined) return MISSING_VALUE;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return MISSING_VALUE;
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+    ...(timeZone && { timeZone }),
+  }).format(date);
+}
+
+function formatUnit(value: number, unit: 'second' | 'minute' | 'hour', locale: Locale, digits = 0) {
+  return new Intl.NumberFormat(locale, {
+    style: 'unit',
+    unit,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+/** Dauer in Millisekunden mit den Einheiten der Locale: `1,2 Sek.`, `3 Min. 12 Sek.`, `1 Std. 5 Min.` */
+export function formatDuration(ms: number | null | undefined, locale: Locale): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return MISSING_VALUE;
+  // Auf Zehntel abrunden: 59,94 s erscheint als „59,9 s“, nicht als „60 s“.
+  if (ms < 60_000) return formatUnit(Math.floor(ms / 100) / 10, 'second', locale, 1);
+  const totalSeconds = Math.floor(ms / 1000);
+  if (totalSeconds < 3600) {
+    return `${formatUnit(Math.floor(totalSeconds / 60), 'minute', locale)} ${formatUnit(totalSeconds % 60, 'second', locale)}`;
+  }
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  return `${formatUnit(Math.floor(totalMinutes / 60), 'hour', locale)} ${formatUnit(totalMinutes % 60, 'minute', locale)}`;
+}

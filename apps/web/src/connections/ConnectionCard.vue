@@ -171,7 +171,16 @@ const statusDot = computed(
       role="status"
       class="rounded-control bg-violet-wash px-space-md py-space-sm text-body-sm text-ink"
     >
-      {{ t('connections.syncQueued') }}
+      <i18n-t keypath="connections.syncQueued" scope="global">
+        <template #link>
+          <RouterLink
+            :to="{ name: 'sync', query: { job: 'profiles-sync' } }"
+            class="font-medium text-violet underline underline-offset-2"
+          >
+            {{ t('nav.sync') }}
+          </RouterLink>
+        </template>
+      </i18n-t>
     </p>
     <InlineError v-if="syncErrorKey" :message="t(syncErrorKey)" />
 

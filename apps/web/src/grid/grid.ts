@@ -2,6 +2,7 @@ import {
   CellStyleModule,
   ClientSideRowModelModule,
   ModuleRegistry,
+  RowAutoHeightModule,
   RowStyleModule,
   themeQuartz,
   ValidationModule,
@@ -16,6 +17,7 @@ ModuleRegistry.registerModules([
   ClientSideRowModelModule,
   RowStyleModule,
   CellStyleModule,
+  RowAutoHeightModule,
   ...(import.meta.env.DEV ? [ValidationModule] : []),
 ]);
 
