@@ -63,6 +63,10 @@ describe("parseJsonLossless mit { decimals: 'string' }", () => {
     expect(parsed).toEqual({ clicks: 42, zero: 0, id: '9007199254740993' });
   });
 
+  it('lässt -0 als Zahl (der Betrag wird erst im Schema zu 0)', () => {
+    expect(Object.is(parseJsonLossless('-0', { decimals: 'string' }), -0)).toBe(true);
+  });
+
   it('wirkt in verschachtelten Objekten und Arrays', () => {
     const parsed = parseJsonLossless('{"rows": [{"cost": 12.34, "sales7d": [0.5]}]}', {
       decimals: 'string',

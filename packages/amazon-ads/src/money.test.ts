@@ -20,14 +20,21 @@ describe('amazonDecimalSchema', () => {
   });
 
   it.each([
-    [0.1, '0.1'],
-    [1234567.89, '1234567.89'],
     [42, '42'],
+    [0, '0'],
     [-0, '0'],
-    [1e-7, '0.0000001'],
-  ])('übernimmt die sichere Zahl %s als %s', (input, expected) => {
+    [-7, '-7'],
+    [Number.MAX_SAFE_INTEGER, '9007199254740991'],
+  ])('übernimmt die sichere Ganzzahl %s als %s', (input, expected) => {
     expect(amazonDecimalSchema.parse(input)).toBe(expected);
   });
+
+  it.each([0.1, 1234567.89, 1e-7, Number('0.12345678901234567')])(
+    'lehnt die Zahl %s mit Nachkommastellen ab (Parser-Option vergessen, sonst still gerundet)',
+    (input) => {
+      expect(amazonDecimalSchema.safeParse(input).success).toBe(false);
+    },
+  );
 
   it.each(['', ' 1', '1 ', '1.', '.5', '+1', '1,5', 'abc', 'NaN', 'Infinity', '0x10', '1e'])(
     'lehnt den String %j ab',
@@ -43,9 +50,24 @@ describe('amazonDecimalSchema', () => {
     },
   );
 
-  it('lehnt Werte mit riesigem Exponenten ab, statt einen riesigen String zu bauen', () => {
-    expect(amazonDecimalSchema.safeParse('1e-1000000').success).toBe(false);
-    expect(amazonDecimalSchema.safeParse('1e1000000').success).toBe(false);
+  it('nimmt Werte bis zur Zehnerpotenz ±40 an', () => {
+    expect(amazonDecimalSchema.parse('1e40')).toBe(`1${'0'.repeat(40)}`);
+    expect(amazonDecimalSchema.parse('1e-40')).toBe(`0.${'0'.repeat(39)}1`);
+    expect(amazonDecimalSchema.parse('0e999')).toBe('0');
+  });
+
+  it.each([
+    '1e41',
+    '1e-41',
+    '1e-1000000',
+    '1e1000000',
+    // jenseits der Grenzen von decimal.js: würde zu `Infinity` bzw. still zu `0`
+    '1e9000000000000001',
+    '1e-9000000000000001',
+    `1e${'9'.repeat(30)}`,
+    `1e-${'9'.repeat(30)}`,
+  ])('lehnt %s ab, statt einen riesigen String, Infinity oder still 0 zu liefern', (input) => {
+    expect(amazonDecimalSchema.safeParse(input).success).toBe(false);
   });
 
   it('lehnt andere Typen ab', () => {
