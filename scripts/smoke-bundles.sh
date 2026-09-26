@@ -50,7 +50,19 @@ export SEED_ADMIN_PASSWORD
 
 # Aus einem fremden Ordner starten: Pfade dürfen nicht vom Arbeitsverzeichnis abhängen.
 workdir="$(mktemp -d)"
+server_pid=""
+cleanup() {
+  if [ -n "$server_pid" ]; then kill "$server_pid" 2>/dev/null || true; fi
+  rm -rf "$workdir"
+}
+trap cleanup EXIT
 cd "$workdir"
+
+# Ein anderer Prozess auf dem Port würde den Healthcheck statt unseres Servers beantworten.
+if curl -s -o /dev/null "http://localhost:$port/"; then
+  echo "::error::Port $port ist belegt. Anderen Port über SMOKE_PORT wählen." >&2
+  exit 1
+fi
 
 echo "→ migrate"
 node "$dist/migrate.js"
@@ -60,7 +72,6 @@ node "$dist/seed.js"
 echo "→ server"
 node "$dist/index.js" &
 server_pid=$!
-trap 'kill "$server_pid" 2>/dev/null || true; rm -rf "$workdir"' EXIT
 
 healthy=false
 for _ in $(seq 1 60); do
@@ -71,8 +82,8 @@ for _ in $(seq 1 60); do
   if ! kill -0 "$server_pid" 2>/dev/null; then break; fi
   sleep 0.5
 done
-if [ "$healthy" != true ]; then
-  echo "::error::GET /api/health antwortet nicht mit 200." >&2
+if [ "$healthy" != true ] || ! kill -0 "$server_pid" 2>/dev/null; then
+  echo "::error::Der Server läuft nicht oder GET /api/health antwortet nicht mit 200." >&2
   exit 1
 fi
 echo "  /api/health ok"

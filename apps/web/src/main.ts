@@ -14,10 +14,14 @@ import { ApiError } from './api';
 import { i18n } from './i18n';
 import { createAppRouter, installGuards } from './router';
 import { installSessionSync } from './router/session-sync';
+import { installStaleChunkReload } from './router/stale-chunks';
 import { pageTitleKey } from './router/title';
 import { useSessionStore } from './stores/session';
 import { applyColorScheme, readCachedTheme, resolveColorScheme } from './theme/mode';
 import { preset } from './theme/preset';
+
+// Nach einem Deploy fehlen die Chunks der alten Version: einmal neu laden statt zu hängen.
+installStaleChunkReload();
 
 // Theme vor dem ersten Paint setzen (Einstellung aus dem letzten Besuch), sonst blitzt es hell auf.
 applyColorScheme(

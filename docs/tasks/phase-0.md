@@ -446,7 +446,16 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
     (Pfad relativ zu `apps/api/dist/index.js`, fehlt `index.html` → Start bricht ab). `/assets/*` mit
     `Cache-Control: public, max-age=31536000, immutable`, sonst `no-cache`. SPA-Fallback auf `index.html` nur für GET/HEAD
     und Pfade ohne Dateiendung; fehlende Dateien und andere Methoden bekommen das JSON-404 der API. In der Entwicklung
-    geht alles an die API (Vite liefert das Web).
+    geht alles an die API (Vite liefert das Web). Client-Routen dürfen im letzten Segment keinen Punkt enthalten
+    (sonst gelten sie als Datei → 404).
+  - **Security-Header** (`secureHeaders` in `createServerApp`, für Web und API): `X-Frame-Options: DENY`, nosniff, HSTS
+    u. a. `Referrer-Policy` bewusst `strict-origin-when-cross-origin`, nicht Honos `no-referrer`: Damit sendeten Browser bei
+    Same-Origin-POSTs `Origin: null`, und CSRF-Prüfung sowie better-auth lehnten ab. Noch keine CSP (PrimeVue setzt
+    Inline-Styles; eigene Aufgabe, falls gewünscht).
+  - **Nach einem Deploy** fehlen die Chunks der alten Version: `installStaleChunkReload` (`apps/web/src/router/stale-chunks.ts`)
+    lädt bei `vite:preloadError` einmal neu (Sperre 30 s über `sessionStorage`, ohne Storage kein Neuladen).
+  - **Browser-Check** gegen das Produktions-Bundle (`NODE_ENV=production`, Smoke-DB): Login, SPA-Route, Settings speichern
+    (PUT mit CSRF-Prüfung) funktionieren.
   - **Port:** `PORT` gilt nur bei `NODE_ENV=production` (Railway), sonst `API_PORT`: Dev-Werkzeuge setzen `PORT` oft für
     den Web-Server (die Preview setzt `PORT=5173`, dann lauschte die API auf dem Vite-Port).
   - **Smoke-Test:** `scripts/smoke-bundles.sh` startet migrate, seed und Server mit `node`, `NODE_ENV=production` und
