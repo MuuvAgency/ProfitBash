@@ -150,17 +150,17 @@ describe('Connections, Profile und Clients', () => {
     const { requests } = stubFetch({
       [`PATCH /api/profiles/${profileId}`]: ({ body }) =>
         json({ id: profileId, ...(body as object) }),
-      'POST /api/clients': json({ id: clientId, name: 'Soapi', slug: 'soapi' }, 201),
+      'POST /api/clients': json({ id: clientId, name: 'Nordwind', slug: 'nordwind' }, 201),
     });
     const api = createApi();
     await expect(api.updateProfile(profileId, { isHidden: true })).resolves.toMatchObject({
       id: profileId,
       isHidden: true,
     });
-    await expect(api.createClient({ name: 'Soapi' })).resolves.toMatchObject({ id: clientId });
+    await expect(api.createClient({ name: 'Nordwind' })).resolves.toMatchObject({ id: clientId });
     expect(requests.map((r) => [r.method, r.path, r.body])).toEqual([
       ['PATCH', `/api/profiles/${profileId}`, { isHidden: true }],
-      ['POST', '/api/clients', { name: 'Soapi' }],
+      ['POST', '/api/clients', { name: 'Nordwind' }],
     ]);
   });
 });

@@ -139,7 +139,7 @@ describe('syncConnectionProfiles', () => {
     await sync(connectionA);
     const [client] = await testDb.db
       .insert(clients)
-      .values({ organizationId, name: 'Soapi', slug: 'soapi' })
+      .values({ organizationId, name: 'Nordwind', slug: 'nordwind' })
       .returning({ id: clients.id });
     await testDb.db
       .update(amazonAdsProfiles)

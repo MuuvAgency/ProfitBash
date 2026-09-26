@@ -95,7 +95,7 @@ beforeAll(async () => {
   const [client, otherOrgClient] = await db
     .insert(clients)
     .values([
-      { organizationId: orgId, name: 'Soapi', slug: 'soapi' },
+      { organizationId: orgId, name: 'Nordwind', slug: 'nordwind' },
       { organizationId: otherOrgId, name: 'Fremd', slug: 'fremd' },
     ])
     .returning({ id: clients.id });
@@ -360,8 +360,8 @@ describe('Clients', () => {
     expect(body.clients.map((c) => c.slug)).not.toContain('fremd');
     expect(body.clients.find((c) => c.id === ids.client)).toEqual({
       id: ids.client,
-      name: 'Soapi',
-      slug: 'soapi',
+      name: 'Nordwind',
+      slug: 'nordwind',
       createdAt: expect.stringMatching(/Z$/),
       updatedAt: expect.stringMatching(/Z$/),
     });
@@ -394,7 +394,7 @@ describe('Clients', () => {
     const res = await request(ctx, '/api/clients', {
       method: 'POST',
       cookie: admin,
-      json: { name: 'SOAPI' },
+      json: { name: 'NORDWIND' },
     });
     expect(res.status).toBe(409);
     expect(await errorCode(res)).toBe('CLIENT_SLUG_TAKEN');
@@ -437,10 +437,14 @@ describe('Clients', () => {
     const res = await request(ctx, `/api/clients/${ids.client}`, {
       method: 'PATCH',
       cookie: admin,
-      json: { name: 'Soapi GmbH' },
+      json: { name: 'Nordwind GmbH' },
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: ids.client, name: 'Soapi GmbH', slug: 'soapi' });
+    expect(await res.json()).toMatchObject({
+      id: ids.client,
+      name: 'Nordwind GmbH',
+      slug: 'nordwind',
+    });
 
     const events = await ctx.testDb.db.select().from(auditEvents);
     expect(events).toMatchObject([
@@ -449,8 +453,8 @@ describe('Clients', () => {
         target: {
           type: 'client',
           id: ids.client,
-          before: { name: 'Soapi', slug: 'soapi' },
-          after: { name: 'Soapi GmbH', slug: 'soapi' },
+          before: { name: 'Nordwind', slug: 'nordwind' },
+          after: { name: 'Nordwind GmbH', slug: 'nordwind' },
         },
       },
     ]);

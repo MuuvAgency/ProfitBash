@@ -48,8 +48,8 @@ describe('AccountMenu', () => {
     const adminMe = meFixture({ orgRole: 'admin' });
     adminMe.organizations.push({
       id: 'org-2',
-      name: 'Soapi',
-      slug: 'soapi',
+      name: 'Nordwind',
+      slug: 'nordwind',
       type: 'client',
       role: 'viewer',
     });
@@ -63,7 +63,7 @@ describe('AccountMenu', () => {
       },
     });
     const { wrapper, router } = await mountWithApp(undefined, { path: '/admin/connections' });
-    await openMenuAndClick(wrapper, 'Soapi');
+    await openMenuAndClick(wrapper, 'Nordwind');
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('forbidden'));
   });
 
