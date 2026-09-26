@@ -129,19 +129,43 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 ## Aufgaben
 
 ### 1.1 Geld und Dezimalzahlen (`packages/shared`, `packages/amazon-ads`)
-- [ ] **ADR 003 – Decimal-Library.** Vorschlag `decimal.js` (MIT, verbreitet, ohne Abhängigkeiten, beliebige Genauigkeit, Rundungsmodi).
+- [x] **ADR 003 – Decimal-Library.** Vorschlag `decimal.js` (MIT, verbreitet, ohne Abhängigkeiten, beliebige Genauigkeit, Rundungsmodi).
       Alternativen im ADR abwägen: `big.js` (kleiner, weniger Funktionen), `dinero.js` (Geld-Objekte, bringt eigene Währungslogik mit,
       für unsere Decimal-Strings mehr als nötig). Entscheidung mit Dominik (F13). Nur Server und `packages/engine`; das Web bekommt Decimal-Strings
       und formatiert sie (Formatierungs-Helper in `@profitbash/shared` auf Strings erweitern, nicht auf `number`).
-- [ ] `parseJsonLossless(text, { decimals: 'string' })`: Dezimalzahlen (und Zahlen in Exponentialschreibweise) kommen als **Quelltext-String**,
+- [x] `parseJsonLossless(text, { decimals: 'string' })`: Dezimalzahlen (und Zahlen in Exponentialschreibweise) kommen als **Quelltext-String**,
       nicht über `String(number)`. Standard bleibt wie heute (Profile, Tokens). Tests: `0.1`, `1234567.89`, `1e-7`, `-0.00`, sehr lange Nachkommastellen.
-- [ ] zod-Bausteine in `packages/amazon-ads`: `amazonDecimalSchema` (String oder sichere Zahl → normalisierter Decimal-String),
+- [x] zod-Bausteine in `packages/amazon-ads`: `amazonDecimalSchema` (String oder sichere Zahl → normalisierter Decimal-String),
       `currencyCodeSchema` (ISO 4217, drei Großbuchstaben). Unbekannte Währungen durchreichen und loggen, nicht verwerfen.
-- [ ] Konvention für die DB festhalten (in dieser Datei unter „Umsetzung“): Beträge von Amazon als `numeric` **ohne** feste Skala
+- [x] Konvention für die DB festhalten (in dieser Datei unter „Umsetzung“): Beträge von Amazon als `numeric` **ohne** feste Skala
       (speichert exakt, was Amazon liefert, rundet nie still; Gebote/CPC haben teils mehr als 2 Nachkommastellen). Gerundet wird erst beim
       Rechnen bzw. Anzeigen. Zähler (`impressions`, `clicks`) `bigint`, Währung immer als eigene Spalte `currency_code`.
       Drizzle liefert `numeric` als String (`mode: 'string'`), nie als `number`. Tagesdaten als `date` mit `mode: 'string'` (ein JS-`Date`
       um Mitternacht UTC verschiebt Tage in anderen Zeitzonen).
+- [x] Umsetzung (Stand für 1.2 und später):
+  - ADR 003 angenommen (`decimal.js` ^10.6), Abhängigkeit vorerst nur in `packages/amazon-ads`. `packages/engine` bekommt sie mit der
+    ersten Berechnung, dann als **eine** konfigurierte Kopie (`Decimal.clone`), nie über die globale Konfiguration.
+  - `parseJsonLossless(text, { decimals: 'string' })`: jede Zahl mit Nachkommastellen oder Exponent kommt als Quelltext-String
+    (`1.50` bleibt `'1.50'`, `1e3` wird `'1e3'`), sichere Ganzzahlen ohne Exponent bleiben `number` (Zähler), unsichere wie bisher String.
+    Standard unverändert. `http.ts` nutzt weiter den Standard; Report- und Export-Downloads (1.4/1.6) rufen den Parser mit der Option auf.
+  - `packages/amazon-ads/src/money.ts`:
+    - `amazonDecimalSchema`: String nach JSON-Zahlgrammatik (auch mit führenden Nullen, ohne `+`, Leerzeichen, Komma) oder endliche
+      Zahl mit Betrag ≤ `MAX_SAFE_INTEGER` → `Decimal#toFixed()`: exakt, ohne Exponent, ohne überflüssige Nullen, `-0` → `0`.
+      Zehnerpotenz auf ±40 begrenzt (`1e-1000000` würde sonst einen String mit einer Million Zeichen erzeugen).
+      Ungültige Werte scheitern in zod; die Zeile zählt dann als ungültig (1.4).
+    - `currencyCodeSchema`: nur Format (`^[A-Z]{3}$`). `isKnownCurrencyCode(code)` prüft gegen `Intl.supportedValuesOf('currency')`;
+      die Normalisierung (1.6) loggt unbekannte Codes wie unbekannte Enum-Werte (`amazon_ads.unknown_enum_value`) und reicht sie durch.
+  - Die Formatierungs-Helper in `@profitbash/shared` nahmen schon Decimal-Strings ohne Umweg über `number` (Tests für `0.005` und
+    Werte über `MAX_SAFE_INTEGER`); die Ausgabe von `amazonDecimalSchema` passt zu deren Muster. Keine Änderung nötig.
+  - **DB-Konvention** (gilt ab 1.5):
+    - Beträge: `numeric('cost')` ohne `precision`/`scale`, Drizzle-Standard `mode: 'string'` (nie `'number'`). Gerundet wird erst
+      beim Rechnen oder Anzeigen. Postgres gibt `numeric` unverändert zurück (`'1.5'` bleibt `'1.5'`); normalisiert ist der Wert
+      schon beim Einlesen.
+    - Jeder Betrag mit Währungsbezug hat eine eigene Spalte `currency_code` (bzw. `budget_currency_code` o. ä. je Betragsgruppe).
+    - Zähler (`impressions`, `clicks`, `purchases_*`, `units_*`): `bigint(..., { mode: 'number' })`. Tageswerte liegen weit unter
+      2^53; `mode: 'bigint'` wäre nicht JSON-serialisierbar. Bei Summen über viele Profile in SQL (`sum()` gibt `numeric`) beachten.
+    - Tage: `date(..., { mode: 'string' })` (`'2026-09-25'`), nie `Date`. Zeitpunkte wie bisher `timestamptz`.
+    - Amazon-IDs: `text`.
 
 ### 1.2 Einwilligungszeitpunkt je Connection
 - [ ] Migration: `connections.consented_at` (timestamptz, nullable für Bestandsdaten). Der OAuth-Callback setzt ihn bei Anlage **und**
