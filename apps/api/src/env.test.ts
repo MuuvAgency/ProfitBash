@@ -45,13 +45,19 @@ describe('loadApiEnv', () => {
     expect(env.HEALTHCHECKS_TOKEN_REFRESH_URL).toBeUndefined();
   });
 
-  it('lauscht auf PORT (von Railway gesetzt) statt auf API_PORT', () => {
-    expect(load({ ...base, PORT: '3000', API_PORT: '8787' }).port).toBe(3000);
+  it('lauscht in Produktion auf PORT (von Railway gesetzt) statt auf API_PORT', () => {
+    const env = load({ ...base, NODE_ENV: 'production', PORT: '3000', API_PORT: '8787' });
+    expect(env.port).toBe(3000);
   });
 
-  it('nutzt API_PORT (Standard 8787), wenn PORT fehlt oder leer ist', () => {
-    expect(load({ ...base, API_PORT: '9000' }).port).toBe(9000);
-    expect(load({ ...base, PORT: '' }).port).toBe(8787);
+  it('nutzt in Produktion API_PORT (Standard 8787), wenn PORT fehlt oder leer ist', () => {
+    expect(load({ ...base, NODE_ENV: 'production', API_PORT: '9000' }).port).toBe(9000);
+    expect(load({ ...base, NODE_ENV: 'production', PORT: '' }).port).toBe(8787);
+  });
+
+  it('ignoriert PORT außerhalb von Produktion (der Vite-Proxy zielt auf API_PORT)', () => {
+    // Dev-Werkzeuge setzen PORT oft für den Web-Server (z. B. 5173).
+    expect(load({ ...base, NODE_ENV: 'development', PORT: '5173' }).port).toBe(8787);
   });
 
   it('lehnt einen ungültigen PORT ab', () => {

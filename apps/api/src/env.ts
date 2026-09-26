@@ -32,7 +32,7 @@ export const apiEnvSchema = nodeEnvSchema
   .extend(amazonAdsEnvSchema.shape)
   .extend(healthchecksEnvSchema.shape)
   .extend({
-    /** Von Railway gesetzt; hat Vorrang vor `API_PORT`. Leer gilt als nicht gesetzt. */
+    /** Von Railway gesetzt; hat in Produktion Vorrang vor `API_PORT`. Leer gilt als nicht gesetzt. */
     PORT: z.preprocess(
       (value) => (value === '' ? undefined : value),
       z.coerce.number().int().min(1).max(65535).optional(),
@@ -64,5 +64,8 @@ export type ApiEnv = ReturnType<typeof loadApiEnv>;
 export function loadApiEnv(options?: LoadEnvOptions) {
   const env = loadEnv(apiEnvSchema, options);
   // Bereits im Schema geprüft (refineKeyring), wirft hier also nicht mehr.
-  return { ...env, keyring: parseKeyring(env), port: env.PORT ?? env.API_PORT };
+  // PORT gilt nur in Produktion (Railway). In der Entwicklung setzen Werkzeuge PORT oft für den
+  // Web-Server; der Vite-Proxy leitet /api aber an API_PORT.
+  const port = env.NODE_ENV === 'production' ? (env.PORT ?? env.API_PORT) : env.API_PORT;
+  return { ...env, keyring: parseKeyring(env), port };
 }
