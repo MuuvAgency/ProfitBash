@@ -20,8 +20,9 @@ export {
   AmazonAdsResponseError,
 } from './errors';
 export type { HttpClientOptions, HttpMethod } from './http';
-export { parseJsonLossless } from './json';
+export { parseJsonLossless, type ParseJsonLosslessOptions } from './json';
 export type { LogEntry, Logger } from './logger';
+export { amazonDecimalSchema, currencyCodeSchema, isKnownCurrencyCode } from './money';
 export {
   AMAZON_ADS_SCOPES,
   type AccountIdentity,
