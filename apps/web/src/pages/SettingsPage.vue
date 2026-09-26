@@ -25,7 +25,10 @@ const preview = computed(() => formatPreview(session.preferences.locale));
 
 // --- Speichern ----------------------------------------------------------------------------
 
-/** Ergebnis der letzten Änderung. Ältere Antworten überschreiben keine neuere Meldung. */
+/**
+ * Ergebnis der Änderungen seit der letzten Nutzeraktion. Ein Fehler bleibt stehen, bis der Nutzer
+ * wieder etwas ändert, auch wenn ein späterer Save klappt (sonst ginge die Rücknahme unbemerkt unter).
+ */
 const outcome = ref<'saved' | 'failed' | null>(null);
 let latest = 0;
 
@@ -34,9 +37,9 @@ async function update(patch: Partial<Settings>) {
   outcome.value = null;
   try {
     await session.updatePreferences(patch);
-    if (request === latest) outcome.value = 'saved';
+    if (request === latest && outcome.value !== 'failed') outcome.value = 'saved';
   } catch {
-    if (request === latest) outcome.value = 'failed';
+    outcome.value = 'failed';
   }
 }
 </script>
@@ -64,16 +67,21 @@ async function update(patch: Partial<Settings>) {
     <InlineError v-if="outcome === 'failed'" :message="t('settings.saveFailed')" />
 
     <section class="flex flex-col gap-space-md rounded-tile bg-tile p-space-lg shadow-tile">
-      <fieldset class="flex flex-col gap-space-md">
-        <legend class="mb-space-xs text-headline-sm text-ink">
-          {{ t('settings.theme.title') }}
+      <fieldset class="flex flex-col gap-space-md" aria-describedby="settings-theme-hint">
+        <!-- Überschrift in der Legende: Die Sprungnavigation über Überschriften findet beide Bereiche. -->
+        <legend class="mb-space-xs">
+          <h2 class="text-headline-sm text-ink">{{ t('settings.theme.title') }}</h2>
         </legend>
-        <p class="text-body-sm text-ink-secondary">{{ t('settings.theme.hint') }}</p>
+        <p id="settings-theme-hint" class="text-body-sm text-ink-secondary">
+          {{ t('settings.theme.hint') }}
+        </p>
         <div class="grid gap-space-sm sm:grid-cols-3">
-          <div
+          <!-- Die ganze Kachel ist das Label: Klick auf Symbol oder Rand wählt ebenfalls aus. -->
+          <label
             v-for="theme in THEMES"
             :key="theme"
-            class="flex items-center gap-space-sm rounded-control bg-well px-space-md py-space-sm"
+            :for="`settings-theme-${theme}`"
+            class="flex cursor-pointer items-center gap-space-sm rounded-control bg-well px-space-md py-space-sm text-body-md text-ink"
           >
             <RadioButton
               :input-id="`settings-theme-${theme}`"
@@ -83,10 +91,8 @@ async function update(patch: Partial<Settings>) {
               @update:model-value="(value: Theme) => update({ theme: value })"
             />
             <i :class="['pi', THEME_ICONS[theme], 'text-ink-secondary']" aria-hidden="true" />
-            <label :for="`settings-theme-${theme}`" class="flex-1 text-body-md text-ink">
-              {{ t(`settings.theme.${theme}`) }}
-            </label>
-          </div>
+            <span class="flex-1">{{ t(`settings.theme.${theme}`) }}</span>
+          </label>
         </div>
       </fieldset>
     </section>

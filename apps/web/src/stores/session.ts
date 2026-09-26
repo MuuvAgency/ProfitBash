@@ -50,6 +50,7 @@ export const useSessionStore = defineStore('session', () => {
       const result = await api.me();
       if (requestGeneration !== generation) return;
       me.value = result;
+      confirmedPreferences = { ...result.preferences };
       loadError.value = null;
       status.value = 'authenticated';
       cachedTheme.value = result.preferences.theme;
@@ -115,15 +116,24 @@ export const useSessionStore = defineStore('session', () => {
    * darf keinen früheren überholen. Jeder Request sendet den Stand zum Zeitpunkt des Sendens.
    */
   let saveQueue: Promise<void> = Promise.resolve();
+  /** Vom Server bestätigter Stand (`/api/me` oder letzte erfolgreiche Antwort auf `PUT`). */
+  let confirmedPreferences: Settings | null = null;
+  /** Zählt Änderungen je Feld: Eine Rücknahme gilt nur, solange niemand das Feld seither geändert hat. */
+  const fieldVersions: Record<keyof Settings, number> = { theme: 0, locale: 0, density: 0 };
 
   function setCachedTheme(theme: Theme) {
     cachedTheme.value = theme;
     writeCachedTheme(theme);
   }
 
+  function sameSettings(a: Settings, b: Settings) {
+    return a.theme === b.theme && a.locale === b.locale && a.density === b.density;
+  }
+
   /**
-   * Ändert Einstellungen sofort und speichert sie. Scheitert das Speichern, gelten für die Felder dieses
-   * Patches wieder die alten Werte, sofern sie inzwischen niemand anders geändert hat.
+   * Ändert Einstellungen sofort und speichert sie. Scheitert das Speichern, gilt für die Felder dieses
+   * Patches wieder der vom Server bestätigte Wert, sofern niemand sie inzwischen erneut geändert hat.
+   * Ist der Nutzer beim Senden ein anderer (Abmelden, `/api/me` neu geladen), entfällt der Request.
    */
   async function updatePreferences(patch: Partial<Settings>) {
     const current = me.value;
@@ -133,20 +143,29 @@ export const useSessionStore = defineStore('session', () => {
       return;
     }
     const keys = Object.keys(patch) as (keyof Settings)[];
-    const before = current.preferences;
-    current.preferences = { ...before, ...patch };
+    const versions = Object.fromEntries(keys.map((key) => [key, ++fieldVersions[key]]));
+    current.preferences = { ...current.preferences, ...patch };
     if (patch.theme) setCachedTheme(patch.theme);
 
     const job = saveQueue.then(async () => {
+      if (me.value !== current) return;
+      const sending = current.preferences;
+      // Ein früherer Request hat diesen Stand schon mitgenommen.
+      if (confirmedPreferences && sameSettings(sending, confirmedPreferences)) return;
       try {
-        await api.updateSettings(current.preferences);
+        const saved = await api.updateSettings(sending);
+        if (me.value === current) confirmedPreferences = saved;
       } catch (error) {
-        const reverted = { ...current.preferences };
-        for (const key of keys) {
-          if (reverted[key] === patch[key]) Object.assign(reverted, { [key]: before[key] });
+        const confirmed = confirmedPreferences;
+        if (me.value === current && confirmed) {
+          const reverted = { ...current.preferences };
+          for (const key of keys) {
+            if (fieldVersions[key] === versions[key])
+              Object.assign(reverted, { [key]: confirmed[key] });
+          }
+          current.preferences = reverted;
+          setCachedTheme(reverted.theme);
         }
-        current.preferences = reverted;
-        setCachedTheme(reverted.theme);
         throw error;
       }
     });
