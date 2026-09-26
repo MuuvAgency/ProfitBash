@@ -10,10 +10,12 @@ export default defineConfig({
   //   dist/index.js   Server (API + Web)
   //   dist/migrate.js Migrationen (Railway Pre-Deploy-Command)
   //   dist/seed.js    Seed (einmalig)
+  //   dist/rotate-keys.js Schlüsselrotation (docs/deploy.md)
   entry: {
     index: 'src/index.ts',
     migrate: '../../packages/db/src/migrate-cli.ts',
     seed: 'src/seed-cli.ts',
+    'rotate-keys': '../../packages/db/src/rotate-keys-cli.ts',
   },
   format: ['esm'],
   platform: 'node',

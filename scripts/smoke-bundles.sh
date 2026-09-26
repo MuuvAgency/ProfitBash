@@ -4,7 +4,8 @@
 #
 #   SMOKE_DATABASE_URL=postgres://…/profitbash_smoke scripts/smoke-bundles.sh
 #
-# Die Datenbank wird migriert und geseedet (beides idempotent). Nie gegen Produktion laufen lassen.
+# Die Datenbank wird migriert und geseedet (beides idempotent), danach läuft die Schlüsselrotation
+# (ändert nur Connections mit früheren Schlüsseln). Nie gegen Produktion laufen lassen.
 set -euo pipefail
 
 : "${SMOKE_DATABASE_URL:?SMOKE_DATABASE_URL fehlt (eigene Datenbank, wird migriert und geseedet)}"
@@ -13,8 +14,8 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 dist="$repo_root/apps/api/dist"
 web_dist="$repo_root/apps/web/dist"
 
-for file in "$dist/index.js" "$dist/migrate.js" "$dist/seed.js" "$dist/drizzle/meta/_journal.json" \
-  "$web_dist/index.html"; do
+for file in "$dist/index.js" "$dist/migrate.js" "$dist/seed.js" "$dist/rotate-keys.js" \
+  "$dist/drizzle/meta/_journal.json" "$web_dist/index.html"; do
   if [ ! -f "$file" ]; then
     echo "::error::$file fehlt. Erst 'pnpm build' ausführen." >&2
     exit 1
@@ -68,6 +69,11 @@ echo "→ migrate"
 node "$dist/migrate.js"
 echo "→ seed"
 node "$dist/seed.js"
+echo "→ rotate-keys"
+if ! node "$dist/rotate-keys.js"; then
+  echo "::error::rotate-keys ist fehlgeschlagen (siehe Ausgabe oben)." >&2
+  exit 1
+fi
 
 echo "→ server"
 node "$dist/index.js" &

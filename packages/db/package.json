@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate-cli.ts",
+    "rotate-keys": "tsx src/rotate-keys-cli.ts",
     "studio": "drizzle-kit studio"
   },
   "dependencies": {
