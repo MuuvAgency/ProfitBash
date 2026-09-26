@@ -10,13 +10,14 @@ import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { gridStyleOptions, gridTheme } from '../grid/grid';
+import { countryName } from './country';
 import AccountCell from './cells/AccountCell.vue';
 import ClientCell from './cells/ClientCell.vue';
 import CountryCell from './cells/CountryCell.vue';
 import HiddenCell from './cells/HiddenCell.vue';
 import type { ProfileGridContext } from './cells/types';
 
-const props = defineProps<{ profiles: Profile[]; clients: Client[] }>();
+const props = defineProps<{ profiles: Profile[]; clients: Client[]; clientsReady: boolean }>();
 const emit = defineEmits<{
   patch: [profile: Profile, patch: ProfilePatch];
   createClient: [profile: Profile];
@@ -26,11 +27,13 @@ const { t, te } = useI18n();
 
 const context = reactive<ProfileGridContext>({
   clients: [],
+  clientsReady: false,
   patch: (profile, patch) => emit('patch', profile, patch),
   createClient: (profile) => emit('createClient', profile),
 });
 watchEffect(() => {
   context.clients = props.clients;
+  context.clientsReady = props.clientsReady;
 });
 
 /**
@@ -61,7 +64,8 @@ const columnDefs = computed<ColDef<Profile>[]>(() => [
   {
     colId: 'country',
     headerName: t('connections.profiles.column.country'),
-    field: 'countryCode',
+    // Sortiert nach dem angezeigten Namen („Vereinigtes Königreich“, nicht „UK“).
+    valueGetter: ({ data }) => (data ? countryName(data.countryCode) : ''),
     cellRenderer: markRaw(CountryCell),
     minWidth: 240,
     flex: 1,
@@ -115,14 +119,22 @@ const columnDefs = computed<ColDef<Profile>[]>(() => [
   },
 ]);
 
+/** Konstant: Ein neues Objekt je Render setzte die Spalten zurück (z. B. geänderte Breiten). */
+const defaultColDef: ColDef<Profile> = {
+  resizable: true,
+  sortable: true,
+  suppressMovable: true,
+  cellClass: CELL,
+};
+
 const getRowId = ({ data }: GetRowIdParams<Profile>) => data.id;
 
 /**
- * Ausgeblendete und entfernte Profile treten zurück. Als `rowClassRules`, nicht `getRowClass`:
+ * Ausgeblendete und entfernte Profile treten zurück (Sekundärfarbe: bleibt lesbar, AA-Kontrast). Als `rowClassRules`, nicht `getRowClass`:
  * Nur die Regeln wertet AG Grid bei geänderten Zeilendaten neu aus.
  */
 const rowClassRules = {
-  'text-ink-tertiary': ({ data }: RowClassParams<Profile>) =>
+  'text-ink-secondary': ({ data }: RowClassParams<Profile>) =>
     Boolean(data && (data.isHidden || data.removedAt)),
 };
 </script>
@@ -142,6 +154,6 @@ const rowClassRules = {
     dom-layout="autoHeight"
     :suppress-column-virtualisation="true"
     :suppress-cell-focus="true"
-    :default-col-def="{ resizable: true, sortable: true, suppressMovable: true, cellClass: CELL }"
+    :default-col-def="defaultColDef"
   />
 </template>

@@ -96,7 +96,15 @@ afterEach(() => {
   cleanupMounted();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
+
+/** Antwort, die erst auf Anweisung eintrifft (Reihenfolge paralleler Requests steuern). */
+function deferred() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((r) => (resolve = r));
+  return { promise, resolve };
+}
 
 describe('ConnectionsPage', () => {
   it('zeigt die Connection mit Status und ihre Profile', async () => {
@@ -277,7 +285,7 @@ describe('ConnectionsPage', () => {
     );
     const { wrapper } = await mountPage();
     await waitForRow(wrapper, 'Soapi GmbH');
-    const toggle = () => wrapper.get('input[aria-label="Soapi GmbH ausblenden"]');
+    const toggle = () => wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]');
     expect((toggle().element as HTMLInputElement).checked).toBe(false);
     await toggle().setValue(true);
     await flushPromises();
@@ -295,12 +303,12 @@ describe('ConnectionsPage', () => {
       }),
     );
     const { wrapper } = await mountPage();
-    const dimmed = () => row(wrapper, 'Soapi GmbH')!.classes('text-ink-tertiary');
+    const dimmed = () => row(wrapper, 'Soapi GmbH')!.classes('text-ink-secondary');
     await waitForRow(wrapper, 'Soapi GmbH');
     expect(dimmed()).toBe(true);
-    expect(row(wrapper, 'Soapi UK Ltd')!.classes('text-ink-tertiary')).toBe(false);
+    expect(row(wrapper, 'Soapi UK Ltd')!.classes('text-ink-secondary')).toBe(false);
 
-    await wrapper.get('input[aria-label="Soapi GmbH ausblenden"]').setValue(false);
+    await wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').setValue(false);
     await flushPromises();
     await vi.waitFor(() => expect(dimmed()).toBe(false));
   });
@@ -309,7 +317,7 @@ describe('ConnectionsPage', () => {
     stubFetch(routes({ [`PATCH /api/profiles/${soapiDe.id}`]: serverError }));
     const { wrapper } = await mountPage();
     await waitForRow(wrapper, 'Soapi GmbH');
-    await wrapper.get('input[aria-label="Soapi GmbH ausblenden"]').setValue(true);
+    await wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').setValue(true);
     await flushPromises();
     await vi.waitFor(() =>
       expect(wrapper.get('[role="alert"]').text()).toContain(
@@ -317,7 +325,7 @@ describe('ConnectionsPage', () => {
       ),
     );
     expect(
-      (wrapper.get('input[aria-label="Soapi GmbH ausblenden"]').element as HTMLInputElement)
+      (wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').element as HTMLInputElement)
         .checked,
     ).toBe(false);
   });
@@ -331,7 +339,7 @@ describe('ConnectionsPage', () => {
     );
     const { wrapper } = await mountPage();
     await waitForRow(wrapper, 'Soapi GmbH');
-    await choose(wrapper, 'Client für Soapi GmbH', 'Soapi');
+    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Soapi');
     expect(requests.find((r) => r.method === 'PATCH')?.body).toEqual({ clientId: soapi.id });
     await vi.waitFor(() =>
       expect(row(wrapper, 'Soapi GmbH')!.get('[role="combobox"]').text()).toBe('Soapi'),
@@ -358,7 +366,7 @@ describe('ConnectionsPage', () => {
     );
     const { wrapper } = await mountPage();
     await waitForRow(wrapper, 'Soapi GmbH');
-    await choose(wrapper, 'Client für Soapi GmbH', 'Neuen Client anlegen …');
+    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Neuen Client anlegen …');
 
     const form = dialog();
     expect(form?.text()).toContain('Neuen Client anlegen');
@@ -391,7 +399,7 @@ describe('ConnectionsPage', () => {
     );
     const { wrapper } = await mountPage();
     await waitForRow(wrapper, 'Soapi GmbH');
-    await choose(wrapper, 'Client für Soapi GmbH', 'Neuen Client anlegen …');
+    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Neuen Client anlegen …');
     const form = dialog()!;
     await form.get('input').setValue('Soapi');
     await form.get('form').trigger('submit');
@@ -399,5 +407,122 @@ describe('ConnectionsPage', () => {
     await vi.waitFor(() =>
       expect(form.get('[role="alert"]').text()).toContain('Einen Client mit diesem Namen gibt es'),
     );
+  });
+
+  it('zeigt Zuordnungen nicht als „Kein Client“, solange die Clients fehlen', async () => {
+    let fail = true;
+    stubFetch(
+      routes({ 'GET /api/clients': () => (fail ? serverError() : json({ clients: [soapi] })) }),
+    );
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Soapi UK Ltd');
+    await vi.waitFor(() =>
+      expect(wrapper.text()).toContain('Die Clients konnten nicht geladen werden.'),
+    );
+    const combobox = () => row(wrapper, 'Soapi UK Ltd')!.get('[role="combobox"]');
+    expect(combobox().text()).not.toBe('Kein Client');
+    expect(combobox().attributes('aria-disabled')).toBe('true');
+
+    fail = false;
+    await button(wrapper, 'Erneut versuchen').trigger('click');
+    await vi.waitFor(() => expect(combobox().text()).toBe('Soapi'));
+    expect(combobox().attributes('aria-disabled')).not.toBe('true');
+  });
+
+  it('lädt nach dem Verbinden nach, bis die ersten Profile da sind', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let synced = false;
+    stubFetch(
+      routes({ [`GET ${PROFILES_PATH}`]: () => json({ profiles: synced ? [soapiDe] : [] }) }),
+    );
+    const { wrapper } = await mountPage('/admin/connections?oauth=connected');
+    await vi.waitFor(() => expect(wrapper.text()).toContain('noch keine Profile'));
+    synced = true;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await waitForRow(wrapper, 'Soapi GmbH');
+  });
+
+  it('lädt nach „Jetzt synchronisieren“ eine Weile nach und hört dann auf', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { requests } = stubFetch(
+      routes({ [`POST ${SYNC_PATH}`]: json({ status: 'queued' }, 202) }),
+    );
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Soapi GmbH');
+    const profileLoads = () => requests.filter((r) => r.path === PROFILES_PATH).length;
+    const before = profileLoads();
+
+    await button(wrapper, 'Jetzt synchronisieren').trigger('click');
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(profileLoads()).toBeGreaterThan(before);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    const afterWindow = profileLoads();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(profileLoads()).toBe(afterWindow);
+  });
+
+  it('nimmt beim Fehlschlag nur die eigene Änderung zurück', async () => {
+    const hide = deferred();
+    stubFetch(
+      routes({
+        [`PATCH /api/profiles/${soapiDe.id}`]: ({ body }) =>
+          'isHidden' in (body as object)
+            ? hide.promise
+            : json({ ...soapiDe, ...(body as Partial<Profile>) }),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Soapi GmbH');
+    await wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').setValue(true);
+    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Soapi');
+    await flushPromises();
+
+    hide.resolve(serverError());
+    await flushPromises();
+    await vi.waitFor(() =>
+      expect(
+        (wrapper.get('input[aria-label="Soapi GmbH (DE) ausblenden"]').element as HTMLInputElement)
+          .checked,
+      ).toBe(false),
+    );
+    expect(row(wrapper, 'Soapi GmbH')!.get('[role="combobox"]').text()).toBe('Soapi');
+  });
+
+  it('gibt den Verbinden-Button frei, wenn der Browser von Amazon zurückkehrt', async () => {
+    stubFetch(
+      routes({ 'POST /api/amazon/oauth/start': json({ url: 'https://eu.account.amazon.com/' }) }),
+    );
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Soapi GmbH');
+    await button(wrapper, 'Amazon-Account verbinden').trigger('click');
+    await flushPromises();
+    expect(button(wrapper, 'Amazon-Account verbinden').attributes('disabled')).toBeDefined();
+
+    const event = new Event('pageshow');
+    Object.defineProperty(event, 'persisted', { value: true });
+    window.dispatchEvent(event);
+    await flushPromises();
+    expect(button(wrapper, 'Amazon-Account verbinden').attributes('disabled')).toBeUndefined();
+  });
+
+  it('lässt den Dialog nicht schließen, solange der Client angelegt wird', async () => {
+    const create = deferred();
+    stubFetch(routes({ 'POST /api/clients': () => create.promise }));
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Soapi GmbH');
+    await choose(wrapper, 'Client für Soapi GmbH (DE)', 'Neuen Client anlegen …');
+    const form = dialog()!;
+    const closeButton = () =>
+      form.find('button[aria-label="Close"], button[aria-label="Schließen"]').exists();
+    expect(closeButton()).toBe(true);
+    await form.get('input').setValue('Aliseo');
+    await form.get('form').trigger('submit');
+    await flushPromises();
+
+    const cancel = form.findAll('button').find((b) => b.text() === 'Abbrechen')!;
+    expect(cancel.attributes('disabled')).toBeDefined();
+    expect(closeButton()).toBe(false);
   });
 });

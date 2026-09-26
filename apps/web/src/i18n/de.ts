@@ -131,6 +131,9 @@ export const de = {
     sync: 'Jetzt synchronisieren',
     syncQueued: 'Sync eingeplant. Den Fortschritt zeigt der Sync-Status.',
     loadError: 'Die Connections konnten nicht geladen werden.',
+    clientsLoadError:
+      'Die Clients konnten nicht geladen werden. Die Zuordnung ist so lange gesperrt.',
+    provider: { amazon_ads: 'Amazon Ads' },
     emptyTitle: 'Noch kein Amazon-Konto verbunden',
     emptyText:
       'Verbinde das Amazon-Konto, über das die Agentur Zugriff auf die Werbekonten ihrer Kunden hat. Danach erscheinen die Profile hier.',
@@ -183,10 +186,10 @@ export const de = {
         hidden: 'Ausblenden',
       },
       accountType: { seller: 'Seller', vendor: 'Vendor', agency: 'Agentur' },
-      clientFor: 'Client für {account}',
+      clientFor: 'Client für {account} ({country})',
       noClient: 'Kein Client',
       newClient: 'Neuen Client anlegen …',
-      hideFor: '{account} ausblenden',
+      hideFor: '{account} ({country}) ausblenden',
       updateFailed: 'Das Profil konnte nicht gespeichert werden.',
     },
     clientDialog: {

@@ -16,7 +16,12 @@ function onChange(isHidden: boolean) {
   <ToggleSwitch
     v-if="params.data"
     :model-value="params.data.isHidden"
-    :aria-label="t('connections.profiles.hideFor', { account: params.data.accountName })"
+    :aria-label="
+      t('connections.profiles.hideFor', {
+        account: params.data.accountName,
+        country: params.data.countryCode,
+      })
+    "
     @update:model-value="onChange"
   />
 </template>

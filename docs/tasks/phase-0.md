@@ -351,7 +351,12 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
     einem Fehler zurückgenommen (sonst zeigten Schalter/Auswahl einen ungespeicherten Stand).
   - Verbinden: `POST /api/amazon/oauth/start`, dann `browserNavigation.assign(url)` (nur `http(s)`-URLs; als Objekt, damit Tests es ersetzen).
     `?oauth=<Ergebnis>` erscheint als Hinweis (`oauthNotice`), Schließen entfernt den Parameter.
-  - Nach „Jetzt synchronisieren“ lädt die Karte Connections und Profile nach 5 s einmal neu. Den Fortschritt zeigt später der Sync-Status.
+  - Nach „Jetzt synchronisieren“ und nach `?oauth=connected` fragen Connections und Profile 60 s lang alle 3 s nach (`useSyncPolling`).
+    Den genauen Fortschritt zeigt der Sync-Status; der Hinweis „Sync eingeplant …“ kann dann dorthin verlinken.
+  - Profil-Änderungen nehmen bei Fehlern nur ihre eigenen Felder zurück (zwei gleichzeitige Änderungen am selben Profil überschreiben sich nicht).
+    Solange die Clients fehlen (Laden/Fehler), ist die Client-Auswahl gesperrt und zeigt „–“ statt „Kein Client“.
+  - Offen: AG Grid ohne `LocaleModule`, die grid-eigenen ARIA-/Menütexte sind englisch. Deutsche `localeText` ergänzen, sobald ein Grid
+    Sortier-/Filtermenüs braucht (spätestens Explorer, Phase 2).
   - **AG Grid:** `src/grid/grid.ts` registriert nur die genutzten Community-Module (fehlende meldet in der Entwicklung das `ValidationModule`)
     und baut das Theme aus den Token-CSS-Variablen (Hell/Dunkel ohne zweites Theme). Grid-CSS liegt im Layer `ag-grid` (Reihenfolge in
     `src/styles/main.css`) und wird in den `<body>` geschrieben (`gridStyleOptions`), sonst nähme Tailwinds Preflight den Zellen das Padding.
