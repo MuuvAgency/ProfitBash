@@ -58,6 +58,7 @@ Ein deploytes Grundgerüst mit folgendem Stand:
 - [x] Lokale DB ist eingerichtet: Postgres 17 (Homebrew), Rolle `profitbash`, Datenbanken `profitbash` und `profitbash_test`. Tests nutzen `DATABASE_URL_TEST`. CI nutzt einen Postgres-17-Service-Container.
 - [x] Root-Skripte: `dev`, `build`, `test`, `typecheck`, `lint`, `db:generate`, `db:migrate`, `db:seed`.
 - [x] GitHub-Actions-Workflow; Postgres für Tests als Service-Container. (Lokal verifiziert; erster echter Lauf nach dem Push ins GitHub-Repo, siehe 0.0f.)
+  App-URLs in CI zeigen auf `profitbash`, nur `DATABASE_URL_TEST` auf `profitbash_test` (sonst greift die Schutzprüfung aus 0.2).
 - [x] `.env.example` mit allen Variablen (siehe unten); Env-Validierung per zod beim Start jeder App (`loadEnv` in `packages/shared`; das Web ist eine statische SPA und bekommt nur `VITE_*`-Variablen).
 - [x] Vite-Dev-Server leitet `/api` an `http://localhost:8787` weiter. So laufen alle Browser-Requests über eine Origin.
 
