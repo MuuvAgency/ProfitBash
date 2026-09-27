@@ -4,7 +4,7 @@
 > (Umsetzungsnotizen 0.5–0.7), `docs/decisions/` (001 Stack, 002 Mandanten-Modell, 003 Decimal-Library, 004 Amazon-API).
 >
 > **Status: abgestimmt (2026-09-26), in Umsetzung.** Entscheidungen stehen als **F1–F14** unter „Fragen an Dominik“.
-> Entschieden: F1–F11, F13, F14. Offen: F12 (betrifft nur die Doku in `phase-0.md`, nicht den Code).
+> Entschieden: F1–F11, F13, F14. Offen: F12 (betrifft nur die Doku in `phase-0.md`, nicht den Code; Stand 2026-09-27 unter F12).
 > Aufgaben, die von einer Frage abhängen, verweisen darauf.
 
 ## Ziel
@@ -120,6 +120,10 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   In einer früheren Session hieß es, das Partner Network nehme nur juristische Personen (Muuv ist Einzelunternehmen). Welcher Weg gilt?
   (Betrifft nur die Doku in `phase-0.md` 0.0b/0.0c, nicht den Code.)
   **Stand (Dominik, 2026-09-26): noch offen, wird erst geklärt.** Bis dahin bleibt `phase-0.md` 0.0c unverändert.
+  **Stand (Dominik, 2026-09-27):** Laut Amazon-FAQ müssen Anbieter von Werbedienstleistungen über das Partner Network (3P-Formular)
+  gehen; ein Antrag als Direct Advertiser (1P) würde abgelehnt. Dominik hat den Partner-Network-Antrag erneut gestellt und fragt beim
+  Support nach, wie ein Einzelunternehmen die 3P-Registrierung abschließt (Rückfall: schriftliche Bestätigung, dass der Weg als Direct
+  Advertiser für ihn zulässig ist). `phase-0.md` 0.0b/0.0c/0.0e erst nach der Antwort anpassen. Rückfallebene ohne API: 1.11.
 - **F13 – Decimal-Library (ADR 003).** Empfehlung `decimal.js` (Begründung und Alternativen in 1.1).
   **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F14 – Ausgeblendete Profile.** Synchronisieren? Empfehlung **ja**: Ausblenden ist Darstellung, keine Datenentscheidung, und
@@ -310,6 +314,9 @@ Kennzahlen (je Tag, Datum in der Zeitzone des Profils, so liefert Amazon es):
       `audit_events` (wie `profiles-sync` in 0.7): Nachvollziehbar sind sie über `job_runs` und ihre Zähler; Audit gilt für Aktionen von
       Nutzern und Änderungen an Connections. Nutzerseitige Lesezugriffe
       gibt es in Phase 1 nicht (außer „Daten bis“ je Profil, 1.8, über `visibleProfilesScope`); der Access-Layer bekommt dafür keine neuen Regeln.
+- Umsetzung (Vorgabe aus 1.11, entschieden 2026-09-27, gilt auch für 1.7): Die Upserts für Entities und Kennzahlen nehmen **normalisierte
+  Datensätze** entgegen (eigene Typen in `packages/db` bzw. das Modell aus 1.6), nie Antworttypen der Amazon-API. So kann ein späterer
+  Datei-Import (1.11) dieselbe Schreibschicht nutzen. Der Datei-Import selbst wird hier **nicht** gebaut.
 
 ### 1.6 Amazon-Client: Entities und Reports (`packages/amazon-ads`)
 Endpunkte nach F1 (a), siehe ADR 004.
@@ -390,6 +397,16 @@ Nach F11.
       überschneiden können.
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
+### 1.11 Datei-Import (optional, nur mit Auslöser)
+**Entschieden (Dominik, 2026-09-27):** Wird nur gebaut, wenn Phase 2 fertig ist und die Ads-API-Freigabe dann immer noch fehlt
+(Dominik kann den Stichtag ändern). Sonst nicht bauen.
+- Entities aus der Bulk-Datei der Werbekonsole, Tageskennzahlen aus den täglichen Sponsored-Ads-Reports der Konsole.
+- Profile von Hand anlegen (Profil ohne Connection).
+- Upload und Import-Job über `runJob`; geschrieben wird über dieselbe Schreibschicht wie der API-Sync (1.5, normalisierte Datensätze).
+- Hintergrund: Bulk-Dateien tragen dieselben IDs wie die API (ein späterer API-Sync setzt nahtlos fort), enthalten aber nur
+  Zeitraumsummen; Tageswerte kommen aus den separaten Reports. Wegwerf-Anteil: Parser, Upload, Job.
+- Testdaten nur synthetisch (öffentliches Repo).
+
 ## `.env.example`
 
 Neu in Phase 1 (Vorschlag): `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPORTS_SYNC_URL` (1.7), optional `AMAZON_ADS_REQUESTS_PER_SECOND` (1.3).
@@ -407,7 +424,7 @@ Neu in Phase 1 (Vorschlag): `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPO
 
 ## Reihenfolge für Claude Code
 
-1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 (SP) → 1.7 → 1.8 → 1.9 (nach F2) → 1.10 (nach der Freigabe).
+1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6 (SP) → 1.7 → 1.8 → 1.9 (nach F2) → 1.10 (nach der Freigabe). 1.11 nur mit Auslöser (siehe dort).
 
 Eine frische Session je Aufgabe (1.5 und 1.6 ggf. in Entities und Reports geteilt). Nach jedem Schritt: Tests grün, kleiner Commit,
 Häkchen in dieser Datei, Umsetzungsnotizen unter der Aufgabe („Umsetzung (Stand für …)“ wie in Phase 0).
