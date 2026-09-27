@@ -39,6 +39,7 @@ export {
 } from './download';
 export {
   AmazonAdsDownloadTooLargeError,
+  AmazonAdsDuplicateReportError,
   AmazonAdsError,
   AmazonAdsHttpError,
   AmazonAdsNetworkError,
@@ -69,6 +70,26 @@ export {
   type MockAmazonAdsClientOptions,
 } from './mock';
 export { PORTFOLIOS_CONTENT_TYPE, type AmazonAdsPortfolio } from './portfolios';
+export {
+  createReportRowSchema,
+  isReportType,
+  MAX_REPORT_DAYS,
+  REPORT_DEFINITIONS,
+  REPORT_TYPES_BY_AD_PRODUCT,
+  reportTypesFor,
+  type AmazonAdsAdGroupDailyMetric,
+  type AmazonAdsCampaignDailyMetric,
+  type AmazonAdsDailyMetricValues,
+  type AmazonAdsMetricsLevel,
+  type AmazonAdsProductAdDailyMetric,
+  type AmazonAdsReportRows,
+  type AmazonAdsReportType,
+  type AmazonAdsSearchTermDailyMetric,
+  type AmazonAdsTargetDailyMetric,
+  type GetReportInput,
+  type ReportDefinition,
+  type RequestReportInput,
+} from './reports';
 export { amazonIdSchema, KNOWN_ACCOUNT_TYPES, type AmazonAdsProfile } from './profiles';
 export { DEFAULT_REQUESTS_PER_SECOND, type ProfileRateLimiterOptions } from './rate-limit';
 export {

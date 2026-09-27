@@ -1,0 +1,503 @@
+import { z } from 'zod';
+import type { ConnectionRef } from './access-token';
+import type { AmazonAdsAsyncStatus } from './async-status';
+import type { AdsApiRequest, RequestOptions } from './client';
+import { AmazonAdsDuplicateReportError, AmazonAdsHttpError } from './errors';
+import type { Logger } from './logger';
+import { amazonDecimalSchema } from './money';
+import { createUnknownValueReporter } from './normalize';
+import { amazonIdSchema } from './profiles';
+
+/**
+ * Reporting v3 (Kennzahlen, ADR 004). Geprüft am 2026-09-27 gegen Guide und OpenAPI-Spec
+ * (`OfflineReport_prod_3p.json`):
+ * - `POST /reporting/reports` mit `Content-Type: application/vnd.createasyncreportrequest.v3+json`, Antwort mit
+ *   `reportId`. Identische Anfrage, solange die erste läuft: 425 mit `{ code, detail }`.
+ * - `GET /reporting/reports/{reportId}`: Status laut Spec `PENDING`/`PROCESSING`/`COMPLETED`/`FAILED` (der Guide
+ *   schreibt `FAILURE`, beides wird erkannt), bei `COMPLETED` eine signierte URL (Standard 1 h gültig).
+ * - Höchstens 31 Tage je Anfrage, `timeUnit: DAILY` mit Spalte `date`, Format `GZIP_JSON`.
+ * - `Amazon-Ads-AccountId`: laut Spec optional (DSP), laut Guide für alle Ad-Typen „erforderlich“. Wir senden ihn
+ *   nicht; beim ersten echten Lauf klären (1.10).
+ */
+
+export const REPORT_CREATE_CONTENT_TYPE = 'application/vnd.createasyncreportrequest.v3+json';
+
+/** Höchstens so viele Tage je Report (beide Grenzen eingeschlossen). */
+export const MAX_REPORT_DAYS = 31;
+
+/** Ebene der Kennzahlen, wie `replaceDailyMetrics` in `@profitbash/db` sie nimmt. */
+export type AmazonAdsMetricsLevel = 'campaign' | 'adGroup' | 'target' | 'productAd' | 'searchTerm';
+
+export interface ReportDefinition {
+  adProduct: string;
+  level: AmazonAdsMetricsLevel;
+  /** Amazons Report-Typ (`reportTypeId`). */
+  reportTypeId: string;
+  groupBy: readonly string[];
+  columns: readonly string[];
+  /** So viele Tage hält Amazon die Daten vor (Historie beim ersten Sync, F4). */
+  retentionDays: number;
+}
+
+/** Attribution nach F7: 7 und 14 Tage, gesamt und „same SKU“. 1 und 30 Tage bewusst nicht. */
+const SP_METRIC_COLUMNS = [
+  'impressions',
+  'clicks',
+  'cost',
+  'sales7d',
+  'sales14d',
+  'attributedSalesSameSku7d',
+  'attributedSalesSameSku14d',
+  'purchases7d',
+  'purchases14d',
+  'purchasesSameSku7d',
+  'purchasesSameSku14d',
+  'unitsSoldClicks7d',
+  'unitsSoldClicks14d',
+  'unitsSoldSameSku7d',
+  'unitsSoldSameSku14d',
+] as const;
+
+/**
+ * Report-Typen im eigenen Katalog. Der Schlüssel steht in `amazon_ads_report_requests.report_type` und ist
+ * meist Amazons `reportTypeId`; nur `spAdGroups` ist eigener Name für `spCampaigns` mit `groupBy` Ad Group
+ * (sonst kollidierten beide Aufträge im Schlüssel des offenen Auftrags).
+ */
+export const REPORT_DEFINITIONS = {
+  spCampaigns: {
+    adProduct: 'SPONSORED_PRODUCTS',
+    level: 'campaign',
+    reportTypeId: 'spCampaigns',
+    groupBy: ['campaign'],
+    columns: ['date', 'campaignId', 'campaignName', ...SP_METRIC_COLUMNS],
+    retentionDays: 95,
+  },
+  spAdGroups: {
+    adProduct: 'SPONSORED_PRODUCTS',
+    level: 'adGroup',
+    reportTypeId: 'spCampaigns',
+    groupBy: ['campaign', 'adGroup'],
+    columns: [
+      'date',
+      'campaignId',
+      'campaignName',
+      'adGroupId',
+      'adGroupName',
+      ...SP_METRIC_COLUMNS,
+    ],
+    retentionDays: 95,
+  },
+  spTargeting: {
+    adProduct: 'SPONSORED_PRODUCTS',
+    level: 'target',
+    reportTypeId: 'spTargeting',
+    groupBy: ['targeting'],
+    // `keywordId` ist in spTargeting die ID von Keywords und Targets (1.10: gegen `targetId` im Export prüfen).
+    columns: [
+      'date',
+      'campaignId',
+      'campaignName',
+      'adGroupId',
+      'adGroupName',
+      'keywordId',
+      ...SP_METRIC_COLUMNS,
+    ],
+    retentionDays: 95,
+  },
+  spAdvertisedProduct: {
+    adProduct: 'SPONSORED_PRODUCTS',
+    level: 'productAd',
+    reportTypeId: 'spAdvertisedProduct',
+    groupBy: ['advertiser'],
+    columns: [
+      'date',
+      'campaignId',
+      'campaignName',
+      'adGroupId',
+      'adGroupName',
+      'adId',
+      'advertisedAsin',
+      'advertisedSku',
+      ...SP_METRIC_COLUMNS,
+    ],
+    retentionDays: 95,
+  },
+  spSearchTerm: {
+    adProduct: 'SPONSORED_PRODUCTS',
+    level: 'searchTerm',
+    reportTypeId: 'spSearchTerm',
+    groupBy: ['searchTerm'],
+    columns: [
+      'date',
+      'campaignId',
+      'campaignName',
+      'adGroupId',
+      'adGroupName',
+      'keywordId',
+      'searchTerm',
+      ...SP_METRIC_COLUMNS,
+    ],
+    // Laut Doku (Stand 2026-09-27) nur 65 Tage, nicht 95 wie die übrigen SP-Reports.
+    retentionDays: 65,
+  },
+} as const satisfies Record<string, ReportDefinition>;
+
+export type AmazonAdsReportType = keyof typeof REPORT_DEFINITIONS;
+
+/** Report-Typen je Ad-Typ in Hierarchie-Reihenfolge (SB/SD folgen mit 1.9). */
+export const REPORT_TYPES_BY_AD_PRODUCT = {
+  SPONSORED_PRODUCTS: [
+    'spCampaigns',
+    'spAdGroups',
+    'spTargeting',
+    'spAdvertisedProduct',
+    'spSearchTerm',
+  ],
+} as const satisfies Record<string, readonly AmazonAdsReportType[]>;
+
+/** Report-Typen eines Ad-Typs; leer für Ad-Typen ohne Reports im Katalog. */
+export function reportTypesFor(adProduct: string): readonly AmazonAdsReportType[] {
+  return Object.hasOwn(REPORT_TYPES_BY_AD_PRODUCT, adProduct)
+    ? REPORT_TYPES_BY_AD_PRODUCT[adProduct as keyof typeof REPORT_TYPES_BY_AD_PRODUCT]
+    : [];
+}
+
+export function isReportType(value: string): value is AmazonAdsReportType {
+  return Object.hasOwn(REPORT_DEFINITIONS, value);
+}
+
+// ---------------------------------------------------------------------------
+// Eigenes Modell der Kennzahlen (Felder wie die Zeilen von `replaceDailyMetrics` in `@profitbash/db`)
+// ---------------------------------------------------------------------------
+
+export interface AmazonAdsDailyMetricValues {
+  impressions: number;
+  clicks: number;
+  /** Decimal-String in der Währung des Profils (v3 liefert je Zeile keine Währung). */
+  cost: string;
+  sales7d: string | null;
+  sales14d: string | null;
+  salesSameSku7d: string | null;
+  salesSameSku14d: string | null;
+  purchases7d: number | null;
+  purchases14d: number | null;
+  purchasesSameSku7d: number | null;
+  purchasesSameSku14d: number | null;
+  units7d: number | null;
+  units14d: number | null;
+  unitsSameSku7d: number | null;
+  unitsSameSku14d: number | null;
+  extra: Record<string, unknown>;
+}
+
+interface MetricRowBase extends AmazonAdsDailyMetricValues {
+  /** Tag in der Zeitzone des Profils (`YYYY-MM-DD`). */
+  date: string;
+  amazonCampaignId: string;
+  campaignName?: string | null;
+}
+
+export type AmazonAdsCampaignDailyMetric = MetricRowBase;
+
+export interface AmazonAdsAdGroupDailyMetric extends MetricRowBase {
+  amazonAdGroupId: string;
+  adGroupName?: string | null;
+}
+
+export interface AmazonAdsTargetDailyMetric extends MetricRowBase {
+  amazonAdGroupId: string | null;
+  adGroupName?: string | null;
+  amazonTargetId: string;
+}
+
+export interface AmazonAdsProductAdDailyMetric extends MetricRowBase {
+  amazonAdGroupId: string;
+  adGroupName?: string | null;
+  amazonAdId: string;
+  asin?: string | null;
+  sku?: string | null;
+}
+
+export interface AmazonAdsSearchTermDailyMetric extends AmazonAdsTargetDailyMetric {
+  searchTerm: string;
+}
+
+export interface AmazonAdsReportRows {
+  spCampaigns: AmazonAdsCampaignDailyMetric;
+  spAdGroups: AmazonAdsAdGroupDailyMetric;
+  spTargeting: AmazonAdsTargetDailyMetric;
+  spAdvertisedProduct: AmazonAdsProductAdDailyMetric;
+  spSearchTerm: AmazonAdsSearchTermDailyMetric;
+}
+
+// ---------------------------------------------------------------------------
+// Anfordern und Status
+// ---------------------------------------------------------------------------
+
+type RequestFn = <S extends z.ZodType>(
+  connection: ConnectionRef,
+  request: AdsApiRequest<S>,
+) => Promise<z.output<S>>;
+
+interface Deps {
+  request: RequestFn;
+  logger: Logger;
+}
+
+export interface RequestReportInput {
+  amazonProfileId: string;
+  reportType: AmazonAdsReportType;
+  /** `YYYY-MM-DD`, beide Grenzen eingeschlossen, höchstens 31 Tage. */
+  startDate: string;
+  endDate: string;
+}
+
+const requestResponseSchema = z.object({ reportId: z.string().min(1) });
+
+/**
+ * Fordert einen Report an. Der Name ist aus Typ und Zeitraum abgeleitet: Eine erneute Anforderung nach einem
+ * Absturz ist damit identisch und trifft bei Amazon auf 425 mit der ID des laufenden Reports.
+ */
+export async function requestReport(
+  deps: Deps,
+  connection: ConnectionRef,
+  input: RequestReportInput,
+  options: RequestOptions = {},
+): Promise<{ reportId: string }> {
+  const operation = 'reports.request';
+  assertReportRange(input.startDate, input.endDate);
+  const definition: ReportDefinition = REPORT_DEFINITIONS[input.reportType];
+  try {
+    const response = await deps.request(connection, {
+      operation,
+      method: 'POST',
+      path: '/reporting/reports',
+      amazonProfileId: input.amazonProfileId,
+      headers: { 'Content-Type': REPORT_CREATE_CONTENT_TYPE },
+      body: JSON.stringify({
+        name: `profitbash ${input.reportType} ${input.startDate}..${input.endDate}`,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        configuration: {
+          adProduct: definition.adProduct,
+          reportTypeId: definition.reportTypeId,
+          groupBy: definition.groupBy,
+          columns: definition.columns,
+          timeUnit: 'DAILY',
+          format: 'GZIP_JSON',
+        },
+      }),
+      schema: requestResponseSchema,
+      ...(options.meter && { meter: options.meter }),
+    });
+    return { reportId: response.reportId };
+  } catch (error) {
+    if (error instanceof AmazonAdsHttpError && error.status === 425) {
+      throw new AmazonAdsDuplicateReportError(
+        operation,
+        duplicateReportId(error.details),
+        error.amazonRequestId,
+        error.details,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Report-ID aus dem 425-Text. Beobachtetes Format „The Request is a duplicate of : <reportId>“; sonst die
+ * erste UUID im Text. Die Doku nennt nur `{ code, detail }` (Stand 2026-09-27), 1.10 prüft das echte Format.
+ */
+export function duplicateReportId(detail: string | null): string | null {
+  if (!detail) return null;
+  const explicit = /duplicate of\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]{7,})/i.exec(detail);
+  if (explicit) return explicit[1]!;
+  const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(detail);
+  return uuid ? uuid[0] : null;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function assertReportRange(startDate: string, endDate: string): void {
+  const start = ISO_DATE.test(startDate) ? Date.parse(`${startDate}T00:00:00Z`) : NaN;
+  const end = ISO_DATE.test(endDate) ? Date.parse(`${endDate}T00:00:00Z`) : NaN;
+  if (Number.isNaN(start) || Number.isNaN(end) || start > end) {
+    throw new RangeError('requestReport: Zeitraum ist ungültig (YYYY-MM-DD, Beginn vor Ende).');
+  }
+  if ((end - start) / DAY_MS + 1 > MAX_REPORT_DAYS) {
+    throw new RangeError(`requestReport: Ein Report umfasst höchstens ${MAX_REPORT_DAYS} Tage.`);
+  }
+}
+
+export interface GetReportInput {
+  amazonProfileId: string;
+  reportId: string;
+}
+
+const statusResponseSchema = z.object({
+  status: z.string().min(1),
+  url: z.string().nullish(),
+  failureReason: z.string().nullish(),
+});
+
+const RUNNING_REPORT_STATES: ReadonlySet<string> = new Set(['PENDING', 'PROCESSING']);
+
+export async function getReport(
+  deps: Deps,
+  connection: ConnectionRef,
+  input: GetReportInput,
+  options: RequestOptions = {},
+): Promise<AmazonAdsAsyncStatus> {
+  const operation = 'reports.get';
+  let response: z.output<typeof statusResponseSchema>;
+  try {
+    response = await deps.request(connection, {
+      operation,
+      method: 'GET',
+      path: `/reporting/reports/${encodeURIComponent(input.reportId)}`,
+      amazonProfileId: input.amazonProfileId,
+      schema: statusResponseSchema,
+      ...(options.meter && { meter: options.meter }),
+    });
+  } catch (error) {
+    if (error instanceof AmazonAdsHttpError && error.status === 404) return { status: 'NOT_FOUND' };
+    throw error;
+  }
+  switch (response.status) {
+    case 'COMPLETED':
+      return { status: 'COMPLETED', url: response.url ?? null };
+    case 'FAILED':
+    case 'FAILURE':
+      return { status: 'FAILURE', failureReason: response.failureReason ?? null };
+    case 'PENDING':
+      return { status: 'PENDING' };
+    default:
+      if (!RUNNING_REPORT_STATES.has(response.status)) {
+        createUnknownValueReporter(deps.logger, { operation }).check(
+          'status',
+          response.status,
+          RUNNING_REPORT_STATES,
+        );
+      }
+      return { status: 'PROCESSING' };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Zeilen-Schemas
+// ---------------------------------------------------------------------------
+
+const counter = z.number().int().nonnegative();
+const optionalCounter = counter.nullish().transform((value) => value ?? null);
+const optionalAmount = amazonDecimalSchema.nullish().transform((value) => value ?? null);
+const optionalText = z
+  .string()
+  .nullish()
+  .transform((value) => value ?? null);
+
+const metricColumns = {
+  date: z.string().regex(ISO_DATE),
+  campaignId: amazonIdSchema,
+  campaignName: optionalText,
+  impressions: counter,
+  clicks: counter,
+  cost: amazonDecimalSchema,
+  sales7d: optionalAmount,
+  sales14d: optionalAmount,
+  attributedSalesSameSku7d: optionalAmount,
+  attributedSalesSameSku14d: optionalAmount,
+  purchases7d: optionalCounter,
+  purchases14d: optionalCounter,
+  purchasesSameSku7d: optionalCounter,
+  purchasesSameSku14d: optionalCounter,
+  unitsSoldClicks7d: optionalCounter,
+  unitsSoldClicks14d: optionalCounter,
+  unitsSoldSameSku7d: optionalCounter,
+  unitsSoldSameSku14d: optionalCounter,
+};
+
+type MetricColumns = z.output<z.ZodObject<typeof metricColumns>>;
+
+function metricBase(row: MetricColumns): MetricRowBase {
+  return {
+    date: row.date,
+    amazonCampaignId: row.campaignId,
+    campaignName: row.campaignName,
+    impressions: row.impressions,
+    clicks: row.clicks,
+    cost: row.cost,
+    sales7d: row.sales7d,
+    sales14d: row.sales14d,
+    salesSameSku7d: row.attributedSalesSameSku7d,
+    salesSameSku14d: row.attributedSalesSameSku14d,
+    purchases7d: row.purchases7d,
+    purchases14d: row.purchases14d,
+    purchasesSameSku7d: row.purchasesSameSku7d,
+    purchasesSameSku14d: row.purchasesSameSku14d,
+    units7d: row.unitsSoldClicks7d,
+    units14d: row.unitsSoldClicks14d,
+    unitsSameSku7d: row.unitsSoldSameSku7d,
+    unitsSameSku14d: row.unitsSoldSameSku14d,
+    extra: {},
+  };
+}
+
+const adGroupColumns = { adGroupId: amazonIdSchema, adGroupName: optionalText };
+
+const REPORT_ROW_SCHEMAS: { [K in AmazonAdsReportType]: z.ZodType<AmazonAdsReportRows[K]> } = {
+  spCampaigns: z.object(metricColumns).transform(metricBase),
+  spAdGroups: z.object({ ...metricColumns, ...adGroupColumns }).transform((row) => ({
+    ...metricBase(row),
+    amazonAdGroupId: row.adGroupId,
+    adGroupName: row.adGroupName,
+  })),
+  spTargeting: z
+    .object({ ...metricColumns, ...adGroupColumns, keywordId: amazonIdSchema })
+    .transform((row) => ({
+      ...metricBase(row),
+      amazonAdGroupId: row.adGroupId,
+      adGroupName: row.adGroupName,
+      amazonTargetId: row.keywordId,
+    })),
+  spAdvertisedProduct: z
+    .object({
+      ...metricColumns,
+      ...adGroupColumns,
+      adId: amazonIdSchema,
+      advertisedAsin: optionalText,
+      advertisedSku: optionalText,
+    })
+    .transform((row) => ({
+      ...metricBase(row),
+      amazonAdGroupId: row.adGroupId,
+      adGroupName: row.adGroupName,
+      amazonAdId: row.adId,
+      asin: row.advertisedAsin,
+      sku: row.advertisedSku,
+    })),
+  spSearchTerm: z
+    .object({
+      ...metricColumns,
+      ...adGroupColumns,
+      keywordId: amazonIdSchema,
+      searchTerm: z.string(),
+    })
+    .transform((row) => ({
+      ...metricBase(row),
+      amazonAdGroupId: row.adGroupId,
+      adGroupName: row.adGroupName,
+      amazonTargetId: row.keywordId,
+      searchTerm: row.searchTerm,
+    })),
+};
+
+/**
+ * zod-Schema je Zeile einer Report-Datei (Eingabe aus `decodeGzipJson`), Ausgabe als Kennzahl im eigenen
+ * Modell. Beträge über `amazonDecimalSchema`, Zähler als sichere Ganzzahlen, IDs als Strings.
+ */
+export function createReportRowSchema<T extends AmazonAdsReportType>(
+  reportType: T,
+): z.ZodType<AmazonAdsReportRows[T]> {
+  return REPORT_ROW_SCHEMAS[reportType];
+}
