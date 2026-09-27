@@ -98,6 +98,13 @@ async function storedConnections() {
   return ctx.testDb.db.select().from(connections);
 }
 
+/** Einwilligungszeitpunkt liegt zwischen `after` und jetzt. */
+function expectRecentConsent(consentedAt: Date | null, after: number) {
+  expect(consentedAt).toBeInstanceOf(Date);
+  expect(consentedAt!.getTime()).toBeGreaterThanOrEqual(after);
+  expect(consentedAt!.getTime()).toBeLessThanOrEqual(Date.now());
+}
+
 function decryptToken(row: typeof connections.$inferSelect): string {
   return decrypt(row.refreshTokenEncrypted, {
     keyring: ctx.keyring,
@@ -166,11 +173,14 @@ describe('Mock-Einwilligungsseite', () => {
     const target = new URL(allow!);
     expect(`${target.origin}${target.pathname}`).toBe(`${TEST_APP_URL}${CALLBACK}`);
 
+    const before = Date.now();
     expectResult(
       await request(ctx, `${target.pathname}${target.search}`, { cookie: admin }),
       'connected',
     );
-    expect(await storedConnections()).toHaveLength(1);
+    const rows = await storedConnections();
+    expect(rows).toHaveLength(1);
+    expectRecentConsent(rows[0]!.consentedAt, before);
   });
 
   it('lehnt einen fehlenden oder überlangen state ab', async () => {
@@ -181,9 +191,11 @@ describe('Mock-Einwilligungsseite', () => {
 
 describe('GET /api/amazon/oauth/callback', () => {
   it('legt die Connection mit verschlüsseltem Token an, plant den Sync und schreibt ein Audit-Event', async () => {
+    const before = Date.now();
     expectResult(await connect(admin), 'connected');
 
     const [row] = await storedConnections();
+    expectRecentConsent(row!.consentedAt, before);
     expect(row).toMatchObject({
       organizationId: ctx.seeded.organizationId,
       provider: 'amazon_ads',
@@ -212,6 +224,7 @@ describe('GET /api/amazon/oauth/callback', () => {
         provider: 'amazon_ads',
         region: 'eu',
         externalAccountId: MOCK_AMAZON_ADS_IDENTITY.userId,
+        consentedAt: row!.consentedAt!.toISOString(),
       },
     });
     expect(JSON.stringify(events[0]!.target)).not.toContain('Atzr');
@@ -220,11 +233,13 @@ describe('GET /api/amazon/oauth/callback', () => {
   it('Neu-Verbinden aktualisiert die Connection statt sie zu duplizieren, und der Token bleibt entschlüsselbar', async () => {
     expectResult(await connect(admin), 'connected');
     const [first] = await storedConnections();
+    // Einwilligung liegt fast ein Jahr zurück: Neu-Verbinden startet die 365 Tage neu.
     await ctx.testDb.db
       .update(connections)
-      .set({ status: 'reauth_required' })
+      .set({ status: 'reauth_required', consentedAt: new Date('2025-10-01T00:00:00Z') })
       .where(eq(connections.id, first!.id));
 
+    const before = Date.now();
     expectResult(await connect(admin, { connectionId: first!.id }), 'connected');
 
     const rows = await storedConnections();
@@ -240,14 +255,21 @@ describe('GET /api/amazon/oauth/callback', () => {
     const ref = { id: second!.id, organizationId: second!.organizationId, region: 'eu' as const };
     await expect(ctx.deps.amazonAds.client.getAccessToken(ref)).resolves.toMatch(/^Atza\|/);
 
-    const actions = (await ctx.testDb.db.select().from(auditEvents)).map((e) => e.action);
-    expect(actions).toEqual(['connection.create', 'connection.reconnect']);
+    expectRecentConsent(second!.consentedAt, before);
+
+    const events = await ctx.testDb.db.select().from(auditEvents);
+    expect(events.map((e) => e.action)).toEqual(['connection.create', 'connection.reconnect']);
+    expect(events[1]!.target).toMatchObject({ consentedAt: second!.consentedAt!.toISOString() });
   });
 
-  it('Verbinden ohne connectionId mit demselben Konto aktualisiert ebenfalls', async () => {
+  it('Verbinden ohne connectionId mit demselben Konto aktualisiert ebenfalls, samt Einwilligung', async () => {
     await connect(admin);
+    await ctx.testDb.db.update(connections).set({ consentedAt: null });
+    const before = Date.now();
     await connect(admin);
-    expect(await storedConnections()).toHaveLength(1);
+    const rows = await storedConnections();
+    expect(rows).toHaveLength(1);
+    expectRecentConsent(rows[0]!.consentedAt, before);
   });
 
   it('verwirft nach dem Neu-Verbinden das gecachte Access-Token', async () => {

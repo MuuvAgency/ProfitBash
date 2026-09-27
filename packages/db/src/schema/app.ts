@@ -101,6 +101,11 @@ export const connections = pgTable(
     refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
     status: connectionStatus('status').notNull().default('active'),
     lastRefreshedAt: timestamp('last_refreshed_at', { withTimezone: true, mode: 'date' }),
+    /**
+     * Letzte Einwilligung beim Anbieter (Anlage oder Neu-Verbinden). Amazon-Refresh-Tokens laufen
+     * 365 Tage danach ab (abgeleitet in der API, nicht gespeichert). Leer bei Bestandsdaten.
+     */
+    consentedAt: timestamp('consented_at', { withTimezone: true, mode: 'date' }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

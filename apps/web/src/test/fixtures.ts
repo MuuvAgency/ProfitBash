@@ -58,6 +58,8 @@ export function connectionFixture(overrides: Partial<Connection> = {}): Connecti
     externalAccountEmail: 'ads@muuv.test',
     status: 'active',
     lastRefreshedAt: '2026-09-26T08:15:00.000Z',
+    consentedAt: '2026-09-20T10:00:00.000Z',
+    refreshTokenExpiresAt: '2027-09-20T10:00:00.000Z',
     createdAt: '2026-09-20T10:00:00.000Z',
     updatedAt: '2026-09-26T08:15:00.000Z',
     ...overrides,

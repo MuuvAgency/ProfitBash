@@ -1048,6 +1048,10 @@ export interface components {
             /** Format: date-time */
             lastRefreshedAt: string | null;
             /** Format: date-time */
+            consentedAt: string | null;
+            /** Format: date-time */
+            refreshTokenExpiresAt: string | null;
+            /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;

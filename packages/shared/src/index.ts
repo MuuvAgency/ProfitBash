@@ -3,6 +3,7 @@
 //   @profitbash/shared/crypto          Verschlüsselung von Secrets (Node)
 //   @profitbash/shared/access-control  better-auth-Zugriffskontrolle
 export * from './api';
+export * from './consent';
 export * from './features';
 export * from './format';
 export * from './logger';
