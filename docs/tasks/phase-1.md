@@ -682,13 +682,38 @@ Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
 ### 1.8 Sichtbares (`apps/api`, `apps/web`)
 Nach F11.
 - [x] Sync-Status zeigt die neuen Jobs und Zähler (mit 1.7 erledigt: Namen, i18n-Keys, `COUNTER_ORDER`).
-- [ ] Connections-Seite: Profiltabelle mit Spalte „Daten bis“ (der Ablauf der Einwilligung ist mit 1.2 erledigt) aus einer neuen Spalte
+- [x] Connections-Seite: Profiltabelle mit Spalte „Daten bis“ (der Ablauf der Einwilligung ist mit 1.2 erledigt) aus einer neuen Spalte
       `amazon_ads_profiles.metrics_imported_through` (date), die der Import eines Kampagnen-Reports auf `max(end_date)` setzt (nicht
       `max(date)` der Kennzahlen: ein pausiertes Profil hätte sonst ein altes Datum; nicht aus den Auftragszeilen: die werden nach 30 Tagen
       gelöscht). Endpunkt begrenzt die Profile über `visibleProfilesScope`.
-- [ ] Optional aus dem Review-Backlog: Sync-Status „läuft seit“ für laufende Jobs (hilft beim Erkennen hängender Jobs und belegter Leases).
+- [x] Optional aus dem Review-Backlog: Sync-Status „läuft seit“ für laufende Jobs (hilft beim Erkennen hängender Jobs und belegter Leases).
+- [x] Umsetzung (Stand für 1.9 und später):
+  - **Merker:** Spalte `amazon_ads_profiles.metrics_imported_through` (`date`, Migration `0011_amazon_ads_profiles_metrics_imported_through`,
+    ohne Nachbefüllung: bestehende Profile zeigen „–“ bis zum nächsten Kampagnen-Report). `markMetricsImportedThrough` in
+    `amazon-ads-metrics.ts` setzt `greatest(alt, Tag)` (rückt nur vor, ein Stück der Historie setzt nicht zurück), lässt `updated_at`
+    unverändert (Datenstand, keine Stammdaten) und prüft die Organisation (`ProfileNotFoundError`). `importReport` (`import.ts`) ruft sie für
+    Report-Typen der Ebene `campaign` mit dem **`end_date` des Auftrags** auf, nicht mit dem Ende der `ranges`: Tage außerhalb der `ranges`
+    deckt ein neuerer, schon importierter Report desselben Typs ab. Läuft in der Import-Transaktion (ein gescheiterter Import setzt nichts);
+    überholte Aufträge importieren nicht, der neuere hat den Merker gesetzt. Auch ein Report ohne Zeilen setzt ihn (Profil ohne Aktivität).
+  - **API:** `metricsImportedThrough` (`YYYY-MM-DD` oder `null`) im `Profile`-Schema, also in `GET /api/connections/:id/profiles`
+    (weiter über `visibleProfilesScope`) und in der Antwort von `PATCH /api/profiles/:id`; OpenAPI und `schema.gen.ts` neu erzeugt.
+  - **Web:** Spalte „Daten bis“ in `ProfileGrid.vue` über den neuen Helfer `formatDay` (`packages/shared`): Kalendertag ohne Umrechnung in
+    die Zeitzone des Browsers, numerisch mit fester Breite in jeder Sprache (`25.09.2026`, `09/25/2026`). Spaltenbreiten so gewählt, dass
+    die Tabelle bei 1440 px mit ausgeklappter Sidebar ohne Scrollen passt (Summe 1120, Mindestbreite in `ConnectionCard.vue`).
+  - **Sync-Status:** Die Spalte „Dauer“ zeigt bei laufenden Jobs die bisherige Dauer (ohne „seit“: Der Status daneben sagt „Läuft“, die
+    Mono-Spalte bliebe sonst zu schmal). Sie zählt jede Sekunde weiter: `DurationCell` rechnet mit einer Uhr im reaktiven Grid-Kontext,
+    die nur tickt, solange ein Job läuft. Neue Daten allein zeichnen nicht neu (Structural Sharing der Abfrage, AG Grid aktualisiert nur
+    geänderte Zeilen; `api.refreshCells` bräuchte das nicht registrierte `RenderApiModule`). Geht die Uhr des Browsers nach, zeigt ein
+    gerade gestarteter Lauf 0 statt „–“.
+  - Review (unabhängig): Übernommen: weiterzählende Dauer (vorher eingefroren), Breiten bei 1440 px und veraltete Mindestbreiten beider
+    Tabellen, englische Datumsformate zu breit, negative Dauer bei Uhrabweichung, Jahre unter 100 in `formatDay`. Nur festgehalten:
+    lange Job-Namen („Amazon-Aufträge abholen“) und die Startzeit werden im Sync-Status schon seit 1.7 knapp abgeschnitten (eigene
+    Aufgabe, Umbruch sah schlechter aus).
 
 ### 1.9 Weitere Ad-Typen (nach F2)
+- [ ] **Offen aus 1.8:** „Daten bis“ ist heute das Maximum über alle Kampagnen-Reports des Profils. Mit `sbCampaigns`/`sdCampaigns`
+      (ebenfalls Ebene `campaign`) zeigte ein Profil den Stand von SP, auch wenn SB/SD hängen. Vor dem Umsetzen entscheiden: Merker je
+      Ad-Typ oder Minimum über die aktiven Ad-Typen des Profils.
 - [ ] SB: Entities (Exports decken SB ab) und Reports (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`); Hinweis auf die v3-Preview-Lücke
       (SB-Kampagnen ohne Multi-Ad-Group fehlen) in der UI-Doku von Phase 2 vermerken.
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
