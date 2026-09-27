@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ProfileNotFoundError } from './amazon-ads-entities';
 import {
   markMetricsImportedThrough,
+  metricsImportedThroughSql,
   MetricsImportRejectedError,
   replaceDailyMetrics,
   type DailyMetricValues,
@@ -15,6 +16,7 @@ import {
   amazonAdsCampaigns,
   amazonAdsProductAdDailyMetrics,
   amazonAdsProductAds,
+  amazonAdsProfileMetricsImportedThrough,
   amazonAdsProfiles,
   amazonAdsSearchTermDailyMetrics,
   amazonAdsTargetDailyMetrics,
@@ -516,54 +518,109 @@ describe('replaceDailyMetrics: weitere Ebenen', () => {
 });
 
 describe('markMetricsImportedThrough', () => {
-  async function profileState() {
-    const [row] = await testDb.db
+  beforeEach(async () => {
+    await testDb.db.delete(amazonAdsProfileMetricsImportedThrough);
+  });
+
+  async function marks(profile = secondProfileId) {
+    return testDb.db
       .select({
-        metricsImportedThrough: amazonAdsProfiles.metricsImportedThrough,
-        updatedAt: amazonAdsProfiles.updatedAt,
+        adProduct: amazonAdsProfileMetricsImportedThrough.adProduct,
+        date: amazonAdsProfileMetricsImportedThrough.importedThrough,
       })
-      .from(amazonAdsProfiles)
-      .where(eq(amazonAdsProfiles.id, secondProfileId));
-    return row!;
+      .from(amazonAdsProfileMetricsImportedThrough)
+      .where(eq(amazonAdsProfileMetricsImportedThrough.profileId, profile))
+      .orderBy(asc(amazonAdsProfileMetricsImportedThrough.adProduct));
   }
   const mark = (
     date: string,
-    overrides: Partial<{ organizationId: string; profileId: string }> = {},
+    overrides: Partial<{ organizationId: string; profileId: string; adProduct: string }> = {},
   ) =>
     markMetricsImportedThrough(testDb.db, {
       organizationId,
       profileId: secondProfileId,
+      adProduct: SP,
       date,
       ...overrides,
     });
 
   it('setzt den Tag und rückt nur vor, nie zurück (Historie nach dem Fenster)', async () => {
-    expect((await profileState()).metricsImportedThrough).toBeNull();
+    expect(await marks()).toEqual([]);
     await mark('2026-09-26');
-    expect((await profileState()).metricsImportedThrough).toBe('2026-09-26');
+    expect(await marks()).toEqual([{ adProduct: SP, date: '2026-09-26' }]);
     await mark('2026-08-01');
-    expect((await profileState()).metricsImportedThrough).toBe('2026-09-26');
+    expect(await marks()).toEqual([{ adProduct: SP, date: '2026-09-26' }]);
     await mark('2026-09-27');
-    expect((await profileState()).metricsImportedThrough).toBe('2026-09-27');
+    expect(await marks()).toEqual([{ adProduct: SP, date: '2026-09-27' }]);
+  });
+
+  it('führt den Tag je Ad-Typ', async () => {
+    await mark('2026-09-27');
+    await mark('2026-09-20', { adProduct: SB });
+    expect(await marks()).toEqual([
+      { adProduct: SB, date: '2026-09-20' },
+      { adProduct: SP, date: '2026-09-27' },
+    ]);
   });
 
   it('lässt updated_at des Profils unverändert (Datenstand, keine Stammdaten)', async () => {
-    const before = await profileState();
+    const profileUpdatedAt = async () =>
+      (
+        await testDb.db
+          .select({ updatedAt: amazonAdsProfiles.updatedAt })
+          .from(amazonAdsProfiles)
+          .where(eq(amazonAdsProfiles.id, secondProfileId))
+      )[0]!.updatedAt;
+    const before = await profileUpdatedAt();
     await mark('2026-09-30');
-    const after = await profileState();
-    expect(after.metricsImportedThrough).toBe('2026-09-30');
-    expect(after.updatedAt).toEqual(before.updatedAt);
+    expect(await profileUpdatedAt()).toEqual(before);
   });
 
   it('lehnt ein Profil einer anderen Organisation ab', async () => {
     await expect(mark('2026-09-26', { profileId: foreignProfileId })).rejects.toBeInstanceOf(
       ProfileNotFoundError,
     );
-    const [foreign] = await testDb.db
-      .select({ metricsImportedThrough: amazonAdsProfiles.metricsImportedThrough })
+    expect(await marks(foreignProfileId)).toEqual([]);
+  });
+});
+
+describe('metricsImportedThroughSql', () => {
+  beforeEach(async () => {
+    await testDb.db.delete(amazonAdsProfileMetricsImportedThrough);
+  });
+
+  async function dataThrough(adProducts: readonly string[]) {
+    const [row] = await testDb.db
+      .select({ date: metricsImportedThroughSql(adProducts) })
       .from(amazonAdsProfiles)
-      .where(eq(amazonAdsProfiles.id, foreignProfileId));
-    expect(foreign!.metricsImportedThrough).toBeNull();
+      .where(eq(amazonAdsProfiles.id, secondProfileId));
+    return row!.date;
+  }
+  const mark = (adProduct: string, date: string) =>
+    markMetricsImportedThrough(testDb.db, {
+      organizationId,
+      profileId: secondProfileId,
+      adProduct,
+      date,
+    });
+
+  it('ist das Minimum über die Ad-Typen: ein hängender Ad-Typ bremst „Daten bis“', async () => {
+    await mark(SP, '2026-09-27');
+    await mark(SB, '2026-09-20');
+    expect(await dataThrough([SP, SB])).toBe('2026-09-20');
+    expect(await dataThrough([SP])).toBe('2026-09-27');
+  });
+
+  it('ist leer, solange einem der Ad-Typen ein Tag fehlt', async () => {
+    expect(await dataThrough([SP])).toBeNull();
+    await mark(SP, '2026-09-27');
+    expect(await dataThrough([SP, SB])).toBeNull();
+  });
+
+  it('ignoriert Ad-Typen, die der Sync nicht anfordert', async () => {
+    await mark(SP, '2026-09-27');
+    await mark(SB, '2026-09-01');
+    expect(await dataThrough([SP])).toBe('2026-09-27');
   });
 });
 
