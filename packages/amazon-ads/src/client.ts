@@ -34,6 +34,8 @@ export interface AdsApiRequest<S extends z.ZodType> {
   headers?: Record<string, string>;
   body?: string;
   schema: S;
+  /** `string` für Endpunkte mit Beträgen (siehe `HttpRequest.decimals`). */
+  decimals?: 'number' | 'string';
   retryServerErrors?: boolean;
   /** Zähler des aufrufenden Jobs (Anfragen, 429, Wiederholungen). */
   meter?: RequestMeter;
@@ -146,6 +148,7 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
         },
         ...(req.body !== undefined && { body: req.body }),
         schema: req.schema,
+        ...(req.decimals && { decimals: req.decimals }),
         ...(req.retryServerErrors !== undefined && { retryServerErrors: req.retryServerErrors }),
         ...(req.meter && { meter: req.meter }),
         ...(pacing && { pacing }),

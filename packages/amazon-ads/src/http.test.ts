@@ -269,6 +269,41 @@ describe('createHttpClient', () => {
     expect(result.id).toBe('9007199254740993');
   });
 
+  it("liefert Dezimalzahlen mit decimals: 'string' als Quelltext (Beträge ohne Umweg über number)", async () => {
+    const body = '{"amount": 0.10, "big": 1234567.89, "tiny": 1e-7, "count": 3}';
+    server.use(
+      http.get(
+        URL_,
+        () => new HttpResponse(body, { headers: { 'Content-Type': 'application/json' } }),
+      ),
+    );
+    const { client } = setup();
+    const lossless = await client.send({ ...get(), schema: z.unknown(), decimals: 'string' });
+    expect(lossless).toEqual({ amount: '0.10', big: '1234567.89', tiny: '1e-7', count: 3 });
+    const standard = await client.send({ ...get(), schema: z.unknown() });
+    expect(standard).toEqual({ amount: 0.1, big: 1234567.89, tiny: 1e-7, count: 3 });
+  });
+
+  it('übernimmt `detail` (Reporting v3) als Fehlerdetail und gibt es im Fehler weiter', async () => {
+    server.use(
+      http.get(URL_, () =>
+        HttpResponse.json(
+          { code: '425', detail: 'The Request is a duplicate of : abc-123' },
+          { status: 425 },
+        ),
+      ),
+    );
+    const { client } = setup();
+    const error = await client.send(get()).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AmazonAdsHttpError);
+    expect(error).toMatchObject({
+      status: 425,
+      code: '425',
+      details: 'The Request is a duplicate of : abc-123',
+    });
+    expect((error as Error).message).toContain('duplicate of : abc-123');
+  });
+
   it('loggt Operation, Host, Pfad und Status, aber nie Header, Query-Strings oder Bodies', async () => {
     let calls = 0;
     server.use(

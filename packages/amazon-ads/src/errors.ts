@@ -26,6 +26,8 @@ export class AmazonAdsHttpError extends AmazonAdsError {
     public readonly amazonRequestId: string | null,
     /** Von Amazon per `Retry-After` verlangte Wartezeit (bei 429/5xx), sonst `null`. */
     public readonly retryAfterMs: number | null = null,
+    /** Fehlertext aus der Antwort (bereinigt und gekürzt), falls vorhanden. */
+    public readonly details: string | null = null,
   ) {
     super(message, operation);
     this.name = 'AmazonAdsHttpError';
