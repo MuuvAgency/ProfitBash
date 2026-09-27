@@ -253,6 +253,36 @@ export const amazonAdsReportRequests = pgTable(
   ],
 );
 
+/**
+ * Merker der Historie beim ersten Report-Import (F4, Phase 1, 1.7): je Profil, Ad-Typ und Report-Typ,
+ * ab welchem Tag nachgeladen wird und ob alles da ist. `reports-sync` fordert fehlende Stücke an, bis
+ * `completed_at` gesetzt ist. So holt auch ein später ergänzter Ad-Typ (1.9) seine Historie nach.
+ */
+export const amazonAdsBackfills = pgTable(
+  'amazon_ads_backfills',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: uuid('profile_id').notNull(),
+    adProduct: text('ad_product').notNull(),
+    reportType: text('report_type').notNull(),
+    /** Erster nachzuladender Tag (Zeitzone des Profils), beim Anlegen festgelegt. */
+    fromDate: date('from_date', { mode: 'string' }).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    // Betriebszustand wie die Aufträge: verschwindet mit dem Profil.
+    foreignKey({
+      name: 'amazon_ads_backfills_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    unique('amazon_ads_backfills_profile_type_uq').on(t.profileId, t.adProduct, t.reportType),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Betrieb: Jobläufe und Audit-Log
 // ---------------------------------------------------------------------------
