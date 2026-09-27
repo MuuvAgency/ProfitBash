@@ -74,3 +74,20 @@ export class AmazonAdsResponseError extends AmazonAdsError {
     this.name = 'AmazonAdsResponseError';
   }
 }
+
+/**
+ * Eine heruntergeladene Datei (Report, Export) ist entpackt größer als erlaubt. Der Deckel schützt den
+ * Speicher des Prozesses (bei `WORKER_MODE=inline` teilt er sich ihn mit der API).
+ */
+export class AmazonAdsDownloadTooLargeError extends AmazonAdsError {
+  constructor(
+    operation: string,
+    public readonly maxBytes: number,
+  ) {
+    super(
+      `${operation}: Die Datei ist entpackt größer als ${Math.floor(maxBytes / (1024 * 1024))} MB.`,
+      operation,
+    );
+    this.name = 'AmazonAdsDownloadTooLargeError';
+  }
+}
