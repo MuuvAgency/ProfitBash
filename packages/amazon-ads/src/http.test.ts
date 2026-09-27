@@ -357,6 +357,7 @@ describe('Zähler und Anfrage-Budget', () => {
     const pacing = {
       acquire: async () => {
         events.push('acquire');
+        return null;
       },
       onThrottled: (retryAfterMs: number | null) => events.push(`throttled:${retryAfterMs}`),
       onSuccess: () => events.push('success'),
@@ -366,12 +367,40 @@ describe('Zähler und Anfrage-Budget', () => {
     expect(events).toEqual(['acquire', 'throttled:7000', 'acquire', 'success']);
   });
 
+  it('sendet nicht, solange das Profil länger pausiert als abgewartet wird, und nennt die Restdauer', async () => {
+    let calls = 0;
+    server.use(
+      http.get(URL_, () => {
+        calls += 1;
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+    const maxPauses: number[] = [];
+    const pacing = {
+      acquire: async (maxPauseMs: number) => {
+        maxPauses.push(maxPauseMs);
+        return { pausedForMs: 90_000 };
+      },
+      onThrottled: () => {},
+      onSuccess: () => {},
+    };
+    const { client } = setup({ maxRetryAfterMs: 60_000 });
+    const meter = createRequestMeter();
+    const error = await client.send({ ...get(), pacing, meter }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AmazonAdsHttpError);
+    expect(error).toMatchObject({ status: 429, retryAfterMs: 90_000 });
+    expect(calls).toBe(0);
+    expect(maxPauses).toEqual([60_000]);
+    expect(meter).toEqual({ requests: 0, throttled: 0, retries: 0 });
+  });
+
   it('meldet dem Budget keinen Erfolg bei anderen Fehlern (z. B. 400)', async () => {
     server.use(http.get(URL_, () => HttpResponse.json({ code: 'BAD' }, { status: 400 })));
     const events: string[] = [];
     const pacing = {
       acquire: async () => {
         events.push('acquire');
+        return null;
       },
       onThrottled: () => events.push('throttled'),
       onSuccess: () => events.push('success'),

@@ -102,8 +102,17 @@ describe('startWorker', () => {
       organizationId,
       job: 'profiles-sync',
       status: 'success',
-      counters: expect.objectContaining({ profiles: 4, created: 4 }) as unknown,
+      // Anfragezähler aus dem Amazon-Client (1.3); die Lease ist danach wieder frei.
+      counters: expect.objectContaining({
+        profiles: 4,
+        created: 4,
+        requests: 1,
+        throttled: 0,
+        retries: 0,
+        deferred: 0,
+      }) as unknown,
     });
+    expect(await testDb.db.select().from(connectionJobLeases)).toEqual([]);
     const [big] = await testDb.db
       .select()
       .from(amazonAdsProfiles)
@@ -147,15 +156,6 @@ describe('startWorker', () => {
       status: 'success',
       counters: { refreshed: 1 },
     });
-  });
-
-  it('schreibt beim Profil-Sync die Anfragezähler und gibt die Lease frei', async () => {
-    const [run] = await testDb.db
-      .select()
-      .from(jobRuns)
-      .where(and(eq(jobRuns.job, 'profiles-sync'), eq(jobRuns.scope, connectionId)));
-    expect(run?.counters).toMatchObject({ requests: 1, throttled: 0, retries: 0, deferred: 0 });
-    expect(await testDb.db.select().from(connectionJobLeases)).toEqual([]);
   });
 
   it('stellt einen Profil-Sync zurück, solange ein anderer Datenjob die Connection hält', async () => {

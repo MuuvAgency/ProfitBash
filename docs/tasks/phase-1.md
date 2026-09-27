@@ -235,23 +235,33 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     `profiles-sync`). **1.7 meldet `entities-sync`, `reports-sync` und `amazon-requests-poll` dort nur mit `lease: true` an.**
     `runConnectionJob` (`jobs/run-connection-job.ts`): Lauf-ID vorab erzeugen → Lease nehmen (`CONNECTION_LEASE_SECONDS` = 15 Min.,
     länger als `JOB_EXPIRE_SECONDS` = 10 Min. von pg-boss, per Test abgesichert) → `runJob` mit dieser ID → Lease im `finally`
-    freigeben (scheitert das, läuft sie ab; Log `job.lease_release_failed`).
+    freigeben (scheitert das, läuft sie ab; Log `job.lease_release_failed`). Fehlt die Connection (gelöscht, fremde Organisation),
+    endet der Lauf ohne Lease mit „Connection nicht gefunden.“.
   - **Belegt:** Es entsteht **kein** `job_runs`-Eintrag und kein Healthcheck-Ping. Derselbe Job wird mit `startAfter`
     (`LEASE_DEFER_SECONDS` = 60 s) und `deferredCount + 1` neu eingeplant (Log `job.deferred` mit dem Halter); der spätere Lauf zeigt
     den Zähler `deferred`. So erzeugt eine länger belegte Connection keine Zeile je Minute im Sync-Status, und Healthchecks sieht nur
     echte Läufe. Wartet schon ein Job der Queue auf die Connection, fällt der zurückgestellte weg (Ergebnis `queued: false`).
-    `extendConnectionLease` ist für lange Schritte da; heute nutzt es noch kein Job (1.7 bei Bedarf über den Lauf-Kontext).
+    `extendConnectionLease` ist für lange Schritte da; heute nutzt es noch kein Job. 1.7 reicht es bei Bedarf über `ConnectionJobRun`
+    weiter (z. B. `run.extendLease()`), statt dass Jobs die DB-Funktion direkt aufrufen: Bei 0,2/s dauern 180 Aufrufe an ein Profil
+    schon 15 Min. **Betrieb:** Stirbt ein Halter, bleibt die Connection bis zu 15 Min. belegt; manuelle Syncs erscheinen solange nicht
+    im Sync-Status, nur als Log `job.deferred` etwa jede Minute. Selten kommt `heldBy: null` vor (Halter gab zwischen den beiden
+    Abfragen frei); der Job wartet dann trotzdem 60 s (bewusst nicht optimiert).
   - **Anfrage-Budget:** `packages/amazon-ads/src/rate-limit.ts` (`createProfileRateLimiter`): Token-Bucket mit Kapazität 1 je Profil
     (Schlüssel `region:amazonProfileId`), also gleichmäßiger Abstand `1/Rate`, auch für gleichzeitige Aufrufe. Standard 2/s, Untergrenze
-    0,2/s, +0,05/s je Erfolg, 429 halbiert; `Retry-After` sperrt das Profil bis zum Ende der Pause. Greift in `request()` nur mit
+    0,2/s, +0,05/s je Erfolg, 429 halbiert; `Retry-After` sperrt das Profil bis zum Ende der Pause. Wer beim 429 schon auf seinen
+    Schlitz wartete, bucht nach dem Aufwachen neu (nach der Pause, halbierte Rate). Ist die Pause länger als `maxRetryAfterMs` (60 s),
+    wird nicht gesendet: Der Aufruf endet sofort mit `AmazonAdsHttpError` (429, Code `PROFILE_PAUSED`, `retryAfterMs` = Restdauer), und
+    `handleAmazonError` plant neu bzw. lässt den Lauf scheitern wie bei einem zu langen `Retry-After`. Greift in `request()` nur mit
     `amazonProfileId` (Profil-Scope), vor **jedem** Versuch inkl. Wiederholungen; `/v2/profiles` und LWA laufen ohne Profil-Budget.
     Konfigurierbar über `AMAZON_ADS_REQUESTS_PER_SECOND` (optional, 0,2–100; `.env.example`, `docs/deploy.md`). Im Modus `inline`
     teilen API und Worker denselben Client und damit dasselbe Budget.
-  - **Zähler:** `createRequestMeter()` (`@profitbash/amazon-ads`) zählt je Lauf `requests` (jede gesendete HTTP-Anfrage), `throttled`
-    (429) und `retries` (zweiter und weitere Versuche). Jobs reichen ihn über den dritten Parameter (`ConnectionJobRun`) an jeden Aufruf
+  - **Zähler:** `createRequestMeter()` (`@profitbash/amazon-ads`) zählt je Lauf `requests` (jede gesendete Anfrage an die Ads-API,
+    ohne LWA), `throttled` (429) und `retries` (zweiter und weitere Versuche, auch der Neuversand nach einem 401). Jobs reichen ihn über den dritten Parameter (`ConnectionJobRun`) an jeden Aufruf
     weiter (`request(…, { meter })`, `listProfiles(connection, { meter })`); neue Client-Methoden in 1.6 nehmen dieselbe Option.
     `runJob` hat dafür die Option `counters` (auch bei Fehlschlag geschrieben, gerade gedrosselte Läufe sollen sie zeigen) und `runId`.
     Nur Datenjobs schreiben diese vier Zähler; Anzeige nach den fachlichen Zählern (`COUNTER_ORDER`), Nullwerte ausgeblendet.
+    Offen nach dem ersten echten Lauf: ob ein Zähler für die Wartezeit im Budget (`pacedMs`) nötig ist, um Budget und Amazon als
+    Engpass zu unterscheiden.
 
 ### 1.4 Asynchrone Amazon-Aufträge: Tabelle und Zustandsmaschine
 Gemeinsamer Baustein für Exports (Entities) und Reports, damit Neustarts nichts verlieren. Diese Aufgabe baut **Tabelle und

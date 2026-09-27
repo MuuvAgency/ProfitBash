@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createProfileRateLimiter, type ProfileRateLimiterOptions } from './rate-limit';
 
 /** Uhr, die nur beim Warten weiterläuft: Jede Wartezeit ist sichtbar und deterministisch. */
@@ -95,6 +95,43 @@ describe('createProfileRateLimiter', () => {
     await limiter.acquire('eu:1');
     expect(sleeps).toEqual([7_000]);
     expect(now()).toBe(7_000);
+  });
+
+  it('hält auch schon wartende Anfragen an, wenn danach ein 429 mit Retry-After kommt', async () => {
+    vi.useFakeTimers({ now: 0 });
+    try {
+      const limiter = createProfileRateLimiter({ now: () => Date.now() });
+      const fired: number[] = [];
+      const request = async () => {
+        await limiter.acquire('eu:1');
+        fired.push(Date.now());
+      };
+      const all = Promise.all([request(), request(), request(), request()]);
+      await vi.advanceTimersByTimeAsync(0);
+      // Die erste Anfrage bekommt ein 429 mit 10 s Pause, die übrigen warten schon auf ihren Schlitz.
+      limiter.onThrottled('eu:1', 10_000);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await all;
+      expect(fired[0]).toBe(0);
+      // Nach der Pause im Abstand der halbierten Rate (1/s).
+      expect(fired.slice(1)).toEqual([10_000, 11_000, 12_000]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('wartet nicht länger als erlaubt auf das Ende einer Retry-After-Pause', async () => {
+    const { limiter, sleeps } = setup();
+    limiter.onThrottled('eu:1', 24 * 60 * 60 * 1000);
+    await expect(limiter.acquire('eu:1', { maxPauseMs: 60_000 })).resolves.toEqual({
+      pausedForMs: 24 * 60 * 60 * 1000,
+    });
+    expect(sleeps).toEqual([]);
+    // Kürzere Pausen werden abgewartet.
+    const other = setup();
+    other.limiter.onThrottled('eu:2', 30_000);
+    await expect(other.limiter.acquire('eu:2', { maxPauseMs: 60_000 })).resolves.toBeNull();
+    expect(other.sleeps).toEqual([30_000]);
   });
 
   it('lehnt unsinnige Raten ab', () => {

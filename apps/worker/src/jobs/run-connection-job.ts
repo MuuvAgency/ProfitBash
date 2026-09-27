@@ -3,13 +3,15 @@ import { createRequestMeter } from '@profitbash/amazon-ads';
 import {
   acquireConnectionLease,
   errorLogFields,
+  findJobConnection,
   releaseConnectionLease,
   type Db,
 } from '@profitbash/db';
 import type { Logger } from '@profitbash/shared';
-import type { JobOutcome, JobRunResult, RunJob } from '../run-job';
+import { JobFailure, type JobOutcome, type JobRunResult, type RunJob } from '../run-job';
 import {
   CONNECTION_LEASE_SECONDS,
+  CONNECTION_NOT_FOUND_MESSAGE,
   LEASE_DEFER_SECONDS,
   type ConnectionJobData,
   type ConnectionJobDeps,
@@ -59,6 +61,11 @@ export async function runConnectionJob(
   const meter = createRequestMeter();
 
   if (!definition.lease) return runJob(queue, scope, () => definition.run(deps, job, { meter }));
+
+  // Ohne Connection (gelöscht, fremde Organisation) gäbe die Lease nur einen FK-Fehler ohne Lauf.
+  if (!(await findJobConnection(db, job))) {
+    return runJob(queue, scope, () => Promise.reject(new JobFailure(CONNECTION_NOT_FOUND_MESSAGE)));
+  }
 
   const runId = randomUUID();
   const leaseRef = {

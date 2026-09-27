@@ -66,6 +66,8 @@ export interface ConnectionJobRun {
   meter: RequestMeter;
 }
 
+export const CONNECTION_NOT_FOUND_MESSAGE = 'Connection nicht gefunden.';
+
 export const REAUTH_REQUIRED_MESSAGE =
   'Amazon hat den Refresh-Token abgelehnt. Die Connection muss neu verbunden werden.';
 
@@ -77,7 +79,7 @@ export interface LoadedConnection extends ConnectionRef {
 /** Lädt die Connection im Org-Kontext des Jobs. Connections mit `reauth_required` laufen nicht. */
 export async function loadConnection(db: Db, job: ConnectionJobData): Promise<LoadedConnection> {
   const row = await findJobConnection(db, job);
-  if (!row) throw new JobFailure('Connection nicht gefunden.');
+  if (!row) throw new JobFailure(CONNECTION_NOT_FOUND_MESSAGE);
   if (row.status === 'reauth_required') throw new JobFailure(REAUTH_REQUIRED_MESSAGE);
   if (!row.region) throw new JobFailure('Connection ohne Region.');
   return {
