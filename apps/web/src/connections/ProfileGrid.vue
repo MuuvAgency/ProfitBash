@@ -79,7 +79,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       headerName: t('connections.profiles.column.accountName'),
       field: 'accountName',
       cellRenderer: markRaw(AccountCell),
-      minWidth: 165,
+      minWidth: 140,
       flex: 2,
     },
     {
@@ -93,7 +93,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       headerName: t('connections.profiles.column.currency'),
       field: 'currencyCode',
       cellClass: DATA_CELL,
-      width: 95,
+      width: 85,
     },
     {
       colId: 'timezone',
@@ -110,7 +110,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       field: 'metricsImportedThrough',
       valueFormatter: ({ value }) => formatDay(value, locale),
       cellClass: DATA_CELL,
-      width: 120,
+      width: 115,
     },
     {
       colId: 'client',
@@ -128,7 +128,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       field: 'isHidden',
       cellRenderer: markRaw(HiddenCell),
       suppressKeyboardEvent: suppressControlKeys,
-      width: 115,
+      width: 110,
     },
   ];
 });

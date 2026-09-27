@@ -2,21 +2,23 @@
 import type { JobRun } from '@profitbash/shared';
 import type { ColDef, GetRowIdParams } from 'ag-grid-community';
 import { AgGridVue } from 'ag-grid-vue3';
-import { computed, markRaw, reactive } from 'vue';
+import { computed, markRaw, onBeforeUnmount, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { gridStyleOptions, gridTheme } from '../grid/grid';
+import DurationCell from './cells/DurationCell.vue';
 import ResultCell from './cells/ResultCell.vue';
 import StatusCell from './cells/StatusCell.vue';
 import type { JobRunGridContext } from './cells/types';
-import { elapsedMs, useJobRunLabels } from './labels';
+import { elapsedMs, RUNNING_DURATION_TICK_MS, useJobRunLabels } from './labels';
 
-defineProps<{ runs: JobRun[] }>();
+const props = defineProps<{ runs: JobRun[] }>();
 
 const { t } = useI18n();
 const labels = useJobRunLabels();
 
 const context = reactive<JobRunGridContext>({
   expanded: new Set(),
+  now: Date.now(),
   toggleError(runId) {
     if (!context.expanded.delete(runId)) context.expanded.add(runId);
   },
@@ -59,9 +61,9 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
   {
     colId: 'duration',
     headerName: t('sync.column.duration'),
-    // Laufende Jobs: Dauer bis jetzt. Der Wert ändert sich bei jeder Abfrage, so zeichnet AG Grid neu.
+    // Laufende Jobs: Dauer bis jetzt (sortiert zum Stand der Daten, angezeigt mit der Uhr des Kontexts).
     valueGetter: ({ data }) => (data ? elapsedMs(data) : null),
-    valueFormatter: ({ data }) => (data ? labels.duration(data) : ''),
+    cellRenderer: markRaw(DurationCell),
     cellClass: DATA_CELL,
     width: 140,
   },
@@ -88,6 +90,24 @@ const defaultColDef: ColDef<JobRun> = {
 };
 
 const getRowId = ({ data }: GetRowIdParams<JobRun>) => data.id;
+
+/**
+ * Die Dauer laufender Jobs zählt weiter. Neue Daten zeichnen sie nicht neu: Die Abfrage liefert bei
+ * gleichem Stand dieselben Objekte (Structural Sharing), und AG Grid aktualisiert nur geänderte Zeilen.
+ * Die Zelle rechnet deshalb mit der Uhr aus dem (reaktiven) Kontext.
+ */
+let tick: ReturnType<typeof setInterval> | undefined;
+watchEffect(() => {
+  const running = props.runs.some((run) => run.status === 'running');
+  if (running && !tick) {
+    context.now = Date.now();
+    tick = setInterval(() => (context.now = Date.now()), RUNNING_DURATION_TICK_MS);
+  } else if (!running && tick) {
+    clearInterval(tick);
+    tick = undefined;
+  }
+});
+onBeforeUnmount(() => clearInterval(tick));
 </script>
 
 <template>

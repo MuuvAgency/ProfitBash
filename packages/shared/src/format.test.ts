@@ -106,7 +106,13 @@ describe('formatDay', () => {
   it('formatiert einen Kalendertag ohne Verschiebung durch die Zeitzone', () => {
     // Ein Kalendertag (`YYYY-MM-DD`) hat keine Zeitzone: Er bleibt in jeder Zeitzone derselbe Tag.
     expect(formatDay('2026-09-25', 'de-DE')).toBe('25.09.2026');
-    expect(formatDay('2026-01-01', 'en-US')).toBe('Jan 1, 2026');
+  });
+
+  it('hat in jeder Sprache dieselbe Breite (Tabellenspalten)', () => {
+    expect(formatDay('2026-01-01', 'en-US')).toBe('01/01/2026');
+    expect(formatDay('2026-01-01', 'en-GB')).toBe('01/01/2026');
+    // Jahr 50, nicht 1950.
+    expect(formatDay('0050-03-01', 'de-DE')).toBe('01.03.50');
   });
 
   it('zeigt fehlende, ungültige oder nicht existierende Tage als Platzhalter', () => {

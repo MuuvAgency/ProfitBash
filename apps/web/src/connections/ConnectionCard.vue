@@ -254,7 +254,7 @@ const statusDot = computed(
       :aria-label="t('connections.profiles.label', { account: title })"
     >
       <ProfileGrid
-        class="min-w-[1090px]"
+        class="min-w-[1120px]"
         :profiles="profiles"
         :clients="clients"
         :clients-ready="clientsReady"

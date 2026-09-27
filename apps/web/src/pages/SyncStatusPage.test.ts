@@ -177,6 +177,13 @@ describe('SyncStatusPage', () => {
 
     expect(row(wrapper, running).get('[col-id="duration"]').text()).toBe('1 Std. 5 Min.');
     expect(row(wrapper, failed).get('[col-id="duration"]').text()).toBe('3 Min. 12 Sek.');
+
+    // Die Dauer zählt weiter, auch wenn die Abfragen dieselben Daten liefern.
+    vi.setSystemTime(new Date('2026-09-26T06:07:30.000Z'));
+    await vi.waitFor(
+      () => expect(row(wrapper, running).get('[col-id="duration"]').text()).toBe('1 Std. 7 Min.'),
+      { timeout: 3_000 },
+    );
   });
 
   it('zeigt die Amazon-Datenjobs (1.7) mit ihren Zählern in fester Reihenfolge', async () => {

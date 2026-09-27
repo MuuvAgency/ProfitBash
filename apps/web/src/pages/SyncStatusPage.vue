@@ -188,7 +188,7 @@ async function refresh() {
       role="region"
       :aria-label="t('sync.label')"
     >
-      <JobRunGrid class="min-w-[1070px]" :runs="runs" />
+      <JobRunGrid class="min-w-[1090px]" :runs="runs" />
     </section>
   </div>
 </template>
