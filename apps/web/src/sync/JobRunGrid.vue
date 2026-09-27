@@ -116,7 +116,7 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     headerName: t('sync.column.connection'),
     valueGetter: ({ data }) => (data ? labels.connection(data) : ''),
     cellRenderer: markRaw(TruncatedCell),
-    minWidth: 220,
+    minWidth: 180,
     flex: 1,
   },
   {
@@ -134,6 +134,8 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     valueGetter: ({ data }) => (data ? elapsedMs(data) : null),
     cellRenderer: markRaw(DurationCell),
     cellClass: DATA_CELL,
+    // Angepasst wird nur nach neuen Zeilen, die Dauer laufender Jobs wächst dazwischen: Platz für „12 Std. 59 Min.“.
+    minWidth: 160,
   },
   {
     colId: 'result',
@@ -147,7 +149,7 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     // Aufgeklappt wächst die Zeile mit dem Fehlertext.
     autoHeight: true,
     sortable: false,
-    minWidth: 300,
+    minWidth: 280,
     flex: 2,
   },
 ]);
