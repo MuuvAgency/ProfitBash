@@ -3,6 +3,7 @@ import {
   AmazonAdsReauthRequiredError,
   type AmazonAdsClient,
   type ConnectionRef,
+  type RequestMeter,
 } from '@profitbash/amazon-ads';
 import {
   ConnectionReauthRequiredError,
@@ -22,12 +23,23 @@ export const MAX_RETRY_AFTER_ATTEMPTS = 3;
  */
 export const MAX_RETRY_AFTER_SECONDS = 60 * 60;
 
+/**
+ * Gültigkeit der Lease je Connection (1.3). Länger als der Ablauf der Jobs in pg-boss
+ * (`expireInSeconds`, siehe `queues.ts`): Ein von pg-boss schon als abgelaufen geführter, aber noch
+ * laufender Job hält die Connection weiter. Nach einem Absturz ist sie spätestens danach wieder frei.
+ */
+export const CONNECTION_LEASE_SECONDS = 15 * 60;
+/** Ist die Connection belegt, startet der Job so viel später erneut. */
+export const LEASE_DEFER_SECONDS = 60;
+
 /** Daten der Jobs je Connection (`token-refresh`, `profiles-sync`). */
 export const connectionJobDataSchema = z.object({
   organizationId: z.uuid(),
   connectionId: z.uuid(),
   /** Zählt Neu-Planungen nach `Retry-After`. */
   retryAttempt: z.number().int().min(1).max(MAX_RETRY_AFTER_ATTEMPTS).optional(),
+  /** Zählt Zurückstellungen, weil ein anderer Datenjob die Connection hielt (ohne Obergrenze). */
+  deferredCount: z.number().int().min(1).optional(),
 });
 
 export type ConnectionJobData = z.infer<typeof connectionJobDataSchema>;
@@ -47,6 +59,11 @@ export interface ConnectionJobDeps {
   amazonAds: Pick<AmazonAdsClient, 'listProfiles' | 'getAccessToken' | 'invalidateAccessToken'>;
   /** Plant denselben Job später erneut ein (pg-boss `startAfter`); `false`, wenn schon einer wartet. */
   scheduleRetry(retry: ScheduledRetry): Promise<boolean>;
+}
+
+/** Kontext eines Laufs: Zähler für alle Aufrufe an Amazon (landen in `job_runs.counters`). */
+export interface ConnectionJobRun {
+  meter: RequestMeter;
 }
 
 export const REAUTH_REQUIRED_MESSAGE =

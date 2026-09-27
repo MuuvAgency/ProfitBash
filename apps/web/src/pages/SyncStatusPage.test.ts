@@ -9,7 +9,17 @@ import { cleanupMounted, mountWithApp } from '../test/mount';
 // Key-Reihenfolge wie aus Postgres (`jsonb` sortiert nach Länge), nicht wie geschrieben.
 const succeeded = jobRunFixture({
   startedAt: '2026-09-26T03:00:00.000Z',
-  counters: { created: 1, removed: 2, profiles: 4, reassigned: 0, removalDeferred: 0 },
+  counters: {
+    retries: 2,
+    created: 1,
+    removed: 2,
+    deferred: 1,
+    profiles: 4,
+    requests: 12,
+    throttled: 1,
+    reassigned: 0,
+    removalDeferred: 0,
+  },
 });
 const failed = jobRunFixture({
   job: 'token-refresh',
@@ -124,12 +134,19 @@ describe('SyncStatusPage', () => {
       expect(success.text()).toContain(text);
     }
     // Bekannte Zähler in fester Reihenfolge, Nullwerte fehlen.
-    expect(success.get('[col-id="result"]').text()).toBe('4 Profile · 1 neu · 2 entfernt');
+    // Anfragezähler (1.3) nach den fachlichen Zählern.
+    expect(success.get('[col-id="result"]').text()).toBe(
+      '4 Profile · 1 neu · 2 entfernt · 12 Anfragen · 1 gedrosselt · 2 Wiederholungen · 1 Mal zurückgestellt',
+    );
     // Zahlen in Mono.
     expect(success.findAll('[col-id="result"] .font-data').map((n) => n.text())).toEqual([
       '4',
       '1',
       '2',
+      '12',
+      '1',
+      '2',
+      '1',
     ]);
     // Zeitstempel und Dauer in Mono.
     const started = success.get('[col-id="startedAt"]');

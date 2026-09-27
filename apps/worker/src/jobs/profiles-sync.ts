@@ -12,6 +12,7 @@ import {
   loadConnection,
   type ConnectionJobData,
   type ConnectionJobDeps,
+  type ConnectionJobRun,
 } from './connection-job';
 
 /**
@@ -23,13 +24,14 @@ import {
 export async function syncConnectionProfiles(
   deps: ConnectionJobDeps,
   job: ConnectionJobData,
+  run: ConnectionJobRun,
 ): Promise<JobOutcome> {
   const { db } = deps;
   const connection = await loadConnection(db, job);
 
   let listed: AmazonAdsProfile[];
   try {
-    listed = await deps.amazonAds.listProfiles(connection);
+    listed = await deps.amazonAds.listProfiles(connection, { meter: run.meter });
   } catch (err) {
     return handleAmazonError(deps, 'profiles-sync', job, connection, err);
   }
@@ -42,7 +44,7 @@ export async function syncConnectionProfiles(
     seenAmazonProfileIds: profiles.map((p) => p.amazonProfileId),
   });
   // Amazon-Aufrufe vor der Transaktion, damit sie keine Sperren hält.
-  const resolution = unseen.length > 0 ? await resolveUnseen(deps, connection, unseen) : null;
+  const resolution = unseen.length > 0 ? await resolveUnseen(deps, run, connection, unseen) : null;
 
   const now = new Date();
   const counters = await db.transaction(async (tx) => {
@@ -87,6 +89,7 @@ type UnseenResolution =
 /** Fragt die übrigen aktiven Connections der Organisation, ob sie die verschwundenen Profile liefern. */
 async function resolveUnseen(
   deps: ConnectionJobDeps,
+  run: ConnectionJobRun,
   connection: ConnectionRef,
   unseen: string[],
 ): Promise<UnseenResolution> {
@@ -99,11 +102,10 @@ async function resolveUnseen(
     if (!other.region) continue;
     let listed: AmazonAdsProfile[];
     try {
-      listed = await deps.amazonAds.listProfiles({
-        id: other.id,
-        organizationId: connection.organizationId,
-        region: other.region,
-      });
+      listed = await deps.amazonAds.listProfiles(
+        { id: other.id, organizationId: connection.organizationId, region: other.region },
+        { meter: run.meter },
+      );
     } catch (err) {
       deps.logger({
         level: 'warn',

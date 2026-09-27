@@ -20,6 +20,11 @@ const COUNTER_ORDER = [
   'reassigned',
   'removed',
   'removalDeferred',
+  // Anfragen an Amazon und Lease der Connection (1.3), nach den fachlichen Zählern.
+  'requests',
+  'throttled',
+  'retries',
+  'deferred',
 ];
 
 /** Immer zeigen, auch bei 0 (ein Sync ohne Profile ist eine Aussage). Andere Zähler nur ungleich 0. */
