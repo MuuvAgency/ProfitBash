@@ -13,8 +13,18 @@ import type { LogEntry } from '@profitbash/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { JobFailure } from '../run-job';
-import { amazonProfile, createConnection, createOrganization } from '../testing';
-import type { ConnectionJobDeps, ScheduledRetry } from './connection-job';
+import {
+  amazonProfile,
+  createConnection,
+  createOrganization,
+  stubAmazonAdsClient,
+} from '../testing';
+import type {
+  ConnectionJobData,
+  ConnectionJobDeps,
+  ConnectionQueue,
+  ScheduledRetry,
+} from './connection-job';
 import { syncConnectionProfiles } from './profiles-sync';
 
 const { amazonAdsProfiles, auditEvents, clients, connections } = schema;
@@ -32,6 +42,7 @@ const listed: string[] = [];
 const meters: Array<RequestMeter | undefined> = [];
 let meter: RequestMeter = createRequestMeter();
 const retries: ScheduledRetry[] = [];
+const enqueued: Array<{ queue: ConnectionQueue; job: ConnectionJobData }> = [];
 /** Antwort von `scheduleRetry`: `false` = für die Connection wartet schon ein Job. */
 let retryAccepted = true;
 const logs: LogEntry[] = [];
@@ -40,7 +51,7 @@ function deps(): ConnectionJobDeps {
   return {
     db: testDb.db,
     logger: (entry) => logs.push(entry),
-    amazonAds: {
+    amazonAds: stubAmazonAdsClient({
       listProfiles(connection: ConnectionRef, options?: RequestOptions) {
         listed.push(connection.id);
         meters.push(options?.meter);
@@ -48,21 +59,28 @@ function deps(): ConnectionJobDeps {
         if (answer instanceof Error) return Promise.reject(answer);
         return Promise.resolve(answer ?? []);
       },
-      getAccessToken: () => Promise.reject(new Error('nicht benutzt')),
-      invalidateAccessToken: () => {},
-    },
+    }),
     scheduleRetry(retry) {
       retries.push(retry);
       return Promise.resolve(retryAccepted);
     },
+    enqueue(queue, job) {
+      enqueued.push({ queue, job });
+      return Promise.resolve(true);
+    },
   };
 }
 
-const sync = (connectionId: string, retryAttempt?: number) =>
+const sync = (connectionId: string, retryAttempt?: number, chain?: boolean) =>
   syncConnectionProfiles(
     deps(),
-    { organizationId, connectionId, ...(retryAttempt !== undefined && { retryAttempt }) },
-    { meter },
+    {
+      organizationId,
+      connectionId,
+      ...(retryAttempt !== undefined && { retryAttempt }),
+      ...(chain !== undefined && { chain }),
+    },
+    { meter, runId: null, extendLease: () => Promise.resolve() },
   );
 
 async function profile(amazonProfileId: string, orgId = organizationId) {
@@ -113,6 +131,7 @@ beforeEach(async () => {
   meters.length = 0;
   meter = createRequestMeter();
   retries.length = 0;
+  enqueued.length = 0;
   retryAccepted = true;
   logs.length = 0;
 });
@@ -303,7 +322,7 @@ describe('syncConnectionProfiles', () => {
       syncConnectionProfiles(
         deps(),
         { organizationId: otherOrganizationId, connectionId: connectionA },
-        { meter },
+        { meter, runId: null, extendLease: () => Promise.resolve() },
       ),
     ).rejects.toThrow(/nicht gefunden/);
     expect(listed).toEqual([]);
@@ -345,6 +364,34 @@ describe('syncConnectionProfiles', () => {
     const error = await sync(connectionA).catch((err: unknown) => err);
     expect((error as Error).message).toMatch(/bereits ein Job/);
     expect(error).toMatchObject({ alert: false });
+  });
+
+  it('behält die Kette beim Neu-Einplanen nach Retry-After', async () => {
+    amazon.set(
+      connectionA,
+      new AmazonAdsHttpError('Rate-Limit', 'profiles.list', 429, null, null, 60_000),
+    );
+    await expect(sync(connectionA, undefined, true)).rejects.toThrow(/60 s/);
+    expect(retries[0]?.job).toEqual({
+      organizationId,
+      connectionId: connectionA,
+      retryAttempt: 1,
+      chain: true,
+    });
+  });
+
+  it('plant mit chain nach Erfolg den Entity-Sync ein (Kette), ohne chain nicht', async () => {
+    amazon.set(connectionA, [amazonProfile('1')]);
+    await sync(connectionA);
+    expect(enqueued).toEqual([]);
+
+    await sync(connectionA, undefined, true);
+    expect(enqueued).toEqual([
+      {
+        queue: 'entities-sync',
+        job: { organizationId, connectionId: connectionA, chain: true },
+      },
+    ]);
   });
 
   it('gibt nach drei Retry-After-Versuchen auf', async () => {

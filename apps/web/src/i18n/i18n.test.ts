@@ -1,3 +1,4 @@
+import { CONNECTION_JOB_NAMES } from '@profitbash/shared';
 import { describe, expect, it } from 'vitest';
 import { NAVIGATION } from '../navigation/navigation';
 import { errorMessageKey, i18n } from './index';
@@ -15,6 +16,13 @@ describe('i18n', () => {
       ...group.items.map((i) => i.labelKey),
     ]);
     expect(keys.filter((key) => !te(key))).toEqual([]);
+  });
+
+  it('hat Texte für alle Jobs je Connection im Sync-Status', () => {
+    expect(CONNECTION_JOB_NAMES.filter((job) => !te(`sync.job.${job}`))).toEqual([]);
+    expect(CONNECTION_JOB_NAMES).toEqual(
+      expect.arrayContaining(['entities-sync', 'reports-sync', 'amazon-requests-poll']),
+    );
   });
 
   it('übersetzt bekannte Fehlercodes und fällt sonst auf einen allgemeinen Text zurück', () => {

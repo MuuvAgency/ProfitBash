@@ -6,7 +6,7 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { JOB_EXPIRE_SECONDS } from '../queues';
 import { createJobRunner, JobFailure } from '../run-job';
-import { createConnection, createOrganization } from '../testing';
+import { createConnection, createOrganization, stubAmazonAdsClient } from '../testing';
 import {
   CONNECTION_LEASE_SECONDS,
   LEASE_DEFER_SECONDS,
@@ -34,12 +34,9 @@ function context() {
   const deps: ConnectionJobDeps = {
     db: testDb.db,
     logger,
-    amazonAds: {
-      listProfiles: () => Promise.reject(new Error('nicht benutzt')),
-      getAccessToken: () => Promise.reject(new Error('nicht benutzt')),
-      invalidateAccessToken: () => {},
-    },
+    amazonAds: stubAmazonAdsClient(),
     scheduleRetry: () => Promise.resolve(true),
+    enqueue: () => Promise.reject(new Error('nicht benutzt')),
   };
   return {
     db: testDb.db,
@@ -130,6 +127,42 @@ describe('runConnectionJob mit Lease (Amazon-Datenjobs)', () => {
     const ttl = (during!.expiresAt.getTime() - during!.acquiredAt.getTime()) / 1000;
     expect(ttl).toBeCloseTo(CONNECTION_LEASE_SECONDS, 0);
     expect(await lease()).toBeUndefined();
+  });
+
+  it('gibt dem Lauf seine ID und verlängert die Lease auf Wunsch (lange Schritte)', async () => {
+    let seenRunId: string | undefined;
+    let extended: Awaited<ReturnType<typeof lease>>;
+    const definition: ConnectionJobDefinition = {
+      lease: true,
+      run: async (_deps, _job, run) => {
+        seenRunId = run.runId;
+        await testDb.db
+          .update(connectionJobLeases)
+          .set({ expiresAt: sql`now() + interval '1 minute'` });
+        await run.extendLease();
+        extended = await lease();
+        return {};
+      },
+    };
+
+    const result = await runConnectionJob(context(), 'profiles-sync', definition, job());
+
+    expect(result.status === 'success' && result.runId).toBe(seenRunId);
+    const remaining = (extended!.expiresAt.getTime() - Date.now()) / 1000;
+    expect(remaining).toBeGreaterThan(CONNECTION_LEASE_SECONDS - 60);
+  });
+
+  it('bricht ab, wenn die Lease inzwischen einem anderen Lauf gehört', async () => {
+    const definition: ConnectionJobDefinition = {
+      lease: true,
+      run: async (_deps, _job, run) => {
+        await testDb.db.update(connectionJobLeases).set({ jobRunId: randomUUID() });
+        await run.extendLease();
+        return {};
+      },
+    };
+    const result = await runConnectionJob(context(), 'profiles-sync', definition, job());
+    expect(result).toMatchObject({ status: 'failed', error: expect.stringMatching(/Lease/) });
   });
 
   it('schreibt Anfragen, 429, Wiederholungen und Zurückstellungen in die Zähler', async () => {

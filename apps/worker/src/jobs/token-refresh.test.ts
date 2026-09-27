@@ -51,6 +51,7 @@ function deps(): ConnectionJobDeps {
       retries.push(retry);
       return Promise.resolve(true);
     },
+    enqueue: () => Promise.reject(new Error('nicht benutzt')),
   };
 }
 

@@ -343,7 +343,13 @@ export const clientPatchSchema = z
  * Jobs je Connection (Worker-Queues). Nur ihre Läufe gehören einer Organisation; Cron-Auslöser und
  * Cleanup laufen plattformweit (`organization_id` null) und fehlen in der Org-Sicht.
  */
-export const CONNECTION_JOB_NAMES = ['token-refresh', 'profiles-sync'] as const;
+export const CONNECTION_JOB_NAMES = [
+  'token-refresh',
+  'profiles-sync',
+  'entities-sync',
+  'reports-sync',
+  'amazon-requests-poll',
+] as const;
 export type ConnectionJobName = (typeof CONNECTION_JOB_NAMES)[number];
 
 export const JOB_RUN_STATUSES = ['running', 'success', 'failed'] as const;
