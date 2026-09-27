@@ -267,7 +267,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 Gemeinsamer Baustein für Exports (Entities) und Reports, damit Neustarts nichts verlieren. Diese Aufgabe baut **Tabelle und
 Zustandsmaschine** und testet sie gegen eine injizierte Fake-Schnittstelle („anfordern“, „Status“, „laden“, „importieren“). Die echten
 Client-Methoden kommen in 1.6, Jobs und Dispatcher in 1.7.
-- [ ] Tabelle `amazon_ads_report_requests` (gilt auch für Exports, Spalte `kind`):
+- [x] Tabelle `amazon_ads_report_requests` (gilt auch für Exports, Spalte `kind`):
   - `organization_id`, `profile_id`, `kind` (`report` | `export`), `ad_product` (**ein** Ad-Typ je Auftrag, auch bei Exports),
     `report_type` (z. B. `spCampaigns`, bei Exports `campaigns`/`adGroups`/`targets`/`ads`), `start_date`, `end_date` (nur Reports),
     `batch_id` (Exports eines Entity-Syncs gehören zusammen, siehe 1.7), `amazon_request_id` (Text, leer bis zur Antwort von Amazon)
@@ -277,33 +277,96 @@ Client-Methoden kommen in 1.6, Jobs und Dispatcher in 1.7.
   - Die Download-URL wird **nicht** gespeichert (signiert, läuft ab); sie wird beim Abholen frisch per Status-Abfrage gelesen.
   - Unique (`profile_id`, `kind`, `ad_product`, `report_type`, `start_date`, `end_date`) mit **`NULLS NOT DISTINCT`** als partieller Index auf
     offene Aufträge (`status` nicht `imported`/`failed`): kein doppelter offener Auftrag, auch bei Exports (Daten leer) und nach Neustart.
-- [ ] **Erst schreiben, dann anfordern:** Zeile mit `pending_request` anlegen, dann Amazon aufrufen, dann `amazon_request_id` speichern.
+- [x] **Erst schreiben, dann anfordern:** Zeile mit `pending_request` anlegen, dann Amazon aufrufen, dann `amazon_request_id` speichern.
       Stirbt der Prozess dazwischen, findet der nächste `amazon-requests-poll` die Zeile ohne ID (sie zählt als offener Auftrag, auch für den
       Dispatcher in 1.7) und fordert erneut an. Antwortet Amazon dann mit 425
       (identische Anfrage läuft noch): die Report-ID aus der Fehlerantwort übernehmen, falls Amazon sie liefert (beim Umsetzen prüfen),
       sonst `next_poll_at` in 15 Min. und dann erneut anfordern.
-- [ ] **Abbruchregel:** `failed` erst, wenn Amazon bei einer Abfrage noch `PENDING`/`PROCESSING` meldet und der Auftrag älter als 4 h ist,
+- [x] **Abbruchregel:** `failed` erst, wenn Amazon bei einer Abfrage noch `PENDING`/`PROCESSING` meldet und der Auftrag älter als 4 h ist,
       oder wenn Amazon `FAILURE` meldet. Ein Auftrag, den nur wir nicht abgefragt haben (Absturz, Deploy), wird beim nächsten Poll normal abgeholt.
-- [ ] **Download:** Entpacken gestreamt mit Größendeckel (z. B. 50 MB entpackt, sonst `failed` mit Hinweis), dann `parseJsonLossless`
+- [x] **Download:** Entpacken gestreamt mit Größendeckel (z. B. 50 MB entpackt, sonst `failed` mit Hinweis), dann `parseJsonLossless`
       über den ganzen Text (der Parser arbeitet nicht auf Streams). Der Deckel schützt den Speicher bei `WORKER_MODE=inline`; bei Bedarf
       später ein verlustfreier Streaming-Parser (neue Abhängigkeit, ADR-Notiz). zod-Validierung je Zeile; ungültige Zeilen zählen
       (`invalid_row_count`) und ohne Werte loggen.
-- [ ] **Import:** Reports je Auftrag in **einer** Transaktion (Regeln in 1.5), danach `imported`. **Ausnahme Exports:** Sie werden je
+- [x] **Import:** Reports je Auftrag in **einer** Transaktion (Regeln in 1.5), danach `imported`. **Ausnahme Exports:** Sie werden je
       `batch_id` gemeinsam importiert, Importversuche zählen je Batch (Regeln in 1.7). Scheitert der Import, bleibt der Auftrag
       `completed` und wird beim nächsten Poll erneut geladen; nach 3 Importversuchen `failed` (sonst lädt ein Fehler die Datei endlos).
       Ist die URL abgelaufen, frisch per Status-Abfrage holen; liefert Amazon die Datei nicht mehr, neu anfordern.
-- [ ] **Reihenfolge:** Ein Report-Auftrag importiert nur die Tage, die kein **später angeforderter**, schon importierter Auftrag desselben
+- [x] **Reihenfolge:** Ein Report-Auftrag importiert nur die Tage, die kein **später angeforderter**, schon importierter Auftrag desselben
       Profils, Ad-Typs und Report-Typs abdeckt (sonst überschrieben ältere Werte neuere); das Ersetzen des Ausschnitts (1.5) gilt dann nur für
       diese Tage. Deckt ein neuerer Auftrag alle Tage ab, endet der Auftrag als `imported` mit Zähler `superseded` (seine Tage sind ja durch den
       neueren importiert; für den Historien-Merker in 1.7 zählt er als importiert).
-- [ ] Wartung: `job-runs-cleanup` löscht abgeschlossene Aufträge älter als 30 Tage (F5).
-- [ ] Tests (gegen die Fake-Schnittstelle): Absturz vor und nach dem Anfordern, 425 mit und ohne ID, 429 beim Status, `FAILURE`,
+- [x] Wartung: `job-runs-cleanup` löscht abgeschlossene Aufträge älter als 30 Tage (F5).
+- [x] Tests (gegen die Fake-Schnittstelle): Absturz vor und nach dem Anfordern, 425 mit und ohne ID, 429 beim Status, `FAILURE`,
       abgelaufene URL, Datei über dem Deckel, kaputte Zeile, dreimal scheiternder Import, überholter Auftrag.
+- [x] Umsetzung (Stand für 1.5 und später):
+  - **Tabelle** (`packages/db/src/schema/app.ts`): Migrationen `0004_amazon_ads_profiles_id_org_unique` (unique (`id`, `organization_id`)
+    an `amazon_ads_profiles`, Ziel der zusammengesetzten FKs; **gilt auch für 1.5**, dort nicht erneut anlegen; dazu die Enums),
+    `0005_amazon_ads_report_requests` (Tabelle), `0006_…_open_nulls_not_distinct` (eigene SQL-Migration: Drizzle erzeugt
+    `NULLS NOT DISTINCT` nur für Constraints, der partielle Index wird dort neu angelegt; der Schema-Eintrag verweist darauf) und
+    `0007_…_error_and_request_counts`. Getrennte Migrationen, weil Drizzle den Unique-Constraint sonst **nach** dem FK anlegt, der ihn braucht.
+    - `kind` und `status` als Postgres-Enums (feste interne Mengen), `ad_product`/`report_type` als Text (Amazon-Werte).
+    - CHECK: Reports haben Zeitraum (`start_date <= end_date`) und keinen Batch, Exports einen Batch und keinen Zeitraum.
+    - Zusätzliche Spalten: `error_count` (vorübergehende Fehler in Folge), `request_count` (Anforderungen, begrenzt das Neu-Anfordern),
+      `created_at`/`updated_at`. `next_poll_at` ist nullable: `null` = wartet auf andere Exports des Batches (nie fällig).
+    - **FK auf Profile mit `ON DELETE CASCADE`**, nicht `NO ACTION` wie in 1.5: Aufträge sind Betriebszustand, keine Historie; sie
+      sollen das Löschen eines Profils nicht blockieren.
+  - **Zugriffe** in `packages/db/src/amazon-requests.ts` (Systemzugriff, an die Organisation gebunden): `createAmazonRequest` (offener
+    Auftrag mit gleichem Schlüssel → `created: false` und dieser Auftrag), `createAmazonExportBatch` (alle Exports eines Batches in
+    einer Transaktion; ist für Profil und Ad-Typ noch ein Export offen, entsteht kein neuer Batch), `findAmazonRequest`,
+    `updateAmazonRequest(Batch)`, `listDueAmazonRequests` (fällige offene Aufträge der Profile, die an der Connection hängen, älteste
+    zuerst, mit `limit`), `listAmazonRequestBatch`, `listNewerImportedReportRanges`, `deleteFinishedAmazonRequestsBefore`.
+  - **Download** (`@profitbash/amazon-ads`, `decodeGzipJson(body, { maxBytes })`): entpackt gestreamt, bricht beim Überschreiten des
+    Deckels ab (`AmazonAdsDownloadTooLargeError`), parst dann mit `parseJsonLossless(…, { decimals: 'string' })`. Kaputtes gzip/JSON →
+    `AmazonAdsResponseError` ohne Inhalt; Fehler des Bodys (Netzwerk) bleiben unverändert.
+  - **Zustandsmaschine** (`apps/worker/src/amazon-requests/state-machine.ts`) gegen die Schnittstelle `AmazonRequestPort`
+    (`request`, `getStatus`, `download`, `rowSchema`, `import(tx, …)`), Einstiegspunkte für 1.7: `submitAmazonRequest` (nur Reports),
+    `submitAmazonExportBatch` (Exports immer als Batch) und `advanceAmazonRequest(deps, ref)` (liest die Zeile frisch, ein Schritt je
+    Aufruf). Ergebnis: Zeile plus Zähler `requested`, `reused`, `imported`, `rows`, `superseded`, `failed` für `job_runs.counters`.
+    Uhr injiziert (`now`), Deckel 50 MB (`maxDownloadBytes`).
+    - **Fehler der Connection** (abgelehnter Refresh-Token, 429 bzw. `Retry-After` inkl. `PROFILE_PAUSED` aus 1.3) gehen unverändert an
+      den Job (`handleAmazonError`), der Auftrag bleibt, wie er war.
+    - **Anfordern:** Erfolg → `requested`, `next_poll_at` in 1 Min. 425 mit ID → übernommen (Zähler `reused`). 425 ohne ID → 15 Min.
+      warten; **Erweiterung:** meldet Amazon das über 4 h (seit Anlegen bzw. Neu-Anfordern), `failed` (sonst blockierte die Zeile den
+      Schlüssel endlos). **Doku-Stand 2026-09-27:** Die API-Referenz nennt für 425 nur `{ code, detail }`; ob `detail` die Report-ID
+      enthält, prüft 1.6 (Port liefert `{ status: 'duplicate', amazonRequestId: string | null }`).
+    - **Status:** `PENDING`/`PROCESSING` → Backoff 1 → 2 → 5 → 10 → 15 Min. (Zahl der Abfragen), `failed` erst ab 4 h seit dem Anfordern.
+      `FAILURE` → `failed`. `NOT_FOUND` → Report neu anfordern, Export: Batch `failed`. `COMPLETED` → `completed` und sofort laden.
+    - **Erweiterungen zur Abbruchregel:** 4xx außer 408/425/429 beim Anfordern oder Abfragen → sofort `failed` (eine Wiederholung ändert
+      nichts). Vorübergehende Fehler (5xx, Netzwerk) → Backoff, `failed` erst nach 10 Fehlern in Folge (`error_count`, jede Antwort von
+      Amazon setzt zurück), **nicht** nach Alter: Ein Auftrag, den wir nur lange nicht abgefragt haben, bleibt abholbar.
+    - **Laden/Import:** URL aus der gerade gelaufenen Abfrage; ist sie abgelaufen (`expired`), genau eine frische Status-Abfrage. Fehlt die
+      Datei danach noch: Report neu anfordern, höchstens 3 Anforderungen insgesamt (`request_count`), danach `failed`. Kein Array oder Fehler
+      beim Laden/Import → Importversuch (3 → `failed`, sonst in 5 Min. erneut); Datei über dem Deckel → sofort `failed`. Ein vorübergehender
+      Fehler der frischen Status-Abfrage zählt nicht als Importversuch. Ungültige Zeilen: je Datei höchstens 5 Logs
+      (`amazon_requests.invalid_row`, nur Pfad und Code) plus Summe.
+    - **Reihenfolge:** Vollständig überholte Reports enden ohne Download als `imported` (`row_count` 0, Zähler `superseded`). Die offenen
+      Tage (`ranges`) werden in der Import-Transaktion neu berechnet und an `import` übergeben; **1.5 ersetzt nur diese Tage** und filtert
+      die Zeilen darauf. „Später angefordert“ = `requested_at`; bei 425 mit ID ist das der Zeitpunkt der Übernahme (höchstens etwas zu spät).
+    - **Exports je Batch** (Zustandsteil der Regeln aus 1.7, schon hier umgesetzt): Ein fertiger Export wartet ohne Termin, bis alle Exports
+      des Batches `completed` sind; der zuletzt fertige bleibt fällig, bis der Import gelaufen ist (übersteht Drosselung und Absturz). Import
+      aller Dateien in **einer** Transaktion (`import` bekommt `{ kind: 'export', batchId, files }`, Reihenfolge der Hierarchie ist Sache von
+      1.7). Importversuche zählen je Batch, wieder fällig wird nur der auslösende Auftrag. Jeder endgültige Fehler eines Exports (4xx,
+      `FAILURE`, 4 h, Datei fehlt, zu groß, 3 Importversuche) lässt den ganzen Batch scheitern; einzelne Exports werden nie neu angefordert.
+  - **Wartung:** `job-runs-cleanup` löscht `imported`/`failed`-Aufträge, die vor über 30 Tagen angelegt wurden (Zähler `deletedAmazonRequests`).
+  - **Für 1.6:** Port je Connection bauen (mit `meter` aus `ConnectionJobRun`), Status von Reports (`PENDING`/`PROCESSING`/`COMPLETED`/
+    `FAILURE`) und Exports (`PROCESSING`/`COMPLETED`/`FAILED`) auf `AmazonRequestState` abbilden, 404 → `NOT_FOUND`, abgelaufene S3-URL
+    (403/404 vom Download-Host) → `expired`, `download` liefert den rohen gzip-Body (die Zustandsmaschine entpackt). Zeilen-Schemas mit
+    `amazonIdSchema`/`amazonDecimalSchema` (sichere Ganzzahlen kommen als `number`).
+  - **Für 1.7:** Poll-Lauf: `listDueAmazonRequests` → je Auftrag `advanceAmazonRequest`, Zähler addieren; ein Fehler der Connection beendet
+    den Lauf (`handleAmazonError`). `entities-sync` nutzt nur `submitAmazonExportBatch`. Keine Absicherung per Compare-and-set in
+    `updateAmazonRequest` (bewusst): Die Lease der Connection serialisiert die Läufe; lange Poll-Läufe (bis zu 4 Dateien à 50 MB) sollen
+    die Lease über `run.extendLease()` verlängern (siehe 1.3), sonst könnte nach 15 Min. ein zweiter Lauf denselben Auftrag bearbeiten.
+    Ein Auftrag eines Profils, das die Connection gewechselt hat, erscheint im Poll der neuen Connection.
+  - Review (unabhängig): Befunde zu hängenden Export-Batches (Drosselung/Absturz nach dem letzten `COMPLETED`, 4xx beim Anfordern eines
+    Exports, zwei Schreibvorgänge ohne Transaktion), zur 4-h-Regel bei vorübergehenden Fehlern, zum unbegrenzten Neu-Anfordern und zum
+    Batch-Modell behoben. Zurückgewiesen: Compare-and-set (siehe „Für 1.7“), eine eingesparte Status-Abfrage je Batch (einfacherer Code),
+    Text „0 MB“ in `AmazonAdsDownloadTooLargeError` bei Deckeln unter 1 MB (die Zustandsmaschine formatiert selbst).
 
 ### 1.5 Schema für Entities und Kennzahlen (`packages/db`)
 Allgemeine Regeln für alle Tabellen dieser Aufgabe:
 - `id` (uuid), `organization_id`, `profile_id`; zusammengesetzter FK (`profile_id`, `organization_id`) → `amazon_ads_profiles`
-  (dafür unique (`id`, `organization_id`) an `amazon_ads_profiles` ergänzen, wie bei Clients/Connections).
+  (unique (`id`, `organization_id`) an `amazon_ads_profiles` gibt es seit 1.4, Migration `0004`).
 - Amazon-IDs als Text (`amazon_campaign_id` …), unique (`profile_id`, `amazon_…_id`).
 - `ad_product` (Text: `SPONSORED_PRODUCTS` | `SPONSORED_BRANDS` | `SPONSORED_DISPLAY`), `state` als Text (neue Amazon-Werte brechen nichts).
 - Jede Entity-Tabelle bekommt unique (`id`, `profile_id`). Interne FKs zur Elternebene (`campaign_id`, `ad_group_id`) und von den
