@@ -3,7 +3,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { RefreshTokenStore } from './access-token';
 import { createAmazonAdsClient } from './client';
-import { AmazonAdsHttpError } from './errors';
+import { AmazonAdsHttpError, AmazonAdsResponseError } from './errors';
 import { createExportRowSchema, EXPORT_CONTENT_TYPES, type AmazonAdsExportType } from './exports';
 import { createRequestMeter } from './http';
 import { parseJsonLossless } from './json';
@@ -94,6 +94,26 @@ describe('requestExport', () => {
     },
   );
 
+  it('wiederholt 429 beim Anfordern', async () => {
+    let calls = 0;
+    server.use(
+      http.post(`${API}/ads/export`, () => {
+        calls += 1;
+        return calls === 1
+          ? HttpResponse.json({ code: 'THROTTLED' }, { status: 429 })
+          : HttpResponse.json({ exportId: 'exp-2', status: 'PROCESSING' }, { status: 202 });
+      }),
+    );
+    const { client } = setup();
+    await expect(
+      client.requestExport(connection, {
+        amazonProfileId: PROFILE_ID,
+        exportType: 'ads',
+        adProduct: 'SPONSORED_PRODUCTS',
+      }),
+    ).resolves.toEqual({ exportId: 'exp-2' });
+  });
+
   it('gibt Ablehnungen (400) als HTTP-Fehler weiter und wiederholt sie nicht', async () => {
     let calls = 0;
     server.use(
@@ -165,6 +185,20 @@ describe('getExport', () => {
       status: 'FAILURE',
       failureReason: 'TIMED_OUT: zu groß',
     });
+  });
+
+  it('wiederholt 429 bei der Status-Abfrage und scheitert laut an einer Antwort ohne Status', async () => {
+    let calls = 0;
+    server.use(
+      http.get(`${API}/exports/:exportId`, () => {
+        calls += 1;
+        if (calls === 1) return HttpResponse.json({ code: 'THROTTLED' }, { status: 429 });
+        return HttpResponse.json(calls === 2 ? { status: 'PROCESSING' } : { exportId: 'x' });
+      }),
+    );
+    const { client } = setup();
+    await expect(client.getExport(connection, ref)).resolves.toEqual({ status: 'PROCESSING' });
+    await expect(client.getExport(connection, ref)).rejects.toBeInstanceOf(AmazonAdsResponseError);
   });
 
   it('meldet 404 als NOT_FOUND', async () => {
@@ -420,6 +454,53 @@ describe('Zeilen-Schemas der Exports', () => {
         extra: { adType: 'PRODUCT_AD', headline: 'Hallo' },
       },
     ]);
+  });
+
+  it('verwirft keine Entity, nur weil Felder für extra eine unerwartete Form haben', () => {
+    const [campaign] = parseRows(
+      'campaigns',
+      `[{"campaignId": 1, "name": "a", "state": "ENABLED",
+         "deliveryReasons": [{"reason": "X"}], "tags": {"k": "v"},
+         "optimization": {"bidStrategy": "LEGACY_FOR_SALES", "placementBidAdjustments": {"placement": "TOP"}}}]`,
+    );
+    expect(campaign?.success).toBe(true);
+    expect(campaign?.data).toMatchObject({
+      biddingStrategy: 'LEGACY_FOR_SALES',
+      extra: { deliveryReasons: [{ reason: 'X' }], tags: { k: 'v' } },
+    });
+    const [ad] = parseRows(
+      'ads',
+      '[{"adId": 1, "adGroupId": 2, "state": "ENABLED", "creative": {"products": "B000TEST01"}}]',
+    );
+    expect(ad?.success).toBe(true);
+    expect(ad?.data).toMatchObject({ asin: null, sku: null });
+  });
+
+  it('loggt einmal, wenn ein Keyword-Target keinen Keyword-Text trägt (andere Form im Export)', () => {
+    const logs: LogEntry[] = [];
+    parseRows(
+      'targets',
+      `[{"targetId": 1, "adGroupId": 2, "campaignId": 3, "state": "ENABLED", "negative": false,
+         "targetType": "KEYWORD", "targetDetails": {"keywordTarget": {"keyword": "x"}}},
+        {"targetId": 4, "adGroupId": 2, "campaignId": 3, "state": "ENABLED", "negative": true,
+         "targetType": "KEYWORD", "targetDetails": {}}]`,
+      logs,
+    );
+    expect(logs.filter((l) => l.msg === 'amazon_ads.unexpected_shape')).toEqual([
+      expect.objectContaining({ operation: 'exports.targets', field: 'targetDetails.keyword' }),
+    ]);
+  });
+
+  it('loggt unbekannte Ad-Typen in Zeilen', () => {
+    const logs: LogEntry[] = [];
+    parseRows(
+      'adGroups',
+      '[{"adGroupId": 1, "campaignId": 2, "adProduct": "SPONSORED_HOLOGRAMS", "name": "a", "state": "ENABLED"}]',
+      logs,
+    );
+    expect(logs).toContainEqual(
+      expect.objectContaining({ field: 'adProduct', value: 'SPONSORED_HOLOGRAMS' }),
+    );
   });
 
   it('lehnt Zeilen ohne Pflicht-ID ab', () => {

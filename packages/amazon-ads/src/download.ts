@@ -16,6 +16,10 @@ import type { Logger } from './logger';
  * Exports `snapshots-prod-<region>.s3.<region>.amazonaws.com`. Andere Hosts werden nicht aufgerufen; ein neuer
  * Bucket-Name fällt so laut auf (Import scheitert), statt Anfragen an unbekannte Hosts zu schicken. Beim ersten
  * echten Lauf (1.10) gegen die EU-Hosts abgleichen.
+ *
+ * Die Liste sagt nichts über den Eigentümer eines Buckets (Bucket-Namen kann jeder anlegen). Sie verhindert
+ * Anfragen an beliebige Hosts; geschützt sind die Tokens dadurch, dass Downloads nie Zugangsdaten senden und
+ * die URL nur aus Amazon-Antworten über TLS stammt.
  */
 export const AMAZON_ADS_DOWNLOAD_HOST_PATTERNS: readonly RegExp[] = [
   /^offline-report-storage-[a-z0-9-]+\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/,
@@ -84,8 +88,26 @@ export async function downloadFile(
     throw new AmazonAdsNetworkError(operation, timedOut, { cause: error });
   }
   if (response.ok && response.body) {
-    options.logger({ level: 'info', msg: 'amazon_ads.request', ...logContext, status: 200 });
+    options.logger({
+      level: 'info',
+      msg: 'amazon_ads.request',
+      ...logContext,
+      status: response.status,
+    });
     return { status: 'ok', body: response.body as unknown as AsyncIterable<Uint8Array> };
+  }
+  if (response.ok) {
+    options.logger({
+      level: 'warn',
+      msg: 'amazon_ads.request_failed',
+      ...logContext,
+      status: response.status,
+      reason: 'empty_body',
+    });
+    throw new AmazonAdsResponseError(
+      `${operation}: Der Download-Host antwortete mit HTTP ${response.status}, aber die Datei ist leer.`,
+      operation,
+    );
   }
   // Fehler-Body verwerfen, ohne auf ihn zu warten (das Abbrechen kann hängen, bis der Server schließt).
   response.body?.cancel().catch(() => {});

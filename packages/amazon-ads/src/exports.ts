@@ -1,13 +1,16 @@
 import { z } from 'zod';
 import type { ConnectionRef } from './access-token';
 import type { AmazonAdsAsyncStatus } from './async-status';
-import type { AdsApiRequest, RequestOptions } from './client';
+import type { AdsEndpointDeps, RequestOptions } from './client';
 import { AmazonAdsHttpError } from './errors';
 import type { Logger } from './logger';
 import { amazonDecimalSchema, currencyCodeSchema } from './money';
 import {
+  amazonDateSchema,
   compact,
   createUnknownValueReporter,
+  extraFieldSchema,
+  KNOWN_AD_PRODUCTS,
   KNOWN_ENTITY_STATES,
   parseAmazonTimestamp,
   type UnknownValueReporter,
@@ -138,16 +141,6 @@ const KNOWN_TARGET_TYPES: ReadonlySet<string> = new Set(Object.keys(TARGET_TYPES
 // Anfordern und Status
 // ---------------------------------------------------------------------------
 
-type RequestFn = <S extends z.ZodType>(
-  connection: ConnectionRef,
-  request: AdsApiRequest<S>,
-) => Promise<z.output<S>>;
-
-interface Deps {
-  request: RequestFn;
-  logger: Logger;
-}
-
 export interface RequestExportInput {
   amazonProfileId: string;
   exportType: AmazonAdsExportType;
@@ -158,7 +151,7 @@ export interface RequestExportInput {
 const requestResponseSchema = z.object({ exportId: z.string().min(1) });
 
 export async function requestExport(
-  deps: Deps,
+  deps: AdsEndpointDeps,
   connection: ConnectionRef,
   input: RequestExportInput,
   options: RequestOptions = {},
@@ -192,7 +185,7 @@ const statusResponseSchema = z.object({
 const RUNNING_EXPORT_STATES: ReadonlySet<string> = new Set(['PROCESSING', 'IN_PROGRESS']);
 
 export async function getExport(
-  deps: Deps,
+  deps: AdsEndpointDeps,
   connection: ConnectionRef,
   input: GetExportInput,
   options: RequestOptions = {},
@@ -252,18 +245,14 @@ export interface ExportRowSchemaOptions {
 
 const optionalId = amazonIdSchema.nullish();
 const optionalText = z.string().nullish();
-const datePrefix = z
-  .string()
-  .nullish()
-  .transform((value) => (value && /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null));
 
 const entityBase = {
   adProduct: optionalText,
   state: z.string().min(1),
-  deliveryStatus: optionalText,
-  deliveryReasons: z.array(z.string()).nullish(),
-  creationDateTime: optionalText,
-  lastUpdatedDateTime: optionalText,
+  deliveryStatus: extraFieldSchema,
+  deliveryReasons: extraFieldSchema,
+  creationDateTime: extraFieldSchema,
+  lastUpdatedDateTime: optionalText.catch(null),
 };
 
 const monetaryBudgetSchema = z.object({
@@ -275,9 +264,9 @@ const monetaryBudgetSchema = z.object({
 const optimizationSchema = z
   .object({
     bidStrategy: optionalText,
-    placementBidAdjustments: z.array(z.unknown()).nullish(),
-    shopperSegmentBidAdjustment: z.array(z.unknown()).nullish(),
-    shopperCohortBidAdjustment: z.array(z.unknown()).nullish(),
+    placementBidAdjustments: extraFieldSchema,
+    shopperSegmentBidAdjustment: extraFieldSchema,
+    shopperCohortBidAdjustment: extraFieldSchema,
   })
   .loose();
 
@@ -286,21 +275,25 @@ const campaignRowSchema = z.object({
   campaignId: amazonIdSchema,
   portfolioId: optionalId,
   name: z.string(),
-  startDate: datePrefix,
-  endDate: datePrefix,
+  startDate: amazonDateSchema,
+  endDate: amazonDateSchema,
   targetingSettings: optionalText,
-  costType: optionalText,
-  brandEntityId: optionalText,
-  // Der Guide zeigt `optimization` teils als Array (generisches Beispiel), teils als Objekt.
-  optimization: z.union([optimizationSchema, z.array(optimizationSchema)]).nullish(),
+  costType: extraFieldSchema,
+  brandEntityId: extraFieldSchema,
+  // Der Guide zeigt `optimization` teils als Array (generisches Beispiel), teils als Objekt. Andere Formen
+  // kosten nur die Gebotsstrategie, nicht die Kampagne.
+  optimization: z
+    .union([optimizationSchema, z.array(optimizationSchema)])
+    .nullish()
+    .catch(null),
   budgetCaps: z
     .object({
       recurrenceTimePeriod: optionalText,
-      budgetType: optionalText,
+      budgetType: extraFieldSchema,
       budgetValue: z.object({ monetaryBudget: monetaryBudgetSchema.nullish() }).nullish(),
     })
     .nullish(),
-  tags: z.array(z.unknown()).nullish(),
+  tags: extraFieldSchema,
 });
 
 const adGroupRowSchema = z.object({
@@ -308,7 +301,7 @@ const adGroupRowSchema = z.object({
   adGroupId: amazonIdSchema,
   campaignId: amazonIdSchema,
   name: z.string(),
-  creativeType: optionalText,
+  creativeType: extraFieldSchema,
   bid: z
     .object({
       defaultBid: amazonDecimalSchema.nullish(),
@@ -336,25 +329,27 @@ const adRowSchema = z.object({
   adId: amazonIdSchema,
   adGroupId: amazonIdSchema,
   campaignId: optionalId,
-  name: optionalText,
-  adType: optionalText,
+  name: extraFieldSchema,
+  adType: extraFieldSchema,
   creative: z
     .object({
       products: z
         .array(z.object({ productIdType: optionalText, productId: optionalText }))
-        .nullish(),
-      headline: optionalText,
+        .nullish()
+        .catch(null),
+      headline: extraFieldSchema,
     })
     .loose()
-    .nullish(),
+    .nullish()
+    .catch(null),
 });
 
 type EntityBaseRow = {
   adProduct?: string | null | undefined;
   state: string;
-  deliveryStatus?: string | null | undefined;
-  deliveryReasons?: string[] | null | undefined;
-  creationDateTime?: string | null | undefined;
+  deliveryStatus?: unknown;
+  deliveryReasons?: unknown;
+  creationDateTime?: unknown;
   lastUpdatedDateTime?: string | null | undefined;
 };
 
@@ -364,6 +359,7 @@ function baseFields(
   unknown: UnknownValueReporter,
 ): Omit<EntityBase, 'extra'> & { extraBase: Record<string, unknown> } {
   unknown.check('state', row.state, KNOWN_ENTITY_STATES);
+  unknown.check('adProduct', row.adProduct, KNOWN_AD_PRODUCTS);
   return {
     adProduct: row.adProduct ?? options.adProduct,
     state: row.state,
@@ -451,12 +447,16 @@ export function createExportRowSchema<T extends AmazonAdsExportType>(
         const { extraBase, ...base } = baseFields(row, options, unknown);
         unknown.check('targetType', row.targetType, KNOWN_TARGET_TYPES);
         const details = row.targetDetails ?? {};
+        const keywordText = typeof details.keyword === 'string' ? details.keyword : null;
+        if (row.targetType === 'KEYWORD' && keywordText === null) {
+          unknown.missing('targetDetails.keyword');
+        }
         const common = {
           amazonTargetId: row.targetId,
           amazonCampaignId: row.campaignId ?? null,
           amazonAdGroupId: row.adGroupId ?? null,
           targetType: TARGET_TYPES[row.targetType] ?? row.targetType.toLowerCase(),
-          keywordText: typeof details.keyword === 'string' ? details.keyword : null,
+          keywordText,
           matchType: typeof details.matchType === 'string' ? details.matchType : null,
           expression: details,
           ...base,

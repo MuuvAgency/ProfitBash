@@ -46,6 +46,18 @@ export interface AdsApiRequest<S extends z.ZodType> {
   meter?: RequestMeter;
 }
 
+/** Aufruf der Ads-API (`AmazonAdsClient.request`), für die Endpunkt-Module. */
+export type AdsRequestFn = <S extends z.ZodType>(
+  connection: ConnectionRef,
+  request: AdsApiRequest<S>,
+) => Promise<z.output<S>>;
+
+/** Was die Endpunkt-Module (Portfolios, Exports, Reports) vom Client brauchen. */
+export interface AdsEndpointDeps {
+  request: AdsRequestFn;
+  logger: Logger;
+}
+
 export interface RequestOptions {
   /** Zähler des aufrufenden Jobs (Anfragen, 429, Wiederholungen). */
   meter?: RequestMeter;

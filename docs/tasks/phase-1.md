@@ -526,6 +526,10 @@ Endpunkte nach F1 (a), siehe ADR 004.
       `product_audience`, `category_audience`, `theme`, `content_category`; Unbekanntes klein durchgereicht und geloggt). `expression` =
       `targetDetails` unverändert (Dezimalzahlen als Quelltext), `keywordText`/`matchType` daraus.
     - Ads → `AmazonAdsProductAd` (ASIN/SKU aus `creative.products`, `adType` in `extra`). SB/SD-Ads (Video usw.) entscheidet 1.9.
+    - Streng geprüft werden nur IDs, Zustand, Name, Beträge und Währungen. Felder, die nur in `extra` landen (Lieferstatus, Tags,
+      Platzierungs-Anpassungen, Creative …), nehmen jede Form an; unlesbare Tage und Zeitpunkte werden `null`. Eine unerwartete Form
+      kostet so höchstens ein Feld, nie die Entity (fehlende Entities gälten in 1.7 als entfernt). Keyword-Targets ohne Keyword-Text
+      loggen einmal `amazon_ads.unexpected_shape` (Hinweis auf eine andere Verschachtelung im echten Export).
     - Zustände und Enum-Werte bleiben in Amazons Schreibweise (`ENABLED` …), wie in den 1.5-Tests. Fehlt `adProduct` in der Zeile,
       gilt der des Auftrags. Unbekannte Werte je Feld und Wert einmal als `amazon_ads.unknown_enum_value`.
   - **Reports** (`reports.ts`): Katalog `REPORT_DEFINITIONS` (Schlüssel = `report_type` der Aufträge): `spCampaigns`, **`spAdGroups`**
@@ -536,7 +540,9 @@ Endpunkte nach F1 (a), siehe ADR 004.
     Name `profitbash <typ> <start>..<ende>` (identisch bei erneutem Anfordern → 425 mit ID); 425 → `AmazonAdsDuplicateReportError`
     (`duplicateOfReportId`). `getReport` → `AmazonAdsAsyncStatus`. `createReportRowSchema(reportType)` → Kennzahlen im eigenen Modell
     (`AmazonAdsCampaignDailyMetric` …, Felder wie die Zeilen von `replaceDailyMetrics`; `unitsSoldClicks*` → `units*`,
-    `attributedSalesSameSku*` → `salesSameSku*`); fehlende Attribution `null`, Zähler als sichere Ganzzahlen, `extra` leer.
+    `attributedSalesSameSku*` → `salesSameSku*`); fehlende Attribution `null`, Zähler als sichere Ganzzahlen (auch negativ: eine
+    Korrektur soll nicht die Zeile samt Kosten verwerfen), `extra` leer. Aus einem gekürzten 425-Text wird keine abgeschnittene ID
+    übernommen (dann `null`).
   - **Mock** (`mock.ts`, `mock-data.ts`): Portfolios (Seiten zu 2), Exports, Reports und S3-Downloads je Mock-Profil, prüft Content-Type
     (415) und Accept (406) wie Amazon. Daten deterministisch: IDs = Profil-ID + Nummer (beim DE-Profil über `MAX_SAFE_INTEGER`), drei
     Kampagnen (eine archiviert), Negatives auf beiden Ebenen, Vendor ohne SKU, Tage ohne Aktivität fehlen, Kampagnen = Summe der Ad Groups,
@@ -547,6 +553,8 @@ Endpunkte nach F1 (a), siehe ADR 004.
   - **Port** (`apps/worker/src/amazon-requests/amazon-port.ts`): `createAmazonRequestPort({ client, connection, amazonProfileIds, meter,
     logger, import })` erfüllt `AmazonRequestPort` aus 1.4. `amazonProfileIds`: interne Profil-ID → Amazon-Profil-ID aller Profile der
     Connection (1.7 lädt sie im Poll-Lauf). `import` liefert 1.7 (Abbildung auf die DB-Typen, `replaceDailyMetrics`, Entity-Upserts).
+    Ein Test im Worker prüft per Typecheck, dass das Modell ohne Umbau auf die DB-Typen aus 1.5 passt (bei Targets, Negatives und Product
+    Ads mit ergänzter Kampagne).
   - **Für 1.7:**
     - Entity-Batch-Import: Zeilen kommen als `AmazonAdsCampaign`/`…AdGroup`/`AmazonAdsExportedTarget`/`…ProductAd`. Kampagne für Ads
       (und SB/SD-Targets) über die Ad Groups des Batches ergänzen; fehlt die Ad Group im Batch, die Zeile als ungültig zählen oder über
@@ -554,6 +562,18 @@ Endpunkte nach F1 (a), siehe ADR 004.
     - Report-Import: `REPORT_DEFINITIONS[reportType].level` wählt `replaceDailyMetrics({ level, rows })`; die Zeilen passen ohne Umbau.
     - Historie (F4): Stücke je Report-Typ nur bis `retentionDays` zurück (`spSearchTerm` 65 Tage).
     - Rund 20 Report-Aufträge beim ersten SP-Sync je Profil und das Export-Limit (5 laufend je Endpunkt) beim Planen berücksichtigen.
+    - **Kein `removed_at` aus einem Batch mit ungültigen Zeilen** (wie „kein Löschen bei `invalidRowCount > 0`“ bei Kennzahlen): Eine
+      ungültige Zeile ist eine Entity, die im Batch fehlt, obwohl es sie gibt.
+    - Programmierfehler im Port (Profil nicht in `amazonProfileIds`, Report- oder Export-Typ nicht im Katalog, Zeitraum über 31 Tage)
+      werfen einfache Fehler, die die Zustandsmaschine wie vorübergehende behandelt (10 Versuche, rund 2 h). 1.7 legt Aufträge nur aus dem
+      Katalog und in 31-Tage-Stücken an.
+  - Review (unabhängig): Übernommen: Felder nur für `extra` tolerant statt streng (sonst verschwänden Entities bei einer anderen Form),
+    Log bei Keyword-Targets ohne Keyword-Text, keine abgeschnittene ID aus gekürztem 425-Text, negative Zähler erlaubt, 429-Tests je
+    Endpunkt, leerer Download-Body als Fehler, Budget-Tage der Portfolios normalisiert, unbekannte Ad-Typen geloggt, gemeinsamer
+    `AdsEndpointDeps`-Typ, Typ-Vertrag zu den DB-Typen, Hinweis zur Bedeutung der Host-Liste. Zurückgewiesen: eigene, nicht wiederholbare
+    Fehlerklasse für Programmierfehler im Port (tritt nur bei Fehlern in 1.7 auf, die Tests dort fangen; die Zustandsmaschine müsste dafür
+    eine neue Fehlerart kennen). Offen gelassen: Enum-Prüfung für `matchType`, `targetingSettings` und Budget-Wiederholung (viele,
+    je Ad-Typ verschiedene Werte; ohne echte Daten eher Rauschen).
 
 ### 1.7 Jobs (`apps/worker`)
 Alle Datenjobs nehmen die Lease der Connection (1.3) und bleiben **kurz**: Ein Lauf erledigt eine begrenzte Menge Arbeit und plant bei
@@ -616,7 +636,10 @@ Nach F11.
       Content-Types, Laufzeiten, 429-Quote, ob Amazon offene Reports je Profil begrenzt (der erste SP-Sync fordert rund 20 an), ob `targetId`
       im Export der `keywordId` bzw. `targetId` in `spTargeting`/`spSearchTerm` entspricht, ob sich Amazon-IDs über Ad-Typen eines Profils
       überschneiden können. Aus 1.6: Download-Hosts der EU (`AMAZON_ADS_DOWNLOAD_HOST_PATTERNS`), Format des 425-Texts (Report-ID),
-      Export-Status-Schreibweise, ob SP-Product-Ads im Export ASIN und SKU tragen, Limit von 5 laufenden Exports je Endpunkt.
+      Export-Status-Schreibweise, ob SP-Product-Ads im Export ASIN und SKU tragen, Limit von 5 laufenden Exports je Endpunkt,
+      Form von `targetDetails` (flach oder verschachtelt, Log `amazon_ads.unexpected_shape`), `startDate` vs. `startDateTime` bei Kampagnen,
+      ob `spSearchTerm` für Auto- und Produkt-Targets immer `keywordId` liefert, ob Vendor-Profile `advertisedSku` und die Same-SKU-Spalten
+      in `spAdvertisedProduct` annehmen (ein 400 dort ließe Vendor-Reports dauerhaft scheitern).
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
 ### 1.11 Datei-Import (optional, nur mit Auslöser)
