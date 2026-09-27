@@ -310,7 +310,7 @@ export async function requestReport(
  */
 export function duplicateReportId(detail: string | null): string | null {
   if (!detail) return null;
-  const explicit = /duplicate of\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]{7,})/i.exec(detail);
+  const explicit = /duplicate of\s*:?\s*([A-Za-z0-9][A-Za-z0-9_-]{7,})/i.exec(detail);
   if (explicit) return explicit[1]!;
   const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(detail);
   return uuid ? uuid[0] : null;
