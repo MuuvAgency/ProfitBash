@@ -1,19 +1,47 @@
-import { AMAZON_ADS_OAUTH_NONCE_PREFIX, schema } from '@profitbash/db';
+import {
+  AMAZON_ADS_OAUTH_NONCE_PREFIX,
+  createAmazonRequest,
+  schema,
+  updateAmazonRequest,
+} from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import { asc } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createConnection, createOrganization } from '../testing';
 import { cleanupJobRuns } from './job-runs-cleanup';
 
-const { jobRuns, verifications } = schema;
+const { amazonAdsProfiles, amazonAdsReportRequests, jobRuns, verifications } = schema;
 
 const DAY = 24 * 60 * 60 * 1000;
 const now = new Date('2026-09-26T03:30:00Z');
 const ago = (ms: number) => new Date(now.getTime() - ms);
 
 let testDb: TestDatabase;
+let organizationId = '';
+let profileId = '';
 
 beforeAll(async () => {
   testDb = await createTestDatabase();
+  organizationId = await createOrganization(testDb.db, 'muuv');
+  const connectionId = await createConnection(testDb.db, {
+    organizationId,
+    externalAccountId: 'amzn1.account.A',
+  });
+  const [profile] = await testDb.db
+    .insert(amazonAdsProfiles)
+    .values({
+      organizationId,
+      connectionId,
+      amazonProfileId: '111',
+      accountName: 'Konto',
+      countryCode: 'DE',
+      currencyCode: 'EUR',
+      timezone: 'Europe/Berlin',
+      accountType: 'seller',
+    })
+    .returning({ id: amazonAdsProfiles.id });
+  if (!profile) throw new Error('Profil fehlt');
+  profileId = profile.id;
 });
 
 afterAll(async () => {
@@ -23,6 +51,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await testDb.db.delete(jobRuns);
   await testDb.db.delete(verifications);
+  await testDb.db.delete(amazonAdsReportRequests);
 });
 
 describe('cleanupJobRuns', () => {
@@ -82,5 +111,39 @@ describe('cleanupJobRuns', () => {
       'email-verification:x',
     ]);
     expect(outcome.counters).toMatchObject({ deletedOAuthNonces: 1 });
+  });
+
+  it('löscht abgeschlossene Amazon-Aufträge, die älter als 30 Tage sind (F5)', async () => {
+    const request = async (
+      reportType: string,
+      createdAgo: number,
+      status?: 'imported' | 'failed',
+    ) => {
+      const { request: row } = await createAmazonRequest(testDb.db, {
+        organizationId,
+        profileId,
+        kind: 'report',
+        adProduct: 'SPONSORED_PRODUCTS',
+        reportType,
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+        batchId: null,
+        now: ago(createdAgo),
+      });
+      if (status) await updateAmazonRequest(testDb.db, row, { status });
+      return row;
+    };
+    await request('alt-importiert', 31 * DAY, 'imported');
+    await request('alt-gescheitert', 31 * DAY, 'failed');
+    const open = await request('alt-offen', 31 * DAY);
+    const recent = await request('neu', 29 * DAY, 'imported');
+
+    const outcome = await cleanupJobRuns({ db: testDb.db, now: () => now });
+
+    const rows = await testDb.db
+      .select({ id: amazonAdsReportRequests.id })
+      .from(amazonAdsReportRequests);
+    expect(rows.map((row) => row.id).sort()).toEqual([open.id, recent.id].sort());
+    expect(outcome.counters).toMatchObject({ deletedAmazonRequests: 2 });
   });
 });
