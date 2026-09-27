@@ -2,6 +2,7 @@
 import type { JobRun } from '@profitbash/shared';
 import type {
   ColDef,
+  ColumnResizedEvent,
   GetRowIdParams,
   GridApi,
   GridReadyEvent,
@@ -44,31 +45,59 @@ const AUTO_SIZED = ['status', 'job', 'startedAt', 'duration'];
 const AUTO_SIZE_PADDING = 4;
 
 /**
- * Mindestbreite des Grids = angepasste Spalten + Mindestbreiten der Flex-Spalten. Darunter scrollt die
- * Tabelle im Container der Seite, statt Spalten zu beschneiden.
+ * Mindestbreite des Grids = Breiten der festen Spalten + Mindestbreiten der Flex-Spalten. Darunter scrollt
+ * die Tabelle im Container der Seite, statt Spalten zu beschneiden.
  */
 const minWidth = ref<number>();
 
-/**
- * Nach `modelUpdated`: Dann stehen alle Zeilen im DOM (`rowDataUpdated` kommt, bevor sie gezeichnet
- * sind; ohne Zeilen-Virtualisierung auch die außerhalb des Fensters). Neue Läufe können längere Inhalte
- * bringen; manuell geänderte Breiten dieser Spalten gehen dabei verloren.
- */
+function updateMinWidth(api: GridApi<JobRun>) {
+  minWidth.value = api
+    .getAllDisplayedColumns()
+    .reduce(
+      (sum, column) => sum + (column.getFlex() ? column.getMinWidth() : column.getActualWidth()),
+      0,
+    );
+}
+
 function fitContents(api: GridApi<JobRun>) {
   if (api.isDestroyed()) return;
   api.autoSizeColumns(AUTO_SIZED);
-  minWidth.value = (api.getColumns() ?? []).reduce(
-    (sum, column) => sum + (column.getFlex() ? column.getMinWidth() : column.getActualWidth()),
-    0,
-  );
+  updateMinWidth(api);
 }
 
-/** Gemessen mit der Ersatzschrift wäre der Zeitstempel in JetBrains Mono zu schmal: nach dem Laden neu. */
+/**
+ * Angepasst wird nur nach neuen Zeilen (auch nach einem Filterwechsel), nicht bei jedem `modelUpdated`:
+ * Das kommt auch beim Sortieren und wenn aufgeklappte Fehler die Zeilenhöhe ändern und nähme sonst
+ * manuell geänderte Breiten zurück. Gemessen wird erst im `modelUpdated` danach, weil
+ * `rowDataUpdated` kommt, bevor die Zeilen im DOM stehen. Ohne Zeilen-Virtualisierung sind das alle
+ * Zeilen; sonst zeichnet AG Grid sie in Etappen und die Messung sähe nur die ersten.
+ */
+let fitPending = true;
+
+const onRowDataUpdated = () => {
+  fitPending = true;
+};
+
+function onModelUpdated({ api }: ModelUpdatedEvent<JobRun>) {
+  if (!fitPending) return;
+  fitPending = false;
+  fitContents(api);
+}
+
+function onColumnResized({ api, finished }: ColumnResizedEvent<JobRun>) {
+  if (finished) updateMinWidth(api);
+}
+
+/**
+ * Gemessen mit der Ersatzschrift wäre der Zeitstempel zu schmal. Die Mono-Schrift lädt der Browser erst,
+ * wenn die Tabelle sie braucht (`document.fonts.ready` ist dann meist schon erfüllt): gezielt laden,
+ * danach neu anpassen.
+ */
 function onGridReady({ api }: GridReadyEvent<JobRun>) {
-  void document.fonts?.ready.then(() => fitContents(api));
+  const mono = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();
+  if (!mono || !document.fonts) return;
+  void document.fonts.load(`1em ${mono}`).then(() => fitContents(api));
 }
-
-const onModelUpdated = ({ api }: ModelUpdatedEvent<JobRun>) => fitContents(api);
 
 const columnDefs = computed<ColDef<JobRun>[]>(() => [
   {
@@ -171,6 +200,8 @@ onBeforeUnmount(() => clearInterval(tick));
     :default-col-def="defaultColDef"
     :auto-size-padding="AUTO_SIZE_PADDING"
     @grid-ready="onGridReady"
+    @row-data-updated="onRowDataUpdated"
     @model-updated="onModelUpdated"
+    @column-resized="onColumnResized"
   />
 </template>

@@ -248,6 +248,16 @@ describe('SyncStatusPage', () => {
     expect(counters.attributes('title')).toBe(counters.text());
   });
 
+  it('gibt der Tabelle eine Mindestbreite aus den Spalten, darunter scrollt die Seite', async () => {
+    stubFetch(routes([succeeded]));
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, succeeded);
+
+    const grid = wrapper.get('section[role="region"]').element.firstElementChild as HTMLElement;
+    // Mindestens die Mindestbreiten von Amazon-Konto (220) und Ergebnis (300).
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThanOrEqual(520));
+  });
+
   it('zeigt statt einer fehlenden Connection den Platzhalter', async () => {
     const orphan = jobRunFixture({ connection: null });
     stubFetch(routes([orphan]));
