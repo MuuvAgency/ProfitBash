@@ -95,12 +95,13 @@ async function importReport(
     // Das Zeilen-Schema des Report-Typs (Port, 1.6) liefert genau die Zeilen dieser Ebene.
     ...({ level, rows: input.rows } as DailyMetricsRows),
   });
-  // „Daten bis“ (1.8) aus dem Kampagnen-Report: Das Ende des Auftrags, nicht das der `ranges`. Tage
-  // außerhalb der `ranges` deckt ein neuerer, schon importierter Report ab.
+  // „Daten bis“ (1.8) je Ad-Typ aus dem Kampagnen-Report: Das Ende des Auftrags, nicht das der
+  // `ranges`. Tage außerhalb der `ranges` deckt ein neuerer, schon importierter Report ab.
   if (level === 'campaign' && request.endDate) {
     await markMetricsImportedThrough(tx, {
       organizationId: request.organizationId,
       profileId: request.profileId,
+      adProduct: request.adProduct,
       date: request.endDate,
     });
   }

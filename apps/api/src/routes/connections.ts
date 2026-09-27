@@ -1,6 +1,8 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
+import { REPORT_AD_PRODUCTS } from '@profitbash/amazon-ads';
 import {
   canSeeProfile,
+  metricsImportedThroughSql,
   recordAuditEvent,
   schema,
   visibleProfilesScope,
@@ -96,10 +98,14 @@ const profileColumns = {
   isHidden: amazonAdsProfiles.isHidden,
   removedAt: amazonAdsProfiles.removedAt,
   syncedAt: amazonAdsProfiles.syncedAt,
-  metricsImportedThrough: amazonAdsProfiles.metricsImportedThrough,
+  // „Daten bis“: Minimum über die Ad-Typen, für die der Sync Reports anfordert.
+  metricsImportedThrough: metricsImportedThroughSql(REPORT_AD_PRODUCTS),
 };
 
-type ProfileRow = Pick<typeof amazonAdsProfiles.$inferSelect, keyof typeof profileColumns>;
+type ProfileRow = Pick<
+  typeof amazonAdsProfiles.$inferSelect,
+  Exclude<keyof typeof profileColumns, 'metricsImportedThrough'>
+> & { metricsImportedThrough: string | null };
 
 function toProfile(row: ProfileRow): Profile {
   return { ...row, removedAt: toIso(row.removedAt), syncedAt: toIso(row.syncedAt) };

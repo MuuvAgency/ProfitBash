@@ -11,7 +11,14 @@ import {
   type TestContext,
 } from '../testing';
 
-const { amazonAdsProfiles, auditEvents, clients, connections, organizations } = schema;
+const {
+  amazonAdsProfileMetricsImportedThrough,
+  amazonAdsProfiles,
+  auditEvents,
+  clients,
+  connections,
+  organizations,
+} = schema;
 
 let ctx: TestContext;
 let admin: string;
@@ -107,11 +114,7 @@ beforeAll(async () => {
     .insert(amazonAdsProfiles)
     .values([
       profileRow(orgId, ids.connection, '9007199254740993'),
-      {
-        ...profileRow(orgId, ids.connection, '2222222222222222'),
-        isHidden: true,
-        metricsImportedThrough: '2026-09-26',
-      },
+      { ...profileRow(orgId, ids.connection, '2222222222222222'), isHidden: true },
       { ...profileRow(orgId, ids.connection, '3333333333333333'), removedAt: new Date() },
       profileRow(otherOrgId, ids.otherOrgConnection, '4444444444444444'),
     ])
@@ -120,6 +123,22 @@ beforeAll(async () => {
   ids.hidden = hidden!.id;
   ids.removed = removed!.id;
   ids.otherOrgProfile = otherOrgProfile!.id;
+
+  // „Daten bis“ je Ad-Typ: Der Sync fordert Reports nur für SP an, SB zählt nicht.
+  await db.insert(amazonAdsProfileMetricsImportedThrough).values([
+    {
+      organizationId: orgId,
+      profileId: ids.hidden,
+      adProduct: 'SPONSORED_PRODUCTS',
+      importedThrough: '2026-09-26',
+    },
+    {
+      organizationId: orgId,
+      profileId: ids.visible,
+      adProduct: 'SPONSORED_BRANDS',
+      importedThrough: '2026-09-26',
+    },
+  ]);
 });
 
 afterAll(async () => {
@@ -289,7 +308,7 @@ describe('GET /api/connections/:id/profiles', () => {
       metricsImportedThrough: null,
     });
     expect(profiles.find((p) => p.id === ids.removed)?.removedAt).toMatch(/Z$/);
-    // „Daten bis“ (1.8): Tag im Format YYYY-MM-DD, kein Zeitstempel.
+    // „Daten bis“ (1.8): Tag im Format YYYY-MM-DD, kein Zeitstempel; aus den Ad-Typen des Syncs.
     expect(profiles.find((p) => p.id === ids.hidden)?.metricsImportedThrough).toBe('2026-09-26');
   });
 
@@ -339,7 +358,10 @@ describe('PATCH /api/profiles/:id', () => {
   });
 
   it('erlaubt Änderungen an ausgeblendeten und entfernten Profilen', async () => {
-    expect((await patch(ids.hidden, { isHidden: false })).status).toBe(200);
+    const shown = await patch(ids.hidden, { isHidden: false });
+    expect(shown.status).toBe(200);
+    // Die Antwort trägt „Daten bis“ wie die Liste.
+    expect((await readJson<Profile>(shown)).metricsImportedThrough).toBe('2026-09-26');
     expect((await patch(ids.removed, { clientId: ids.client })).status).toBe(200);
     await patch(ids.hidden, { isHidden: true });
   });

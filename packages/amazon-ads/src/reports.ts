@@ -154,6 +154,14 @@ export const REPORT_TYPES_BY_AD_PRODUCT = {
   ],
 } as const satisfies Record<string, readonly AmazonAdsReportType[]>;
 
+/**
+ * Ad-Typen, für die der Sync Reports anfordert (F2: SP zuerst; SB und SD folgen mit 1.9). Auch die
+ * Anzeige „Daten bis“ rechnet über genau diese Ad-Typen.
+ */
+export const REPORT_AD_PRODUCTS = Object.keys(REPORT_TYPES_BY_AD_PRODUCT) as ReadonlyArray<
+  keyof typeof REPORT_TYPES_BY_AD_PRODUCT
+>;
+
 /** Report-Typen eines Ad-Typs; leer für Ad-Typen ohne Reports im Katalog. */
 export function reportTypesFor(adProduct: string): readonly AmazonAdsReportType[] {
   return Object.hasOwn(REPORT_TYPES_BY_AD_PRODUCT, adProduct)

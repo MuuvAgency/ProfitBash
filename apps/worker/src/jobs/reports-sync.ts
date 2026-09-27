@@ -1,5 +1,6 @@
 import {
   MAX_REPORT_DAYS,
+  REPORT_AD_PRODUCTS,
   REPORT_DEFINITIONS,
   reportTypesFor,
   type AmazonAdsReportType,
@@ -38,8 +39,6 @@ import {
   type LoadedConnection,
 } from './connection-job';
 
-/** Ad-Typen der Reports (F2: SP zuerst; SB und SD folgen mit 1.9). */
-export const REPORT_AD_PRODUCTS = ['SPONSORED_PRODUCTS'] as const;
 /** Tage, die der tägliche Import neu lädt (F3), bis einschließlich gestern (F9). */
 export const ROLLING_WINDOW_DAYS = 30;
 /**

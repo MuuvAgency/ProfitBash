@@ -85,6 +85,13 @@
       "when": 1790530751476,
       "tag": "0011_amazon_ads_profiles_metrics_imported_through",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790538783562,
+      "tag": "0012_amazon_ads_profile_metrics_imported_through",
+      "breakpoints": true
     }
   ]
 }

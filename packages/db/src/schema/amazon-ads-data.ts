@@ -9,6 +9,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -414,5 +415,29 @@ export const amazonAdsSearchTermDailyMetrics = pgTable(
       t.searchTerm,
     ),
     index('amazon_ads_search_term_daily_metrics_profile_date_idx').on(t.profileId, t.date),
+  ],
+);
+
+/**
+ * „Daten bis“ je Profil und Ad-Typ (1.8, je Ad-Typ seit 1.9): Ende des zuletzt importierten
+ * Kampagnen-Reports, rückt nur vor. Bewusst nicht `max(date)` der Kennzahlen (ein pausiertes Profil
+ * hätte sonst ein altes Datum). Angezeigt wird das Minimum über die Ad-Typen des Syncs
+ * (`metricsImportedThroughSql`): Ein hängender Ad-Typ bremst die Anzeige.
+ */
+export const amazonAdsProfileMetricsImportedThrough = pgTable(
+  'amazon_ads_profile_metrics_imported_through',
+  {
+    organizationId: organizationId(),
+    profileId: profileId(),
+    adProduct: adProduct(),
+    /** Tag in der Zeitzone des Profils. */
+    importedThrough: date('imported_through', { mode: 'string' }).notNull(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'amazon_ads_profile_metrics_imported_through_pk',
+      columns: [t.profileId, t.adProduct],
+    }),
+    profileFk('amazon_ads_profile_metrics_imported_through', t.profileId, t.organizationId),
   ],
 );

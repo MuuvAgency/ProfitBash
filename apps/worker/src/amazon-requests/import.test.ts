@@ -22,6 +22,7 @@ const {
   amazonAdsCampaigns,
   amazonAdsNegativeTargets,
   amazonAdsProductAds,
+  amazonAdsProfileMetricsImportedThrough,
   amazonAdsProfiles,
   amazonAdsTargets,
 } = schema;
@@ -402,7 +403,7 @@ describe('Import eines Reports', () => {
   });
 });
 
-describe('„Daten bis“ am Profil', () => {
+describe('„Daten bis“ je Profil und Ad-Typ', () => {
   const campaignRow = (date: string): AmazonAdsCampaignDailyMetric => ({
     date,
     amazonCampaignId: 'c-1',
@@ -425,12 +426,17 @@ describe('„Daten bis“ am Profil', () => {
     extra: {},
   });
 
+  /** Tag des Ad-Typs SP; andere Ad-Typen dürfen keinen Tag haben. */
   async function importedThrough() {
-    const [row] = await testDb.db
-      .select({ date: amazonAdsProfiles.metricsImportedThrough })
-      .from(amazonAdsProfiles)
-      .where(eq(amazonAdsProfiles.id, profileId));
-    return row!.date;
+    const marks = await testDb.db
+      .select({
+        adProduct: amazonAdsProfileMetricsImportedThrough.adProduct,
+        date: amazonAdsProfileMetricsImportedThrough.importedThrough,
+      })
+      .from(amazonAdsProfileMetricsImportedThrough)
+      .where(eq(amazonAdsProfileMetricsImportedThrough.profileId, profileId));
+    expect(marks.filter((mark) => mark.adProduct !== SP)).toEqual([]);
+    return marks[0]?.date ?? null;
   }
 
   function importReport(
@@ -453,9 +459,8 @@ describe('„Daten bis“ am Profil', () => {
 
   beforeEach(async () => {
     await testDb.db
-      .update(amazonAdsProfiles)
-      .set({ metricsImportedThrough: null })
-      .where(eq(amazonAdsProfiles.id, profileId));
+      .delete(amazonAdsProfileMetricsImportedThrough)
+      .where(eq(amazonAdsProfileMetricsImportedThrough.profileId, profileId));
   });
 
   it('setzt das Ende des Kampagnen-Reports, auch wenn neuere Reports einen Teil schon abdecken', async () => {

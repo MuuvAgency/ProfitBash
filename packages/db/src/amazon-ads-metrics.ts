@@ -1,4 +1,4 @@
-import { and, between, eq, getTableColumns, or, sql, type SQL } from 'drizzle-orm';
+import { and, between, eq, getTableColumns, inArray, or, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import {
   ensureAdGroups,
@@ -14,6 +14,7 @@ import {
   amazonAdsAdGroupDailyMetrics,
   amazonAdsCampaignDailyMetrics,
   amazonAdsProductAdDailyMetrics,
+  amazonAdsProfileMetricsImportedThrough,
   amazonAdsProfiles,
   amazonAdsSearchTermDailyMetrics,
   amazonAdsTargetDailyMetrics,
@@ -138,28 +139,58 @@ export interface ReplaceDailyMetricsResult {
 }
 
 /**
- * Merkt „Daten bis“ am Profil (1.8): der letzte Tag eines importierten Kampagnen-Reports. Rückt nur vor
- * (`greatest`), damit ein später importiertes Stück der Historie das Datum nicht zurücksetzt. `updated_at`
- * bleibt unverändert: Das ist ein Datenstand, keine Änderung der Stammdaten.
+ * Merkt „Daten bis“ je Profil und Ad-Typ (1.8, je Ad-Typ seit 1.9): der letzte Tag eines importierten
+ * Kampagnen-Reports. Rückt nur vor (`greatest`), damit ein später importiertes Stück der Historie das
+ * Datum nicht zurücksetzt. Das Profil selbst (auch `updated_at`) bleibt unverändert.
  */
 export async function markMetricsImportedThrough(
   db: DbOrTx,
-  input: { organizationId: string; profileId: string; date: string },
+  input: { organizationId: string; profileId: string; adProduct: string; date: string },
 ): Promise<void> {
-  const updated = await db
-    .update(amazonAdsProfiles)
-    .set({
-      metricsImportedThrough: sql`greatest(${amazonAdsProfiles.metricsImportedThrough}, ${input.date}::date)`,
-      updatedAt: sql`${amazonAdsProfiles.updatedAt}`,
-    })
-    .where(
-      and(
-        eq(amazonAdsProfiles.id, input.profileId),
-        eq(amazonAdsProfiles.organizationId, input.organizationId),
-      ),
+  const marks = amazonAdsProfileMetricsImportedThrough;
+  // Aus dem Profil derselben Organisation gewählt: Ein fremdes Profil ergibt keine Zeile.
+  const inserted = await db
+    .insert(marks)
+    .select(
+      db
+        .select({
+          organizationId: amazonAdsProfiles.organizationId,
+          profileId: amazonAdsProfiles.id,
+          adProduct: sql`${input.adProduct}::text`.as('ad_product'),
+          importedThrough: sql`${input.date}::date`.as('imported_through'),
+        })
+        .from(amazonAdsProfiles)
+        .where(
+          and(
+            eq(amazonAdsProfiles.id, input.profileId),
+            eq(amazonAdsProfiles.organizationId, input.organizationId),
+          ),
+        ),
     )
-    .returning({ id: amazonAdsProfiles.id });
-  if (updated.length === 0) throw new ProfileNotFoundError();
+    .onConflictDoUpdate({
+      target: [marks.profileId, marks.adProduct],
+      set: { importedThrough: sql`greatest(${marks.importedThrough}, excluded.imported_through)` },
+    })
+    .returning({ profileId: marks.profileId });
+  if (inserted.length === 0) throw new ProfileNotFoundError();
+}
+
+/**
+ * „Daten bis“ eines Profils für ein `select` über `amazon_ads_profiles`: das Minimum über die
+ * übergebenen Ad-Typen (die der Sync anfordert), leer, solange einem davon ein Tag fehlt. So bremst ein
+ * hängender Ad-Typ die Anzeige, statt hinter dem Stand der anderen zu verschwinden.
+ */
+export function metricsImportedThroughSql(adProducts: readonly string[]): SQL<string | null> {
+  const marks = amazonAdsProfileMetricsImportedThrough;
+  const unique = [...new Set(adProducts)];
+  if (unique.length === 0) return sql<null>`null::text`;
+  // Als Text (`YYYY-MM-DD`): Ein Tag ohne Uhrzeit, keine Umrechnung durch den Treiber.
+  return sql<string | null>`(
+    select case when count(*) = ${unique.length} then min(${marks.importedThrough})::text end
+    from ${marks}
+    where ${marks.profileId} = ${amazonAdsProfiles.id}
+      and ${inArray(marks.adProduct, unique)}
+  )`;
 }
 
 /**
