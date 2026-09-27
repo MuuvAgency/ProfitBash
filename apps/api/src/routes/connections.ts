@@ -14,6 +14,7 @@ import {
   profileListSchema,
   profilePatchSchema,
   profileSchema,
+  refreshTokenExpiresAt,
   syncQueuedSchema,
   type Connection,
   type Profile,
@@ -43,6 +44,7 @@ const connectionColumns = {
   externalAccountEmail: connections.externalAccountEmail,
   status: connections.status,
   lastRefreshedAt: connections.lastRefreshedAt,
+  consentedAt: connections.consentedAt,
   createdAt: connections.createdAt,
   updatedAt: connections.updatedAt,
 };
@@ -70,6 +72,8 @@ function toConnection(row: ConnectionRow): Connection {
   return {
     ...row,
     lastRefreshedAt: toIso(row.lastRefreshedAt),
+    consentedAt: toIso(row.consentedAt),
+    refreshTokenExpiresAt: toIso(refreshTokenExpiresAt(row.consentedAt)),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

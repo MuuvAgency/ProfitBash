@@ -202,6 +202,8 @@ export function registerAmazonOAuthRoutes(app: OpenAPIHono<AppEnv>, deps: AppDep
       keyring,
       aad: connectionTokenAad(naturalKey),
     });
+    // Jede Einwilligung (Anlage oder Neu-Verbinden) startet die 365 Tage des Refresh-Tokens neu.
+    const consentedAt = new Date();
     const connection = await db.transaction(async (tx) => {
       const [row] = await tx
         .insert(connections)
@@ -210,7 +212,8 @@ export function registerAmazonOAuthRoutes(app: OpenAPIHono<AppEnv>, deps: AppDep
           externalAccountEmail: identity.email,
           refreshTokenEncrypted,
           status: 'active',
-          lastRefreshedAt: new Date(),
+          lastRefreshedAt: consentedAt,
+          consentedAt,
           createdBy: state.userId,
         })
         .onConflictDoUpdate({
@@ -224,7 +227,8 @@ export function registerAmazonOAuthRoutes(app: OpenAPIHono<AppEnv>, deps: AppDep
             externalAccountEmail: identity.email,
             refreshTokenEncrypted,
             status: 'active',
-            lastRefreshedAt: new Date(),
+            lastRefreshedAt: consentedAt,
+            consentedAt,
           },
         })
         // xmax = 0 nur bei frisch eingefügten Zeilen (Postgres-Systemspalte).
@@ -240,6 +244,7 @@ export function registerAmazonOAuthRoutes(app: OpenAPIHono<AppEnv>, deps: AppDep
           provider: naturalKey.provider,
           region: naturalKey.region,
           externalAccountId: naturalKey.externalAccountId,
+          consentedAt: consentedAt.toISOString(),
         },
       });
       return row;

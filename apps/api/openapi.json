@@ -489,6 +489,20 @@
             ],
             "format": "date-time"
           },
+          "consentedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "refreshTokenExpiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -506,6 +520,8 @@
           "externalAccountEmail",
           "status",
           "lastRefreshedAt",
+          "consentedAt",
+          "refreshTokenExpiresAt",
           "createdAt",
           "updatedAt"
         ]

@@ -1,0 +1,1 @@
+ALTER TABLE "connections" ADD COLUMN "consented_at" timestamp with time zone;

@@ -234,6 +234,10 @@ export const connectionSchema = z
     externalAccountEmail: z.string().nullable(),
     status: z.enum(CONNECTION_STATUSES),
     lastRefreshedAt: timestamp.nullable(),
+    /** Letzte Einwilligung (Anlage oder Neu-Verbinden); leer bei Connections von vor 1.2. */
+    consentedAt: timestamp.nullable(),
+    /** Ablauf des Refresh-Tokens: `consentedAt` + 365 Tage, abgeleitet; ohne Einwilligung unbekannt. */
+    refreshTokenExpiresAt: timestamp.nullable(),
     createdAt: timestamp,
     updatedAt: timestamp,
   })

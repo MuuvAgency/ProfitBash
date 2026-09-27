@@ -79,6 +79,7 @@ beforeAll(async () => {
       {
         ...connectionRow(orgId, 'amzn1.account.EINS'),
         createdAt: new Date('2026-09-01T10:00:00Z'),
+        consentedAt: new Date('2026-09-01T10:00:05Z'),
       },
       {
         ...connectionRow(orgId, 'amzn1.account.ZWEI'),
@@ -167,10 +168,23 @@ describe('GET /api/connections', () => {
       externalAccountEmail: 'amzn1.account.EINS@amazon.test',
       status: 'active',
       lastRefreshedAt: null,
+      consentedAt: '2026-09-01T10:00:05.000Z',
+      refreshTokenExpiresAt: '2027-09-01T10:00:05.000Z',
       createdAt: expect.stringMatching(/Z$/),
       updatedAt: expect.stringMatching(/Z$/),
     });
-    expect(JSON.stringify(body)).not.toContain('refreshToken');
+    expect(JSON.stringify(body)).not.toContain('refreshTokenEncrypted');
+    expect(JSON.stringify(body)).not.toContain('v1:k1:');
+  });
+
+  it('meldet den Ablauf ohne Einwilligungszeitpunkt als unbekannt (null)', async () => {
+    const res = await request(ctx, '/api/connections', { cookie: admin });
+    const body = await readJson<{ connections: Record<string, unknown>[] }>(res);
+    expect(body.connections[1]).toMatchObject({
+      externalAccountId: 'amzn1.account.ZWEI',
+      consentedAt: null,
+      refreshTokenExpiresAt: null,
+    });
   });
 });
 
