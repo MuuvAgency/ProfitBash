@@ -29,3 +29,32 @@ export function subtractDateRanges(range: DateRange, covered: readonly DateRange
   if (next <= last) result.push({ startDate: fromDay(next), endDate: fromDay(last) });
   return result;
 }
+
+/** Tag `date` plus `days` Tage (negativ: zurück). */
+export function addDays(date: string, days: number): string {
+  return fromDay(toDay(date) + days);
+}
+
+/** Heutiger Kalendertag in der Zeitzone `timeZone` (IANA). Unbekannte Zeitzonen werfen `RangeError`. */
+export function todayIn(timeZone: string, now: Date): string {
+  // `en-CA` formatiert als `YYYY-MM-DD`.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+/** Teilt `range` von vorn in Stücke von höchstens `maxDays` Tagen. */
+export function splitDateRange(range: DateRange, maxDays: number): DateRange[] {
+  const result: DateRange[] = [];
+  const last = toDay(range.endDate);
+  for (let start = toDay(range.startDate); start <= last; start += maxDays) {
+    result.push({
+      startDate: fromDay(start),
+      endDate: fromDay(Math.min(start + maxDays - 1, last)),
+    });
+  }
+  return result;
+}
