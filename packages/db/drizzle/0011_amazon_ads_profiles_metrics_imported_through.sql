@@ -1,0 +1,1 @@
+ALTER TABLE "amazon_ads_profiles" ADD COLUMN "metrics_imported_through" date;
