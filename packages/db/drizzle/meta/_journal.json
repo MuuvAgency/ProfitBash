@@ -57,6 +57,13 @@
       "when": 1790494588581,
       "tag": "0007_amazon_ads_report_requests_error_and_request_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790498035791,
+      "tag": "0008_amazon_ads_entities",
+      "breakpoints": true
     }
   ]
 }

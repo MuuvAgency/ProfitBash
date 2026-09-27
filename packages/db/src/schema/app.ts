@@ -16,23 +16,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { organizations, users } from './auth';
-
-// ---------------------------------------------------------------------------
-// Gemeinsame Spalten
-// ---------------------------------------------------------------------------
-
-const id = () => uuid('id').primaryKey().defaultRandom();
-const createdAt = () =>
-  timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull();
-const updatedAt = () =>
-  timestamp('updated_at', { withTimezone: true, mode: 'date' })
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date());
-const organizationId = () =>
-  uuid('organization_id')
-    .notNull()
-    .references(() => organizations.id, { onDelete: 'cascade' });
+import { createdAt, id, organizationId, updatedAt } from './columns';
 
 // ---------------------------------------------------------------------------
 // Enums (stabile Wertemengen; neue Werte = Migration mit ALTER TYPE … ADD VALUE)
