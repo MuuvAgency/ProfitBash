@@ -72,7 +72,11 @@ export function createRequestMeter(): RequestMeter {
 }
 
 export interface RequestPacing {
-  acquire(): Promise<void>;
+  /**
+   * Wartet auf den nächsten Zeitschlitz (`null`). Pausiert das Budget länger als `maxPauseMs`
+   * (`Retry-After` eines früheren Aufrufs), liefert es die Restdauer, ohne zu warten.
+   */
+  acquire(maxPauseMs: number): Promise<{ pausedForMs: number } | null>;
   onThrottled(retryAfterMs: number | null): void;
   onSuccess(): void;
 }
@@ -115,7 +119,28 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
 
     const { meter, pacing } = request;
     for (let attempt = 1; ; attempt += 1) {
-      await pacing?.acquire();
+      const paused = pacing ? await pacing.acquire(maxRetryAfterMs) : null;
+      if (paused) {
+        // Nicht senden: Amazon hat für dieses Profil eine längere Pause verlangt. Der Aufruf endet wie
+        // ein zu langes `Retry-After`, damit ein Job später neu starten kann.
+        logger({
+          level: 'warn',
+          msg: 'amazon_ads.request_failed',
+          ...logContext,
+          status: 429,
+          code: 'PROFILE_PAUSED',
+          attempts: attempt - 1,
+          retryAfterMs: paused.pausedForMs,
+        });
+        throw httpError(
+          request.operation,
+          429,
+          'PROFILE_PAUSED',
+          'Amazon hat für dieses Profil eine Pause verlangt',
+          null,
+          paused.pausedForMs,
+        );
+      }
       if (meter) {
         meter.requests += 1;
         if (attempt > 1) meter.retries += 1;

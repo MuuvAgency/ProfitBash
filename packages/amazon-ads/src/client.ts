@@ -116,7 +116,7 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
   function pacingFor(connection: ConnectionRef, amazonProfileId: string): RequestPacing {
     const key = `${connection.region}:${amazonProfileId}`;
     return {
-      acquire: () => rateLimiter.acquire(key),
+      acquire: (maxPauseMs) => rateLimiter.acquire(key, { maxPauseMs }),
       onThrottled: (retryAfterMs) => rateLimiter.onThrottled(key, retryAfterMs),
       onSuccess: () => rateLimiter.onSuccess(key),
     };
@@ -163,6 +163,8 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
         if (last !== undefined && now() - last < FORCED_REFRESH_INTERVAL_MS) throw error;
         lastForcedRefresh.set(connection.id, now());
         tokens.invalidate(connection.id);
+        // Der Neuversand wiederholt denselben Aufruf; `send` zählt ihn als neue Anfrage.
+        if (req.meter) req.meter.retries += 1;
         return send();
       }
       throw error;

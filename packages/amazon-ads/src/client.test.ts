@@ -281,6 +281,47 @@ describe('Anfrage-Budget je Profil', () => {
     expect(sleeps).toEqual([75, 1_000]);
   });
 
+  it('lässt nach einem langen Retry-After weitere Anfragen des Profils sofort scheitern (für den Job)', async () => {
+    tokenEndpoint();
+    let calls = 0;
+    server.use(
+      http.get(TEST_URL, () => {
+        calls += 1;
+        return new HttpResponse(null, { status: 429, headers: { 'Retry-After': '3600' } });
+      }),
+    );
+    const { client, sleeps } = budgetSetup();
+    await expect(client.request(connection, scoped('111'))).rejects.toMatchObject({
+      retryAfterMs: 3_600_000,
+    });
+    await expect(client.request(connection, scoped('111'))).rejects.toMatchObject({
+      status: 429,
+      retryAfterMs: 3_600_000,
+    });
+    expect(calls).toBe(1);
+    expect(sleeps).toEqual([]);
+    // Andere Profile sind nicht betroffen.
+    await expect(client.request(connection, scoped('222'))).rejects.toMatchObject({ status: 429 });
+    expect(calls).toBe(2);
+  });
+
+  it('zählt den Neuversand nach einem 401 als Wiederholung', async () => {
+    tokenEndpoint();
+    let calls = 0;
+    server.use(
+      http.get(TEST_URL, () => {
+        calls += 1;
+        return calls === 1
+          ? HttpResponse.json({ code: 'UNAUTHORIZED' }, { status: 401 })
+          : HttpResponse.json({ ok: true });
+      }),
+    );
+    const { client } = budgetSetup();
+    const meter = createRequestMeter();
+    await client.request(connection, { ...scoped('111'), meter });
+    expect(meter).toEqual({ requests: 2, throttled: 0, retries: 1 });
+  });
+
   it('zählt Anfragen im Meter des Aufrufers, auch bei listProfiles', async () => {
     tokenEndpoint();
     server.use(

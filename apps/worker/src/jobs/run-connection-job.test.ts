@@ -224,6 +224,29 @@ describe('runConnectionJob mit Lease (Amazon-Datenjobs)', () => {
     expect(result).toEqual({ status: 'deferred', queued: false });
   });
 
+  it('meldet eine unbekannte Connection als fehlgeschlagenen Lauf, ohne Lease', async () => {
+    let ran = false;
+    const definition: ConnectionJobDefinition = {
+      lease: true,
+      run: async () => {
+        ran = true;
+        return {};
+      },
+    };
+    const unknown = randomUUID();
+    const result = await runConnectionJob(
+      context(),
+      'profiles-sync',
+      definition,
+      job({ connectionId: unknown }),
+    );
+    expect(result).toMatchObject({ status: 'failed', error: 'Connection nicht gefunden.' });
+    expect(ran).toBe(false);
+    expect(deferred).toEqual([]);
+    const [run] = await testDb.db.select().from(jobRuns).where(eq(jobRuns.scope, unknown));
+    expect(run).toMatchObject({ status: 'failed', organizationId });
+  });
+
   it('übernimmt eine abgelaufene Lease', async () => {
     await holdLease();
     await testDb.db
