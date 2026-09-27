@@ -735,6 +735,10 @@ Nach F11.
     (`GET /api/connections/:id/profiles`, `PATCH /api/profiles/:id`) rechnet über `REPORT_AD_PRODUCTS`, das jetzt in
     `@profitbash/amazon-ads` liegt (Schlüssel von `REPORT_TYPES_BY_AD_PRODUCT`) und das `reports-sync` ebenso nutzt: Ein Ad-Typ,
     den der Sync anfordert, zählt automatisch für „Daten bis“. API-Form unverändert (`metricsImportedThrough`).
+- [ ] **Offen für SB und SD (aus dem Review des ersten Punkts):** `REPORT_AD_PRODUCTS` gilt für alle Profile. Lehnt Amazon SB- oder
+      SD-Reports für ein Profil dauerhaft ab (z. B. ohne Brand Registry, SD im Marktplatz nicht verfügbar, Kontotyp), zeigt es „Daten
+      bis“ für immer „–“, obwohl SP aktuell ist. Beim Umsetzen entscheiden: Ad-Typen, die ein Profil nicht nutzen kann, im Sync
+      überspringen und „Daten bis“ über die für dieses Profil synchronisierten Ad-Typen rechnen (mit Dominik abstimmen).
 - [ ] SB: Entities (Exports decken SB ab) und Reports (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`); Hinweis auf die v3-Preview-Lücke
       (SB-Kampagnen ohne Multi-Ad-Group fehlen) in der UI-Doku von Phase 2 vermerken.
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
