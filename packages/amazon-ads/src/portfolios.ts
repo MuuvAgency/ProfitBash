@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import type { ConnectionRef } from './access-token';
-import type { AdsApiRequest, RequestOptions } from './client';
+import type { AdsEndpointDeps, RequestOptions } from './client';
 import { AmazonAdsResponseError } from './errors';
-import type { Logger } from './logger';
 import { amazonDecimalSchema, currencyCodeSchema } from './money';
 import {
+  amazonDateSchema,
   compact,
   createUnknownValueReporter,
+  extraFieldSchema,
   KNOWN_ENTITY_STATES,
   parseAmazonTimestamp,
 } from './normalize';
@@ -34,18 +35,19 @@ const portfolioSchema = z.object({
       amount: amazonDecimalSchema.nullish(),
       currencyCode: currencyCodeSchema.nullish(),
       policy: z.string().nullish(),
-      startDate: z.string().nullish(),
-      endDate: z.string().nullish(),
+      startDate: amazonDateSchema,
+      endDate: amazonDateSchema,
     })
     .nullish(),
-  budgetControls: z.record(z.string(), z.unknown()).nullish(),
+  budgetControls: extraFieldSchema,
   extendedData: z
     .object({
-      servingStatus: z.string().nullish(),
-      lastUpdateDateTime: z.string().nullish(),
-      creationDateTime: z.string().nullish(),
+      servingStatus: extraFieldSchema,
+      lastUpdateDateTime: z.string().nullish().catch(null),
+      creationDateTime: extraFieldSchema,
     })
-    .nullish(),
+    .nullish()
+    .catch(null),
 });
 
 const listResponseSchema = z.object({
@@ -70,13 +72,8 @@ export interface AmazonAdsPortfolio {
   extra: Record<string, unknown>;
 }
 
-type RequestFn = <S extends z.ZodType>(
-  connection: ConnectionRef,
-  request: AdsApiRequest<S>,
-) => Promise<z.output<S>>;
-
 export async function listPortfolios(
-  deps: { request: RequestFn; logger: Logger },
+  deps: AdsEndpointDeps,
   connection: ConnectionRef,
   amazonProfileId: string,
   options: RequestOptions = {},

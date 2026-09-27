@@ -199,6 +199,29 @@ describe('requestReport', () => {
     expect(error).toMatchObject({ duplicateOfReportId: null });
   });
 
+  it('übernimmt keine abgeschnittene ID aus einem gekürzten 425-Text', async () => {
+    server.use(
+      http.post(`${API}/reporting/reports`, () =>
+        HttpResponse.json(
+          {
+            code: '425',
+            detail: `${'x'.repeat(140)} The Request is a duplicate of : 0f3a9c2e-1b2d-4e5f-8a9b-0c1d2e3f4a5b`,
+          },
+          { status: 425 },
+        ),
+      ),
+    );
+    const { client } = setup();
+    const error = await client
+      .requestReport(connection, {
+        amazonProfileId: PROFILE_ID,
+        reportType: 'spCampaigns',
+        ...range,
+      })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ duplicateOfReportId: null });
+  });
+
   it('wiederholt 429 beim Anfordern', async () => {
     let calls = 0;
     server.use(
@@ -263,6 +286,20 @@ describe('getReport', () => {
       status: 'FAILURE',
       failureReason: 'Internal error',
     });
+  });
+
+  it('wiederholt 429 bei der Status-Abfrage', async () => {
+    let calls = 0;
+    server.use(
+      http.get(`${API}/reporting/reports/:reportId`, () => {
+        calls += 1;
+        return calls === 1
+          ? HttpResponse.json({ code: '429' }, { status: 429 })
+          : HttpResponse.json({ reportId: 'rep-1', status: 'PROCESSING' });
+      }),
+    );
+    const { client } = setup();
+    await expect(client.getReport(connection, ref)).resolves.toEqual({ status: 'PROCESSING' });
   });
 
   it('meldet 404 als NOT_FOUND', async () => {
@@ -395,6 +432,20 @@ describe('Zeilen-Schemas der Reports', () => {
     expect(schema.safeParse({ ...base, cost: 1.5 }).success).toBe(false);
     expect(schema.safeParse({ ...base, campaignId: undefined }).success).toBe(false);
     expect(schema.safeParse({ ...base, date: '25.09.2026' }).success).toBe(false);
-    expect(schema.safeParse({ ...base, clicks: -1 }).success).toBe(false);
+    expect(schema.safeParse({ ...base, clicks: 1.5 }).success).toBe(false);
+  });
+
+  it('nimmt negative Zähler an (Korrekturen), statt die ganze Zeile samt Kosten zu verwerfen', () => {
+    const schema = createReportRowSchema('spCampaigns');
+    const result = schema.safeParse({
+      date: '2026-09-25',
+      campaignId: '1',
+      impressions: 1,
+      clicks: 1,
+      cost: '1.5',
+      purchases7d: -1,
+      unitsSoldClicks7d: -2,
+    });
+    expect(result.data).toMatchObject({ purchases7d: -1, units7d: -2, cost: '1.5' });
   });
 });

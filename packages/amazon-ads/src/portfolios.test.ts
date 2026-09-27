@@ -165,6 +165,18 @@ describe('listPortfolios', () => {
     ]);
   });
 
+  it('normalisiert Budget-Tage auf YYYY-MM-DD (Zeitstempel gekürzt, Unlesbares leer)', async () => {
+    server.use(
+      http.post(LIST_URL, () =>
+        jsonText(`{"portfolios": [{"portfolioId": "1", "name": "a", "state": "ENABLED",
+          "budget": {"startDate": "2026-09-01T00:00:00Z", "endDate": "31.12.2026"}}]}`),
+      ),
+    );
+    const { client } = setup();
+    const [portfolio] = await client.listPortfolios(connection, PROFILE_ID);
+    expect(portfolio).toMatchObject({ budgetStartDate: '2026-09-01', budgetEndDate: null });
+  });
+
   it('scheitert laut an einem ungültigen Portfolio (sonst gälte es später als entfernt)', async () => {
     server.use(
       http.post(LIST_URL, () =>

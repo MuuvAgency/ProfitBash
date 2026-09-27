@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import type { ConnectionRef } from './access-token';
 import type { AmazonAdsAsyncStatus } from './async-status';
-import type { AdsApiRequest, RequestOptions } from './client';
+import type { AdsEndpointDeps, RequestOptions } from './client';
 import { AmazonAdsDuplicateReportError, AmazonAdsHttpError } from './errors';
-import type { Logger } from './logger';
 import { amazonDecimalSchema } from './money';
 import { createUnknownValueReporter } from './normalize';
 import { amazonIdSchema } from './profiles';
@@ -234,16 +233,6 @@ export interface AmazonAdsReportRows {
 // Anfordern und Status
 // ---------------------------------------------------------------------------
 
-type RequestFn = <S extends z.ZodType>(
-  connection: ConnectionRef,
-  request: AdsApiRequest<S>,
-) => Promise<z.output<S>>;
-
-interface Deps {
-  request: RequestFn;
-  logger: Logger;
-}
-
 export interface RequestReportInput {
   amazonProfileId: string;
   reportType: AmazonAdsReportType;
@@ -259,7 +248,7 @@ const requestResponseSchema = z.object({ reportId: z.string().min(1) });
  * Absturz ist damit identisch und trifft bei Amazon auf 425 mit der ID des laufenden Reports.
  */
 export async function requestReport(
-  deps: Deps,
+  deps: AdsEndpointDeps,
   connection: ConnectionRef,
   input: RequestReportInput,
   options: RequestOptions = {},
@@ -310,7 +299,10 @@ export async function requestReport(
  */
 export function duplicateReportId(detail: string | null): string | null {
   if (!detail) return null;
-  const explicit = /duplicate of\s*:?\s*([A-Za-z0-9][A-Za-z0-9_-]{7,})/i.exec(detail);
+  // Kein Zeichen der ID und kein Kürzungszeichen („…“ aus `http.ts`) danach: sonst wäre die ID abgeschnitten.
+  const explicit = /duplicate of\s*:?\s*([A-Za-z0-9][A-Za-z0-9_-]{7,})(?![A-Za-z0-9_…-])/i.exec(
+    detail,
+  );
   if (explicit) return explicit[1]!;
   const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.exec(detail);
   return uuid ? uuid[0] : null;
@@ -344,7 +336,7 @@ const statusResponseSchema = z.object({
 const RUNNING_REPORT_STATES: ReadonlySet<string> = new Set(['PENDING', 'PROCESSING']);
 
 export async function getReport(
-  deps: Deps,
+  deps: AdsEndpointDeps,
   connection: ConnectionRef,
   input: GetReportInput,
   options: RequestOptions = {},
@@ -388,7 +380,8 @@ export async function getReport(
 // Zeilen-Schemas
 // ---------------------------------------------------------------------------
 
-const counter = z.number().int().nonnegative();
+// Ohne Untergrenze: Eine negative Korrektur darf nicht die ganze Zeile samt Kosten verwerfen (DB: `bigint`).
+const counter = z.number().int();
 const optionalCounter = counter.nullish().transform((value) => value ?? null);
 const optionalAmount = amazonDecimalSchema.nullish().transform((value) => value ?? null);
 const optionalText = z

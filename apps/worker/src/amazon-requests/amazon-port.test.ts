@@ -2,9 +2,33 @@ import {
   createMockAmazonAdsClient,
   createRequestMeter,
   decodeGzipJson,
+  type AmazonAdsAdGroup,
+  type AmazonAdsAdGroupDailyMetric,
+  type AmazonAdsCampaign,
+  type AmazonAdsCampaignDailyMetric,
   type AmazonAdsClient,
+  type AmazonAdsNegativeTarget,
+  type AmazonAdsPortfolio,
+  type AmazonAdsProductAd,
+  type AmazonAdsProductAdDailyMetric,
+  type AmazonAdsSearchTermDailyMetric,
+  type AmazonAdsTarget,
+  type AmazonAdsTargetDailyMetric,
 } from '@profitbash/amazon-ads';
-import type { AmazonRequest } from '@profitbash/db';
+import type {
+  AdGroupDailyMetric,
+  AdGroupRecord,
+  AmazonRequest,
+  CampaignDailyMetric,
+  CampaignRecord,
+  NegativeTargetRecord,
+  PortfolioRecord,
+  ProductAdDailyMetric,
+  ProductAdRecord,
+  SearchTermDailyMetric,
+  TargetDailyMetric,
+  TargetRecord,
+} from '@profitbash/db';
 import { setupServer } from 'msw/node';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAmazonRequestPort } from './amazon-port';
@@ -190,5 +214,26 @@ describe('createAmazonRequestPort', () => {
     ).rejects.toThrow(/Export-Typ/);
     await expect(port.getStatus(row({ status: 'requested' }))).rejects.toThrow(/ID/);
     expect(() => port.rowSchema(row({ reportType: 'spUnbekannt' }))).toThrow(/Report-Typ/);
+  });
+});
+
+describe('Modell aus @profitbash/amazon-ads passt auf die DB-Typen aus 1.5', () => {
+  it('ist ohne Umbau zuweisbar (Prüfung durch den Typecheck)', () => {
+    // Targets, Negatives und Product Ads brauchen die Kampagne; 1.7 ergänzt sie über die Ad Groups.
+    type WithCampaign<T> = Omit<T, 'amazonCampaignId'> & { amazonCampaignId: string };
+    const contracts = {
+      portfolio: (value: AmazonAdsPortfolio): PortfolioRecord => value,
+      campaign: (value: AmazonAdsCampaign): CampaignRecord => value,
+      adGroup: (value: AmazonAdsAdGroup): AdGroupRecord => value,
+      target: (value: WithCampaign<AmazonAdsTarget>): TargetRecord => value,
+      negative: (value: WithCampaign<AmazonAdsNegativeTarget>): NegativeTargetRecord => value,
+      productAd: (value: WithCampaign<AmazonAdsProductAd>): ProductAdRecord => value,
+      campaignMetric: (value: AmazonAdsCampaignDailyMetric): CampaignDailyMetric => value,
+      adGroupMetric: (value: AmazonAdsAdGroupDailyMetric): AdGroupDailyMetric => value,
+      targetMetric: (value: AmazonAdsTargetDailyMetric): TargetDailyMetric => value,
+      productAdMetric: (value: AmazonAdsProductAdDailyMetric): ProductAdDailyMetric => value,
+      searchTermMetric: (value: AmazonAdsSearchTermDailyMetric): SearchTermDailyMetric => value,
+    };
+    expect(Object.keys(contracts)).toHaveLength(11);
   });
 });

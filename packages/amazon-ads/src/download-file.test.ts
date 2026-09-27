@@ -113,6 +113,14 @@ describe('downloadFile', () => {
     expect(JSON.stringify(logs)).not.toContain('SECRET');
   });
 
+  it('behandelt eine 2xx-Antwort ohne Body als Fehler mit ihrem Status', async () => {
+    server.use(http.get(REPORT_URL.split('?')[0]!, () => new HttpResponse(null, { status: 204 })));
+    const { client } = setup();
+    const error = await client.downloadFile(REPORT_URL).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AmazonAdsResponseError);
+    expect((error as Error).message).toContain('leer');
+  });
+
   it('wirft AmazonAdsNetworkError bei Netzwerkfehlern', async () => {
     server.use(http.get(REPORT_URL.split('?')[0]!, () => HttpResponse.error()));
     const { client } = setup();
