@@ -64,7 +64,7 @@ Aufgabe die konkreten Endpunkte erneut gegen die Doku prüfen.
 - Attribution: SP liefert 1/7/14/30-Tage-Spalten (`sales7d`, `purchases14d` …). Standard im Konsolen-Reporting: 7 Tage für Seller,
   14 Tage für Vendoren. SB/SD liefern ein Fenster (14 Tage) ohne Suffix.
 - **Unklar, beim ersten echten Aufruf klären:** Die Doku nennt einen Header `Amazon-Ads-AccountId` als „erforderlich“ für Reports, die
-  Beispielaufrufe kommen aber nur mit `Amazon-Advertising-API-Scope` (Profil-ID) aus. Falls nötig: welche Konto-ID (`adsAccountId` aus der
+  Beispielaufrufe kommen aber nur mit `Amazon-Advertising-API-Scope` (Profil-ID) aus; die OpenAPI-Spec nennt ihn optional (DSP, Stand 2026-09-27). Falls nötig: welche Konto-ID (`adsAccountId` aus der
   Accounts-API vs. `accountInfo.id` aus `/v2/profiles`, heute in `amazon_ads_profiles.amazon_account_id`).
 
 ## Fragen an Dominik
@@ -472,19 +472,88 @@ Kennzahlen (je Tag, Datum in der Zeitzone des Profils, so liefert Amazon es):
 
 ### 1.6 Amazon-Client: Entities und Reports (`packages/amazon-ads`)
 Endpunkte nach F1 (a), siehe ADR 004.
-- [ ] Exports: `requestExport(profile, 'campaigns' | 'adGroups' | 'targets' | 'ads', { adProducts, states })`, `getExport(id)`,
+- [x] Exports: `requestExport(profile, 'campaigns' | 'adGroups' | 'targets' | 'ads', { adProducts, states })`, `getExport(id)`,
       `downloadExport(url)`. Content-Types laut Doku (`application/vnd.campaignsexport.v1+json` usw., beim Umsetzen prüfen).
-- [ ] Portfolios: `listPortfolios(profile)` mit Paginierung.
-- [ ] Reports: `requestReport(profile, { reportTypeId, adProduct, groupBy, columns, startDate, endDate })`, `getReport(id)`,
+- [x] Portfolios: `listPortfolios(profile)` mit Paginierung.
+- [x] Reports: `requestReport(profile, { reportTypeId, adProduct, groupBy, columns, startDate, endDate })`, `getReport(id)`,
       `downloadReport(url)`. 425 als eigener Fehler mit Hinweis „läuft bereits“.
-- [ ] Normalisierung in ein eigenes Modell (`AmazonAdsCampaign` …) mit zod; IDs und Beträge als Strings (Beträge und alle gebrochenen
+- [x] Normalisierung in ein eigenes Modell (`AmazonAdsCampaign` …) mit zod; IDs und Beträge als Strings (Beträge und alle gebrochenen
       Werte über `amazonDecimalSchema`, Währungen über `currencyCodeSchema`). Unbekannte Enum-Werte und unbekannte Währungscodes
       (`isKnownCurrencyCode`) durchreichen und loggen.
-- [ ] Download-Hosts: S3-URLs aus Amazon-Antworten nur per `https` und **ohne** Authorization-Header abrufen (Tokens gehen nie an fremde Hosts,
+- [x] Download-Hosts: S3-URLs aus Amazon-Antworten nur per `https` und **ohne** Authorization-Header abrufen (Tokens gehen nie an fremde Hosts,
       Regel aus 0.5). Erlaubte Host-Muster als Konstante.
-- [ ] Mock-Anbieter erweitern: Entities für die Test-Profile (inkl. großer IDs, Beträge mit vielen Nachkommastellen, archivierter Kampagne,
+- [x] Mock-Anbieter erweitern: Entities für die Test-Profile (inkl. großer IDs, Beträge mit vielen Nachkommastellen, archivierter Kampagne,
       Negatives auf beiden Ebenen, Vendor-Profil ohne SKU), Reports als gzip-JSON mit simulierter Verarbeitungszeit, 425 und `FAILURE` auf Wunsch.
-- [ ] Tests mit msw für jeden Endpunkt (Paginierung, 429, 425, Validierungsfehler, verlustfreie Zahlen).
+- [x] Tests mit msw für jeden Endpunkt (Paginierung, 429, 425, Validierungsfehler, verlustfreie Zahlen).
+- [x] Umsetzung (Stand für 1.7 und später):
+  - **Doku-Abgleich 2026-09-27** (Guides und OpenAPI-Specs `AmazonAdsAPIExports_prod_3p.json`, `OfflineReport_prod_3p.json`,
+    `Portfolios_prod_3p.json`), Abweichungen zur bisherigen Annahme:
+    - Export-Status laut Spec `PROCESSING`/`COMPLETED`/`FAILED` (der Guide schreibt `IN_PROGRESS`, wird ebenso als „läuft“ erkannt).
+      Report-Status laut Spec `FAILED` (Guide: `FAILURE`, beides erkannt). Unbekannte Status gelten als „läuft“ und werden geloggt;
+      die 4-h-Regel aus 1.4 beendet sie.
+    - Exports liefern ohne `stateFilter` nur `ENABLED`/`PAUSED`; der Client fordert `ARCHIVED` immer mit an (F10). `GET /exports/{id}`
+      braucht den Accept-Header des Export-Typs (sonst 406). Jede Status-Abfrage erzeugt eine neue URL (1 h gültig, bis 24 h nach
+      Fertigstellung). **Amazon begrenzt laufende Exports auf 5 je Endpunkt** (FAQ): für 1.7/1.10 relevant, wenn viele Profile
+      gleichzeitig synchronisieren.
+    - **Ads und SB/SD-Targets tragen im Export keine `campaignId`** (gemeinsames Modell). SP-Targets haben sie. Das Modell hat deshalb
+      `amazonCampaignId: string | null` bei Targets, Negatives und Product Ads; **1.7 ergänzt sie beim Batch-Import über die Ad Groups
+      desselben Batches** (die DB-Records verlangen sie).
+    - Portfolios v3: `POST /portfolios/list`, Content-Type und Accept `application/vnd.spPortfolio.v3+json`, `nextToken`-Paginierung;
+      Zustandsfilter nimmt nur einen Wert, v3 kennt nur `ENABLED` (kein Filter gesendet).
+    - Reporting v3: 425-Antwort laut Spec nur `{ code, detail }`. Übernommen wird die ID aus dem beobachteten Format
+      „… duplicate of : <reportId>“, sonst die erste UUID im Text, sonst `null` (1.10 prüft das echte Format).
+    - **`spSearchTerm` hält nur 65 Tage vor**, nicht 95 (Report-Typen-Seite). `REPORT_DEFINITIONS[…].retentionDays` trägt das; 1.7 nutzt es
+      für die Historie (F4).
+    - `Amazon-Ads-AccountId`: Die Spec nennt den Header optional (DSP), der Guide „erforderlich für alle Ad-Typen“. Der Client sendet ihn
+      nicht; bleibt offen für 1.10.
+  - **HTTP** (`http.ts`, `client.ts`): Option `decimals: 'string'` je Anfrage (Portfolios nutzen sie). Fehlerantworten übernehmen auch
+    `detail` (Reporting v3); `AmazonAdsHttpError.details` trägt den bereinigten Text (höchstens 200 Zeichen).
+  - **Downloads** (`download.ts`): `client.downloadFile(url)` für Reports und Exports (ein Aufruf statt `downloadReport`/`downloadExport`).
+    Nur `https`, Hosts laut `AMAZON_ADS_DOWNLOAD_HOST_PATTERNS` (`offline-report-storage-*.s3…amazonaws.com`, `snapshots-prod-*.s3…`,
+    aus den Doku-Beispielen; 1.10 gleicht die EU-Hosts ab), ohne Authorization- und Amazon-Header, ohne Weiterleitungen, Timeout 5 Min.,
+    keine Wiederholung. 403/404 → `{ status: 'expired' }`, andere Status → `AmazonAdsHttpError`. Logs und Fehler nennen nur den Host.
+    Downloads zählen nicht im `meter` (keine Ads-API-Anfrage).
+  - **Portfolios** (`portfolios.ts`): `client.listPortfolios(connection, amazonProfileId, { meter })` → `AmazonAdsPortfolio[]` (Felder wie
+    `PortfolioRecord`). Ein ungültiges Portfolio lässt den ganzen Aufruf scheitern (`AmazonAdsResponseError`), statt es zu überspringen:
+    Übersprungene Portfolios gälten in 1.7 sonst als entfernt. Wiederholter `nextToken` oder mehr als 100 Seiten → Fehler.
+  - **Exports** (`exports.ts`): `requestExport(connection, { amazonProfileId, exportType, adProduct })` → `{ exportId }`,
+    `getExport(connection, { amazonProfileId, exportType, exportId })` → `AmazonAdsAsyncStatus` (404 → `NOT_FOUND`).
+    `createExportRowSchema(exportType, { adProduct, logger })` validiert und normalisiert je Zeile:
+    - Kampagnen → `AmazonAdsCampaign` (Budget aus `budgetCaps…monetaryBudget`, `budgetType` = `recurrenceTimePeriod`, Gebotsstrategie aus
+      `optimization.bidStrategy`; Platzierungs-Anpassungen, `ruleAmount` als `budgetRuleAmount`, Tags, Lieferstatus in `extra`).
+    - Targets → `{ kind: 'target', target }` bzw. `{ kind: 'negative', target }` mit `level` `ad_group`/`campaign` (ohne Ad Group).
+      `targetType` klein (`KEYWORD` → `keyword`, `PRODUCT_CATEGORY` → `category`, `AUTO` → `auto`, `AUDIENCE` → `audience`, dazu
+      `product_audience`, `category_audience`, `theme`, `content_category`; Unbekanntes klein durchgereicht und geloggt). `expression` =
+      `targetDetails` unverändert (Dezimalzahlen als Quelltext), `keywordText`/`matchType` daraus.
+    - Ads → `AmazonAdsProductAd` (ASIN/SKU aus `creative.products`, `adType` in `extra`). SB/SD-Ads (Video usw.) entscheidet 1.9.
+    - Zustände und Enum-Werte bleiben in Amazons Schreibweise (`ENABLED` …), wie in den 1.5-Tests. Fehlt `adProduct` in der Zeile,
+      gilt der des Auftrags. Unbekannte Werte je Feld und Wert einmal als `amazon_ads.unknown_enum_value`.
+  - **Reports** (`reports.ts`): Katalog `REPORT_DEFINITIONS` (Schlüssel = `report_type` der Aufträge): `spCampaigns`, **`spAdGroups`**
+    (eigener Schlüssel für `spCampaigns` mit `groupBy: ['campaign', 'adGroup']`, sonst kollidierten beide im Schlüssel offener Aufträge),
+    `spTargeting` (`keywordId` = Target-ID), `spAdvertisedProduct`, `spSearchTerm`; je Eintrag `level`, `reportTypeId`, `groupBy`,
+    `columns` (Tag, IDs, Namen, Attribution nach F7), `retentionDays`. `reportTypesFor(adProduct)` liefert die Typen in
+    Hierarchie-Reihenfolge. `requestReport(connection, { amazonProfileId, reportType, startDate, endDate })` prüft höchstens 31 Tage,
+    Name `profitbash <typ> <start>..<ende>` (identisch bei erneutem Anfordern → 425 mit ID); 425 → `AmazonAdsDuplicateReportError`
+    (`duplicateOfReportId`). `getReport` → `AmazonAdsAsyncStatus`. `createReportRowSchema(reportType)` → Kennzahlen im eigenen Modell
+    (`AmazonAdsCampaignDailyMetric` …, Felder wie die Zeilen von `replaceDailyMetrics`; `unitsSoldClicks*` → `units*`,
+    `attributedSalesSameSku*` → `salesSameSku*`); fehlende Attribution `null`, Zähler als sichere Ganzzahlen, `extra` leer.
+  - **Mock** (`mock.ts`, `mock-data.ts`): Portfolios (Seiten zu 2), Exports, Reports und S3-Downloads je Mock-Profil, prüft Content-Type
+    (415) und Accept (406) wie Amazon. Daten deterministisch: IDs = Profil-ID + Nummer (beim DE-Profil über `MAX_SAFE_INTEGER`), drei
+    Kampagnen (eine archiviert), Negatives auf beiden Ebenen, Vendor ohne SKU, Tage ohne Aktivität fehlen, Kampagnen = Summe der Ad Groups,
+    am ersten Tag feste Werte `0.005` (Kosten) und `1234567.89` (Umsatz). **Auftrags-IDs kodieren den Auftrag** (`mock_r_…`/`mock_e_…`):
+    Auch ein neu gestarteter Prozess holt einen laufenden Report ab (DoD „Neustart“ mit dem Mock vorführbar). Option `simulation`
+    (`now`, `processingMs` Standard 5 s, `failingReportTypes`, `duplicatesWithoutId`); 425 kommt bei identischer Anfrage während der
+    Verarbeitung (nur im selben Prozess).
+  - **Port** (`apps/worker/src/amazon-requests/amazon-port.ts`): `createAmazonRequestPort({ client, connection, amazonProfileIds, meter,
+    logger, import })` erfüllt `AmazonRequestPort` aus 1.4. `amazonProfileIds`: interne Profil-ID → Amazon-Profil-ID aller Profile der
+    Connection (1.7 lädt sie im Poll-Lauf). `import` liefert 1.7 (Abbildung auf die DB-Typen, `replaceDailyMetrics`, Entity-Upserts).
+  - **Für 1.7:**
+    - Entity-Batch-Import: Zeilen kommen als `AmazonAdsCampaign`/`…AdGroup`/`AmazonAdsExportedTarget`/`…ProductAd`. Kampagne für Ads
+      (und SB/SD-Targets) über die Ad Groups des Batches ergänzen; fehlt die Ad Group im Batch, die Zeile als ungültig zählen oder über
+      vorhandene Ad Groups in der DB auflösen (dort entscheiden).
+    - Report-Import: `REPORT_DEFINITIONS[reportType].level` wählt `replaceDailyMetrics({ level, rows })`; die Zeilen passen ohne Umbau.
+    - Historie (F4): Stücke je Report-Typ nur bis `retentionDays` zurück (`spSearchTerm` 65 Tage).
+    - Rund 20 Report-Aufträge beim ersten SP-Sync je Profil und das Export-Limit (5 laufend je Endpunkt) beim Planen berücksichtigen.
 
 ### 1.7 Jobs (`apps/worker`)
 Alle Datenjobs nehmen die Lease der Connection (1.3) und bleiben **kurz**: Ein Lauf erledigt eine begrenzte Menge Arbeit und plant bei
@@ -546,7 +615,8 @@ Nach F11.
       Kampagne an drei Tagen). Abweichungen und Überraschungen hier festhalten: Header `Amazon-Ads-AccountId`,
       Content-Types, Laufzeiten, 429-Quote, ob Amazon offene Reports je Profil begrenzt (der erste SP-Sync fordert rund 20 an), ob `targetId`
       im Export der `keywordId` bzw. `targetId` in `spTargeting`/`spSearchTerm` entspricht, ob sich Amazon-IDs über Ad-Typen eines Profils
-      überschneiden können.
+      überschneiden können. Aus 1.6: Download-Hosts der EU (`AMAZON_ADS_DOWNLOAD_HOST_PATTERNS`), Format des 425-Texts (Report-ID),
+      Export-Status-Schreibweise, ob SP-Product-Ads im Export ASIN und SKU tragen, Limit von 5 laufenden Exports je Endpunkt.
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
 ### 1.11 Datei-Import (optional, nur mit Auslöser)
