@@ -7,13 +7,15 @@ import {
   amazonAdsNegativeTargets,
   amazonAdsPortfolios,
   amazonAdsProductAds,
+  amazonAdsProfiles,
   amazonAdsTargets,
 } from './schema';
 
 /**
  * Werbe-Entities je Profil schreiben (Phase 1, 1.5). Systemzugriff der Jobs ohne Nutzerkontext und
- * ohne `audit_events` (nachvollziehbar über `job_runs`), an Organisation und Profil gebunden: Die
- * zusammengesetzten FKs lehnen ein Profil einer anderen Organisation ab.
+ * ohne `audit_events` (nachvollziehbar über `job_runs`), an Organisation und Profil gebunden: Jede
+ * Schreibfunktion prüft, dass das Profil zur Organisation gehört (`assertProfileInOrganization`).
+ * Jeder Upsert läuft in einer eigenen Transaktion (bzw. einem Savepoint in der des Aufrufers).
  *
  * Die Upserts nehmen **normalisierte Datensätze** (eigene Typen), nie Antworttypen der Amazon-API.
  * So nutzen Entity-Sync (1.7) und ein späterer Datei-Import (1.11) dieselbe Schreibschicht.
@@ -124,6 +126,32 @@ export interface ProductAdRecord extends EntityFields {
   state: string;
 }
 
+/**
+ * Das Profil gehört zur Organisation des Aufrufers. Die zusammengesetzten FKs prüfen das nur beim
+ * Einfügen; ein Upsert auf vorhandene Zeilen (`ON CONFLICT DO UPDATE`) und die Suche nach vorhandenen
+ * Entities gingen sonst an der Organisation vorbei.
+ */
+export async function assertProfileInOrganization(db: DbOrTx, scope: EntityScope): Promise<void> {
+  const [profile] = await db
+    .select({ id: amazonAdsProfiles.id })
+    .from(amazonAdsProfiles)
+    .where(
+      and(
+        eq(amazonAdsProfiles.id, scope.profileId),
+        eq(amazonAdsProfiles.organizationId, scope.organizationId),
+      ),
+    );
+  if (!profile) throw new ProfileNotFoundError();
+}
+
+/** Profil fehlt oder gehört zu einer anderen Organisation. */
+export class ProfileNotFoundError extends Error {
+  constructor() {
+    super('Profil nicht gefunden.');
+    this.name = 'ProfileNotFoundError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Upserts
 // ---------------------------------------------------------------------------
@@ -133,11 +161,13 @@ export async function upsertPortfolios(
   scope: EntityWriteScope,
   records: readonly PortfolioRecord[],
 ): Promise<EntityUpsertCounts> {
-  const rows = lastById(records, (r) => r.amazonPortfolioId).map((record) => ({
-    ...record,
-    ...rowScope(scope),
-  }));
-  return upsertRows(db, scope, entityTable(amazonAdsPortfolios, 'amazonPortfolioId'), rows, 0);
+  return db.transaction(async (tx) => {
+    const rows = lastById(records, (r) => r.amazonPortfolioId).map((record) => ({
+      ...record,
+      ...rowScope(scope),
+    }));
+    return upsertRows(tx, scope, entityTable(amazonAdsPortfolios, 'amazonPortfolioId'), rows, 0);
+  });
 }
 
 export async function upsertCampaigns(
@@ -145,26 +175,28 @@ export async function upsertCampaigns(
   scope: EntityWriteScope,
   records: readonly CampaignRecord[],
 ): Promise<EntityUpsertCounts> {
-  const unique = lastById(records, (r) => r.amazonCampaignId);
-  const portfolios = await ensurePortfolios(
-    db,
-    scope,
-    unique.flatMap((r) =>
-      r.amazonPortfolioId ? [{ amazonPortfolioId: r.amazonPortfolioId }] : [],
-    ),
-  );
-  const rows = unique.map(({ amazonPortfolioId, ...record }) => ({
-    ...record,
-    ...rowScope(scope),
-    portfolioId: amazonPortfolioId ? portfolios.ids.get(amazonPortfolioId)! : null,
-  }));
-  return upsertRows(
-    db,
-    scope,
-    entityTable(amazonAdsCampaigns, 'amazonCampaignId'),
-    rows,
-    portfolios.created,
-  );
+  return db.transaction(async (tx) => {
+    const unique = lastById(records, (r) => r.amazonCampaignId);
+    const portfolios = await ensurePortfolios(
+      tx,
+      scope,
+      unique.flatMap((r) =>
+        r.amazonPortfolioId ? [{ amazonPortfolioId: r.amazonPortfolioId }] : [],
+      ),
+    );
+    const rows = unique.map(({ amazonPortfolioId, ...record }) => ({
+      ...record,
+      ...rowScope(scope),
+      portfolioId: amazonPortfolioId ? portfolios.ids.get(amazonPortfolioId)! : null,
+    }));
+    return upsertRows(
+      tx,
+      scope,
+      entityTable(amazonAdsCampaigns, 'amazonCampaignId'),
+      rows,
+      portfolios.created,
+    );
+  });
 }
 
 export async function upsertAdGroups(
@@ -172,20 +204,22 @@ export async function upsertAdGroups(
   scope: EntityWriteScope,
   records: readonly AdGroupRecord[],
 ): Promise<EntityUpsertCounts> {
-  const unique = lastById(records, (r) => r.amazonAdGroupId);
-  const campaigns = await ensureCampaigns(db, scope, unique);
-  const rows = unique.map(({ amazonCampaignId, ...record }) => ({
-    ...record,
-    ...rowScope(scope),
-    campaignId: campaigns.ids.get(amazonCampaignId)!,
-  }));
-  return upsertRows(
-    db,
-    scope,
-    entityTable(amazonAdsAdGroups, 'amazonAdGroupId'),
-    rows,
-    campaigns.created,
-  );
+  return db.transaction(async (tx) => {
+    const unique = lastById(records, (r) => r.amazonAdGroupId);
+    const campaigns = await ensureCampaigns(tx, scope, unique);
+    const rows = unique.map(({ amazonCampaignId, ...record }) => ({
+      ...record,
+      ...rowScope(scope),
+      campaignId: campaigns.ids.get(amazonCampaignId)!,
+    }));
+    return upsertRows(
+      tx,
+      scope,
+      entityTable(amazonAdsAdGroups, 'amazonAdGroupId'),
+      rows,
+      campaigns.created,
+    );
+  });
 }
 
 export async function upsertTargets(
@@ -193,21 +227,23 @@ export async function upsertTargets(
   scope: EntityWriteScope,
   records: readonly TargetRecord[],
 ): Promise<EntityUpsertCounts> {
-  const unique = lastById(records, (r) => r.amazonTargetId);
-  const parents = await ensureParents(db, scope, unique);
-  const rows = unique.map(({ amazonCampaignId, amazonAdGroupId, ...record }) => ({
-    ...record,
-    ...rowScope(scope),
-    campaignId: parents.campaigns.get(amazonCampaignId)!,
-    adGroupId: amazonAdGroupId === null ? null : parents.adGroups.get(amazonAdGroupId)!,
-  }));
-  return upsertRows(
-    db,
-    scope,
-    entityTable(amazonAdsTargets, 'amazonTargetId'),
-    rows,
-    parents.created,
-  );
+  return db.transaction(async (tx) => {
+    const unique = lastById(records, (r) => r.amazonTargetId);
+    const parents = await ensureParents(tx, scope, unique);
+    const rows = unique.map(({ amazonCampaignId, amazonAdGroupId, ...record }) => ({
+      ...record,
+      ...rowScope(scope),
+      campaignId: parents.campaigns.get(amazonCampaignId)!,
+      adGroupId: amazonAdGroupId === null ? null : parents.adGroups.get(amazonAdGroupId)!,
+    }));
+    return upsertRows(
+      tx,
+      scope,
+      entityTable(amazonAdsTargets, 'amazonTargetId'),
+      rows,
+      parents.created,
+    );
+  });
 }
 
 export async function upsertNegativeTargets(
@@ -215,21 +251,23 @@ export async function upsertNegativeTargets(
   scope: EntityWriteScope,
   records: readonly NegativeTargetRecord[],
 ): Promise<EntityUpsertCounts> {
-  const unique = lastById(records, (r) => r.amazonTargetId);
-  const parents = await ensureParents(db, scope, unique);
-  const rows = unique.map(({ amazonCampaignId, amazonAdGroupId, ...record }) => ({
-    ...record,
-    ...rowScope(scope),
-    campaignId: parents.campaigns.get(amazonCampaignId)!,
-    adGroupId: amazonAdGroupId === null ? null : parents.adGroups.get(amazonAdGroupId)!,
-  }));
-  return upsertRows(
-    db,
-    scope,
-    entityTable(amazonAdsNegativeTargets, 'amazonTargetId'),
-    rows,
-    parents.created,
-  );
+  return db.transaction(async (tx) => {
+    const unique = lastById(records, (r) => r.amazonTargetId);
+    const parents = await ensureParents(tx, scope, unique);
+    const rows = unique.map(({ amazonCampaignId, amazonAdGroupId, ...record }) => ({
+      ...record,
+      ...rowScope(scope),
+      campaignId: parents.campaigns.get(amazonCampaignId)!,
+      adGroupId: amazonAdGroupId === null ? null : parents.adGroups.get(amazonAdGroupId)!,
+    }));
+    return upsertRows(
+      tx,
+      scope,
+      entityTable(amazonAdsNegativeTargets, 'amazonTargetId'),
+      rows,
+      parents.created,
+    );
+  });
 }
 
 export async function upsertProductAds(
@@ -237,21 +275,23 @@ export async function upsertProductAds(
   scope: EntityWriteScope,
   records: readonly ProductAdRecord[],
 ): Promise<EntityUpsertCounts> {
-  const unique = lastById(records, (r) => r.amazonAdId);
-  const parents = await ensureParents(db, scope, unique);
-  const rows = unique.map(({ amazonCampaignId, amazonAdGroupId, ...record }) => ({
-    ...record,
-    ...rowScope(scope),
-    campaignId: parents.campaigns.get(amazonCampaignId)!,
-    adGroupId: parents.adGroups.get(amazonAdGroupId)!,
-  }));
-  return upsertRows(
-    db,
-    scope,
-    entityTable(amazonAdsProductAds, 'amazonAdId'),
-    rows,
-    parents.created,
-  );
+  return db.transaction(async (tx) => {
+    const unique = lastById(records, (r) => r.amazonAdId);
+    const parents = await ensureParents(tx, scope, unique);
+    const rows = unique.map(({ amazonCampaignId, amazonAdGroupId, ...record }) => ({
+      ...record,
+      ...rowScope(scope),
+      campaignId: parents.campaigns.get(amazonCampaignId)!,
+      adGroupId: parents.adGroups.get(amazonAdGroupId)!,
+    }));
+    return upsertRows(
+      tx,
+      scope,
+      entityTable(amazonAdsProductAds, 'amazonAdId'),
+      rows,
+      parents.created,
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -422,6 +462,7 @@ interface EntityTableView<Row> {
   profileId: PgColumn;
   syncedAt: PgColumn;
   removedAt: PgColumn;
+  updatedAt: PgColumn;
   amazonId: PgColumn;
   amazonIdOf: (row: Row) => string;
   /** Daten-Spalten (Schlüssel im Datensatz → Spalte), die ein Upsert übernimmt. */
@@ -439,6 +480,7 @@ function entityTable<T extends EntityTable, K extends AmazonIdKey & keyof T['$in
     profileId: table.profileId,
     syncedAt: table.syncedAt,
     removedAt: table.removedAt,
+    updatedAt: table.updatedAt,
     amazonId: columns[amazonIdKey]!,
     amazonIdOf: (row) => row[amazonIdKey],
     dataColumns: Object.entries(columns).filter(
@@ -466,6 +508,7 @@ async function upsertRows<Row extends object>(
     placeholdersFilled: 0,
     placeholdersCreated,
   };
+  await assertProfileInOrganization(db, scope);
   const excluded = (column: PgColumn) => sql.raw(`excluded."${column.name}"`);
   const set: Record<string, unknown> = {
     ...Object.fromEntries(view.dataColumns.map(([key, column]) => [key, excluded(column)])),
@@ -497,7 +540,8 @@ async function upsertRows<Row extends object>(
     // Unveränderte Entities: nur bestätigen.
     await db
       .update(view.table)
-      .set({ syncedAt: scope.now })
+      // `updated_at` bleibt (sonst setzte Drizzles `$onUpdate` ihn bei jeder Bestätigung neu).
+      .set({ syncedAt: scope.now, updatedAt: sql`${view.updatedAt}` })
       .where(and(inChunk, or(isNull(view.syncedAt), ne(view.syncedAt, scope.now))));
 
     const created = written.filter((row) => row.inserted).length;
@@ -515,6 +559,7 @@ async function ensureRows<Row extends object>(
   view: EntityTableView<Row>,
   rows: readonly Row[],
 ): Promise<EnsuredEntities> {
+  await assertProfileInOrganization(db, scope);
   const result: EnsuredEntities = { ids: new Map(), created: 0 };
   for (const chunk of chunks(rows)) {
     const created = await db

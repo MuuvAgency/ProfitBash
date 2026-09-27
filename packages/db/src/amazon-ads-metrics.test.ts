@@ -321,6 +321,12 @@ describe('replaceDailyMetrics: Kampagnen', () => {
     expect(result).toEqual({ rows: 0, skipped: 0, deleted: 0, placeholdersCreated: 0 });
   });
 
+  it('lehnt eine Datei ab, deren Zeilen alle ungültig sind', async () => {
+    await expect(
+      replaceDailyMetrics(testDb.db, campaignImport([], { invalidRowCount: 3 })),
+    ).rejects.toThrow(MetricsImportRejectedError);
+  });
+
   it('lehnt doppelte Zeilen (gleicher Tag, gleiche Kampagne) ab', async () => {
     await expect(
       replaceDailyMetrics(
@@ -330,7 +336,7 @@ describe('replaceDailyMetrics: Kampagnen', () => {
           { date: '2026-09-01', amazonCampaignId: 'c-1' },
         ]),
       ),
-    ).rejects.toThrow('doppelt');
+    ).rejects.toThrow(MetricsImportRejectedError);
   });
 
   it('schreibt große Lieferungen in Stücken', async () => {

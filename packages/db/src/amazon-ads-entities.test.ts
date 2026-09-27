@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  ensureCampaigns,
   upsertAdGroups,
   upsertCampaigns,
   upsertNegativeTargets,
@@ -194,6 +195,11 @@ describe('upsertPortfolios', () => {
       placeholdersCreated: 0,
     });
 
+    const [before] = await testDb.db
+      .select({ updatedAt: amazonAdsPortfolios.updatedAt })
+      .from(amazonAdsPortfolios)
+      .where(eq(amazonAdsPortfolios.profileId, profileId));
+
     const second = await upsertPortfolios(testDb.db, scope({ now: t1 }), [portfolio()]);
     expect(second).toEqual({
       created: 0,
@@ -218,6 +224,7 @@ describe('upsertPortfolios', () => {
       inBudget: true,
       syncedAt: t1,
       removedAt: null,
+      updatedAt: before!.updatedAt,
     });
   });
 
@@ -308,10 +315,36 @@ describe('upsertCampaigns', () => {
     expect(await campaignRow('c-dup')).toMatchObject({ removedAt: null, syncedAt: t1 });
   });
 
-  it('lehnt ein Profil einer anderen Organisation ab', async () => {
+  it('lehnt ein Profil einer anderen Organisation ab, auch für vorhandene Entities', async () => {
+    const foreignScope = { organizationId: otherOrganizationId, profileId: foreignProfileId };
+    await upsertCampaigns(testDb.db, { ...foreignScope, now: t0 }, [campaign({ name: 'Fremd' })]);
+
     await expect(
-      upsertCampaigns(testDb.db, scope({ profileId: foreignProfileId }), [campaign()]),
-    ).rejects.toMatchObject({ cause: { constraint_name: 'amazon_ads_campaigns_profile_org_fk' } });
+      upsertCampaigns(testDb.db, scope({ profileId: foreignProfileId }), [
+        campaign({ name: 'Überschrieben' }),
+      ]),
+    ).rejects.toThrow('Profil nicht gefunden');
+    await expect(
+      ensureCampaigns(testDb.db, { organizationId, profileId: foreignProfileId }, [
+        { amazonCampaignId: 'c-1', adProduct: SP },
+      ]),
+    ).rejects.toThrow('Profil nicht gefunden');
+    expect((await campaignRow('c-1', foreignProfileId))?.name).toBe('Fremd');
+  });
+
+  it('schreibt nichts, wenn ein Teil der Lieferung scheitert', async () => {
+    await expect(
+      upsertCampaigns(testDb.db, scope(), [
+        campaign({ amazonCampaignId: 'c-atomar', amazonPortfolioId: 'pf-atomar' }),
+        campaign({ amazonCampaignId: 'c-kaputt', budgetAmount: 'kein Betrag' }),
+      ]),
+    ).rejects.toThrow();
+    expect(await campaignRow('c-atomar')).toBeUndefined();
+    const [pf] = await testDb.db
+      .select()
+      .from(amazonAdsPortfolios)
+      .where(eq(amazonAdsPortfolios.amazonPortfolioId, 'pf-atomar'));
+    expect(pf).toBeUndefined();
   });
 });
 
