@@ -8,7 +8,7 @@ import { gridStyleOptions, gridTheme } from '../grid/grid';
 import ResultCell from './cells/ResultCell.vue';
 import StatusCell from './cells/StatusCell.vue';
 import type { JobRunGridContext } from './cells/types';
-import { useJobRunLabels } from './labels';
+import { elapsedMs, useJobRunLabels } from './labels';
 
 defineProps<{ runs: JobRun[] }>();
 
@@ -59,11 +59,11 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
   {
     colId: 'duration',
     headerName: t('sync.column.duration'),
-    valueGetter: ({ data }) =>
-      data?.finishedAt ? Date.parse(data.finishedAt) - Date.parse(data.startedAt) : null,
+    // Laufende Jobs: Dauer bis jetzt. Der Wert ändert sich bei jeder Abfrage, so zeichnet AG Grid neu.
+    valueGetter: ({ data }) => (data ? elapsedMs(data) : null),
     valueFormatter: ({ data }) => (data ? labels.duration(data) : ''),
     cellClass: DATA_CELL,
-    width: 120,
+    width: 140,
   },
   {
     colId: 'result',

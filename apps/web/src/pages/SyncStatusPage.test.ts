@@ -101,6 +101,7 @@ const jobRunRequests = (requests: ReturnType<typeof stubFetch>['requests']) =>
 afterEach(() => {
   cleanupMounted();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('SyncStatusPage', () => {
@@ -164,7 +165,18 @@ describe('SyncStatusPage', () => {
 
     const runningRow = row(wrapper, running);
     expect(runningRow.text()).toContain('Läuft');
-    expect(runningRow.get('[col-id="duration"]').text()).toBe('–');
+  });
+
+  it('zeigt bei laufenden Jobs die bisherige Dauer (hängende Jobs erkennen)', async () => {
+    // Nur die Uhr fälschen: Timer (Abfragen, waitFor) laufen weiter.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-26T06:05:30.000Z'));
+    stubFetch(routes([running, failed]));
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, running);
+
+    expect(row(wrapper, running).get('[col-id="duration"]').text()).toBe('1 Std. 5 Min.');
+    expect(row(wrapper, failed).get('[col-id="duration"]').text()).toBe('3 Min. 12 Sek.');
   });
 
   it('zeigt die Amazon-Datenjobs (1.7) mit ihren Zählern in fester Reihenfolge', async () => {
