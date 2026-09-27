@@ -8,7 +8,6 @@ import {
   completeBackfill,
   countFailedAmazonRequestsSince,
   ensureBackfill,
-  errorLogFields,
   findPreviousJobRun,
   listReportRanges,
   OPEN_AMAZON_REQUEST_STATUSES,
@@ -21,9 +20,14 @@ import {
   todayIn,
   type DateRange,
 } from '../amazon-requests/date-ranges';
-import { isConnectionError, submitAmazonRequest } from '../amazon-requests/state-machine';
+import { submitAmazonRequest } from '../amazon-requests/state-machine';
 import { JobFailure, type JobCounters, type JobOutcome } from '../run-job';
-import { addCounters, createAmazonJobContext, type AmazonJobContext } from './amazon-context';
+import {
+  addCounters,
+  createAmazonJobContext,
+  forEachProfileWithinBudget,
+  type AmazonJobContext,
+} from './amazon-context';
 import { schedulePoll } from './amazon-requests-poll';
 import {
   handleAmazonError,
@@ -72,21 +76,15 @@ export async function syncConnectionReports(
   };
 
   try {
-    for (const profile of profiles) {
-      try {
-        await syncProfile(deps, connection, run, context, profile, counters);
-      } catch (err) {
-        if (isConnectionError(err)) throw err;
-        counters.profileErrors = (counters.profileErrors ?? 0) + 1;
-        deps.logger({
-          level: 'warn',
-          msg: 'reports_sync.profile_failed',
-          connectionId: connection.id,
-          profileId: profile.id,
-          ...errorLogFields(err),
-        });
-      }
-    }
+    await forEachProfileWithinBudget({
+      deps,
+      queue: 'reports-sync',
+      job,
+      profiles,
+      now: context.now,
+      counters,
+      handle: (profile) => syncProfile(deps, connection, run, context, profile, counters),
+    });
   } catch (err) {
     return handleAmazonError(deps, 'reports-sync', job, connection, err);
   }
@@ -94,7 +92,7 @@ export async function syncConnectionReports(
   await schedulePoll(deps, job, context.now());
   if (counters.profileErrors) {
     throw new JobFailure(
-      `Report-Anforderung für ${counters.profileErrors} von ${profiles.length} Profilen fehlgeschlagen.`,
+      `Report-Anforderung für ${counters.profileErrors} von ${counters.profiles} Profilen fehlgeschlagen.`,
       counters,
     );
   }

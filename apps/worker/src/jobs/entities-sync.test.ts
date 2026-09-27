@@ -16,7 +16,7 @@ import { eq, isNotNull } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { JobFailure } from '../run-job';
 import { createConnection, createOrganization, testKeyring } from '../testing';
-import { MAX_RUNNING_EXPORTS_PER_TYPE } from './amazon-context';
+import { DATA_JOB_TIME_BUDGET_MS, MAX_RUNNING_EXPORTS_PER_TYPE } from './amazon-context';
 import type { ConnectionJobData, ConnectionJobDeps, ConnectionQueue } from './connection-job';
 import { syncConnectionEntities } from './entities-sync';
 import { syncConnectionProfiles } from './profiles-sync';
@@ -85,9 +85,11 @@ beforeAll(async () => {
     simulation: { now: () => clock, processingMs: 60_000 },
   });
   await syncConnectionProfiles(deps(), { organizationId, connectionId }, run());
+  // Reihenfolge wie im Job (Fortsetzen nach Zeitbudget).
   profiles = await testDb.db
     .select({ id: amazonAdsProfiles.id, amazonProfileId: amazonAdsProfiles.amazonProfileId })
-    .from(amazonAdsProfiles);
+    .from(amazonAdsProfiles)
+    .orderBy(amazonAdsProfiles.createdAt, amazonAdsProfiles.id);
 });
 
 afterAll(async () => {
@@ -253,6 +255,32 @@ describe('syncConnectionEntities', () => {
     });
     expect(await exportsOf(deProfileId())).toEqual([]);
     // Die Kette läuft trotzdem weiter (Reports der übrigen Profile).
+    expect(enqueued).toContainEqual(expect.objectContaining({ queue: 'reports-sync' }));
+  });
+
+  it('setzt nach Ablauf des Zeitbudgets in einem neuen Lauf beim nächsten Profil fort', async () => {
+    const slow: AmazonAdsClient = {
+      ...client,
+      listPortfolios: (connection, amazonProfileId, options) => {
+        clock += DATA_JOB_TIME_BUDGET_MS + 1;
+        return client.listPortfolios(connection, amazonProfileId, options);
+      },
+    };
+
+    const outcome = await sync({ chain: true }, deps(slow));
+
+    expect(outcome.counters).toMatchObject({ profiles: 1, continued: 1 });
+    expect(enqueued).toContainEqual({
+      queue: 'entities-sync',
+      job: { organizationId, connectionId, chain: true, resumeFromProfileId: profiles[1]!.id },
+    });
+    // Die Kette geht erst nach dem letzten Profil weiter.
+    expect(enqueued).not.toContainEqual(expect.objectContaining({ queue: 'reports-sync' }));
+
+    enqueued.length = 0;
+    const resumed = await sync({ chain: true, resumeFromProfileId: profiles[1]!.id });
+    expect(resumed.counters).toMatchObject({ profiles: profiles.length - 1 });
+    expect(await exportsOf(profiles[0]!.id)).toHaveLength(4);
     expect(enqueued).toContainEqual(expect.objectContaining({ queue: 'reports-sync' }));
   });
 
