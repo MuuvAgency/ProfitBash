@@ -1,6 +1,6 @@
 // Test-Hilfen für den Worker. Nur aus Tests importieren.
 import { randomBytes } from 'node:crypto';
-import type { AmazonAdsProfile } from '@profitbash/amazon-ads';
+import type { AmazonAdsClient, AmazonAdsProfile } from '@profitbash/amazon-ads';
 import { schema, type Db } from '@profitbash/db';
 import { connectionTokenAad, encrypt, parseKeyring } from '@profitbash/shared/crypto';
 
@@ -64,6 +64,29 @@ export function amazonProfile(
     timezone: 'Europe/Berlin',
     marketplaceId: 'A1PA6795UKMFR9',
     accountType: 'seller',
+    ...overrides,
+  };
+}
+
+/** Amazon-Client, dessen Methoden scheitern, außer den übergebenen (Jobs, die nur wenige Aufrufe brauchen). */
+export function stubAmazonAdsClient(overrides: Partial<AmazonAdsClient> = {}): AmazonAdsClient {
+  const unused = () => Promise.reject(new Error('nicht benutzt'));
+  return {
+    buildAuthorizeUrl: () => {
+      throw new Error('nicht benutzt');
+    },
+    exchangeCode: unused,
+    getAccountIdentity: unused,
+    getAccessToken: unused,
+    invalidateAccessToken: () => {},
+    request: unused,
+    listProfiles: unused,
+    downloadFile: unused,
+    requestExport: unused,
+    getExport: unused,
+    requestReport: unused,
+    getReport: unused,
+    listPortfolios: unused,
     ...overrides,
   };
 }

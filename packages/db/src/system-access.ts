@@ -112,6 +112,38 @@ export async function findUnseenProfiles(
   return rows.map((row) => row.amazonProfileId);
 }
 
+export interface JobProfile {
+  id: string;
+  amazonProfileId: string;
+  timezone: string;
+  removedAt: Date | null;
+}
+
+/**
+ * Alle Profile, die an der Connection hängen, auch ausgeblendete (F14) und entfernte (offene Aufträge
+ * entfernter Profile laufen noch aus). Die Datenjobs filtern entfernte selbst.
+ */
+export async function listJobProfiles(
+  db: DbOrTx,
+  input: { organizationId: string; connectionId: string },
+): Promise<JobProfile[]> {
+  return db
+    .select({
+      id: amazonAdsProfiles.id,
+      amazonProfileId: amazonAdsProfiles.amazonProfileId,
+      timezone: amazonAdsProfiles.timezone,
+      removedAt: amazonAdsProfiles.removedAt,
+    })
+    .from(amazonAdsProfiles)
+    .where(
+      and(
+        eq(amazonAdsProfiles.organizationId, input.organizationId),
+        eq(amazonAdsProfiles.connectionId, input.connectionId),
+      ),
+    )
+    .orderBy(amazonAdsProfiles.createdAt, amazonAdsProfiles.id);
+}
+
 /**
  * Alle aktiven Connections aller Organisationen (Planung der Jobs je Connection). Plattformweiter
  * Systemzugriff, nur für den Worker.

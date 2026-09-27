@@ -3,6 +3,7 @@ import { createRequestMeter } from '@profitbash/amazon-ads';
 import {
   acquireConnectionLease,
   errorLogFields,
+  extendConnectionLease,
   findJobConnection,
   releaseConnectionLease,
   type Db,
@@ -60,7 +61,10 @@ export async function runConnectionJob(
   const scope = { organizationId: job.organizationId, scope: job.connectionId };
   const meter = createRequestMeter();
 
-  if (!definition.lease) return runJob(queue, scope, () => definition.run(deps, job, { meter }));
+  if (!definition.lease) {
+    const run = { meter, runId: null, extendLease: () => Promise.resolve() };
+    return runJob(queue, scope, () => definition.run(deps, job, run));
+  }
 
   // Ohne Connection (gelöscht, fremde Organisation) gäbe die Lease nur einen FK-Fehler ohne Lauf.
   if (!(await findJobConnection(db, job))) {
@@ -94,8 +98,20 @@ export async function runConnectionJob(
     return { status: 'deferred', queued };
   }
 
+  const run: ConnectionJobRun = {
+    meter,
+    runId,
+    async extendLease() {
+      const extended = await extendConnectionLease(db, {
+        ...leaseRef,
+        ttlSeconds: CONNECTION_LEASE_SECONDS,
+      });
+      // Abgelaufen und von einem anderen Lauf übernommen: weiterarbeiten wäre parallel zu ihm.
+      if (!extended) throw new JobFailure('Die Lease der Connection ist verloren gegangen.');
+    },
+  };
   try {
-    return await runJob(queue, scope, () => definition.run(deps, job, { meter }), {
+    return await runJob(queue, scope, () => definition.run(deps, job, run), {
       runId,
       counters: () => ({
         requests: meter.requests,

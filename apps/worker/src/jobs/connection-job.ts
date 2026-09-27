@@ -32,7 +32,7 @@ export const CONNECTION_LEASE_SECONDS = 15 * 60;
 /** Ist die Connection belegt, startet der Job so viel später erneut. */
 export const LEASE_DEFER_SECONDS = 60;
 
-/** Daten der Jobs je Connection (`token-refresh`, `profiles-sync`). */
+/** Daten der Jobs je Connection (`CONNECTION_JOB_NAMES`). */
 export const connectionJobDataSchema = z.object({
   organizationId: z.uuid(),
   connectionId: z.uuid(),
@@ -40,6 +40,11 @@ export const connectionJobDataSchema = z.object({
   retryAttempt: z.number().int().min(1).max(MAX_RETRY_AFTER_ATTEMPTS).optional(),
   /** Zählt Zurückstellungen, weil ein anderer Datenjob die Connection hielt (ohne Obergrenze). */
   deferredCount: z.number().int().min(1).optional(),
+  /**
+   * „Jetzt synchronisieren“ (1.7): `profiles-sync` plant danach `entities-sync` ein, dieser `reports-sync`.
+   * Nur der manuelle Auslöser setzt es; die täglichen Läufe haben eigene Zeiten.
+   */
+  chain: z.boolean().optional(),
 });
 
 export type ConnectionJobData = z.infer<typeof connectionJobDataSchema>;
@@ -56,14 +61,33 @@ export interface ScheduledRetry {
 export interface ConnectionJobDeps {
   db: Db;
   logger: Logger;
-  amazonAds: Pick<AmazonAdsClient, 'listProfiles' | 'getAccessToken' | 'invalidateAccessToken'>;
+  amazonAds: AmazonAdsClient;
   /** Plant denselben Job später erneut ein (pg-boss `startAfter`); `false`, wenn schon einer wartet. */
   scheduleRetry(retry: ScheduledRetry): Promise<boolean>;
+  /**
+   * Plant einen Job je Connection ein (Kette, Poll nach dem Anfordern); `false`, wenn für die Connection
+   * in dieser Queue schon einer wartet.
+   */
+  enqueue(
+    queue: ConnectionQueue,
+    job: ConnectionJobData,
+    options?: { startAfterSeconds?: number },
+  ): Promise<boolean>;
+  /** Uhr (Tests). Standard `new Date()`. */
+  now?: () => Date;
 }
 
 /** Kontext eines Laufs: Zähler für alle Aufrufe an Amazon (landen in `job_runs.counters`). */
 export interface ConnectionJobRun {
   meter: RequestMeter;
+  /** ID der `job_runs`-Zeile (nur Datenjobs mit Lease, sonst `null`). */
+  runId: string | null;
+  /**
+   * Verlängert die Lease der Connection um `CONNECTION_LEASE_SECONDS` ab jetzt. Lange Schritte (viele
+   * Aufrufe, Downloads) rufen das vor jedem Schritt, sonst könnte nach Ablauf ein zweiter Datenjob starten.
+   * Ohne Lease wirkungslos.
+   */
+  extendLease(): Promise<void>;
 }
 
 export const CONNECTION_NOT_FOUND_MESSAGE = 'Connection nicht gefunden.';
@@ -130,6 +154,7 @@ export async function handleAmazonError(
         organizationId: job.organizationId,
         connectionId: job.connectionId,
         retryAttempt: attempt + 1,
+        ...(job.chain && { chain: true }),
       },
       startAfterSeconds,
     });

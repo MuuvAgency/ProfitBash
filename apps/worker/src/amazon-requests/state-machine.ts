@@ -816,7 +816,7 @@ function requireBatchId(request: AmazonRequest): string {
 }
 
 /** Fehler, die die ganze Connection betreffen: gehen an den Job, der Auftrag bleibt unverändert. */
-function isConnectionError(error: unknown): boolean {
+export function isConnectionError(error: unknown): boolean {
   if (error instanceof AmazonAdsReauthRequiredError) return true;
   if (error instanceof ConnectionReauthRequiredError) return true;
   return (

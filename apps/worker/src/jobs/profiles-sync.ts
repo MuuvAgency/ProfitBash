@@ -80,6 +80,14 @@ export async function syncConnectionProfiles(
       removalDeferred: resolution?.deferred ? unseen.length : 0,
     };
   });
+  // Kette von „Jetzt synchronisieren“: Profile → Entities → Reports.
+  if (job.chain) {
+    await deps.enqueue('entities-sync', {
+      organizationId: job.organizationId,
+      connectionId: job.connectionId,
+      chain: true,
+    });
+  }
   return { counters };
 }
 

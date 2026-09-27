@@ -235,6 +235,9 @@ export const de = {
     job: {
       'token-refresh': 'Token-Refresh',
       'profiles-sync': 'Profil-Sync',
+      'entities-sync': 'Entity-Sync',
+      'reports-sync': 'Report-Anforderung',
+      'amazon-requests-poll': 'Amazon-Aufträge abholen',
     },
     status: {
       running: 'Läuft',
