@@ -196,6 +196,28 @@ describe('request', () => {
     expect(refreshes).toBe(2);
   });
 
+  it("reicht decimals: 'string' an den Parser weiter (Beträge als Quelltext)", async () => {
+    tokenEndpoint();
+    server.use(
+      http.post(
+        'https://advertising-api-eu.amazon.com/test',
+        () =>
+          new HttpResponse('{"amount": 12.50}', {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
+    );
+    const { client } = setup();
+    const result = await client.request(connection, {
+      operation: 't',
+      method: 'POST',
+      path: '/test',
+      decimals: 'string',
+      schema: z.object({ amount: z.string() }),
+    });
+    expect(result).toEqual({ amount: '12.50' });
+  });
+
   it('akzeptiert nur Pfade, keine vollständigen URLs (Tokens gehen nur an Amazon-Hosts)', async () => {
     const { client } = setup();
     await expect(

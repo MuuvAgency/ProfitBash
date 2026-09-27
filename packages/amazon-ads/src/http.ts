@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { AmazonAdsHttpError, AmazonAdsNetworkError, AmazonAdsResponseError } from './errors';
-import { parseJsonLossless } from './json';
+import { parseJsonLossless, type ParseJsonLosslessOptions } from './json';
 import { noopLogger, type Logger } from './logger';
 
 /**
@@ -46,6 +46,12 @@ export interface HttpRequest<S extends z.ZodType> {
   headers?: Record<string, string>;
   body?: string | URLSearchParams;
   schema: S;
+  /**
+   * `string`: Dezimalzahlen der Antwort kommen als Quelltext-String (Beträge, siehe `parseJsonLossless`).
+   * Standard `number`. Mit `string` gilt das für **alle** gebrochenen Werte; das Schema nimmt sie über
+   * `amazonDecimalSchema`, nie `z.number()`.
+   */
+  decimals?: ParseJsonLosslessOptions['decimals'];
   /**
    * 5xx und Netzwerkfehler wiederholen. Standard: nur bei GET. Bei schreibenden Aufrufen könnte eine
    * Wiederholung sonst doppelt wirken.
@@ -251,7 +257,8 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
 function parseAndValidate<S extends z.ZodType>(request: HttpRequest<S>, text: string): z.output<S> {
   let data: unknown;
   try {
-    data = text === '' ? undefined : parseJsonLossless(text);
+    data =
+      text === '' ? undefined : parseJsonLossless(text, { decimals: request.decimals ?? 'number' });
   } catch {
     throw new AmazonAdsResponseError(
       `${request.operation}: Antwort von Amazon ist kein gültiges JSON.`,
@@ -301,7 +308,8 @@ function parseErrorBody(text: string): { code: string | null; details: string | 
     return null;
   };
   const code = pick('code', 'error');
-  const details = pick('details', 'message', 'error_description');
+  // `detail` liefert Reporting v3 (z. B. bei 425 mit der ID des laufenden Reports).
+  const details = pick('details', 'detail', 'message', 'error_description');
   return {
     code: code === null ? null : sanitize(code, 64),
     details: details === null ? null : sanitize(details, MAX_DETAIL_LENGTH),
@@ -328,5 +336,13 @@ function httpError(
     (code ? ` (${code})` : '') +
     (details ? `: ${details}` : '') +
     '.';
-  return new AmazonAdsHttpError(message, operation, status, code, amazonRequestId, retryAfterMs);
+  return new AmazonAdsHttpError(
+    message,
+    operation,
+    status,
+    code,
+    amazonRequestId,
+    retryAfterMs,
+    details,
+  );
 }
