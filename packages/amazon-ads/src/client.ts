@@ -20,6 +20,7 @@ import {
   type AmazonAdsCredentials,
   type TokenSet,
 } from './lwa';
+import { listPortfolios, type AmazonAdsPortfolio } from './portfolios';
 import { normalizeProfiles, profileResponseSchema, type AmazonAdsProfile } from './profiles';
 import { createProfileRateLimiter, type ProfileRateLimiterOptions } from './rate-limit';
 import { AMAZON_ADS_REGIONS, type AmazonAdsRegion, type AmazonAdsRegionEndpoints } from './regions';
@@ -71,6 +72,12 @@ export interface AmazonAdsClient {
    * ohne Token). Liefert den rohen gzip-Body; entpacken mit `decodeGzipJson`.
    */
   downloadFile(url: string): Promise<AmazonAdsDownload>;
+  /** Alle Portfolios eines Profils (synchron, paginiert). */
+  listPortfolios(
+    connection: ConnectionRef,
+    amazonProfileId: string,
+    options?: RequestOptions,
+  ): Promise<AmazonAdsPortfolio[]>;
 }
 
 export interface AmazonAdsClientOptions {
@@ -202,6 +209,8 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
       });
       return normalizeProfiles(response, logger);
     },
+    listPortfolios: (connection, amazonProfileId, requestOptions) =>
+      listPortfolios({ request, logger }, connection, amazonProfileId, requestOptions),
     downloadFile: (url) =>
       downloadFile(url, { fetch: fetchImpl, logger, timeoutMs: DOWNLOAD_TIMEOUT_MS }),
   };

@@ -51,6 +51,7 @@ export {
   renderMockConsentPage,
   type MockAmazonAdsClientOptions,
 } from './mock';
+export { PORTFOLIOS_CONTENT_TYPE, type AmazonAdsPortfolio } from './portfolios';
 export { amazonIdSchema, KNOWN_ACCOUNT_TYPES, type AmazonAdsProfile } from './profiles';
 export { DEFAULT_REQUESTS_PER_SECOND, type ProfileRateLimiterOptions } from './rate-limit';
 export {
