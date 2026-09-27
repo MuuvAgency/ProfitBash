@@ -92,7 +92,7 @@ Secrets nur in Railway eintragen, nie ins Repo, nie in Actions-Logs. Werte mit `
 | `AMAZON_ADS_USE_MOCK` | `true` bis zur Ads-API-Freigabe, dann `false` |
 | `AMAZON_ADS_CLIENT_ID`, `AMAZON_ADS_CLIENT_SECRET` | aus dem Security Profile (Pflicht ohne Mock) |
 | `AMAZON_ADS_REQUESTS_PER_SECOND` | optional, Anfrage-Budget je Profil (Standard 2, mindestens 0.2); erst nach beobachteten 429-Quoten ändern |
-| `HEALTHCHECKS_TOKEN_REFRESH_URL`, `HEALTHCHECKS_PROFILES_SYNC_URL` | Ping-URLs (siehe Healthchecks.io) |
+| `HEALTHCHECKS_TOKEN_REFRESH_URL`, `HEALTHCHECKS_PROFILES_SYNC_URL`, `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPORTS_SYNC_URL` | Ping-URLs (siehe Healthchecks.io) |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `35` (falls nicht in den Einstellungen gesetzt) |
 
 Nicht setzen: `NODE_ENV` (siehe oben), `PORT` (setzt Railway; hat in Produktion Vorrang vor `API_PORT`), `MIGRATIONS_DIR`,
@@ -110,17 +110,20 @@ Nicht setzen: `NODE_ENV` (siehe oben), `PORT` (setzt Railway; hat in Produktion 
 
 ## Healthchecks.io
 
-Vier Checks anlegen, Ping-URLs als Variablen eintragen (nur https). Die Ping-URLs sind geheim (wer sie kennt, kann
+Sechs Checks anlegen, Ping-URLs als Variablen eintragen (nur https). Die Ping-URLs sind geheim (wer sie kennt, kann
 falsche Erfolge melden):
 
 | Check | Periode | Karenzzeit | Variable |
 |---|---|---|---|
 | token-refresh | 1 Stunde | großzügig (z. B. 30 Min.) | `HEALTHCHECKS_TOKEN_REFRESH_URL` |
 | profiles-sync | 1 Tag | großzügig (z. B. 2 Std.) | `HEALTHCHECKS_PROFILES_SYNC_URL` |
+| entities-sync | 1 Tag | großzügig (z. B. 2 Std.) | `HEALTHCHECKS_ENTITIES_SYNC_URL` |
+| reports-sync | 1 Tag | großzügig (z. B. 2 Std.) | `HEALTHCHECKS_REPORTS_SYNC_URL` |
 | db-backup | 1 Tag | 2 Std. | `HEALTHCHECKS_DB_BACKUP_URL` (Service `db-backup`) |
 | db-restore-test | 31 Tage | 3 Tage | `HEALTHCHECKS_DB_RESTORE_URL` (lokal beim Test-Restore) |
 
-Auslöser und Connection-Jobs pingen dieselbe URL (Details in `phase-0.md`, 0.7). Backup und Test-Restore pingen `/start`,
+Auslöser und Connection-Jobs pingen dieselbe URL (Details in `phase-0.md`, 0.7). `amazon-requests-poll` pingt nicht
+(läuft oft und kurz); gescheiterte Amazon-Aufträge zeigt `reports-sync` im Zähler `failedSinceLastRun` (Phase 1, 1.7). Backup und Test-Restore pingen `/start`,
 Erfolg und `/fail`. Bleibt der monatliche Test-Restore aus, meldet sich „db-restore-test“.
 
 ## Graceful Shutdown

@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createConnection, createOrganization, testKeyring } from './testing';
 import { startJobQueue, startWorker, type Worker } from './worker';
 
-const { amazonAdsProfiles, connectionJobLeases, jobRuns } = schema;
+const { amazonAdsProfiles, amazonAdsReportRequests, connectionJobLeases, jobRuns } = schema;
 
 let testDb: TestDatabase;
 let organizationId = '';
@@ -57,6 +57,8 @@ describe('startWorker', () => {
         redirectUri: 'http://localhost:5173/api/amazon/oauth/callback',
         consentUrl: 'http://localhost:5173/api/amazon/oauth/mock-consent',
         store: createConnectionTokenStore({ db: testDb.db, keyring: testKeyring }),
+        // Ohne Budget-Pause: Der Standard (2/s je Profil) machte die Kette im Test langsam.
+        rateLimit: { requestsPerSecond: 100 },
       }),
       logger: (entry) => logs.push(entry),
       pollingIntervalSeconds: 0.5,
@@ -67,13 +69,16 @@ describe('startWorker', () => {
     await worker.stop();
   });
 
-  it('richtet die Zeitpläne ein (stündlicher Refresh, Sync 05:00 Berlin, täglicher Cleanup)', async () => {
+  it('richtet die Zeitpläne ein (Refresh stündlich, Profile 05:00, Entities und Reports 06:00 Berlin, Poll alle 10 Min.)', async () => {
     const rows = await testDb.db.execute<{ name: string; cron: string; timezone: string }>(
       sql`select name, cron, timezone from pgboss.schedule order by name`,
     );
     expect([...rows]).toEqual([
+      { name: 'amazon-requests-poll-all', cron: '*/10 * * * *', timezone: 'UTC' },
+      { name: 'entities-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'job-runs-cleanup', cron: '30 3 * * *', timezone: 'Europe/Berlin' },
       { name: 'profiles-sync-all', cron: '0 5 * * *', timezone: 'Europe/Berlin' },
+      { name: 'reports-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'token-refresh-all', cron: '0 * * * *', timezone: 'UTC' },
     ]);
   });
@@ -118,6 +123,65 @@ describe('startWorker', () => {
       .from(amazonAdsProfiles)
       .where(eq(amazonAdsProfiles.amazonProfileId, '9007199254740993'));
     expect(big).toMatchObject({ connectionId, countryCode: 'DE' });
+  });
+
+  it('kettet bei „Jetzt synchronisieren“ Profile → Entities → Reports', async () => {
+    await worker.jobs.enqueueProfilesSync({ organizationId, connectionId, chain: true });
+
+    const finished = async (job: string) => {
+      const [row] = await testDb.db
+        .select()
+        .from(jobRuns)
+        .where(and(eq(jobRuns.job, job), eq(jobRuns.scope, connectionId)));
+      return row && row.status !== 'running' ? row : undefined;
+    };
+    const entities = await waitFor(() => finished('entities-sync'), 20_000);
+    const reports = await waitFor(() => finished('reports-sync'), 20_000);
+
+    expect(entities).toMatchObject({ status: 'success' });
+    expect(entities.counters.requested).toBeGreaterThan(0);
+    expect(reports).toMatchObject({ status: 'success' });
+    expect(reports.counters.requested).toBeGreaterThan(0);
+    // Der Poll wartet auf den ersten Termin (1 Min.) der angeforderten Aufträge.
+    expect(await queuedJobs('amazon-requests-poll')).toContainEqual({
+      singleton_key: connectionId,
+      state: 'created',
+    });
+  }, 30_000);
+
+  it('plant beim Poll-Auslöser nur Connections mit fälligen Aufträgen ein', async () => {
+    await testDb.db.execute(sql`delete from pgboss.job where name = 'amazon-requests-poll'`);
+    await testDb.db
+      .update(amazonAdsReportRequests)
+      .set({ nextPollAt: new Date(Date.now() - 1000) });
+    const boss = new PgBoss({ connectionString: testDb.url, supervise: false, schedule: false });
+    await boss.start();
+    try {
+      await boss.send('amazon-requests-poll-all', {});
+    } finally {
+      await boss.stop();
+    }
+
+    const dispatch = await waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(jobRuns)
+        .where(and(eq(jobRuns.job, 'amazon-requests-poll'), isNull(jobRuns.scope)));
+      return row && row.status !== 'running' ? row : undefined;
+    });
+    expect(dispatch).toMatchObject({ status: 'success', counters: { connections: 1, queued: 1 } });
+    const poll = await waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(jobRuns)
+        .where(and(eq(jobRuns.job, 'amazon-requests-poll'), eq(jobRuns.scope, connectionId)));
+      return row && row.status !== 'running' ? row : undefined;
+    });
+    expect(poll).toMatchObject({ status: 'success' });
+    // Keine weiteren Polls in den folgenden Tests (sie hielten die Lease der Connection).
+    await testDb.db.execute(
+      sql`delete from pgboss.job where name = 'amazon-requests-poll' and state = 'created'`,
+    );
   });
 
   it('plant beim stündlichen Auslöser je aktiver Connection einen token-refresh ein', async () => {

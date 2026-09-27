@@ -122,6 +122,8 @@ const optionalHttpsUrl = z.preprocess(
 export const healthchecksEnvSchema = z.object({
   HEALTHCHECKS_TOKEN_REFRESH_URL: optionalHttpsUrl,
   HEALTHCHECKS_PROFILES_SYNC_URL: optionalHttpsUrl,
+  HEALTHCHECKS_ENTITIES_SYNC_URL: optionalHttpsUrl,
+  HEALTHCHECKS_REPORTS_SYNC_URL: optionalHttpsUrl,
 });
 
 export class EnvValidationError extends Error {
