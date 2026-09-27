@@ -7,6 +7,7 @@ import {
   type AmazonAdsProductAd,
 } from '@profitbash/amazon-ads';
 import {
+  findAdGroupCampaignIds,
   markEntitiesRemoved,
   replaceDailyMetrics,
   upsertAdGroups,
@@ -137,7 +138,25 @@ async function importEntityBatch(
   const exportedTargets = targetsFile.rows as AmazonAdsExportedTarget[];
   const ads = adsFile.rows as AmazonAdsProductAd[];
 
+  // Kampagne über die Ad Groups des Batches, sonst über vorhandene (die Exports eines Batches können
+  // zeitversetzt laufen, siehe Export-Plätze in `amazon-context.ts`).
   const campaignOfAdGroup = new Map(adGroups.map((g) => [g.amazonAdGroupId, g.amazonCampaignId]));
+  const missingAdGroups = [...exportedTargets.map((row) => row.target), ...ads].flatMap((row) =>
+    row.amazonCampaignId === null &&
+    row.amazonAdGroupId !== null &&
+    !campaignOfAdGroup.has(row.amazonAdGroupId)
+      ? [row.amazonAdGroupId]
+      : [],
+  );
+  if (missingAdGroups.length > 0) {
+    for (const [adGroupId, campaignId] of await findAdGroupCampaignIds(
+      tx,
+      scope,
+      missingAdGroups,
+    )) {
+      campaignOfAdGroup.set(adGroupId, campaignId);
+    }
+  }
   let unresolved = 0;
   function withCampaign<
     T extends { amazonCampaignId: string | null; amazonAdGroupId: string | null },

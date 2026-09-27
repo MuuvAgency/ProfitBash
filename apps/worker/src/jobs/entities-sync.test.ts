@@ -12,12 +12,19 @@ import {
   upsertPortfolios,
 } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
+import type { LogEntry } from '@profitbash/shared';
 import { eq, isNotNull } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { JobFailure } from '../run-job';
 import { createConnection, createOrganization, testKeyring } from '../testing';
 import { DATA_JOB_TIME_BUDGET_MS, MAX_RUNNING_EXPORTS_PER_TYPE } from './amazon-context';
-import type { ConnectionJobData, ConnectionJobDeps, ConnectionQueue } from './connection-job';
+import {
+  LeaseLostError,
+  type ConnectionJobData,
+  type ConnectionJobDeps,
+  type ConnectionQueue,
+  type ScheduledRetry,
+} from './connection-job';
 import { syncConnectionEntities } from './entities-sync';
 import { syncConnectionProfiles } from './profiles-sync';
 
@@ -33,6 +40,9 @@ let connectionId = '';
 let profiles: Array<{ id: string; amazonProfileId: string }> = [];
 let clock = START;
 let client: AmazonAdsClient;
+const retries: ScheduledRetry[] = [];
+const logs: LogEntry[] = [];
+let enqueueAccepted = true;
 const enqueued: Array<{
   queue: ConnectionQueue;
   job: ConnectionJobData;
@@ -44,12 +54,15 @@ const deProfileId = () => profiles.find((p) => p.amazonProfileId === DE)!.id;
 function deps(amazonAds: AmazonAdsClient = client): ConnectionJobDeps {
   return {
     db: testDb.db,
-    logger: () => {},
+    logger: (entry) => logs.push(entry),
     amazonAds,
-    scheduleRetry: () => Promise.resolve(true),
+    scheduleRetry(retry) {
+      retries.push(retry);
+      return Promise.resolve(true);
+    },
     enqueue(queue, job, options) {
       enqueued.push({ queue, job, ...options });
-      return Promise.resolve(true);
+      return Promise.resolve(enqueueAccepted);
     },
     now: () => new Date(clock),
   };
@@ -99,6 +112,9 @@ afterAll(async () => {
 beforeEach(async () => {
   clock = START;
   enqueued.length = 0;
+  retries.length = 0;
+  logs.length = 0;
+  enqueueAccepted = true;
   await testDb.db.delete(amazonAdsReportRequests);
   await testDb.db.update(amazonAdsProfiles).set({ removedAt: null, isHidden: false });
 });
@@ -282,6 +298,66 @@ describe('syncConnectionEntities', () => {
     expect(resumed.counters).toMatchObject({ profiles: profiles.length - 1 });
     expect(await exportsOf(profiles[0]!.id)).toHaveLength(4);
     expect(enqueued).toContainEqual(expect.objectContaining({ queue: 'reports-sync' }));
+  });
+
+  it('setzt nach Retry-After beim gedrosselten Profil fort und behält die Zähler', async () => {
+    const throttled: AmazonAdsClient = {
+      ...client,
+      listPortfolios: (connection, amazonProfileId, options) =>
+        amazonProfileId === profiles[1]!.amazonProfileId
+          ? Promise.reject(
+              new AmazonAdsHttpError('Rate-Limit', 'portfolios.list', 429, null, null, 30_000),
+            )
+          : client.listPortfolios(connection, amazonProfileId, options),
+    };
+
+    const error = await sync({ chain: true }, deps(throttled)).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(JobFailure);
+    expect((error as JobFailure).counters).toMatchObject({ profiles: 2, requested: 4 });
+    expect(retries).toEqual([
+      {
+        queue: 'entities-sync',
+        job: {
+          organizationId,
+          connectionId,
+          retryAttempt: 1,
+          chain: true,
+          resumeFromProfileId: profiles[1]!.id,
+        },
+        startAfterSeconds: 30,
+      },
+    ]);
+  });
+
+  it('bricht ab, wenn die Lease verloren geht, statt Profile als gescheitert zu zählen', async () => {
+    let calls = 0;
+    const lost = {
+      meter: createRequestMeter(),
+      runId: null,
+      extendLease: () => {
+        calls += 1;
+        return calls > 1 ? Promise.reject(new LeaseLostError()) : Promise.resolve();
+      },
+    };
+
+    await expect(
+      syncConnectionEntities(deps(), { organizationId, connectionId, chain: true }, lost),
+    ).rejects.toBeInstanceOf(LeaseLostError);
+    expect(enqueued).not.toContainEqual(expect.objectContaining({ queue: 'reports-sync' }));
+  });
+
+  it('loggt, wenn die Kette wegfällt, weil für die Connection schon ein Job wartet', async () => {
+    enqueueAccepted = false;
+    await sync({ chain: true });
+    expect(logs).toContainEqual(
+      expect.objectContaining({
+        msg: 'job.follow_up_dropped',
+        job: 'entities-sync',
+        followUp: 'reports-sync',
+        connectionId,
+      }),
+    );
   });
 
   it('bricht bei einem abgelehnten Refresh-Token sofort ab', async () => {

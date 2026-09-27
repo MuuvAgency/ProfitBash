@@ -331,6 +331,24 @@ describe('Import eines Entity-Batches', () => {
   });
 });
 
+describe('Kampagne über vorhandene Ad Groups', () => {
+  it('löst die Kampagne über eine Ad Group aus der DB auf, wenn sie im Batch fehlt', async () => {
+    await importBatch(fullBatch());
+    // Die Exports eines Batches können zeitversetzt laufen: Die Ad Group fehlt im späteren Export.
+    const content = fullBatch();
+    content.adGroups = [adGroup('ag-1', 'c-1')];
+    content.ads = [ad('ad-1', 'ag-1'), ad('ad-2', 'ag-2')];
+    content.targets = [target('t-2', 'ag-2', null)];
+
+    const counters = await importBatch(content);
+
+    expect(logs).not.toContainEqual(
+      expect.objectContaining({ msg: 'entities_import.unresolved_campaign' }),
+    );
+    expect(counters.created).toBe(0);
+  });
+});
+
 describe('Import eines Reports', () => {
   it('schreibt die Zeilen über replaceDailyMetrics in die Ebene des Report-Typs', async () => {
     const row: AmazonAdsAdGroupDailyMetric = {

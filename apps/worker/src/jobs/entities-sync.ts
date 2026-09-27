@@ -11,12 +11,13 @@ import {
   addCounters,
   createAmazonJobContext,
   forEachProfileWithinBudget,
-  exportSlotFree,
+  handleProfileLoopError,
+  exportSlot,
   type AmazonJobContext,
 } from './amazon-context';
 import { schedulePoll } from './amazon-requests-poll';
 import {
-  handleAmazonError,
+  enqueueFollowUp,
   loadConnection,
   type ConnectionJobData,
   type ConnectionJobDeps,
@@ -67,13 +68,13 @@ export async function syncConnectionEntities(
       handle: (profile) => syncProfile(deps, connection, run, context, profile, counters),
     });
   } catch (err) {
-    return handleAmazonError(deps, 'entities-sync', job, connection, err);
+    return handleProfileLoopError(deps, 'entities-sync', job, connection, err, counters);
   }
 
   await schedulePoll(deps, job, context.now());
   // Die Kette geht erst nach dem letzten Profil weiter (eine Fortsetzung trägt `chain` mit).
   if (finished && job.chain) {
-    await deps.enqueue('reports-sync', {
+    await enqueueFollowUp(deps, 'entities-sync', 'reports-sync', {
       organizationId: job.organizationId,
       connectionId: job.connectionId,
     });
@@ -128,7 +129,7 @@ async function syncProfile(
     };
     let slotsFree = true;
     for (const exportType of EXPORT_TYPES) {
-      if (!(await exportSlotFree(deps, connection, exportType))) slotsFree = false;
+      if (!(await exportSlot(deps, connection, exportType)).free) slotsFree = false;
     }
     if (slotsFree) {
       const { counters: submitted } = await submitAmazonExportBatch(context.machine, batch);

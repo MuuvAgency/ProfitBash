@@ -4,10 +4,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createAmazonExportBatch,
   countFailedAmazonRequestsSince,
-  countRunningExports,
   createAmazonRequest,
   deleteFinishedAmazonRequestsBefore,
   findAmazonRequest,
+  findRunningExports,
   listAmazonRequestBatch,
   listConnectionsWithDueAmazonRequests,
   listDueAmazonRequests,
@@ -368,15 +368,15 @@ describe('listConnectionsWithDueAmazonRequests', () => {
   });
 });
 
-describe('countRunningExports', () => {
-  it('zählt angeforderte Exports eines Typs über alle Profile der Connection', async () => {
-    for (const [profile, status] of [
-      [profileId, 'requested'],
-      [secondProfileId, 'requested'],
-      [otherConnectionProfileId, 'requested'],
+describe('findRunningExports', () => {
+  it('zählt angeforderte Exports eines Typs über alle Profile der Connection, mit frühestem Termin', async () => {
+    for (const [profile, nextPollAt] of [
+      [profileId, minutes(10)],
+      [secondProfileId, minutes(4)],
+      [otherConnectionProfileId, minutes(1)],
     ] as const) {
       const row = await create(exportRequest({ profileId: profile }));
-      await updateAmazonRequest(testDb.db, row, { status });
+      await updateAmazonRequest(testDb.db, row, { status: 'requested', nextPollAt });
     }
     await create(exportRequest({ adProduct: 'SPONSORED_BRANDS' }));
     const completed = await create(exportRequest({ adProduct: 'SPONSORED_DISPLAY' }));
@@ -385,12 +385,15 @@ describe('countRunningExports', () => {
     await updateAmazonRequest(testDb.db, otherType, { status: 'requested' });
 
     expect(
-      await countRunningExports(testDb.db, {
+      await findRunningExports(testDb.db, {
         organizationId,
         connectionId,
         exportType: 'campaigns',
       }),
-    ).toBe(2);
+    ).toEqual({ count: 2, nextPollAt: minutes(4) });
+    expect(
+      await findRunningExports(testDb.db, { organizationId, connectionId, exportType: 'ads' }),
+    ).toEqual({ count: 0, nextPollAt: null });
   });
 });
 

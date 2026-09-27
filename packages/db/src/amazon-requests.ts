@@ -288,13 +288,16 @@ export async function listConnectionsWithDueAmazonRequests(
     .orderBy(connections.id);
 }
 
-/** Bei Amazon laufende Exports eines Typs (`requested`) über alle Profile der Connection. */
-export async function countRunningExports(
+/**
+ * Bei Amazon laufende Exports eines Typs (`requested`) über alle Profile der Connection: Anzahl und
+ * frühester Termin (`next_poll_at`), an dem einer davon fertig werden und einen Platz freigeben kann.
+ */
+export async function findRunningExports(
   db: DbOrTx,
   input: { organizationId: string; connectionId: string; exportType: string },
-): Promise<number> {
+): Promise<{ count: number; nextPollAt: Date | null }> {
   const [row] = await db
-    .select({ running: count() })
+    .select({ count: count(), nextPollAt: min(amazonAdsReportRequests.nextPollAt) })
     .from(amazonAdsReportRequests)
     .innerJoin(amazonAdsProfiles, onConnectionProfiles)
     .where(
@@ -306,7 +309,7 @@ export async function countRunningExports(
         eq(amazonAdsReportRequests.status, 'requested'),
       ),
     );
-  return row?.running ?? 0;
+  return { count: row?.count ?? 0, nextPollAt: row?.nextPollAt ?? null };
 }
 
 /** Zeiträume der Reports eines Profils, Ad-Typs und Report-Typs in den genannten Zuständen. */

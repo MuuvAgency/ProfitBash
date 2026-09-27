@@ -186,7 +186,13 @@ describe('SyncStatusPage', () => {
       id: '66666666-6666-4666-8666-666666666666',
       job: 'reports-sync',
       startedAt: '2026-09-26T02:00:00.000Z',
-      counters: { profiles: 2, requested: 19, backfillsCompleted: 1, failedSinceLastRun: 2 },
+      counters: {
+        profiles: 2,
+        requested: 19,
+        backfillsCompleted: 1,
+        failedSinceLastRun: 2,
+        continued: 1,
+      },
     });
     stubFetch(routes([poll, reports]));
     const { wrapper } = await mountPage();
@@ -200,7 +206,7 @@ describe('SyncStatusPage', () => {
     const reportsRow = row(wrapper, reports);
     expect(reportsRow.text()).toContain('Report-Anforderung');
     expect(reportsRow.get('[col-id="result"]').text()).toBe(
-      '2 Profile · 19 angefordert · 1 Historie vollständig · 2 seit dem letzten Lauf gescheitert',
+      '2 Profile · 19 angefordert · 1 Historie vollständig · 2 seit dem letzten Lauf gescheitert · 1 Mal fortgesetzt',
     );
   });
 
