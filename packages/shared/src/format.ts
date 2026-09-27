@@ -68,6 +68,21 @@ export function formatPercent(
   });
 }
 
+/** Datum eines Zeitpunkts ohne Uhrzeit, z. B. `26.09.2026`. Ohne `timeZone` in der Zeitzone des Browsers. */
+export function formatDate(
+  value: string | Date | null | undefined,
+  locale: Locale,
+  { timeZone }: { timeZone?: string } = {},
+): string {
+  if (value === null || value === undefined) return MISSING_VALUE;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return MISSING_VALUE;
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    ...(timeZone && { timeZone }),
+  }).format(date);
+}
+
 /**
  * Zeitpunkt mit Datum und Uhrzeit (Sekunden), z. B. `26.09.2026, 10:15:03`. Ohne `timeZone` in der
  * Zeitzone des Browsers.

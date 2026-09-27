@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatCurrency,
+  formatDate,
   formatDateTime,
   formatDuration,
   formatNumber,
@@ -83,6 +84,20 @@ describe('Randfälle', () => {
 
   it('zeigt bei ungültigem Währungscode den Platzhalter statt einen Fehler zu werfen', () => {
     expect(formatCurrency('1', 'EURO', 'de-DE')).toBe(MISSING_VALUE);
+  });
+});
+
+describe('formatDate', () => {
+  const berlin = { timeZone: 'Europe/Berlin' };
+
+  it('formatiert ISO-Zeitstempel je Locale als Datum ohne Uhrzeit', () => {
+    expect(formatDate('2026-09-26T23:15:00.000Z', 'de-DE', berlin)).toBe('27.09.2026');
+    expect(formatDate('2026-09-26T08:15:00.000Z', 'en-US', berlin)).toBe('Sep 26, 2026');
+  });
+
+  it('zeigt fehlende oder ungültige Werte als Platzhalter', () => {
+    expect(formatDate(null, 'de-DE')).toBe(MISSING_VALUE);
+    expect(formatDate('kein Datum', 'de-DE')).toBe(MISSING_VALUE);
   });
 });
 

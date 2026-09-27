@@ -148,6 +148,16 @@ export const de = {
       'Amazon akzeptiert die Freigabe nicht mehr. Bitte mit demselben Amazon-Konto neu verbinden.',
     lastRefreshed: 'Token erneuert',
     never: 'noch nie',
+    /** Einwilligung bei Amazon: Refresh-Tokens laufen 365 Tage danach ab. `{date}` = Ablaufdatum. */
+    consent: {
+      expiresOn: 'Einwilligung läuft ab am {date}',
+      expiredOn: 'Einwilligung abgelaufen am {date}',
+      unknown: 'Ablauf der Einwilligung: unbekannt',
+      expiringHint:
+        'Die Einwilligung bei Amazon läuft am {date} ab. Danach stoppt der Datenabruf. Bitte vorher mit demselben Amazon-Konto neu verbinden.',
+      expiredHint:
+        'Die Einwilligung bei Amazon ist abgelaufen. Bitte mit demselben Amazon-Konto neu verbinden.',
+    },
     profileCount: 'Profile',
     oauth: {
       dismiss: 'Hinweis schließen',
