@@ -2,6 +2,7 @@ export * from './client';
 export * as schema from './schema';
 export * from './access';
 export * from './amazon-ads-entities';
+export * from './amazon-ads-metrics';
 export * from './amazon-requests';
 export * from './audit';
 export * from './connection-leases';

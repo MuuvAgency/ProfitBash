@@ -1,0 +1,472 @@
+import { and, between, eq, getTableColumns, or, sql, type SQL } from 'drizzle-orm';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import {
+  ensureAdGroups,
+  ensureCampaigns,
+  ensureProductAds,
+  ensureTargets,
+  type EnsuredEntities,
+  type EntityScope,
+} from './amazon-ads-entities';
+import type { DbOrTx } from './audit';
+import {
+  amazonAdsAdGroupDailyMetrics,
+  amazonAdsCampaignDailyMetrics,
+  amazonAdsProductAdDailyMetrics,
+  amazonAdsProfiles,
+  amazonAdsSearchTermDailyMetrics,
+  amazonAdsTargetDailyMetrics,
+} from './schema';
+
+/**
+ * Tageskennzahlen aus Reports schreiben (Phase 1, 1.5). Systemzugriff der Jobs ohne Nutzerkontext und
+ * ohne `audit_events`, an Organisation und Profil gebunden. Nimmt normalisierte Zeilen (eigene Typen),
+ * nie Antworttypen der Amazon-API.
+ *
+ * Amazon liefert nur Tage mit Aktivität; fehlende Zeilen bedeuten 0. Ein Import ersetzt deshalb genau
+ * den Ausschnitt (Profil, Ad-Typ, Tabelle, übergebene Tage): Upsert der gelieferten Zeilen, Löschen der
+ * übrigen. Die Tage (`ranges`) sind die, die kein später angeforderter Report schon abdeckt (1.4);
+ * Zeilen außerhalb werden übersprungen.
+ */
+
+/** Ganze Tage, beide Grenzen eingeschlossen (`YYYY-MM-DD`). */
+export interface MetricsDateRange {
+  startDate: string;
+  endDate: string;
+}
+
+/**
+ * Der Report widerspricht vorhandenen Kennzahlen so, dass Überschreiben Daten verlieren würde (0 Zeilen
+ * für einen Ausschnitt, der schon Kennzahlen hat). Eine Wiederholung mit derselben Datei ändert nichts.
+ */
+export class MetricsImportRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MetricsImportRejectedError';
+  }
+}
+
+export interface DailyMetricValues {
+  impressions: number;
+  clicks: number;
+  /** Beträge als Decimal-String in der Währung des Profils. */
+  cost: string;
+  /** Attribution (F7). SB/SD: nur `*14d`, `*7d` bleibt `null`. */
+  sales7d: string | null;
+  sales14d: string | null;
+  salesSameSku7d: string | null;
+  salesSameSku14d: string | null;
+  purchases7d: number | null;
+  purchases14d: number | null;
+  purchasesSameSku7d: number | null;
+  purchasesSameSku14d: number | null;
+  units7d: number | null;
+  units14d: number | null;
+  unitsSameSku7d: number | null;
+  unitsSameSku14d: number | null;
+  /** Weitere Report-Spalten ohne eigene Spalte. */
+  extra: Record<string, unknown>;
+}
+
+interface MetricRowBase extends DailyMetricValues {
+  /** Tag in der Zeitzone des Profils (`YYYY-MM-DD`). */
+  date: string;
+  amazonCampaignId: string;
+  /** Vorbelegung des Namens, falls die Kampagne als Platzhalter entsteht. */
+  campaignName?: string | null;
+}
+
+export type CampaignDailyMetric = MetricRowBase;
+
+export interface AdGroupDailyMetric extends MetricRowBase {
+  amazonAdGroupId: string;
+  adGroupName?: string | null;
+}
+
+export interface TargetDailyMetric extends MetricRowBase {
+  /** `null` bei Targets auf Kampagnenebene. */
+  amazonAdGroupId: string | null;
+  adGroupName?: string | null;
+  amazonTargetId: string;
+}
+
+export interface ProductAdDailyMetric extends MetricRowBase {
+  amazonAdGroupId: string;
+  adGroupName?: string | null;
+  amazonAdId: string;
+  asin?: string | null;
+  sku?: string | null;
+}
+
+export interface SearchTermDailyMetric extends TargetDailyMetric {
+  searchTerm: string;
+}
+
+export type DailyMetricsRows =
+  | { level: 'campaign'; rows: readonly CampaignDailyMetric[] }
+  | { level: 'adGroup'; rows: readonly AdGroupDailyMetric[] }
+  | { level: 'target'; rows: readonly TargetDailyMetric[] }
+  | { level: 'productAd'; rows: readonly ProductAdDailyMetric[] }
+  | { level: 'searchTerm'; rows: readonly SearchTermDailyMetric[] };
+
+export type DailyMetricsLevel = DailyMetricsRows['level'];
+
+export type ReplaceDailyMetricsInput = {
+  organizationId: string;
+  profileId: string;
+  /** Ad-Typ des Reports (`SPONSORED_PRODUCTS` …); gilt für alle Zeilen. */
+  adProduct: string;
+  /** Tage, die dieser Import ersetzt. */
+  ranges: readonly MetricsDateRange[];
+  /** Ungültige Zeilen der Datei: dann wird nichts gelöscht (kein stiller Datenverlust). */
+  invalidRowCount: number;
+  /** Wird `imported_at`. */
+  now: Date;
+} & DailyMetricsRows;
+
+export interface ReplaceDailyMetricsResult {
+  /** Geschriebene Zeilen. */
+  rows: number;
+  /** Zeilen außerhalb der übergebenen Tage. */
+  skipped: number;
+  /** Gelöschte Zeilen im Ausschnitt. */
+  deleted: number;
+  /** Als Platzhalter angelegte Entities (inkl. Eltern). */
+  placeholdersCreated: number;
+}
+
+/**
+ * Ersetzt die Kennzahlen einer Ebene in den übergebenen Tagen (eigene Transaktion bzw. Savepoint in der
+ * des Aufrufers). Fehlende Entities entstehen als Platzhalter, Eltern zuerst.
+ *
+ * - Ungültige Zeilen in der Datei (`invalidRowCount > 0`): nur Upsert, kein Löschen.
+ * - 0 Zeilen in den Tagen, obwohl der Ausschnitt Kennzahlen hat: `MetricsImportRejectedError`.
+ * - Doppelte Zeilen (gleicher Tag und gleiche Entity bzw. gleicher Suchbegriff): Fehler.
+ */
+export async function replaceDailyMetrics(
+  db: DbOrTx,
+  input: ReplaceDailyMetricsInput,
+): Promise<ReplaceDailyMetricsResult> {
+  return db.transaction(async (tx) => {
+    const [profile] = await tx
+      .select({ currencyCode: amazonAdsProfiles.currencyCode })
+      .from(amazonAdsProfiles)
+      .where(
+        and(
+          eq(amazonAdsProfiles.id, input.profileId),
+          eq(amazonAdsProfiles.organizationId, input.organizationId),
+        ),
+      );
+    if (!profile) throw new Error('Profil nicht gefunden.');
+
+    const level = LEVELS[input.level];
+    const rows = (input.rows as readonly MetricRow[]).filter((row) =>
+      input.ranges.some((range) => row.date >= range.startDate && row.date <= range.endDate),
+    );
+    const result: ReplaceDailyMetricsResult = {
+      rows: 0,
+      skipped: input.rows.length - rows.length,
+      deleted: 0,
+      placeholdersCreated: 0,
+    };
+    if (input.ranges.length === 0) return result;
+    assertNoDuplicates(input.level, rows, level.keyOf);
+
+    const slice = and(
+      eq(level.view.profileId, input.profileId),
+      eq(level.view.adProduct, input.adProduct),
+      or(...input.ranges.map((range) => between(level.view.date, range.startDate, range.endDate))),
+    );
+
+    if (rows.length === 0) {
+      if (input.invalidRowCount === 0 && (await hasRows(tx, level.view, slice))) {
+        throw new MetricsImportRejectedError(
+          'Amazon hat für Tage mit vorhandenen Kennzahlen keine Zeilen geliefert; die vorhandenen Kennzahlen bleiben erhalten.',
+        );
+      }
+      return result;
+    }
+
+    const scope: EntityScope = { organizationId: input.organizationId, profileId: input.profileId };
+    const entities = await level.ensure(tx, scope, input.adProduct, rows);
+    result.placeholdersCreated = entities.created;
+
+    const written: string[] = [];
+    for (const chunk of chunks(rows)) {
+      const inserted = await tx
+        .insert(level.view.table)
+        .values(
+          chunk.map((row): InsertRow => ({
+            ...metricValues(row),
+            organizationId: input.organizationId,
+            profileId: input.profileId,
+            date: row.date,
+            adProduct: input.adProduct,
+            currencyCode: profile.currencyCode,
+            importedAt: input.now,
+            [level.entityKey]: entities.ids.get(level.amazonIdOf(row))!,
+            ...level.extraKey(row),
+          })),
+        )
+        .onConflictDoUpdate({ target: level.view.conflictTarget, set: level.view.set })
+        .returning({ id: level.view.id });
+      written.push(...inserted.map((row) => String(row.id)));
+    }
+    result.rows = written.length;
+
+    if (input.invalidRowCount === 0) {
+      const deleted = await tx
+        .delete(level.view.table)
+        .where(and(slice, sql`${level.view.id} <> all(${sql.param(written)}::uuid[])`))
+        .returning({ id: level.view.id });
+      result.deleted = deleted.length;
+    }
+    return result;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Intern
+// ---------------------------------------------------------------------------
+
+/** Parameter je Anweisung bleiben so weit unter Postgres' Grenze (65 535). */
+const CHUNK_SIZE = 1000;
+
+type MetricRow = MetricRowBase &
+  Partial<
+    Pick<SearchTermDailyMetric, 'amazonTargetId' | 'searchTerm'> &
+      Pick<ProductAdDailyMetric, 'amazonAdId' | 'asin' | 'sku'>
+  > & { amazonAdGroupId?: string | null; adGroupName?: string | null };
+
+type InsertRow = PgTable['$inferInsert'];
+
+type MetricsTable =
+  | typeof amazonAdsCampaignDailyMetrics
+  | typeof amazonAdsAdGroupDailyMetrics
+  | typeof amazonAdsTargetDailyMetrics
+  | typeof amazonAdsProductAdDailyMetrics
+  | typeof amazonAdsSearchTermDailyMetrics;
+
+/**
+ * Schmale Sicht auf eine Kennzahl-Tabelle (Drizzles Typen tragen eine Union von Tabellen nicht durch
+ * `insert`/`delete`).
+ */
+interface MetricsTableView {
+  table: PgTable;
+  id: PgColumn;
+  profileId: PgColumn;
+  adProduct: PgColumn;
+  date: PgColumn;
+  conflictTarget: PgColumn[];
+  /** Kennzahlen, Währung und `imported_at` aus der neuen Zeile übernehmen. */
+  set: Record<string, SQL>;
+}
+
+const METRIC_VALUE_KEYS = [
+  'currencyCode',
+  'impressions',
+  'clicks',
+  'cost',
+  'sales7d',
+  'sales14d',
+  'salesSameSku7d',
+  'salesSameSku14d',
+  'purchases7d',
+  'purchases14d',
+  'purchasesSameSku7d',
+  'purchasesSameSku14d',
+  'units7d',
+  'units14d',
+  'unitsSameSku7d',
+  'unitsSameSku14d',
+  'extra',
+  'importedAt',
+] as const;
+
+function metricsTable(table: MetricsTable, conflictTarget: PgColumn[]): MetricsTableView {
+  const columns: Record<string, PgColumn> = getTableColumns(table);
+  return {
+    table,
+    id: table.id,
+    profileId: table.profileId,
+    adProduct: table.adProduct,
+    date: table.date,
+    conflictTarget,
+    set: Object.fromEntries(
+      METRIC_VALUE_KEYS.map((key) => [key, sql.raw(`excluded."${columns[key]!.name}"`)]),
+    ),
+  };
+}
+
+function metricValues(row: DailyMetricValues): DailyMetricValues {
+  return {
+    impressions: row.impressions,
+    clicks: row.clicks,
+    cost: row.cost,
+    sales7d: row.sales7d,
+    sales14d: row.sales14d,
+    salesSameSku7d: row.salesSameSku7d,
+    salesSameSku14d: row.salesSameSku14d,
+    purchases7d: row.purchases7d,
+    purchases14d: row.purchases14d,
+    purchasesSameSku7d: row.purchasesSameSku7d,
+    purchasesSameSku14d: row.purchasesSameSku14d,
+    units7d: row.units7d,
+    units14d: row.units14d,
+    unitsSameSku7d: row.unitsSameSku7d,
+    unitsSameSku14d: row.unitsSameSku14d,
+    extra: row.extra,
+  };
+}
+
+interface LevelConfig {
+  view: MetricsTableView;
+  /** Spalte mit der internen Entity-ID. */
+  entityKey: string;
+  amazonIdOf: (row: MetricRow) => string;
+  /** Upsert-Schlüssel ohne Profil (für die Prüfung auf doppelte Zeilen). */
+  keyOf: (row: MetricRow) => string;
+  extraKey: (row: MetricRow) => Record<string, unknown>;
+  ensure: (
+    db: DbOrTx,
+    scope: EntityScope,
+    adProduct: string,
+    rows: readonly MetricRow[],
+  ) => Promise<EnsuredEntities>;
+}
+
+const required = (value: string | null | undefined, name: string): string => {
+  if (value == null) throw new Error(`Kennzahl-Zeile ohne ${name}.`);
+  return value;
+};
+
+const targetRefs = (adProduct: string, rows: readonly MetricRow[]) =>
+  rows.map((row) => ({
+    amazonTargetId: required(row.amazonTargetId, 'Target-ID'),
+    amazonAdGroupId: row.amazonAdGroupId ?? null,
+    amazonCampaignId: row.amazonCampaignId,
+    adProduct,
+    campaignName: row.campaignName,
+    adGroupName: row.adGroupName,
+  }));
+
+const LEVELS: Record<DailyMetricsLevel, LevelConfig> = {
+  campaign: {
+    view: metricsTable(amazonAdsCampaignDailyMetrics, [
+      amazonAdsCampaignDailyMetrics.profileId,
+      amazonAdsCampaignDailyMetrics.campaignId,
+      amazonAdsCampaignDailyMetrics.date,
+    ]),
+    entityKey: 'campaignId',
+    amazonIdOf: (row) => row.amazonCampaignId,
+    keyOf: (row) => `${row.date}|${row.amazonCampaignId}`,
+    extraKey: () => ({}),
+    ensure: (db, scope, adProduct, rows) =>
+      ensureCampaigns(
+        db,
+        scope,
+        rows.map((row) => ({
+          amazonCampaignId: row.amazonCampaignId,
+          adProduct,
+          campaignName: row.campaignName,
+        })),
+      ),
+  },
+  adGroup: {
+    view: metricsTable(amazonAdsAdGroupDailyMetrics, [
+      amazonAdsAdGroupDailyMetrics.profileId,
+      amazonAdsAdGroupDailyMetrics.adGroupId,
+      amazonAdsAdGroupDailyMetrics.date,
+    ]),
+    entityKey: 'adGroupId',
+    amazonIdOf: (row) => required(row.amazonAdGroupId, 'Ad-Group-ID'),
+    keyOf: (row) => `${row.date}|${row.amazonAdGroupId}`,
+    extraKey: () => ({}),
+    ensure: (db, scope, adProduct, rows) =>
+      ensureAdGroups(
+        db,
+        scope,
+        rows.map((row) => ({
+          amazonAdGroupId: required(row.amazonAdGroupId, 'Ad-Group-ID'),
+          amazonCampaignId: row.amazonCampaignId,
+          adProduct,
+          campaignName: row.campaignName,
+          adGroupName: row.adGroupName,
+        })),
+      ),
+  },
+  target: {
+    view: metricsTable(amazonAdsTargetDailyMetrics, [
+      amazonAdsTargetDailyMetrics.profileId,
+      amazonAdsTargetDailyMetrics.targetId,
+      amazonAdsTargetDailyMetrics.date,
+    ]),
+    entityKey: 'targetId',
+    amazonIdOf: (row) => required(row.amazonTargetId, 'Target-ID'),
+    keyOf: (row) => `${row.date}|${row.amazonTargetId}`,
+    extraKey: () => ({}),
+    ensure: (db, scope, adProduct, rows) => ensureTargets(db, scope, targetRefs(adProduct, rows)),
+  },
+  productAd: {
+    view: metricsTable(amazonAdsProductAdDailyMetrics, [
+      amazonAdsProductAdDailyMetrics.profileId,
+      amazonAdsProductAdDailyMetrics.productAdId,
+      amazonAdsProductAdDailyMetrics.date,
+    ]),
+    entityKey: 'productAdId',
+    amazonIdOf: (row) => required(row.amazonAdId, 'Ad-ID'),
+    keyOf: (row) => `${row.date}|${row.amazonAdId}`,
+    extraKey: () => ({}),
+    ensure: (db, scope, adProduct, rows) =>
+      ensureProductAds(
+        db,
+        scope,
+        rows.map((row) => ({
+          amazonAdId: required(row.amazonAdId, 'Ad-ID'),
+          amazonAdGroupId: required(row.amazonAdGroupId, 'Ad-Group-ID'),
+          amazonCampaignId: row.amazonCampaignId,
+          adProduct,
+          campaignName: row.campaignName,
+          adGroupName: row.adGroupName,
+          asin: row.asin,
+          sku: row.sku,
+        })),
+      ),
+  },
+  searchTerm: {
+    view: metricsTable(amazonAdsSearchTermDailyMetrics, [
+      amazonAdsSearchTermDailyMetrics.profileId,
+      amazonAdsSearchTermDailyMetrics.targetId,
+      amazonAdsSearchTermDailyMetrics.date,
+      amazonAdsSearchTermDailyMetrics.searchTerm,
+    ]),
+    entityKey: 'targetId',
+    amazonIdOf: (row) => required(row.amazonTargetId, 'Target-ID'),
+    keyOf: (row) => `${row.date}|${row.amazonTargetId}|${row.searchTerm}`,
+    extraKey: (row) => ({ searchTerm: required(row.searchTerm, 'Suchbegriff') }),
+    ensure: (db, scope, adProduct, rows) => ensureTargets(db, scope, targetRefs(adProduct, rows)),
+  },
+};
+
+function assertNoDuplicates(
+  level: DailyMetricsLevel,
+  rows: readonly MetricRow[],
+  keyOf: (row: MetricRow) => string,
+): void {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    // Ohne IDs und Suchbegriffe in der Meldung (landet in `failure_reason`).
+    if (seen.has(key)) throw new Error(`Report enthält doppelte Zeilen (${level}, ${row.date}).`);
+    seen.add(key);
+  }
+}
+
+async function hasRows(db: DbOrTx, view: MetricsTableView, where: SQL | undefined) {
+  const found = await db.select({ id: view.id }).from(view.table).where(where).limit(1);
+  return found.length > 0;
+}
+
+function* chunks<T>(items: readonly T[]): Generator<T[]> {
+  for (let i = 0; i < items.length; i += CHUNK_SIZE) yield items.slice(i, i + CHUNK_SIZE);
+}

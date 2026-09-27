@@ -3,6 +3,7 @@ import { AmazonAdsHttpError, AmazonAdsReauthRequiredError } from '@profitbash/am
 import {
   createAmazonRequest,
   findAmazonRequest,
+  MetricsImportRejectedError,
   listDueAmazonRequests,
   schema,
   updateAmazonRequest,
@@ -642,6 +643,22 @@ describe('Laden und Importieren (Reports)', () => {
     expect(third.counters).toEqual({ failed: 1 });
 
     expect(await testDb.db.select().from(jobRuns)).toEqual([]);
+  });
+
+  it('ein abgelehnter Import (Datenverlust droht) endet sofort als failed', async () => {
+    const requested = await requestedRow();
+    fake.import = () =>
+      Promise.reject(new MetricsImportRejectedError('Keine Zeilen für vorhandene Kennzahlen.'));
+
+    const { request, counters } = await advance(requested);
+
+    expect(request).toMatchObject({
+      status: 'failed',
+      importAttempts: 1,
+      nextPollAt: null,
+      failureReason: expect.stringMatching(/Keine Zeilen für vorhandene Kennzahlen/) as unknown,
+    });
+    expect(counters).toEqual({ failed: 1 });
   });
 
   it('ein vorübergehender Fehler beim frischen Holen der URL zählt nicht als Importversuch', async () => {

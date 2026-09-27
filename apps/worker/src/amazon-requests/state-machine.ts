@@ -11,6 +11,7 @@ import {
   findAmazonRequest,
   listAmazonRequestBatch,
   listNewerImportedReportRanges,
+  MetricsImportRejectedError,
   updateAmazonRequest,
   updateAmazonRequestBatch,
   type AmazonRequest,
@@ -576,7 +577,10 @@ async function importFailed(
     reportType: request.reportType,
     importAttempts,
   });
-  if (importAttempts >= MAX_IMPORT_ATTEMPTS) return fail(deps, request, reason, { importAttempts });
+  // Abgelehnt (Datenverlust droht): Dieselbe Datei ergäbe beim nächsten Versuch dasselbe.
+  if (importAttempts >= MAX_IMPORT_ATTEMPTS || error instanceof MetricsImportRejectedError) {
+    return fail(deps, request, reason, { importAttempts });
+  }
   const updated = await update(deps, request, {
     importAttempts,
     errorCount: 0,
