@@ -297,6 +297,31 @@ describe('ConnectionsPage', () => {
       button(wrapper, 'Neu verbinden');
     });
 
+    it('zeigt bei reauth_required nur den Hinweis zum Neu-Verbinden, keine zweite Warnung', async () => {
+      stubFetch(
+        routes({
+          'GET /api/connections': json({
+            connections: [
+              connectionFixture({
+                status: 'reauth_required',
+                consentedAt: '2025-09-01T12:00:00.000Z',
+                refreshTokenExpiresAt: '2026-09-01T12:00:00.000Z',
+              }),
+            ],
+          }),
+        }),
+      );
+      const { wrapper } = await mountPage();
+      await waitForRow(wrapper, 'Nordwind GmbH');
+
+      expect(wrapper.text()).toContain('Amazon akzeptiert die Freigabe nicht mehr.');
+      expect(wrapper.find('[data-testid="consent-warning"]').exists()).toBe(false);
+      button(wrapper, 'Neu verbinden');
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Jetzt synchronisieren')).toBe(
+        false,
+      );
+    });
+
     it('zeigt „unbekannt“, wenn der Einwilligungszeitpunkt fehlt', async () => {
       stubFetch(consentRoutes({ consentedAt: null, expiresAt: null }));
       const { wrapper } = await mountPage();

@@ -90,7 +90,8 @@ const lastRefreshed = computed(() => {
   );
 });
 
-// Stand beim Rendern: Die Seite lädt Connections ohnehin regelmäßig neu, ein Tageswechsel ist unkritisch.
+// Stand beim Anzeigen der Karte (`new Date()` ist nicht reaktiv): Über die 30-Tage-Grenze hinweg aktualisiert
+// sich die Anzeige erst beim nächsten Aufruf der Seite. Reicht bis zu den Benachrichtigungen in Phase 5.
 const consentStatus = computed(() =>
   consentExpiryStatus(props.connection.refreshTokenExpiresAt, new Date()),
 );
