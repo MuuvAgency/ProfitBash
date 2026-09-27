@@ -91,6 +91,7 @@ Secrets nur in Railway eintragen, nie ins Repo, nie in Actions-Logs. Werte mit `
 | `AMAZON_ADS_REDIRECT_URI` | `https://<app>.up.railway.app/api/amazon/oauth/callback` (auch im LWA Security Profile eintragen, 0.0b) |
 | `AMAZON_ADS_USE_MOCK` | `true` bis zur Ads-API-Freigabe, dann `false` |
 | `AMAZON_ADS_CLIENT_ID`, `AMAZON_ADS_CLIENT_SECRET` | aus dem Security Profile (Pflicht ohne Mock) |
+| `AMAZON_ADS_REQUESTS_PER_SECOND` | optional, Anfrage-Budget je Profil (Standard 2, mindestens 0.2); erst nach beobachteten 429-Quoten ändern |
 | `HEALTHCHECKS_TOKEN_REFRESH_URL`, `HEALTHCHECKS_PROFILES_SYNC_URL` | Ping-URLs (siehe Healthchecks.io) |
 | `RAILWAY_DEPLOYMENT_DRAINING_SECONDS` | `35` (falls nicht in den Einstellungen gesetzt) |
 

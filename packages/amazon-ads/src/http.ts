@@ -51,6 +51,30 @@ export interface HttpRequest<S extends z.ZodType> {
    * Wiederholung sonst doppelt wirken.
    */
   retryServerErrors?: boolean;
+  /** Zählt gesendete Anfragen, 429 und Wiederholungen (z. B. für `job_runs.counters`). */
+  meter?: RequestMeter;
+  /** Anfrage-Budget: vor jedem Versuch `acquire`, danach Rückmeldung zu 429 bzw. Erfolg. */
+  pacing?: RequestPacing;
+}
+
+/** Zähler eines Jobs über alle seine Aufrufe an Amazon. */
+export interface RequestMeter {
+  /** Gesendete HTTP-Anfragen, jede Wiederholung einzeln. */
+  requests: number;
+  /** Antworten mit HTTP 429. */
+  throttled: number;
+  /** Wiederholungen (zweiter und weitere Versuche). */
+  retries: number;
+}
+
+export function createRequestMeter(): RequestMeter {
+  return { requests: 0, throttled: 0, retries: 0 };
+}
+
+export interface RequestPacing {
+  acquire(): Promise<void>;
+  onThrottled(retryAfterMs: number | null): void;
+  onSuccess(): void;
 }
 
 export interface HttpClient {
@@ -89,7 +113,13 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
     };
     const startedAt = now();
 
+    const { meter, pacing } = request;
     for (let attempt = 1; ; attempt += 1) {
+      await pacing?.acquire();
+      if (meter) {
+        meter.requests += 1;
+        if (attempt > 1) meter.retries += 1;
+      }
       let response: Response;
       let text: string;
       try {
@@ -129,6 +159,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
         response.headers.get('x-amz-request-id') ?? response.headers.get('x-amzn-requestid');
 
       if (response.ok) {
+        pacing?.onSuccess();
         logger({
           level: 'info',
           msg: 'amazon_ads.request',
@@ -145,6 +176,10 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
       const retryable = status === 429 || (status >= 500 && retryServerErrors);
       const retryAfterMs = parseRetryAfter(response.headers.get('retry-after'), now());
       const { code, details } = parseErrorBody(text);
+      if (status === 429) {
+        if (meter) meter.throttled += 1;
+        pacing?.onThrottled(retryAfterMs);
+      }
 
       const tooLongToWait = retryAfterMs !== null && retryAfterMs > maxRetryAfterMs;
       if (retryable && attempt < maxAttempts && !tooLongToWait) {

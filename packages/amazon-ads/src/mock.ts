@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { RefreshTokenStore } from './access-token';
-import { createAmazonAdsClient, type AmazonAdsClient } from './client';
+import { createAmazonAdsClient, type AmazonAdsClient, type AmazonAdsClientOptions } from './client';
 import type { Logger } from './logger';
 import { AMAZON_ADS_SCOPES } from './lwa';
 import { AMAZON_ADS_REGIONS, type AmazonAdsRegion, type AmazonAdsRegionEndpoints } from './regions';
@@ -66,6 +66,8 @@ export interface MockAmazonAdsClientOptions {
   consentUrl: string;
   store: RefreshTokenStore;
   logger?: Logger;
+  /** Anfrage-Budget je Profil wie beim echten Client. */
+  rateLimit?: AmazonAdsClientOptions['rateLimit'];
 }
 
 export function createMockAmazonAdsClient(options: MockAmazonAdsClientOptions): AmazonAdsClient {
@@ -86,6 +88,7 @@ export function createMockAmazonAdsClient(options: MockAmazonAdsClientOptions): 
     ...(options.logger && { logger: options.logger }),
     regions,
     http: { fetch: createMockFetch(options.redirectUri) },
+    ...(options.rateLimit && { rateLimit: options.rateLimit }),
   });
 }
 

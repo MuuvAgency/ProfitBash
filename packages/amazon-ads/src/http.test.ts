@@ -3,7 +3,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AmazonAdsHttpError, AmazonAdsNetworkError, AmazonAdsResponseError } from './errors';
-import { createHttpClient, type HttpClientOptions } from './http';
+import { createHttpClient, createRequestMeter, type HttpClientOptions } from './http';
 import type { LogEntry } from './logger';
 
 const server = setupServer();
@@ -315,5 +315,69 @@ describe('createHttpClient', () => {
     const { client } = setup();
     const error = (await client.send(get()).catch((e: unknown) => e)) as Error;
     expect(error.message.length).toBeLessThan(500);
+  });
+});
+
+describe('Zähler und Anfrage-Budget', () => {
+  it('zählt jede gesendete Anfrage, jedes 429 und jede Wiederholung im Meter', async () => {
+    let calls = 0;
+    server.use(
+      http.get(URL_, () => {
+        calls += 1;
+        if (calls === 1) return HttpResponse.json({ code: 'THROTTLED' }, { status: 429 });
+        if (calls === 2) return HttpResponse.json({ code: 'INTERNAL' }, { status: 500 });
+        return HttpResponse.json({ ok: true });
+      }),
+    );
+    const { client } = setup();
+    const meter = createRequestMeter();
+    await client.send({ ...get(), meter });
+    expect(meter).toEqual({ requests: 3, throttled: 1, retries: 2 });
+  });
+
+  it('zählt auch, wenn der Aufruf am Ende scheitert', async () => {
+    server.use(http.get(URL_, () => HttpResponse.json({ code: 'THROTTLED' }, { status: 429 })));
+    const { client } = setup({ maxAttempts: 2 });
+    const meter = createRequestMeter();
+    await expect(client.send({ ...get(), meter })).rejects.toBeInstanceOf(AmazonAdsHttpError);
+    expect(meter).toEqual({ requests: 2, throttled: 2, retries: 1 });
+  });
+
+  it('fragt vor jedem Versuch das Budget und meldet 429 (mit Retry-After) und Erfolg', async () => {
+    let calls = 0;
+    server.use(
+      http.get(URL_, () => {
+        calls += 1;
+        return calls === 1
+          ? new HttpResponse(null, { status: 429, headers: { 'Retry-After': '7' } })
+          : HttpResponse.json({ ok: true });
+      }),
+    );
+    const events: string[] = [];
+    const pacing = {
+      acquire: async () => {
+        events.push('acquire');
+      },
+      onThrottled: (retryAfterMs: number | null) => events.push(`throttled:${retryAfterMs}`),
+      onSuccess: () => events.push('success'),
+    };
+    const { client } = setup();
+    await client.send({ ...get(), pacing });
+    expect(events).toEqual(['acquire', 'throttled:7000', 'acquire', 'success']);
+  });
+
+  it('meldet dem Budget keinen Erfolg bei anderen Fehlern (z. B. 400)', async () => {
+    server.use(http.get(URL_, () => HttpResponse.json({ code: 'BAD' }, { status: 400 })));
+    const events: string[] = [];
+    const pacing = {
+      acquire: async () => {
+        events.push('acquire');
+      },
+      onThrottled: () => events.push('throttled'),
+      onSuccess: () => events.push('success'),
+    };
+    const { client } = setup();
+    await expect(client.send({ ...get(), pacing })).rejects.toBeInstanceOf(AmazonAdsHttpError);
+    expect(events).toEqual(['acquire']);
   });
 });
