@@ -83,6 +83,22 @@ export function formatDate(
   }).format(date);
 }
 
+const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Kalendertag (`YYYY-MM-DD`, z. B. ein Kennzahl-Tag in der Zeitzone des Profils), z. B. `25.09.2026`.
+ * Anders als `formatDate` ohne Umrechnung: Der Tag bleibt in jeder Zeitzone des Browsers derselbe.
+ */
+export function formatDay(value: string | null | undefined, locale: Locale): string {
+  const match = value ? DAY.exec(value) : null;
+  if (!match) return MISSING_VALUE;
+  const [year, month, day] = match.slice(1).map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  // Ungültige Tage (z. B. 30. Februar) rollt `Date.UTC` weiter; die zählen nicht als Tag.
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return MISSING_VALUE;
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+}
+
 /**
  * Zeitpunkt mit Datum und Uhrzeit (Sekunden), z. B. `26.09.2026, 10:15:03`. Ohne `timeZone` in der
  * Zeitzone des Browsers.

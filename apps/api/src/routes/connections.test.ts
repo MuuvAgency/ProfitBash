@@ -107,7 +107,11 @@ beforeAll(async () => {
     .insert(amazonAdsProfiles)
     .values([
       profileRow(orgId, ids.connection, '9007199254740993'),
-      { ...profileRow(orgId, ids.connection, '2222222222222222'), isHidden: true },
+      {
+        ...profileRow(orgId, ids.connection, '2222222222222222'),
+        isHidden: true,
+        metricsImportedThrough: '2026-09-26',
+      },
       { ...profileRow(orgId, ids.connection, '3333333333333333'), removedAt: new Date() },
       profileRow(otherOrgId, ids.otherOrgConnection, '4444444444444444'),
     ])
@@ -282,8 +286,11 @@ describe('GET /api/connections/:id/profiles', () => {
       isHidden: false,
       removedAt: null,
       syncedAt: null,
+      metricsImportedThrough: null,
     });
     expect(profiles.find((p) => p.id === ids.removed)?.removedAt).toMatch(/Z$/);
+    // „Daten bis“ (1.8): Tag im Format YYYY-MM-DD, kein Zeitstempel.
+    expect(profiles.find((p) => p.id === ids.hidden)?.metricsImportedThrough).toBe('2026-09-26');
   });
 
   it('lehnt Connections fremder Organisationen mit 404 ab', async () => {

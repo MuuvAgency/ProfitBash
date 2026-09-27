@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Client, Profile, ProfilePatch } from '@profitbash/shared';
+import { formatDay, type Client, type Profile, type ProfilePatch } from '@profitbash/shared';
 import type {
   ColDef,
   GetRowIdParams,
@@ -10,6 +10,7 @@ import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { gridStyleOptions, gridTheme } from '../grid/grid';
+import { useSessionStore } from '../stores/session';
 import { countryName } from './country';
 import AccountCell from './cells/AccountCell.vue';
 import ClientCell from './cells/ClientCell.vue';
@@ -24,6 +25,7 @@ const emit = defineEmits<{
 }>();
 
 const { t, te } = useI18n();
+const session = useSessionStore();
 
 const context = reactive<ProfileGridContext>({
   clients: [],
@@ -60,64 +62,76 @@ function accountTypeLabel(type: string | undefined) {
 const CELL = 'flex items-center leading-normal';
 const DATA_CELL = `${CELL} font-data`;
 
-const columnDefs = computed<ColDef<Profile>[]>(() => [
-  {
-    colId: 'country',
-    headerName: t('connections.profiles.column.country'),
-    // Sortiert nach dem angezeigten Namen („Vereinigtes Königreich“, nicht „UK“).
-    valueGetter: ({ data }) => (data ? countryName(data.countryCode) : ''),
-    cellRenderer: markRaw(CountryCell),
-    minWidth: 240,
-    flex: 1,
-  },
-  {
-    colId: 'accountName',
-    headerName: t('connections.profiles.column.accountName'),
-    field: 'accountName',
-    cellRenderer: markRaw(AccountCell),
-    minWidth: 165,
-    flex: 2,
-  },
-  {
-    colId: 'type',
-    headerName: t('connections.profiles.column.type'),
-    valueGetter: ({ data }) => accountTypeLabel(data?.accountType),
-    width: 100,
-  },
-  {
-    colId: 'currency',
-    headerName: t('connections.profiles.column.currency'),
-    field: 'currencyCode',
-    cellClass: DATA_CELL,
-    width: 100,
-  },
-  {
-    colId: 'timezone',
-    headerName: t('connections.profiles.column.timezone'),
-    field: 'timezone',
-    cellClass: DATA_CELL,
-    minWidth: 165,
-    flex: 1,
-  },
-  {
-    colId: 'client',
-    headerName: t('connections.profiles.column.client'),
-    field: 'clientId',
-    cellRenderer: markRaw(ClientCell),
-    suppressKeyboardEvent: suppressControlKeys,
-    sortable: false,
-    minWidth: 190,
-    flex: 1,
-  },
-  {
-    colId: 'hidden',
-    headerName: t('connections.profiles.column.hidden'),
-    field: 'isHidden',
-    cellRenderer: markRaw(HiddenCell),
-    suppressKeyboardEvent: suppressControlKeys,
-    width: 130,
-  },
-]);
+const columnDefs = computed<ColDef<Profile>[]>(() => {
+  const { locale } = session.preferences;
+  return [
+    {
+      colId: 'country',
+      headerName: t('connections.profiles.column.country'),
+      // Sortiert nach dem angezeigten Namen („Vereinigtes Königreich“, nicht „UK“).
+      valueGetter: ({ data }) => (data ? countryName(data.countryCode) : ''),
+      cellRenderer: markRaw(CountryCell),
+      minWidth: 235,
+      flex: 1,
+    },
+    {
+      colId: 'accountName',
+      headerName: t('connections.profiles.column.accountName'),
+      field: 'accountName',
+      cellRenderer: markRaw(AccountCell),
+      minWidth: 165,
+      flex: 2,
+    },
+    {
+      colId: 'type',
+      headerName: t('connections.profiles.column.type'),
+      valueGetter: ({ data }) => accountTypeLabel(data?.accountType),
+      width: 90,
+    },
+    {
+      colId: 'currency',
+      headerName: t('connections.profiles.column.currency'),
+      field: 'currencyCode',
+      cellClass: DATA_CELL,
+      width: 95,
+    },
+    {
+      colId: 'timezone',
+      headerName: t('connections.profiles.column.timezone'),
+      field: 'timezone',
+      cellClass: DATA_CELL,
+      minWidth: 165,
+      flex: 1,
+    },
+    {
+      // Sortiert nach dem Tag (`YYYY-MM-DD`), angezeigt im Format der Sprache.
+      colId: 'metricsImportedThrough',
+      headerName: t('connections.profiles.column.metricsImportedThrough'),
+      field: 'metricsImportedThrough',
+      valueFormatter: ({ value }) => formatDay(value, locale),
+      cellClass: DATA_CELL,
+      width: 120,
+    },
+    {
+      colId: 'client',
+      headerName: t('connections.profiles.column.client'),
+      field: 'clientId',
+      cellRenderer: markRaw(ClientCell),
+      suppressKeyboardEvent: suppressControlKeys,
+      sortable: false,
+      minWidth: 180,
+      flex: 1,
+    },
+    {
+      colId: 'hidden',
+      headerName: t('connections.profiles.column.hidden'),
+      field: 'isHidden',
+      cellRenderer: markRaw(HiddenCell),
+      suppressKeyboardEvent: suppressControlKeys,
+      width: 115,
+    },
+  ];
+});
 
 /** Konstant: Ein neues Objekt je Render setzte die Spalten zurück (z. B. geänderte Breiten). */
 const defaultColDef: ColDef<Profile> = {
