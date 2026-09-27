@@ -254,8 +254,18 @@ describe('SyncStatusPage', () => {
     await waitForRow(wrapper, succeeded);
 
     const grid = wrapper.get('section[role="region"]').element.firstElementChild as HTMLElement;
-    // Mindestens die Mindestbreiten von Amazon-Konto (220) und Ergebnis (300).
-    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThanOrEqual(520));
+    // Mindestens die Mindestbreiten von Amazon-Konto (180), Dauer (160) und Ergebnis (280).
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThanOrEqual(620));
+  });
+
+  it('hält in der Dauer Platz für laufende Jobs frei (sie wächst ohne neue Zeilen)', async () => {
+    stubFetch(routes([succeeded]));
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, succeeded);
+
+    // Angepasst wird nur nach neuen Zeilen; „12 Std. 59 Min.“ muss trotzdem passen.
+    const header = wrapper.get('.ag-header-cell[col-id="duration"]').element as HTMLElement;
+    await vi.waitFor(() => expect(parseFloat(header.style.width)).toBeGreaterThanOrEqual(160));
   });
 
   it('zeigt statt einer fehlenden Connection den Platzhalter', async () => {
