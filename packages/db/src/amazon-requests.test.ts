@@ -3,12 +3,17 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createAmazonExportBatch,
+  countFailedAmazonRequestsSince,
+  countRunningExports,
   createAmazonRequest,
   deleteFinishedAmazonRequestsBefore,
   findAmazonRequest,
   listAmazonRequestBatch,
+  listConnectionsWithDueAmazonRequests,
   listDueAmazonRequests,
   listNewerImportedReportRanges,
+  listReportRanges,
+  nextAmazonRequestPollAt,
   updateAmazonRequest,
   type NewAmazonRequest,
 } from './amazon-requests';
@@ -301,6 +306,145 @@ describe('listDueAmazonRequests', () => {
         limit: 10,
       }),
     ).toEqual([]);
+  });
+});
+
+describe('nextAmazonRequestPollAt', () => {
+  it('liefert den frühesten Termin offener Aufträge der Connection, sonst null', async () => {
+    expect(await nextAmazonRequestPollAt(testDb.db, { organizationId, connectionId })).toBeNull();
+
+    const soon = await create(report());
+    await updateAmazonRequest(testDb.db, soon, { nextPollAt: minutes(5) });
+    const sooner = await create(report({ profileId: secondProfileId }));
+    await updateAmazonRequest(testDb.db, sooner, { nextPollAt: minutes(2) });
+    const waiting = await create(report({ reportType: 'spTargeting' }));
+    await updateAmazonRequest(testDb.db, waiting, { nextPollAt: null });
+    const done = await create(report({ reportType: 'spSearchTerm' }));
+    await updateAmazonRequest(testDb.db, done, { status: 'failed', nextPollAt: minutes(1) });
+    await create(report({ profileId: otherConnectionProfileId, now: minutes(-60) }));
+
+    expect(await nextAmazonRequestPollAt(testDb.db, { organizationId, connectionId })).toEqual(
+      minutes(2),
+    );
+    expect(
+      await nextAmazonRequestPollAt(testDb.db, {
+        organizationId: otherOrganizationId,
+        connectionId,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('listConnectionsWithDueAmazonRequests', () => {
+  it('liefert aktive Connections mit fälligen offenen Aufträgen, je Connection einmal', async () => {
+    await create(report({ now: minutes(-5) }));
+    await create(report({ reportType: 'spTargeting', now: minutes(-5) }));
+    const notDue = await create(report({ profileId: otherConnectionProfileId }));
+    await updateAmazonRequest(testDb.db, notDue, { nextPollAt: minutes(5) });
+    await create(report({ profileId: foreignProfileId, organizationId: otherOrganizationId }));
+
+    const due = await listConnectionsWithDueAmazonRequests(testDb.db, now);
+
+    expect(due).toHaveLength(2);
+    expect(due).toContainEqual({ id: connectionId, organizationId });
+    expect(due).not.toContainEqual(expect.objectContaining({ id: otherConnectionId }));
+  });
+
+  it('überspringt Connections, die neu verbunden werden müssen', async () => {
+    await create(report({ now: minutes(-5) }));
+    await testDb.db
+      .update(connections)
+      .set({ status: 'reauth_required' })
+      .where(eq(connections.id, connectionId));
+    try {
+      const due = await listConnectionsWithDueAmazonRequests(testDb.db, now);
+      expect(due).not.toContainEqual(expect.objectContaining({ id: connectionId }));
+    } finally {
+      await testDb.db
+        .update(connections)
+        .set({ status: 'active' })
+        .where(eq(connections.id, connectionId));
+    }
+  });
+});
+
+describe('countRunningExports', () => {
+  it('zählt angeforderte Exports eines Typs über alle Profile der Connection', async () => {
+    for (const [profile, status] of [
+      [profileId, 'requested'],
+      [secondProfileId, 'requested'],
+      [otherConnectionProfileId, 'requested'],
+    ] as const) {
+      const row = await create(exportRequest({ profileId: profile }));
+      await updateAmazonRequest(testDb.db, row, { status });
+    }
+    await create(exportRequest({ adProduct: 'SPONSORED_BRANDS' }));
+    const completed = await create(exportRequest({ adProduct: 'SPONSORED_DISPLAY' }));
+    await updateAmazonRequest(testDb.db, completed, { status: 'completed' });
+    const otherType = await create(exportRequest({ reportType: 'targets' }));
+    await updateAmazonRequest(testDb.db, otherType, { status: 'requested' });
+
+    expect(
+      await countRunningExports(testDb.db, {
+        organizationId,
+        connectionId,
+        exportType: 'campaigns',
+      }),
+    ).toBe(2);
+  });
+});
+
+describe('listReportRanges', () => {
+  it('liefert die Zeiträume der Reports mit gleichem Schlüssel und passendem Status', async () => {
+    const imported = await create(report({ startDate: '2026-06-01', endDate: '2026-06-30' }));
+    await updateAmazonRequest(testDb.db, imported, { status: 'imported' });
+    await create(report({ startDate: '2026-07-01', endDate: '2026-07-31' }));
+    const failed = await create(report({ startDate: '2026-08-01', endDate: '2026-08-10' }));
+    await updateAmazonRequest(testDb.db, failed, { status: 'failed' });
+    await create(report({ reportType: 'spTargeting' }));
+    await create(report({ profileId: secondProfileId }));
+    await create(report({ adProduct: 'SPONSORED_BRANDS' }));
+
+    const ranges = await listReportRanges(testDb.db, {
+      organizationId,
+      profileId,
+      adProduct: 'SPONSORED_PRODUCTS',
+      reportType: 'spCampaigns',
+      statuses: ['imported', 'pending_request', 'requested', 'completed'],
+    });
+
+    expect(ranges).toEqual([
+      { startDate: '2026-06-01', endDate: '2026-06-30' },
+      { startDate: '2026-07-01', endDate: '2026-07-31' },
+    ]);
+  });
+});
+
+describe('countFailedAmazonRequestsSince', () => {
+  it('zählt Aufträge der Connection, die seit dem Zeitpunkt gescheitert sind', async () => {
+    const setUpdatedAt = (id: string, at: Date) =>
+      testDb.db
+        .update(amazonAdsReportRequests)
+        .set({ updatedAt: at })
+        .where(eq(amazonAdsReportRequests.id, id));
+    const recent = await create(report());
+    await updateAmazonRequest(testDb.db, recent, { status: 'failed' });
+    await setUpdatedAt(recent.id, minutes(10));
+    const recentExport = await create(exportRequest({ profileId: secondProfileId }));
+    await updateAmazonRequest(testDb.db, recentExport, { status: 'failed' });
+    await setUpdatedAt(recentExport.id, minutes(20));
+    const old = await create(report({ reportType: 'spTargeting' }));
+    await updateAmazonRequest(testDb.db, old, { status: 'failed' });
+    await setUpdatedAt(old.id, minutes(-10));
+    const open = await create(report({ reportType: 'spSearchTerm' }));
+    await setUpdatedAt(open.id, minutes(10));
+    const otherConnection = await create(report({ profileId: otherConnectionProfileId }));
+    await updateAmazonRequest(testDb.db, otherConnection, { status: 'failed' });
+    await setUpdatedAt(otherConnection.id, minutes(10));
+
+    expect(
+      await countFailedAmazonRequestsSince(testDb.db, { organizationId, connectionId, since: now }),
+    ).toBe(2);
   });
 });
 

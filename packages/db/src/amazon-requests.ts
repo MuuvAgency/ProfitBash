@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, gt, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gt, gte, inArray, isNotNull, lt, lte, min, sql } from 'drizzle-orm';
 import type { DbOrTx } from './audit';
-import { amazonAdsProfiles, amazonAdsReportRequests } from './schema';
+import { amazonAdsProfiles, amazonAdsReportRequests, connections } from './schema';
 
 /**
  * Asynchrone Amazon-Aufträge (Reports, Exports; Phase 1, 1.4). Systemzugriff des Workers ohne
@@ -229,6 +229,140 @@ export async function listDueAmazonRequests(
     .orderBy(asc(amazonAdsReportRequests.createdAt), asc(amazonAdsReportRequests.id))
     .limit(input.limit);
   return rows.map((row) => row.request);
+}
+
+/** Aufträge der Profile, die aktuell an der Connection hängen (Join für die folgenden Abfragen). */
+const onConnectionProfiles = and(
+  eq(amazonAdsProfiles.id, amazonAdsReportRequests.profileId),
+  eq(amazonAdsProfiles.organizationId, amazonAdsReportRequests.organizationId),
+);
+
+/**
+ * Frühester Termin (`next_poll_at`) der offenen Aufträge an der Connection, `null` ohne solche. Danach
+ * plant sich der Poll neu ein.
+ */
+export async function nextAmazonRequestPollAt(
+  db: DbOrTx,
+  input: { organizationId: string; connectionId: string },
+): Promise<Date | null> {
+  const [row] = await db
+    .select({ next: min(amazonAdsReportRequests.nextPollAt) })
+    .from(amazonAdsReportRequests)
+    .innerJoin(amazonAdsProfiles, onConnectionProfiles)
+    .where(
+      and(
+        eq(amazonAdsReportRequests.organizationId, input.organizationId),
+        eq(amazonAdsProfiles.connectionId, input.connectionId),
+        inArray(amazonAdsReportRequests.status, OPEN_AMAZON_REQUEST_STATUSES),
+      ),
+    );
+  return row?.next ?? null;
+}
+
+/**
+ * Aktive Connections aller Organisationen mit fälligen offenen Aufträgen (Cron-Auslöser des Polls,
+ * holt nach Absturz oder Deploy auf). Plattformweiter Systemzugriff, nur für den Worker.
+ */
+export async function listConnectionsWithDueAmazonRequests(
+  db: DbOrTx,
+  now: Date,
+): Promise<Array<{ id: string; organizationId: string }>> {
+  return db
+    .selectDistinct({ id: connections.id, organizationId: connections.organizationId })
+    .from(amazonAdsReportRequests)
+    .innerJoin(amazonAdsProfiles, onConnectionProfiles)
+    .innerJoin(
+      connections,
+      and(
+        eq(connections.id, amazonAdsProfiles.connectionId),
+        eq(connections.organizationId, amazonAdsProfiles.organizationId),
+      ),
+    )
+    .where(
+      and(
+        eq(connections.status, 'active'),
+        inArray(amazonAdsReportRequests.status, OPEN_AMAZON_REQUEST_STATUSES),
+        lte(amazonAdsReportRequests.nextPollAt, now),
+      ),
+    )
+    .orderBy(connections.id);
+}
+
+/** Bei Amazon laufende Exports eines Typs (`requested`) über alle Profile der Connection. */
+export async function countRunningExports(
+  db: DbOrTx,
+  input: { organizationId: string; connectionId: string; exportType: string },
+): Promise<number> {
+  const [row] = await db
+    .select({ running: count() })
+    .from(amazonAdsReportRequests)
+    .innerJoin(amazonAdsProfiles, onConnectionProfiles)
+    .where(
+      and(
+        eq(amazonAdsReportRequests.organizationId, input.organizationId),
+        eq(amazonAdsProfiles.connectionId, input.connectionId),
+        eq(amazonAdsReportRequests.kind, 'export'),
+        eq(amazonAdsReportRequests.reportType, input.exportType),
+        eq(amazonAdsReportRequests.status, 'requested'),
+      ),
+    );
+  return row?.running ?? 0;
+}
+
+/** Zeiträume der Reports eines Profils, Ad-Typs und Report-Typs in den genannten Zuständen. */
+export async function listReportRanges(
+  db: DbOrTx,
+  input: {
+    organizationId: string;
+    profileId: string;
+    adProduct: string;
+    reportType: string;
+    statuses: readonly AmazonRequestStatus[];
+  },
+): Promise<Array<{ startDate: string; endDate: string }>> {
+  const rows = await db
+    .select({
+      startDate: amazonAdsReportRequests.startDate,
+      endDate: amazonAdsReportRequests.endDate,
+    })
+    .from(amazonAdsReportRequests)
+    .where(
+      and(
+        eq(amazonAdsReportRequests.organizationId, input.organizationId),
+        eq(amazonAdsReportRequests.profileId, input.profileId),
+        eq(amazonAdsReportRequests.kind, 'report'),
+        eq(amazonAdsReportRequests.adProduct, input.adProduct),
+        eq(amazonAdsReportRequests.reportType, input.reportType),
+        inArray(amazonAdsReportRequests.status, [...input.statuses]),
+      ),
+    )
+    .orderBy(asc(amazonAdsReportRequests.startDate), asc(amazonAdsReportRequests.endDate));
+  return rows.flatMap((row) =>
+    row.startDate && row.endDate ? [{ startDate: row.startDate, endDate: row.endDate }] : [],
+  );
+}
+
+/**
+ * Aufträge (Reports und Exports) der Profile an der Connection, die seit `since` gescheitert sind
+ * (`updated_at` der `failed`-Zeile).
+ */
+export async function countFailedAmazonRequestsSince(
+  db: DbOrTx,
+  input: { organizationId: string; connectionId: string; since: Date },
+): Promise<number> {
+  const [row] = await db
+    .select({ failed: count() })
+    .from(amazonAdsReportRequests)
+    .innerJoin(amazonAdsProfiles, onConnectionProfiles)
+    .where(
+      and(
+        eq(amazonAdsReportRequests.organizationId, input.organizationId),
+        eq(amazonAdsProfiles.connectionId, input.connectionId),
+        eq(amazonAdsReportRequests.status, 'failed'),
+        gte(amazonAdsReportRequests.updatedAt, input.since),
+      ),
+    );
+  return row?.failed ?? 0;
 }
 
 /** Alle Aufträge eines Export-Batches. */

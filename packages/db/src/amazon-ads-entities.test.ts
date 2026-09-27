@@ -1,7 +1,9 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   ensureCampaigns,
+  markEntitiesRemoved,
+  ProfileNotFoundError,
   upsertAdGroups,
   upsertCampaigns,
   upsertNegativeTargets,
@@ -497,6 +499,131 @@ describe('upsertProductAds', () => {
       { amazonAdId: 'ad-1', asin: 'B000000001', sku: 'SKU-1' },
       { amazonAdId: 'ad-vendor', sku: null },
     ]);
+  });
+});
+
+describe('markEntitiesRemoved', () => {
+  let removalProfileId = '';
+  const before = new Date('2026-09-26T00:00:00Z');
+  const cutoff = new Date('2026-09-27T00:00:00Z');
+  const after = new Date('2026-09-28T00:00:00Z');
+  const farFuture = new Date('2100-01-01T00:00:00Z');
+  const removalScope = () => ({ organizationId, profileId: removalProfileId, now: t1 });
+
+  async function setCreatedAt(table: typeof amazonAdsCampaigns, amazonIds: string[], at: Date) {
+    await testDb.db
+      .update(table)
+      .set({ createdAt: at })
+      .where(
+        and(eq(table.profileId, removalProfileId), inArray(table.amazonCampaignId, amazonIds)),
+      );
+  }
+
+  async function removedCampaigns() {
+    const rows = await testDb.db
+      .select({ id: amazonAdsCampaigns.amazonCampaignId, removedAt: amazonAdsCampaigns.removedAt })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.profileId, removalProfileId))
+      .orderBy(amazonAdsCampaigns.amazonCampaignId);
+    return rows.map((row) => [row.id, row.removedAt]);
+  }
+
+  beforeAll(async () => {
+    removalProfileId = await createTestProfile(testDb.db, {
+      organizationId,
+      connectionId,
+      amazonProfileId: '444',
+    });
+    await upsertCampaigns(testDb.db, { ...removalScope(), now: t0 }, [
+      campaign({ amazonCampaignId: 'r-1' }),
+      campaign({ amazonCampaignId: 'r-2' }),
+      campaign({ amazonCampaignId: 'r-sb', adProduct: 'SPONSORED_BRANDS' }),
+      campaign({ amazonCampaignId: 'r-new' }),
+    ]);
+    await ensureCampaigns(testDb.db, removalScope(), [
+      { amazonCampaignId: 'r-placeholder-old', adProduct: SP },
+      { amazonCampaignId: 'r-placeholder-new', adProduct: SP },
+    ]);
+    await setCreatedAt(amazonAdsCampaigns, ['r-1', 'r-2', 'r-sb', 'r-placeholder-old'], before);
+    await setCreatedAt(amazonAdsCampaigns, ['r-new', 'r-placeholder-new'], after);
+  });
+
+  it('setzt removed_at nur für fehlende Entities desselben Ad-Typs, die vor dem Stichtag existierten', async () => {
+    const removed = await markEntitiesRemoved(testDb.db, {
+      ...removalScope(),
+      entity: 'campaign',
+      adProduct: SP,
+      existedBefore: cutoff,
+      seenAmazonIds: ['r-1'],
+    });
+
+    expect(removed).toBe(2);
+    expect(await removedCampaigns()).toEqual([
+      ['r-1', null],
+      ['r-2', t1],
+      ['r-new', null],
+      ['r-placeholder-new', null],
+      ['r-placeholder-old', t1],
+      ['r-sb', null],
+    ]);
+  });
+
+  it('lässt schon entfernte Entities unverändert (removed_at bleibt beim ersten Zeitpunkt)', async () => {
+    const removed = await markEntitiesRemoved(testDb.db, {
+      ...removalScope(),
+      now: t2,
+      entity: 'campaign',
+      adProduct: SP,
+      existedBefore: cutoff,
+      seenAmazonIds: ['r-1'],
+    });
+    expect(removed).toBe(0);
+    expect(await removedCampaigns()).toContainEqual(['r-2', t1]);
+  });
+
+  it('entfernt Portfolios ohne Ad-Typ und Targets je Tabelle', async () => {
+    await upsertPortfolios(testDb.db, removalScope(), [
+      portfolio({ amazonPortfolioId: 'rp-1' }),
+      portfolio({ amazonPortfolioId: 'rp-2' }),
+    ]);
+    await upsertTargets(testDb.db, removalScope(), [
+      target({ amazonTargetId: 'rt-1', amazonCampaignId: 'r-1', amazonAdGroupId: 'rag-1' }),
+    ]);
+    await upsertNegativeTargets(testDb.db, removalScope(), [
+      negative({ amazonTargetId: 'rn-1', amazonCampaignId: 'r-1', amazonAdGroupId: 'rag-1' }),
+    ]);
+
+    // Weit in der Zukunft: Die Zeilen dieses Tests entstehen mit der Uhr der Datenbank.
+    const common = { ...removalScope(), existedBefore: farFuture, seenAmazonIds: [] };
+    await expect(
+      markEntitiesRemoved(testDb.db, { ...common, entity: 'portfolio', adProduct: null }),
+    ).resolves.toBe(2);
+    await expect(
+      markEntitiesRemoved(testDb.db, { ...common, entity: 'target', adProduct: SP }),
+    ).resolves.toBe(1);
+    await expect(
+      markEntitiesRemoved(testDb.db, { ...common, entity: 'negativeTarget', adProduct: SP }),
+    ).resolves.toBe(1);
+    await expect(
+      markEntitiesRemoved(testDb.db, { ...common, entity: 'adGroup', adProduct: SP }),
+    ).resolves.toBe(1);
+    await expect(
+      markEntitiesRemoved(testDb.db, { ...common, entity: 'productAd', adProduct: SP }),
+    ).resolves.toBe(0);
+  });
+
+  it('verweigert ein Profil einer anderen Organisation', async () => {
+    await expect(
+      markEntitiesRemoved(testDb.db, {
+        organizationId: otherOrganizationId,
+        profileId: removalProfileId,
+        now: t1,
+        entity: 'campaign',
+        adProduct: SP,
+        existedBefore: farFuture,
+        seenAmazonIds: [],
+      }),
+    ).rejects.toBeInstanceOf(ProfileNotFoundError);
   });
 });
 

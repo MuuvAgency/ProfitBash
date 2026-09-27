@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, isNull, lt, ne, or, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { DbOrTx } from './audit';
 import {
@@ -292,6 +292,95 @@ export async function upsertProductAds(
       parents.created,
     );
   });
+}
+
+// ---------------------------------------------------------------------------
+// Entfernte Entities (Entity-Sync, 1.7)
+// ---------------------------------------------------------------------------
+
+export type RemovableEntity =
+  'portfolio' | 'campaign' | 'adGroup' | 'target' | 'negativeTarget' | 'productAd';
+
+export interface MarkEntitiesRemovedInput extends EntityWriteScope {
+  entity: RemovableEntity;
+  /** Ad-Typ der Lieferung; `null` bei Portfolios (gelten für alle Ad-Typen). */
+  adProduct: string | null;
+  /**
+   * Nur Entities, die vor diesem Zeitpunkt angelegt wurden (Anfordern des Exports): Platzhalter, die
+   * währenddessen aus Reports entstanden, fehlen im Export zu Recht und bleiben.
+   */
+  existedBefore: Date;
+  /** Amazon-IDs, die die Lieferung enthielt. */
+  seenAmazonIds: readonly string[];
+}
+
+/**
+ * Setzt `removed_at = now` für Entities des Profils (und Ad-Typs), die Amazon nicht mehr liefert. Nie
+ * löschen: Kennzahlen verweisen auf sie, und ein späterer Upsert macht es rückgängig. Schon entfernte
+ * behalten ihren ersten Zeitpunkt. Der Aufrufer ruft das nur mit einer vollständigen Lieferung (ohne
+ * ungültige Zeilen). Liefert die Zahl der neu entfernten Entities.
+ */
+export async function markEntitiesRemoved(
+  db: DbOrTx,
+  input: MarkEntitiesRemovedInput,
+): Promise<number> {
+  await assertProfileInOrganization(db, input);
+  const view = REMOVABLE_TABLES[input.entity];
+  const conditions: SQL[] = [
+    eq(view.profileId, input.profileId),
+    isNull(view.removedAt),
+    lt(view.createdAt, input.existedBefore),
+    // Ein Parameter, auch bei vielen tausend IDs.
+    sql`${view.amazonId} <> all(${sql.param([...input.seenAmazonIds])}::text[])`,
+  ];
+  if (view.adProduct) {
+    if (input.adProduct === null) throw new Error('Ad-Typ fehlt.');
+    conditions.push(eq(view.adProduct, input.adProduct));
+  }
+  const rows = await db
+    .update(view.table)
+    // `updated_at` bleibt (die Entity selbst hat sich nicht geändert).
+    .set({ removedAt: input.now, updatedAt: sql`${view.updatedAt}` })
+    .where(and(...conditions))
+    .returning({ id: view.id });
+  return rows.length;
+}
+
+interface RemovableTableView {
+  table: PgTable;
+  id: PgColumn;
+  profileId: PgColumn;
+  removedAt: PgColumn;
+  createdAt: PgColumn;
+  updatedAt: PgColumn;
+  amazonId: PgColumn;
+  adProduct: PgColumn | null;
+}
+
+const REMOVABLE_TABLES: Record<RemovableEntity, RemovableTableView> = {
+  portfolio: removableTable(amazonAdsPortfolios, amazonAdsPortfolios.amazonPortfolioId, null),
+  campaign: removableTable(amazonAdsCampaigns, amazonAdsCampaigns.amazonCampaignId),
+  adGroup: removableTable(amazonAdsAdGroups, amazonAdsAdGroups.amazonAdGroupId),
+  target: removableTable(amazonAdsTargets, amazonAdsTargets.amazonTargetId),
+  negativeTarget: removableTable(amazonAdsNegativeTargets, amazonAdsNegativeTargets.amazonTargetId),
+  productAd: removableTable(amazonAdsProductAds, amazonAdsProductAds.amazonAdId),
+};
+
+function removableTable(
+  table: EntityTable,
+  amazonId: PgColumn,
+  adProduct: PgColumn | null = 'adProduct' in table ? table.adProduct : null,
+): RemovableTableView {
+  return {
+    table,
+    id: table.id,
+    profileId: table.profileId,
+    removedAt: table.removedAt,
+    createdAt: table.createdAt,
+    updatedAt: table.updatedAt,
+    amazonId,
+    adProduct,
+  };
 }
 
 // ---------------------------------------------------------------------------
