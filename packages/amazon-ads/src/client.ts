@@ -4,6 +4,7 @@ import {
   type ConnectionRef,
   type RefreshTokenStore,
 } from './access-token';
+import { downloadFile, type AmazonAdsDownload } from './download';
 import { AmazonAdsHttpError } from './errors';
 import {
   createHttpClient,
@@ -65,6 +66,11 @@ export interface AmazonAdsClient {
     request: AdsApiRequest<S>,
   ): Promise<z.output<S>>;
   listProfiles(connection: ConnectionRef, options?: RequestOptions): Promise<AmazonAdsProfile[]>;
+  /**
+   * Lädt eine Report- oder Export-Datei von der signierten URL aus der Status-Antwort (nur erlaubte Hosts,
+   * ohne Token). Liefert den rohen gzip-Body; entpacken mit `decodeGzipJson`.
+   */
+  downloadFile(url: string): Promise<AmazonAdsDownload>;
 }
 
 export interface AmazonAdsClientOptions {
@@ -88,6 +94,9 @@ export interface AmazonAdsClientOptions {
   regions?: Readonly<Record<AmazonAdsRegion, AmazonAdsRegionEndpoints>>;
 }
 
+/** Ein Download (bis zu 50 MB entpackt) darf länger dauern als eine API-Anfrage. */
+const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
+
 /** Höchstens ca. 25 s unter der Sperre: 3 Versuche à 10 s plus kurzer Backoff. */
 export const LWA_HTTP_DEFAULTS = { timeoutMs: 10_000, maxAttempts: 3, maxRetryAfterMs: 5_000 };
 
@@ -98,6 +107,8 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
   const logger = options.logger ?? noopLogger;
   const regions = options.regions ?? AMAZON_ADS_REGIONS;
   const now = options.http?.now ?? Date.now;
+  const fetchImpl: typeof fetch =
+    options.http?.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const http = createHttpClient({ ...options.http, logger });
   const lwaHttp = createHttpClient({
     ...options.http,
@@ -191,6 +202,8 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
       });
       return normalizeProfiles(response, logger);
     },
+    downloadFile: (url) =>
+      downloadFile(url, { fetch: fetchImpl, logger, timeoutMs: DOWNLOAD_TIMEOUT_MS }),
   };
 }
 
