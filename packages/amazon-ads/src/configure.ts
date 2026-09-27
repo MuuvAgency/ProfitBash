@@ -12,6 +12,8 @@ export interface AmazonAdsClientConfig {
   redirectUri: string;
   /** Simulierte Einwilligungsseite der App; nur im Mock-Modus benutzt. */
   mockConsentUrl: string;
+  /** `AMAZON_ADS_REQUESTS_PER_SECOND`: Anfrage-Budget je Profil. Standard 2/s. */
+  requestsPerSecond?: number | undefined;
 }
 
 /** Wählt Mock oder echten Amazon-Client. Ohne Mock sind Client-ID und Secret Pflicht. */
@@ -21,12 +23,17 @@ export function createAmazonAdsClientFromConfig(options: {
   logger?: Logger;
 }): AmazonAdsClient {
   const { config, store, logger } = options;
+  const rateLimit =
+    config.requestsPerSecond === undefined
+      ? undefined
+      : { requestsPerSecond: config.requestsPerSecond };
   if (config.useMock) {
     return createMockAmazonAdsClient({
       redirectUri: config.redirectUri,
       consentUrl: config.mockConsentUrl,
       store,
       ...(logger && { logger }),
+      ...(rateLimit && { rateLimit }),
     });
   }
   const { clientId, clientSecret, redirectUri } = config;
@@ -39,5 +46,6 @@ export function createAmazonAdsClientFromConfig(options: {
     credentials: { clientId, clientSecret, redirectUri },
     store,
     ...(logger && { logger }),
+    ...(rateLimit && { rateLimit }),
   });
 }

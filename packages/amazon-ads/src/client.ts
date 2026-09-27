@@ -5,7 +5,13 @@ import {
   type RefreshTokenStore,
 } from './access-token';
 import { AmazonAdsHttpError } from './errors';
-import { createHttpClient, type HttpClientOptions, type HttpMethod } from './http';
+import {
+  createHttpClient,
+  type HttpClientOptions,
+  type HttpMethod,
+  type RequestMeter,
+  type RequestPacing,
+} from './http';
 import { noopLogger, type Logger } from './logger';
 import {
   createLwaClient,
@@ -14,6 +20,7 @@ import {
   type TokenSet,
 } from './lwa';
 import { normalizeProfiles, profileResponseSchema, type AmazonAdsProfile } from './profiles';
+import { createProfileRateLimiter, type ProfileRateLimiterOptions } from './rate-limit';
 import { AMAZON_ADS_REGIONS, type AmazonAdsRegion, type AmazonAdsRegionEndpoints } from './regions';
 
 export interface AdsApiRequest<S extends z.ZodType> {
@@ -28,6 +35,13 @@ export interface AdsApiRequest<S extends z.ZodType> {
   body?: string;
   schema: S;
   retryServerErrors?: boolean;
+  /** Zähler des aufrufenden Jobs (Anfragen, 429, Wiederholungen). */
+  meter?: RequestMeter;
+}
+
+export interface RequestOptions {
+  /** Zähler des aufrufenden Jobs (Anfragen, 429, Wiederholungen). */
+  meter?: RequestMeter;
 }
 
 /**
@@ -48,7 +62,7 @@ export interface AmazonAdsClient {
     connection: ConnectionRef,
     request: AdsApiRequest<S>,
   ): Promise<z.output<S>>;
-  listProfiles(connection: ConnectionRef): Promise<AmazonAdsProfile[]>;
+  listProfiles(connection: ConnectionRef, options?: RequestOptions): Promise<AmazonAdsProfile[]>;
 }
 
 export interface AmazonAdsClientOptions {
@@ -63,6 +77,11 @@ export interface AmazonAdsClientOptions {
    * Standard: `LWA_HTTP_DEFAULTS`.
    */
   lwaHttp?: Pick<HttpClientOptions, 'timeoutMs' | 'maxAttempts' | 'maxRetryAfterMs'>;
+  /**
+   * Anfrage-Budget je Profil (gilt für Aufrufe mit `amazonProfileId`). Uhr und Warten kommen aus
+   * `http`. Standard 2 Anfragen/s, siehe `rate-limit.ts`.
+   */
+  rateLimit?: Omit<ProfileRateLimiterOptions, 'now' | 'sleep'>;
   /** Standard: die echten Amazon-Endpunkte */
   regions?: Readonly<Record<AmazonAdsRegion, AmazonAdsRegionEndpoints>>;
 }
@@ -87,12 +106,29 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
   const lwa = createLwaClient({ credentials: options.credentials, http: lwaHttp, regions });
   const tokens = createAccessTokenProvider({ lwa, store: options.store, logger, now });
   const lastForcedRefresh = new Map<string, number>();
+  const rateLimiter = createProfileRateLimiter({
+    ...options.rateLimit,
+    now,
+    ...(options.http?.sleep && { sleep: options.http.sleep }),
+  });
+
+  /** Budget je Profil. Profil-IDs sind je Region vergeben, deshalb Region im Schlüssel. */
+  function pacingFor(connection: ConnectionRef, amazonProfileId: string): RequestPacing {
+    const key = `${connection.region}:${amazonProfileId}`;
+    return {
+      acquire: () => rateLimiter.acquire(key),
+      onThrottled: (retryAfterMs) => rateLimiter.onThrottled(key, retryAfterMs),
+      onSuccess: () => rateLimiter.onSuccess(key),
+    };
+  }
 
   async function request<S extends z.ZodType>(
     connection: ConnectionRef,
     req: AdsApiRequest<S>,
   ): Promise<z.output<S>> {
     const url = apiUrl(regions[connection.region].apiHost, req.path, req.query);
+    const pacing =
+      req.amazonProfileId === undefined ? undefined : pacingFor(connection, req.amazonProfileId);
 
     const send = async () => {
       const accessToken = await tokens.getAccessToken(connection);
@@ -111,6 +147,8 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
         ...(req.body !== undefined && { body: req.body }),
         schema: req.schema,
         ...(req.retryServerErrors !== undefined && { retryServerErrors: req.retryServerErrors }),
+        ...(req.meter && { meter: req.meter }),
+        ...(pacing && { pacing }),
       });
     };
 
@@ -138,12 +176,13 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
     getAccessToken: (connection) => tokens.getAccessToken(connection),
     invalidateAccessToken: (connectionId) => tokens.invalidate(connectionId),
     request,
-    async listProfiles(connection) {
+    async listProfiles(connection, requestOptions = {}) {
       const response = await request(connection, {
         operation: 'profiles.list',
         method: 'GET',
         path: '/v2/profiles',
         schema: profileResponseSchema,
+        ...(requestOptions.meter && { meter: requestOptions.meter }),
       });
       return normalizeProfiles(response, logger);
     },

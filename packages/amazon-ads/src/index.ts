@@ -10,6 +10,7 @@ export {
   type AdsApiRequest,
   type AmazonAdsClient,
   type AmazonAdsClientOptions,
+  type RequestOptions,
 } from './client';
 export { createAmazonAdsClientFromConfig, type AmazonAdsClientConfig } from './configure';
 export {
@@ -19,7 +20,12 @@ export {
   AmazonAdsReauthRequiredError,
   AmazonAdsResponseError,
 } from './errors';
-export type { HttpClientOptions, HttpMethod } from './http';
+export {
+  createRequestMeter,
+  type HttpClientOptions,
+  type HttpMethod,
+  type RequestMeter,
+} from './http';
 export { parseJsonLossless, type ParseJsonLosslessOptions } from './json';
 export type { LogEntry, Logger } from './logger';
 export { amazonDecimalSchema, currencyCodeSchema, isKnownCurrencyCode } from './money';
@@ -38,6 +44,7 @@ export {
   type MockAmazonAdsClientOptions,
 } from './mock';
 export { amazonIdSchema, KNOWN_ACCOUNT_TYPES, type AmazonAdsProfile } from './profiles';
+export { DEFAULT_REQUESTS_PER_SECOND, type ProfileRateLimiterOptions } from './rate-limit';
 export {
   AMAZON_ADS_REGION_KEYS,
   AMAZON_ADS_REGIONS,

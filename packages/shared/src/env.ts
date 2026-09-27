@@ -85,6 +85,14 @@ export const amazonAdsEnvSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((value) => value === 'true'),
+  /**
+   * Anfrage-Budget je Amazon-Profil (Anfragen/s, Standard 2 im Client). Nicht unter der Untergrenze,
+   * auf die der Client nach 429 drosselt (0,2/s, `packages/amazon-ads/src/rate-limit.ts`).
+   */
+  AMAZON_ADS_REQUESTS_PER_SECOND: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().min(0.2, 'mindestens 0,2 Anfragen/s').max(100).optional(),
+  ),
 });
 
 /** Ohne Mock sind Client-ID und Secret Pflicht. Für `superRefine` des App-Schemas. */

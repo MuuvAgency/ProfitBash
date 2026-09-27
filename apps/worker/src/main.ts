@@ -24,6 +24,7 @@ const amazonAds = createAmazonAdsClientFromConfig({
     clientSecret: env.AMAZON_ADS_CLIENT_SECRET,
     redirectUri: env.AMAZON_ADS_REDIRECT_URI,
     mockConsentUrl: new URL(AMAZON_ADS_MOCK_CONSENT_PATH, env.APP_URL).toString(),
+    requestsPerSecond: env.AMAZON_ADS_REQUESTS_PER_SECOND,
   },
   store: createConnectionTokenStore({ db, keyring: env.keyring }),
   logger,

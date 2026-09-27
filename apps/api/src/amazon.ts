@@ -23,6 +23,7 @@ export interface AmazonAdsEnv {
   AMAZON_ADS_USE_MOCK: boolean;
   AMAZON_ADS_CLIENT_ID?: string | undefined;
   AMAZON_ADS_CLIENT_SECRET?: string | undefined;
+  AMAZON_ADS_REQUESTS_PER_SECOND?: number | undefined;
 }
 
 /** Konfiguration des Amazon-Clients aus der Umgebung. */
@@ -33,6 +34,7 @@ function amazonAdsClientConfig(env: AmazonAdsEnv) {
     clientSecret: env.AMAZON_ADS_CLIENT_SECRET,
     redirectUri: env.AMAZON_ADS_REDIRECT_URI,
     mockConsentUrl: new URL(MOCK_CONSENT_PATH, env.APP_URL).toString(),
+    requestsPerSecond: env.AMAZON_ADS_REQUESTS_PER_SECOND,
   };
 }
 

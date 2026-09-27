@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  amazonAdsEnvSchema,
   appUrlSchema,
   databaseUrlSchema,
   EnvValidationError,
@@ -129,5 +130,33 @@ describe('migrationsDirSchema', () => {
       MIGRATIONS_DIR: undefined,
     });
     expect(loadEnv(migrationsDirSchema, { source: {} })).toEqual({ MIGRATIONS_DIR: undefined });
+  });
+});
+
+describe('amazonAdsEnvSchema', () => {
+  const amazon = { AMAZON_ADS_REDIRECT_URI: 'http://localhost:5173/api/amazon/oauth/callback' };
+
+  it('liest AMAZON_ADS_REQUESTS_PER_SECOND als Zahl; leer oder fehlend gilt als nicht gesetzt', () => {
+    const read = (value?: string) =>
+      loadEnv(amazonAdsEnvSchema, {
+        source: {
+          ...amazon,
+          ...(value !== undefined && { AMAZON_ADS_REQUESTS_PER_SECOND: value }),
+        },
+      }).AMAZON_ADS_REQUESTS_PER_SECOND;
+    expect(read('0.5')).toBe(0.5);
+    expect(read('3')).toBe(3);
+    expect(read('')).toBeUndefined();
+    expect(read()).toBeUndefined();
+  });
+
+  it('lehnt Raten unter der Untergrenze (0,2/s) und keine Zahlen ab', () => {
+    for (const value of ['0', '0.1', '-1', 'schnell']) {
+      expect(() =>
+        loadEnv(amazonAdsEnvSchema, {
+          source: { ...amazon, AMAZON_ADS_REQUESTS_PER_SECOND: value },
+        }),
+      ).toThrow(/AMAZON_ADS_REQUESTS_PER_SECOND/);
+    }
   });
 });

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { RefreshTokenStore } from './access-token';
 import { createAmazonAdsClient } from './client';
 import { AmazonAdsHttpError, AmazonAdsResponseError } from './errors';
+import { createRequestMeter } from './http';
 import type { LogEntry } from './logger';
 
 const server = setupServer();
@@ -205,6 +206,92 @@ describe('request', () => {
         schema: z.unknown(),
       }),
     ).rejects.toThrow(TypeError);
+  });
+});
+
+describe('Anfrage-Budget je Profil', () => {
+  const TEST_URL = 'https://advertising-api-eu.amazon.com/test';
+  const schema = z.object({ ok: z.boolean() });
+  const scoped = (amazonProfileId?: string) => ({
+    operation: 't',
+    method: 'GET' as const,
+    path: '/test',
+    ...(amazonProfileId !== undefined && { amazonProfileId }),
+    schema,
+  });
+
+  /** Die Uhr steht; jede Wartezeit (Budget und Backoff) landet in `sleeps`. */
+  function budgetSetup(rateLimit?: { requestsPerSecond: number }) {
+    const sleeps: number[] = [];
+    const client = createAmazonAdsClient({
+      credentials: {
+        clientId: 'amzn1.application-oa2-client.test',
+        clientSecret: 'SECRET-CLIENT',
+        redirectUri: 'https://app.test/api/amazon/oauth/callback',
+      },
+      store,
+      http: {
+        now: () => 0,
+        random: () => 0.5,
+        baseDelayMs: 100,
+        sleep: async (ms) => {
+          sleeps.push(ms);
+        },
+      },
+      ...(rateLimit && { rateLimit }),
+    });
+    return { client, sleeps };
+  }
+
+  it('verteilt Anfragen desselben Profils gleichmäßig (Standard 2/s), andere Profile unabhängig', async () => {
+    tokenEndpoint();
+    server.use(http.get(TEST_URL, () => HttpResponse.json({ ok: true })));
+    const { client, sleeps } = budgetSetup();
+    await client.request(connection, scoped('111'));
+    await client.request(connection, scoped('111'));
+    await client.request(connection, scoped('222'));
+    // Ohne Profil-Scope (z. B. `/v2/profiles`) gilt kein Profil-Budget.
+    await client.request(connection, scoped());
+    expect(sleeps).toEqual([500]);
+  });
+
+  it('nimmt die konfigurierte Rate', async () => {
+    tokenEndpoint();
+    server.use(http.get(TEST_URL, () => HttpResponse.json({ ok: true })));
+    const { client, sleeps } = budgetSetup({ requestsPerSecond: 4 });
+    await client.request(connection, scoped('111'));
+    await client.request(connection, scoped('111'));
+    expect(sleeps).toEqual([250]);
+  });
+
+  it('halbiert nach einem 429 die Rate des Profils vor dem nächsten Versuch', async () => {
+    tokenEndpoint();
+    let calls = 0;
+    server.use(
+      http.get(TEST_URL, () => {
+        calls += 1;
+        return calls === 1
+          ? HttpResponse.json({ code: 'THROTTLED' }, { status: 429 })
+          : HttpResponse.json({ ok: true });
+      }),
+    );
+    const { client, sleeps } = budgetSetup();
+    await client.request(connection, scoped('111'));
+    // Backoff 75 ms, dann Abstand der halbierten Rate (1/s) statt 500 ms.
+    expect(sleeps).toEqual([75, 1_000]);
+  });
+
+  it('zählt Anfragen im Meter des Aufrufers, auch bei listProfiles', async () => {
+    tokenEndpoint();
+    server.use(
+      http.get(TEST_URL, () => HttpResponse.json({ ok: true })),
+      http.get(PROFILES_URL, () => HttpResponse.json([])),
+    );
+    const { client } = budgetSetup();
+    const meter = createRequestMeter();
+    await client.request(connection, { ...scoped('111'), meter });
+    await client.listProfiles(connection, { meter });
+    expect(meter).toEqual({ requests: 2, throttled: 0, retries: 0 });
   });
 });
 
