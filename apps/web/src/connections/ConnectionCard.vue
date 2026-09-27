@@ -246,7 +246,7 @@ const statusDot = computed(
           : t('connections.profiles.emptyFiltered')
       }}
     </p>
-    <!-- Mindestbreite = Summe der Mindestbreiten der Spalten (ProfileGrid): darunter scrollt die Tabelle in der Kachel. -->
+    <!-- Die Mindestbreite setzt ProfileGrid aus seinen Spalten: darunter scrollt die Tabelle in der Kachel. -->
     <div
       v-else
       class="-mx-space-lg overflow-x-auto"
@@ -254,7 +254,6 @@ const statusDot = computed(
       :aria-label="t('connections.profiles.label', { account: title })"
     >
       <ProfileGrid
-        class="min-w-[1120px]"
         :profiles="profiles"
         :clients="clients"
         :clients-ready="clientsReady"
