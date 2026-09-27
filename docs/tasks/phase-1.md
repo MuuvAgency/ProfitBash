@@ -688,7 +688,7 @@ Nach F11.
       gelöscht). Endpunkt begrenzt die Profile über `visibleProfilesScope`.
 - [x] Optional aus dem Review-Backlog: Sync-Status „läuft seit“ für laufende Jobs (hilft beim Erkennen hängender Jobs und belegter Leases).
 - [x] Umsetzung (Stand für 1.9 und später):
-  - **Merker:** Spalte `amazon_ads_profiles.metrics_imported_through` (`date`, Migration `0011_amazon_ads_profiles_metrics_imported_through`,
+  - **Merker** (seit 1.9 je Ad-Typ in eigener Tabelle, siehe dort): Spalte `amazon_ads_profiles.metrics_imported_through` (`date`, Migration `0011_amazon_ads_profiles_metrics_imported_through`,
     ohne Nachbefüllung: bestehende Profile zeigen „–“ bis zum nächsten Kampagnen-Report). `markMetricsImportedThrough` in
     `amazon-ads-metrics.ts` setzt `greatest(alt, Tag)` (rückt nur vor, ein Stück der Historie setzt nicht zurück), lässt `updated_at`
     unverändert (Datenstand, keine Stammdaten) und prüft die Organisation (`ProfileNotFoundError`). `importReport` (`import.ts`) ruft sie für
@@ -721,9 +721,20 @@ Nach F11.
     etwas abzuschneiden.
 
 ### 1.9 Weitere Ad-Typen (nach F2)
-- [ ] **Offen aus 1.8:** „Daten bis“ ist heute das Maximum über alle Kampagnen-Reports des Profils. Mit `sbCampaigns`/`sdCampaigns`
+- [x] **Offen aus 1.8:** „Daten bis“ ist heute das Maximum über alle Kampagnen-Reports des Profils. Mit `sbCampaigns`/`sdCampaigns`
       (ebenfalls Ebene `campaign`) zeigte ein Profil den Stand von SP, auch wenn SB/SD hängen. Vor dem Umsetzen entscheiden: Merker je
       Ad-Typ oder Minimum über die aktiven Ad-Typen des Profils.
+      **Entschieden (Dominik, 2026-09-27): Merker je Ad-Typ, angezeigt wird das Minimum über die synchronisierten Ad-Typen.**
+  - Umsetzung: Tabelle `amazon_ads_profile_metrics_imported_through` (Organisation, Profil, `ad_product`, `imported_through`;
+    Schlüssel Profil + Ad-Typ, Migration `0012_amazon_ads_profile_metrics_imported_through`) ersetzt die Spalte
+    `amazon_ads_profiles.metrics_imported_through` (ohne Übernahme: noch kein Deploy, lokal füllt der nächste Kampagnen-Report sie).
+    `markMetricsImportedThrough` nimmt `adProduct` (Upsert mit `greatest`, fremdes Profil → `ProfileNotFoundError`); `importReport`
+    übergibt den Ad-Typ des Auftrags. `metricsImportedThroughSql(adProducts)` liefert für ein `select` über die Profile das Minimum
+    über die übergebenen Ad-Typen und `null`, solange einem davon ein Tag fehlt (ein neuer Ad-Typ zeigt also „–“, bis sein erster
+    Kampagnen-Report importiert ist; ein dauerhaft scheiternder Ad-Typ fällt zusätzlich über die Alarme aus 1.7 auf). Die API
+    (`GET /api/connections/:id/profiles`, `PATCH /api/profiles/:id`) rechnet über `REPORT_AD_PRODUCTS`, das jetzt in
+    `@profitbash/amazon-ads` liegt (Schlüssel von `REPORT_TYPES_BY_AD_PRODUCT`) und das `reports-sync` ebenso nutzt: Ein Ad-Typ,
+    den der Sync anfordert, zählt automatisch für „Daten bis“. API-Form unverändert (`metricsImportedThrough`).
 - [ ] SB: Entities (Exports decken SB ab) und Reports (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`); Hinweis auf die v3-Preview-Lücke
       (SB-Kampagnen ohne Multi-Ad-Group fehlen) in der UI-Doku von Phase 2 vermerken.
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
