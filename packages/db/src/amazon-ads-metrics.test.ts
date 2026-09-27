@@ -617,6 +617,11 @@ describe('metricsImportedThroughSql', () => {
     expect(await dataThrough([SP, SB])).toBeNull();
   });
 
+  it('zählt einen doppelt übergebenen Ad-Typ einmal', async () => {
+    await mark(SP, '2026-09-27');
+    expect(await dataThrough([SP, SP])).toBe('2026-09-27');
+  });
+
   it('ignoriert Ad-Typen, die der Sync nicht anfordert', async () => {
     await mark(SP, '2026-09-27');
     await mark(SB, '2026-09-01');

@@ -184,9 +184,10 @@ export function metricsImportedThroughSql(adProducts: readonly string[]): SQL<st
   const marks = amazonAdsProfileMetricsImportedThrough;
   const unique = [...new Set(adProducts)];
   if (unique.length === 0) return sql<null>`null::text`;
-  // Als Text (`YYYY-MM-DD`): Ein Tag ohne Uhrzeit, keine Umrechnung durch den Treiber.
+  // Als Text (`YYYY-MM-DD`, unabhängig von `DateStyle`): Ein Tag ohne Uhrzeit, keine Umrechnung durch den Treiber.
   return sql<string | null>`(
-    select case when count(*) = ${unique.length} then min(${marks.importedThrough})::text end
+    select case when count(*) = ${unique.length}
+      then to_char(min(${marks.importedThrough}), 'YYYY-MM-DD') end
     from ${marks}
     where ${marks.profileId} = ${amazonAdsProfiles.id}
       and ${inArray(marks.adProduct, unique)}
