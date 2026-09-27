@@ -263,7 +263,8 @@ describe('SyncStatusPage', () => {
     const { wrapper } = await mountPage();
     await waitForRow(wrapper, succeeded);
 
-    // Angepasst wird nur nach neuen Zeilen; „12 Std. 59 Min.“ muss trotzdem passen.
+    // Angepasst wird nur nach neuen Zeilen; „12 Std. 59 Min.“ muss trotzdem passen. jsdom misst 0 px:
+    // Der Test sichert die Untergrenze der Spalte, ob der Text passt, zeigt nur der Browser.
     const header = wrapper.get('.ag-header-cell[col-id="duration"]').element as HTMLElement;
     await vi.waitFor(() => expect(parseFloat(header.style.width)).toBeGreaterThanOrEqual(160));
   });

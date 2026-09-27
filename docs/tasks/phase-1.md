@@ -699,7 +699,8 @@ Nach F11.
     (weiter über `visibleProfilesScope`) und in der Antwort von `PATCH /api/profiles/:id`; OpenAPI und `schema.gen.ts` neu erzeugt.
   - **Web:** Spalte „Daten bis“ in `ProfileGrid.vue` über den neuen Helfer `formatDay` (`packages/shared`): Kalendertag ohne Umrechnung in
     die Zeitzone des Browsers, numerisch mit fester Breite in jeder Sprache (`25.09.2026`, `09/25/2026`). Spaltenbreiten so gewählt, dass
-    die Tabelle bei 1440 px mit ausgeklappter Sidebar ohne Scrollen passt (Summe 1120, Mindestbreite in `ConnectionCard.vue`).
+    die Tabelle bei 1440 px mit ausgeklappter Sidebar ohne Scrollen passt (Summe 1120; die Mindestbreite berechnet
+    `useGridMinWidth` in `apps/web/src/grid/min-width.ts` aus den Spalten, siehe Nachtrag unten).
   - **Sync-Status:** Die Spalte „Dauer“ zeigt bei laufenden Jobs die bisherige Dauer (ohne „seit“: Der Status daneben sagt „Läuft“, die
     Mono-Spalte bliebe sonst zu schmal). Sie zählt jede Sekunde weiter: `DurationCell` rechnet mit einer Uhr im reaktiven Grid-Kontext,
     die nur tickt, solange ein Job läuft. Neue Daten allein zeichnen nicht neu (Structural Sharing der Abfrage, AG Grid aktualisiert nur
@@ -709,6 +710,15 @@ Nach F11.
     Tabellen, englische Datumsformate zu breit, negative Dauer bei Uhrabweichung, Jahre unter 100 in `formatDay`. Nur festgehalten:
     lange Job-Namen („Amazon-Aufträge abholen“) und die Startzeit werden im Sync-Status schon seit 1.7 knapp abgeschnitten (eigene
     Aufgabe, Umbruch sah schlechter aus).
+
+  - **Nachtrag Spaltenbreiten (nach 1.8):** Der Sync-Status passt Status, Job, Start und Dauer nach neuen Zeilen an ihren Inhalt an
+    (`autoSizeColumns`, `ColumnAutoSizeModule` und `ColumnApiModule` registriert, Zeilen-Virtualisierung aus, Mono-Schrift vorher
+    geladen); Amazon-Konto und Ergebnis kürzen mit nativem `title` (auf Touch nicht erreichbar, vorerst akzeptiert). Beide Tabellen
+    bekommen ihre Mindestbreite aus `useGridMinWidth` (feste Breiten + Mindestbreiten der Flex-Spalten), darunter scrollt der Container.
+    Dauer hat `minWidth` 160 („12 Std. 59 Min.“ passt, obwohl zwischen zwei Anpassungen weiterzählt; ab 100 Std. wird sie bis zur
+    nächsten Anpassung knapp), Amazon-Konto 180, Ergebnis 280. Bei 1440 px mit ausgeklappter Sidebar: Sync 1122, Profile 1120 von
+    1128 px. Gemessen mit Overlay-Scrollbars (macOS); mit klassischer Scrollbar (~15 px) scrollen beide Tabellen waagerecht, ohne
+    etwas abzuschneiden.
 
 ### 1.9 Weitere Ad-Typen (nach F2)
 - [ ] **Offen aus 1.8:** „Daten bis“ ist heute das Maximum über alle Kampagnen-Reports des Profils. Mit `sbCampaigns`/`sdCampaigns`
