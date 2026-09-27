@@ -73,7 +73,9 @@ function toConnection(row: ConnectionRow): Connection {
     ...row,
     lastRefreshedAt: toIso(row.lastRefreshedAt),
     consentedAt: toIso(row.consentedAt),
-    refreshTokenExpiresAt: toIso(refreshTokenExpiresAt(row.consentedAt)),
+    // Die 365-Tage-Regel gilt für Amazon-Ads-Tokens; andere Anbieter bringen eigene Regeln mit.
+    refreshTokenExpiresAt:
+      row.provider === 'amazon_ads' ? toIso(refreshTokenExpiresAt(row.consentedAt)) : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

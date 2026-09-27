@@ -25,7 +25,7 @@ Für jedes verbundene Profil liegen die Werbe-Entities und die täglichen Kennza
 - [ ] Neue Jobs laufen über `runJob`, schreiben `job_runs` mit Zählern, erscheinen im Sync-Status (i18n-Keys) und pingen Healthchecks (außer `amazon-requests-poll`, siehe 1.7).
 - [ ] Jede neue Tabelle trägt `organization_id`, jede Tabelle mit Profildaten zusätzlich `profile_id` (die Lease-Tabelle aus 1.3 gilt je
       Connection); die DB verhindert Verknüpfungen über Org- und Profilgrenzen (zusammengesetzte FKs).
-- [ ] Connections speichern den Zeitpunkt der Einwilligung; die Connections-Seite zeigt, wann der Refresh-Token abläuft.
+- [x] Connections speichern den Zeitpunkt der Einwilligung; die Connections-Seite zeigt, wann der Refresh-Token abläuft.
 - [ ] ADR 003 (Decimal-Library) ist angenommen. ADR 004 (Amazon-API-Generation, F1) ist angenommen und nach dem ersten echten Lauf abgeglichen.
 - [ ] Nach der Ads-API-Freigabe: ein echter Lauf gegen ein Profil der Agentur, Abweichungen zum Mock sind nachgezogen.
 - [ ] `pnpm test`, `typecheck`, `lint`, `build` und beide Smoke-Tests grün, CI grün.
@@ -174,12 +174,26 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     - Amazon-IDs: `text`.
 
 ### 1.2 Einwilligungszeitpunkt je Connection
-- [ ] Migration: `connections.consented_at` (timestamptz, nullable für Bestandsdaten). Der OAuth-Callback setzt ihn bei Anlage **und**
+- [x] Migration: `connections.consented_at` (timestamptz, nullable für Bestandsdaten). Der OAuth-Callback setzt ihn bei Anlage **und**
       bei jedem Neu-Verbinden auf `now()` (jede Einwilligung startet die 365 Tage neu). Audit-Events `connection.create`/`reconnect` enthalten ihn.
-- [ ] `refreshTokenExpiresAt = consented_at + 365 Tage` als abgeleiteter Wert in der API (`GET /api/connections`), nicht gespeichert.
+- [x] `refreshTokenExpiresAt = consented_at + 365 Tage` als abgeleiteter Wert in der API (`GET /api/connections`), nicht gespeichert.
       Hinweis: Die Regel gilt für Tokens ab 30.07.2026; ältere Connections ohne `consented_at` zeigen „unbekannt“.
-- [ ] Connections-Seite: „Einwilligung läuft ab am …“, ab 30 Tagen vorher als Warnung. Benachrichtigungen erst Phase 5.
-- [ ] Tests: Anlage und Neu-Verbinden setzen den Zeitpunkt; Mock-Callback ebenso.
+- [x] Connections-Seite: „Einwilligung läuft ab am …“, ab 30 Tagen vorher als Warnung. Benachrichtigungen erst Phase 5.
+- [x] Tests: Anlage und Neu-Verbinden setzen den Zeitpunkt; Mock-Callback ebenso.
+- [x] Umsetzung (Stand für 1.3 und später):
+  - Migration `0002_connections_consented_at` (nur `ADD COLUMN`, Bestandszeilen bleiben `NULL`). Der Callback nimmt **einen** Zeitpunkt
+    für `consented_at` und `last_refreshed_at` (nach Code-Tausch und Konto-Prüfung, in der Transaktion mit dem Audit-Event); das
+    Audit-Event trägt ihn als `target.consentedAt` (ISO). Die Mock-Einwilligungsseite läuft über denselben Callback.
+  - `@profitbash/shared` (`src/consent.ts`): `AMAZON_ADS_CONSENT_LIFETIME_DAYS` (365, feste Tage, kein Kalenderjahr),
+    `CONSENT_EXPIRY_WARNING_DAYS` (30), `refreshTokenExpiresAt(consentedAt)`, `consentExpiryStatus(expiresAt, now)` →
+    `unknown` | `valid` | `expiring` | `expired`. Dazu `formatDate` (Datum ohne Uhrzeit, Zeitzone des Browsers).
+  - `GET /api/connections` liefert `consentedAt` und `refreshTokenExpiresAt` (nur für `amazon_ads` abgeleitet, sonst `null`).
+    OpenAPI und `schema.gen.ts` neu erzeugt.
+  - Connections-Karte: „Einwilligung läuft ab am …“ / „abgelaufen am …“ / „Ablauf der Einwilligung: unbekannt“. Bei `expiring`/`expired`
+    ein Warnhinweis und „Neu verbinden“ **neben** „Jetzt synchronisieren“ (Neu-Verbinden startet die 365 Tage neu). Bei `reauth_required`
+    gilt nur der bisherige Hinweis. Der Status wird beim Anzeigen berechnet (nicht reaktiv auf die Uhr); ein offener Tab zeigt den
+    Wechsel über die 30-Tage-Grenze erst nach einem Neuladen, bis die Benachrichtigungen in Phase 5 kommen.
+  - Nach Ablauf bleibt die Connection `active`, bis Amazon den Token ablehnt (`invalid_grant` → `reauth_required` über `token-refresh`).
 
 ### 1.3 Anfrage-Budget und Nebenläufigkeit
 - [ ] **Richtigstellung zum Bestand:** `singletonKey` = Connection-ID gilt bei pg-boss `stately` nur **innerhalb einer Queue**
@@ -356,7 +370,7 @@ Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
 ### 1.8 Sichtbares (`apps/api`, `apps/web`)
 Nach F11.
 - [ ] Sync-Status zeigt die neuen Jobs und Zähler.
-- [ ] Connections-Seite: Ablauf der Einwilligung (1.2); Profiltabelle mit Spalte „Daten bis“ aus einer neuen Spalte
+- [ ] Connections-Seite: Profiltabelle mit Spalte „Daten bis“ (der Ablauf der Einwilligung ist mit 1.2 erledigt) aus einer neuen Spalte
       `amazon_ads_profiles.metrics_imported_through` (date), die der Import eines Kampagnen-Reports auf `max(end_date)` setzt (nicht
       `max(date)` der Kennzahlen: ein pausiertes Profil hätte sonst ein altes Datum; nicht aus den Auftragszeilen: die werden nach 30 Tagen
       gelöscht). Endpunkt begrenzt die Profile über `visibleProfilesScope`.
