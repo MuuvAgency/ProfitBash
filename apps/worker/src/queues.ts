@@ -5,7 +5,10 @@ import { sql } from 'drizzle-orm';
 import { fromDrizzle, PgBoss, type Queue } from 'pg-boss';
 import type { ConnectionJobData, ConnectionQueue } from './jobs/connection-job';
 
-/** Jobs je Connection. `stately`: je Connection höchstens ein wartender und ein laufender Job. */
+/**
+ * Jobs je Connection. `stately`: je Connection höchstens ein wartender und ein laufender Job **je
+ * Queue**. Über Queues hinweg serialisiert die Lease der Connection die Amazon-Datenjobs (1.3).
+ */
 export const CONNECTION_QUEUES: readonly ConnectionQueue[] = CONNECTION_JOB_NAMES;
 
 /** Cron-Auslöser, die für jede aktive Connection einen Job der Ziel-Queue einplanen. */
@@ -22,11 +25,14 @@ export const SCHEDULES = [
   { queue: CLEANUP_QUEUE, cron: '30 3 * * *', tz: 'Europe/Berlin' },
 ] as const;
 
+/** So lange darf ein Job laufen, bevor pg-boss ihn als abgelaufen führt. */
+export const JOB_EXPIRE_SECONDS = 10 * 60;
+
 const QUEUE_OPTIONS: Omit<Queue, 'name'> = {
   policy: 'stately',
   // Fehler behandelt runJob; neu geplant wird gezielt (Retry-After) oder im nächsten Zyklus.
   retryLimit: 0,
-  expireInSeconds: 10 * 60,
+  expireInSeconds: JOB_EXPIRE_SECONDS,
 };
 
 const ALL_QUEUES = [...CONNECTION_QUEUES, ...Object.keys(DISPATCH_QUEUES), CLEANUP_QUEUE];

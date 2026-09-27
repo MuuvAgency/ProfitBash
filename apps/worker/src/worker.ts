@@ -11,6 +11,7 @@ import {
 import { dispatchConnectionJobs } from './jobs/dispatch';
 import { cleanupJobRuns } from './jobs/job-runs-cleanup';
 import { syncConnectionProfiles } from './jobs/profiles-sync';
+import { runConnectionJob, type ConnectionJobDefinition } from './jobs/run-connection-job';
 import { refreshConnectionToken } from './jobs/token-refresh';
 import {
   CLEANUP_QUEUE,
@@ -21,14 +22,15 @@ import {
   SCHEDULES,
   type JobQueue,
 } from './queues';
-import { createJobRunner, JobFailure, type JobOutcome, type JobRunnerDeps } from './run-job';
+import { createJobRunner, JobFailure, type JobRunnerDeps } from './run-job';
 
-const CONNECTION_JOBS: Record<
-  ConnectionQueue,
-  (deps: ConnectionJobDeps, job: ConnectionJobData) => Promise<JobOutcome>
-> = {
-  'token-refresh': refreshConnectionToken,
-  'profiles-sync': syncConnectionProfiles,
+/**
+ * Jobs je Connection. `lease: true` = Amazon-Datenjob: höchstens einer je Connection gleichzeitig,
+ * über alle Queues hinweg (1.3). Neue Datenjobs (1.7) melden sich hier mit `lease: true` an.
+ */
+const CONNECTION_JOBS: Record<ConnectionQueue, ConnectionJobDefinition> = {
+  'token-refresh': { run: refreshConnectionToken, lease: false },
+  'profiles-sync': { run: syncConnectionProfiles, lease: true },
 };
 
 /** So lange wartet das Herunterfahren auf laufende Jobs. */
@@ -80,8 +82,17 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
     }),
   };
 
-  for (const [queue, run] of Object.entries(CONNECTION_JOBS) as Array<
-    [ConnectionQueue, (typeof CONNECTION_JOBS)[ConnectionQueue]]
+  const connectionJobContext = {
+    db,
+    logger,
+    runJob,
+    deps: connectionDeps,
+    defer: (queue: ConnectionQueue, job: ConnectionJobData, startAfterSeconds: number) =>
+      jobs.enqueueConnectionJob(queue, job, { startAfterSeconds }),
+  };
+
+  for (const [queue, definition] of Object.entries(CONNECTION_JOBS) as Array<
+    [ConnectionQueue, ConnectionJobDefinition]
   >) {
     await boss.work<unknown>(queue, workOptions, async (batch: Job<unknown>[]) => {
       for (const job of batch) {
@@ -92,10 +103,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
           );
           continue;
         }
-        const data = parsed.data;
-        await runJob(queue, { organizationId: data.organizationId, scope: data.connectionId }, () =>
-          run(connectionDeps, data),
-        );
+        await runConnectionJob(connectionJobContext, queue, definition, parsed.data);
       }
     });
   }

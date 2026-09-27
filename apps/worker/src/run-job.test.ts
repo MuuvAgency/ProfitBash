@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { schema } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import type { LogEntry } from '@profitbash/shared';
@@ -112,6 +113,47 @@ describe('runJob', () => {
       status: 'failed',
       error: 'Connection muss neu verbunden werden.',
       counters: { profiles: 0 },
+    });
+  });
+
+  it('nutzt eine vorgegebene Lauf-ID', async () => {
+    const runJob = createJobRunner({ db: testDb.db, logger });
+    const runId = randomUUID();
+    const result = await runJob('profiles-sync', { organizationId, scope: null }, async () => {}, {
+      runId,
+    });
+    expect(result).toEqual({ status: 'success', runId });
+    expect((await jobRun(runId)).status).toBe('success');
+  });
+
+  it('ergänzt zusätzliche Zähler bei Erfolg und bei Fehlschlag', async () => {
+    const runJob = createJobRunner({ db: testDb.db, logger });
+    let requests = 0;
+    const counters = () => ({ requests });
+
+    const ok = await runJob(
+      'profiles-sync',
+      { organizationId, scope: null },
+      async () => {
+        requests = 3;
+        return { counters: { profiles: 2 } };
+      },
+      { counters },
+    );
+    expect((await jobRun(ok.runId)).counters).toEqual({ profiles: 2, requests: 3 });
+
+    const failed = await runJob(
+      'profiles-sync',
+      { organizationId, scope: null },
+      async () => {
+        requests = 5;
+        throw new Error('kaputt');
+      },
+      { counters },
+    );
+    expect(await jobRun(failed.runId)).toMatchObject({
+      status: 'failed',
+      counters: { requests: 5 },
     });
   });
 

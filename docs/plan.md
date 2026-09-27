@@ -109,8 +109,8 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 - **Amazon-Kennzahlen sind vorläufig:** Amazon korrigiert jüngere Werte, bis die Attributionsfenster
   abgeschlossen sind. Der tägliche Import lädt deshalb ein rollierendes Fenster (14–30 Tage) neu und schreibt
   per Upsert (Profil, Datum, Entity).
-- **Rate-Limits und Nebenläufigkeit:** Jobs je Connection laufen nacheinander (pg-boss `singletonKey`),
-  dazu ein Anfrage-Budget je Profil. Asynchrone Amazon-Reports: anfordern, Status mit Backoff abfragen,
+- **Rate-Limits und Nebenläufigkeit:** Jobs je Connection laufen nacheinander (pg-boss `singletonKey` je Queue,
+  dazu eine Lease je Connection über alle Amazon-Datenjobs, Phase 1, 1.3), dazu ein Anfrage-Budget je Profil. Asynchrone Amazon-Reports: anfordern, Status mit Backoff abfragen,
   Report-Zustand in der DB festhalten, damit ein Neustart nichts verliert.
 - **Schlüsselrotation** für verschlüsselte Tokens ist ab 0.3 vorgesehen (Schlüssel-ID im Ciphertext).
 - **Geldbeträge aus Amazon-JSON:** `parseJsonLossless(text, { decimals: 'string' })` liefert Dezimalzahlen als Quelltext-String,

@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { createMockAmazonAdsClient } from '@profitbash/amazon-ads';
-import { createConnectionTokenStore, schema } from '@profitbash/db';
+import { acquireConnectionLease, createConnectionTokenStore, schema } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import type { LogEntry } from '@profitbash/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -8,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createConnection, createOrganization, testKeyring } from './testing';
 import { startJobQueue, startWorker, type Worker } from './worker';
 
-const { amazonAdsProfiles, jobRuns } = schema;
+const { amazonAdsProfiles, connectionJobLeases, jobRuns } = schema;
 
 let testDb: TestDatabase;
 let organizationId = '';
@@ -146,6 +147,50 @@ describe('startWorker', () => {
       status: 'success',
       counters: { refreshed: 1 },
     });
+  });
+
+  it('schreibt beim Profil-Sync die Anfragezähler und gibt die Lease frei', async () => {
+    const [run] = await testDb.db
+      .select()
+      .from(jobRuns)
+      .where(and(eq(jobRuns.job, 'profiles-sync'), eq(jobRuns.scope, connectionId)));
+    expect(run?.counters).toMatchObject({ requests: 1, throttled: 0, retries: 0, deferred: 0 });
+    expect(await testDb.db.select().from(connectionJobLeases)).toEqual([]);
+  });
+
+  it('stellt einen Profil-Sync zurück, solange ein anderer Datenjob die Connection hält', async () => {
+    await acquireConnectionLease(testDb.db, {
+      organizationId,
+      connectionId,
+      job: 'entities-sync',
+      jobRunId: randomUUID(),
+      ttlSeconds: 600,
+    });
+    const runsBefore = (await testDb.db.select().from(jobRuns)).length;
+    try {
+      await worker.jobs.enqueueProfilesSync({ organizationId, connectionId });
+
+      const waiting = await waitFor(async () => {
+        const rows = await testDb.db.execute<{ deferred: string | null; delay_s: number }>(
+          sql`select data->>'deferredCount' as deferred,
+                     extract(epoch from start_after - now())::float as delay_s
+              from pgboss.job
+              where name = 'profiles-sync' and state = 'created' and singleton_key = ${connectionId}`,
+        );
+        const row = [...rows][0];
+        return row?.deferred === '1' ? row : undefined;
+      });
+      expect(waiting.delay_s).toBeGreaterThan(30);
+      expect((await testDb.db.select().from(jobRuns)).length).toBe(runsBefore);
+      expect(logs).toContainEqual(
+        expect.objectContaining({ msg: 'job.deferred', connectionId, heldBy: 'entities-sync' }),
+      );
+    } finally {
+      await testDb.db.delete(connectionJobLeases);
+      await testDb.db.execute(
+        sql`delete from pgboss.job where name = 'profiles-sync' and state = 'created'`,
+      );
+    }
   });
 });
 

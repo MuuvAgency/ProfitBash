@@ -1,8 +1,11 @@
 import {
   AmazonAdsHttpError,
   AmazonAdsReauthRequiredError,
+  createRequestMeter,
   type AmazonAdsProfile,
   type ConnectionRef,
+  type RequestMeter,
+  type RequestOptions,
 } from '@profitbash/amazon-ads';
 import { schema } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
@@ -25,6 +28,9 @@ let connectionB = '';
 /** Antworten von Amazon je Connection-ID: Profilliste oder Fehler. */
 const amazon = new Map<string, AmazonAdsProfile[] | Error>();
 const listed: string[] = [];
+/** Meter, den jeder Aufruf von `listProfiles` mitbekam. */
+const meters: Array<RequestMeter | undefined> = [];
+let meter: RequestMeter = createRequestMeter();
 const retries: ScheduledRetry[] = [];
 /** Antwort von `scheduleRetry`: `false` = für die Connection wartet schon ein Job. */
 let retryAccepted = true;
@@ -35,8 +41,9 @@ function deps(): ConnectionJobDeps {
     db: testDb.db,
     logger: (entry) => logs.push(entry),
     amazonAds: {
-      listProfiles(connection: ConnectionRef) {
+      listProfiles(connection: ConnectionRef, options?: RequestOptions) {
         listed.push(connection.id);
+        meters.push(options?.meter);
         const answer = amazon.get(connection.id);
         if (answer instanceof Error) return Promise.reject(answer);
         return Promise.resolve(answer ?? []);
@@ -52,11 +59,11 @@ function deps(): ConnectionJobDeps {
 }
 
 const sync = (connectionId: string, retryAttempt?: number) =>
-  syncConnectionProfiles(deps(), {
-    organizationId,
-    connectionId,
-    ...(retryAttempt !== undefined && { retryAttempt }),
-  });
+  syncConnectionProfiles(
+    deps(),
+    { organizationId, connectionId, ...(retryAttempt !== undefined && { retryAttempt }) },
+    { meter },
+  );
 
 async function profile(amazonProfileId: string, orgId = organizationId) {
   const [row] = await testDb.db
@@ -103,6 +110,8 @@ beforeEach(async () => {
   });
   amazon.clear();
   listed.length = 0;
+  meters.length = 0;
+  meter = createRequestMeter();
   retries.length = 0;
   retryAccepted = true;
   logs.length = 0;
@@ -211,6 +220,18 @@ describe('syncConnectionProfiles', () => {
     );
   });
 
+  it('zählt alle Aufrufe an Amazon im Meter des Laufs, auch die anderer Connections', async () => {
+    amazon.set(connectionA, [amazonProfile('1')]);
+    await sync(connectionA);
+    amazon.set(connectionA, []);
+    amazon.set(connectionB, [amazonProfile('1')]);
+    meters.length = 0;
+    await sync(connectionA);
+    expect(listed.slice(-2)).toEqual([connectionA, connectionB]);
+    expect(meters).toEqual([meter, meter]);
+    expect(meters[0]).toBe(meter);
+  });
+
   it('fragt andere Connections nur ab, wenn es Kandidaten zum Entfernen gibt', async () => {
     amazon.set(connectionA, [amazonProfile('1')]);
     await sync(connectionA);
@@ -279,10 +300,11 @@ describe('syncConnectionProfiles', () => {
 
   it('meldet eine unbekannte Connection als Fehlschlag', async () => {
     await expect(
-      syncConnectionProfiles(deps(), {
-        organizationId: otherOrganizationId,
-        connectionId: connectionA,
-      }),
+      syncConnectionProfiles(
+        deps(),
+        { organizationId: otherOrganizationId, connectionId: connectionA },
+        { meter },
+      ),
     ).rejects.toThrow(/nicht gefunden/);
     expect(listed).toEqual([]);
   });

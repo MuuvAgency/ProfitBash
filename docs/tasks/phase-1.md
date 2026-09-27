@@ -200,11 +200,11 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Nach Ablauf bleibt die Connection `active`, bis Amazon den Token ablehnt (`invalid_grant` → `reauth_required` über `token-refresh`).
 
 ### 1.3 Anfrage-Budget und Nebenläufigkeit
-- [ ] **Richtigstellung zum Bestand:** `singletonKey` = Connection-ID gilt bei pg-boss `stately` nur **innerhalb einer Queue**
+- [x] **Richtigstellung zum Bestand:** `singletonKey` = Connection-ID gilt bei pg-boss `stately` nur **innerhalb einer Queue**
       (siehe 0.7: `token-refresh` und `profiles-sync` derselben Connection können gleichzeitig laufen). Mit den neuen Queues
       (`entities-sync`, `reports-sync`, `amazon-requests-poll`) liefen ohne weitere Maßnahme mehrere Datenjobs einer Connection parallel.
       Plan §5 verlangt „Jobs je Connection laufen nacheinander“.
-- [ ] **Sperre je Connection für die Amazon-Datenjobs** (`profiles-sync`, `entities-sync`, `reports-sync`, `amazon-requests-poll`;
+- [x] **Sperre je Connection für die Amazon-Datenjobs** (`profiles-sync`, `entities-sync`, `reports-sync`, `amazon-requests-poll`;
       `token-refresh` nicht, der Token-Store serialisiert LWA bereits über die Zeilensperre). Empfehlung: **Lease-Zeile** in der DB
       (`connection_job_leases`: `organization_id`, `connection_id` unique, `job`, `job_run_id`, `expires_at`; zusammengesetzter FK
       (`connection_id`, `organization_id`) → `connections`), per `INSERT … ON CONFLICT … WHERE expires_at < now()`
@@ -214,14 +214,44 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
       Schritte verlängern sie. Das Neu-Einplanen hat keine Obergrenze (anders als `Retry-After`: max. 3-mal, 1 h), belegt aber den einzigen
       Warteplatz der Connection in dieser Queue: Ein Cron-Einplanen währenddessen fällt als Duplikat weg, der wartende Job erledigt dieselbe
       Arbeit. Die Entscheidung (Lease oder Alternative) hier unter „Umsetzung“ festhalten.
-- [ ] **Anfrage-Budget je Profil** im Amazon-Client: Token-Bucket je **Profil** (nicht je Connection und Profil: ein Profil kann die
+- [x] **Anfrage-Budget je Profil** im Amazon-Client: Token-Bucket je **Profil** (nicht je Connection und Profil: ein Profil kann die
       Connection wechseln) im Prozess, Standard z. B. 2 Anfragen/s, konfigurierbar. Bei einem 429 halbiert sich die Rate des Profils
       (Untergrenze z. B. 0,2/s), je erfolgreicher Anfrage steigt sie additiv um einen kleinen Schritt bis zum Standard (AIMD).
       `Retry-After` hat Vorrang (besteht schon in `request()`). Kein verteiltes Budget: Die Datenjobs laufen in genau einem Prozess
       (`inline`: API-Prozess, `separate`: Worker).
-- [ ] Zähler je Lauf in `job_runs.counters`: `requests`, `throttled` (429), `retries`, `deferred`. Damit lässt sich das Budget später
+- [x] Zähler je Lauf in `job_runs.counters`: `requests`, `throttled` (429), `retries`, `deferred`. Damit lässt sich das Budget später
       anhand echter Werte einstellen.
 - [ ] Offen nach dem ersten echten Lauf: Standardrate an beobachtete 429-Quoten anpassen.
+- [x] Umsetzung (Stand für 1.4 und später):
+  - **Entscheidung: Lease-Zeile** wie empfohlen. Tabelle `connection_job_leases` (Migration `0003_connection_job_leases`):
+    `connection_id` als Primärschlüssel, `organization_id`, `job`, `job_run_id`, `acquired_at`, `expires_at`; zusammengesetzter FK
+    (`connection_id`, `organization_id`) → `connections` mit `ON DELETE CASCADE` (die Lease verschwindet mit der Connection).
+    `job_run_id` ohne FK: Die Lease wird **vor** dem Lauf genommen (siehe unten), die ID steht dann schon fest.
+  - Zugriffe in `packages/db/src/connection-leases.ts` (Systemzugriff, an Org und Connection gebunden): `acquireConnectionLease`
+    (`INSERT … ON CONFLICT (connection_id) DO UPDATE … WHERE expires_at < now() AND organization_id = excluded.organization_id`;
+    belegt → `{ acquired: false, heldBy }`), `extendConnectionLease` und `releaseConnectionLease` (nur die eigene Lease, erkannt an
+    `job_run_id`). Ablauf in Datenbankzeit (`now()`), damit alter und neuer Container beim Deploy dieselbe Uhr sehen.
+  - Worker: `CONNECTION_JOBS` in `worker.ts` führt je Queue `{ run, lease }`; `lease: true` heißt Amazon-Datenjob (heute nur
+    `profiles-sync`). **1.7 meldet `entities-sync`, `reports-sync` und `amazon-requests-poll` dort nur mit `lease: true` an.**
+    `runConnectionJob` (`jobs/run-connection-job.ts`): Lauf-ID vorab erzeugen → Lease nehmen (`CONNECTION_LEASE_SECONDS` = 15 Min.,
+    länger als `JOB_EXPIRE_SECONDS` = 10 Min. von pg-boss, per Test abgesichert) → `runJob` mit dieser ID → Lease im `finally`
+    freigeben (scheitert das, läuft sie ab; Log `job.lease_release_failed`).
+  - **Belegt:** Es entsteht **kein** `job_runs`-Eintrag und kein Healthcheck-Ping. Derselbe Job wird mit `startAfter`
+    (`LEASE_DEFER_SECONDS` = 60 s) und `deferredCount + 1` neu eingeplant (Log `job.deferred` mit dem Halter); der spätere Lauf zeigt
+    den Zähler `deferred`. So erzeugt eine länger belegte Connection keine Zeile je Minute im Sync-Status, und Healthchecks sieht nur
+    echte Läufe. Wartet schon ein Job der Queue auf die Connection, fällt der zurückgestellte weg (Ergebnis `queued: false`).
+    `extendConnectionLease` ist für lange Schritte da; heute nutzt es noch kein Job (1.7 bei Bedarf über den Lauf-Kontext).
+  - **Anfrage-Budget:** `packages/amazon-ads/src/rate-limit.ts` (`createProfileRateLimiter`): Token-Bucket mit Kapazität 1 je Profil
+    (Schlüssel `region:amazonProfileId`), also gleichmäßiger Abstand `1/Rate`, auch für gleichzeitige Aufrufe. Standard 2/s, Untergrenze
+    0,2/s, +0,05/s je Erfolg, 429 halbiert; `Retry-After` sperrt das Profil bis zum Ende der Pause. Greift in `request()` nur mit
+    `amazonProfileId` (Profil-Scope), vor **jedem** Versuch inkl. Wiederholungen; `/v2/profiles` und LWA laufen ohne Profil-Budget.
+    Konfigurierbar über `AMAZON_ADS_REQUESTS_PER_SECOND` (optional, 0,2–100; `.env.example`, `docs/deploy.md`). Im Modus `inline`
+    teilen API und Worker denselben Client und damit dasselbe Budget.
+  - **Zähler:** `createRequestMeter()` (`@profitbash/amazon-ads`) zählt je Lauf `requests` (jede gesendete HTTP-Anfrage), `throttled`
+    (429) und `retries` (zweiter und weitere Versuche). Jobs reichen ihn über den dritten Parameter (`ConnectionJobRun`) an jeden Aufruf
+    weiter (`request(…, { meter })`, `listProfiles(connection, { meter })`); neue Client-Methoden in 1.6 nehmen dieselbe Option.
+    `runJob` hat dafür die Option `counters` (auch bei Fehlschlag geschrieben, gerade gedrosselte Läufe sollen sie zeigen) und `runId`.
+    Nur Datenjobs schreiben diese vier Zähler; Anzeige nach den fachlichen Zählern (`COUNTER_ORDER`), Nullwerte ausgeblendet.
 
 ### 1.4 Asynchrone Amazon-Aufträge: Tabelle und Zustandsmaschine
 Gemeinsamer Baustein für Exports (Entities) und Reports, damit Neustarts nichts verlieren. Diese Aufgabe baut **Tabelle und

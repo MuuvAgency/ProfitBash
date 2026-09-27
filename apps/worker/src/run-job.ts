@@ -58,10 +58,21 @@ export interface JobRunnerDeps {
   fetch?: typeof fetch;
 }
 
+export interface RunJobOptions {
+  /** ID der `job_runs`-Zeile, falls sie vorher feststehen muss (z. B. für die Lease der Connection). */
+  runId?: string;
+  /**
+   * Weitere Zähler, beim Abschluss gelesen und auch bei einem Fehlschlag geschrieben (z. B. Anfragen
+   * an Amazon: gerade gedrosselte Läufe sollen sie zeigen).
+   */
+  counters?: () => JobCounters;
+}
+
 export type RunJob = (
   name: JobName,
   scope: JobScope,
   fn: (context: JobContext) => Promise<JobOutcome | void>,
+  options?: RunJobOptions,
 ) => Promise<JobRunResult>;
 
 const MAX_ERROR_LENGTH = 1_000;
@@ -74,10 +85,16 @@ const MAX_ERROR_LENGTH = 1_000;
 export function createJobRunner(deps: JobRunnerDeps): RunJob {
   const { db, logger } = deps;
 
-  return async (name, scope, fn) => {
+  return async (name, scope, fn, options = {}) => {
+    const extraCounters = () => options.counters?.() ?? {};
     const [run] = await db
       .insert(jobRuns)
-      .values({ job: name, organizationId: scope.organizationId, scope: scope.scope })
+      .values({
+        ...(options.runId !== undefined && { id: options.runId }),
+        job: name,
+        organizationId: scope.organizationId,
+        scope: scope.scope,
+      })
       .returning({ id: jobRuns.id });
     if (!run) throw new Error('Insert in job_runs lieferte keine Zeile.');
     const runId = run.id;
@@ -92,12 +109,20 @@ export function createJobRunner(deps: JobRunnerDeps): RunJob {
       const outcome = await fn({ runId });
       await db
         .update(jobRuns)
-        .set({ status: 'success', finishedAt: new Date(), counters: outcome?.counters ?? {} })
+        .set({
+          status: 'success',
+          finishedAt: new Date(),
+          counters: { ...outcome?.counters, ...extraCounters() },
+        })
         .where(eq(jobRuns.id, runId));
       await ping('success');
       return { status: 'success', runId };
     } catch (err) {
       const error = jobErrorMessage(err);
+      const counters = {
+        ...(err instanceof JobFailure ? err.counters : undefined),
+        ...extraCounters(),
+      };
       logger({
         level: 'error',
         msg: 'job.failed',
@@ -113,7 +138,7 @@ export function createJobRunner(deps: JobRunnerDeps): RunJob {
           status: 'failed',
           finishedAt: new Date(),
           error,
-          ...(err instanceof JobFailure && err.counters && { counters: err.counters }),
+          counters,
         })
         .where(eq(jobRuns.id, runId));
       await ping(err instanceof JobFailure && !err.alert ? 'success' : 'fail');
