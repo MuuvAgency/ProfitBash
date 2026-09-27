@@ -12,6 +12,23 @@ export {
   type AmazonAdsClientOptions,
   type RequestOptions,
 } from './client';
+export type { AmazonAdsAsyncStatus } from './async-status';
+export {
+  createExportRowSchema,
+  EXPORT_CONTENT_TYPES,
+  EXPORT_TYPES,
+  type AmazonAdsAdGroup,
+  type AmazonAdsCampaign,
+  type AmazonAdsExportedTarget,
+  type AmazonAdsExportRows,
+  type AmazonAdsExportType,
+  type AmazonAdsNegativeTarget,
+  type AmazonAdsProductAd,
+  type AmazonAdsTarget,
+  type ExportRowSchemaOptions,
+  type GetExportInput,
+  type RequestExportInput,
+} from './exports';
 export { createAmazonAdsClientFromConfig, type AmazonAdsClientConfig } from './configure';
 export {
   AMAZON_ADS_DOWNLOAD_HOST_PATTERNS,

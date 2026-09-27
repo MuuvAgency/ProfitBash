@@ -5,7 +5,9 @@ import {
   type RefreshTokenStore,
 } from './access-token';
 import { downloadFile, type AmazonAdsDownload } from './download';
+import type { AmazonAdsAsyncStatus } from './async-status';
 import { AmazonAdsHttpError } from './errors';
+import { getExport, requestExport, type GetExportInput, type RequestExportInput } from './exports';
 import {
   createHttpClient,
   type HttpClientOptions,
@@ -72,6 +74,17 @@ export interface AmazonAdsClient {
    * ohne Token). Liefert den rohen gzip-Body; entpacken mit `decodeGzipJson`.
    */
   downloadFile(url: string): Promise<AmazonAdsDownload>;
+  /** Fordert einen Export an (asynchron, Status über `getExport`). */
+  requestExport(
+    connection: ConnectionRef,
+    input: RequestExportInput,
+    options?: RequestOptions,
+  ): Promise<{ exportId: string }>;
+  getExport(
+    connection: ConnectionRef,
+    input: GetExportInput,
+    options?: RequestOptions,
+  ): Promise<AmazonAdsAsyncStatus>;
   /** Alle Portfolios eines Profils (synchron, paginiert). */
   listPortfolios(
     connection: ConnectionRef,
@@ -209,6 +222,10 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
       });
       return normalizeProfiles(response, logger);
     },
+    requestExport: (connection, input, requestOptions) =>
+      requestExport({ request, logger }, connection, input, requestOptions),
+    getExport: (connection, input, requestOptions) =>
+      getExport({ request, logger }, connection, input, requestOptions),
     listPortfolios: (connection, amazonProfileId, requestOptions) =>
       listPortfolios({ request, logger }, connection, amazonProfileId, requestOptions),
     downloadFile: (url) =>
