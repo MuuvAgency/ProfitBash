@@ -8,6 +8,7 @@ import {
 } from '@profitbash/db';
 import type { JobOutcome } from '../run-job';
 import {
+  enqueueFollowUp,
   handleAmazonError,
   loadConnection,
   type ConnectionJobData,
@@ -82,7 +83,7 @@ export async function syncConnectionProfiles(
   });
   // Kette von „Jetzt synchronisieren“: Profile → Entities → Reports.
   if (job.chain) {
-    await deps.enqueue('entities-sync', {
+    await enqueueFollowUp(deps, 'profiles-sync', 'entities-sync', {
       organizationId: job.organizationId,
       connectionId: job.connectionId,
       chain: true,

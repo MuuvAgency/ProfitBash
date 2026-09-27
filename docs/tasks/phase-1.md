@@ -625,10 +625,11 @@ Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
     nannte `removed_at` nur für Exports). Dann je Ad-Typ aus `ENTITY_AD_PRODUCTS` (heute nur SP, 1.9 ergänzt) ein Export-Batch über
     `submitAmazonExportBatch`. **Export-Plätze:** Laufen an der Connection schon `MAX_RUNNING_EXPORTS_PER_TYPE` (5) Exports eines Typs
     (`requested`), entsteht der Batch nur als Zeilen (`pending_request`, Zähler `exportsWaiting`); der Poll fordert sie an, sobald Platz ist
-    (sonst 1 Min. später erneut). Ob Amazons Limit je Profil, Konto oder App gilt, klärt 1.10. Ist für Profil und Ad-Typ noch ein Batch
+    (frühestens zum nächsten Termin eines laufenden Exports, mindestens 1 Min. später). Ob Amazons Limit je Profil, Konto oder App gilt, klärt 1.10. Ist für Profil und Ad-Typ noch ein Batch
     offen, entsteht kein neuer (1.4).
   - **Import** (`amazon-requests/import.ts`, das `import` des Ports): Batch in Hierarchie-Reihenfolge; fehlt Targets oder Ads die Kampagne,
-    kommt sie **nur** von einer Ad Group desselben Batches (Entscheidung zu „Für 1.7“ aus 1.6: nicht aus der DB). Nicht auflösbare Zeilen
+    kommt sie von einer Ad Group desselben Batches, sonst von einer vorhandenen Ad Group in der DB (`findAdGroupCampaignIds`; die Exports
+    eines Batches können wegen der Export-Plätze zeitversetzt laufen). Nicht auflösbare Zeilen
     werden übersprungen, geloggt (`entities_import.unresolved_campaign`, nur Anzahl) und zählen wie ungültige. `removed_at` nur ohne ungültige
     oder nicht auflösbare Zeilen im ganzen Batch, je Entity-Typ für Entities, die vor dem Anfordern **ihres** Exports (`requested_at`)
     angelegt wurden (`markEntitiesRemoved` in `amazon-ads-entities.ts`, ein Array-Parameter für die gesehenen IDs). Reports:
@@ -644,7 +645,8 @@ Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
     2 Stücke). Achtung F5: Die Deckung liest die Auftragszeilen, die nach 30 Tagen gelöscht werden; hängt eine Historie länger, lädt sie
     schon importierte Tage erneut (harmlos, solange Amazon sie hält).
   - **`failedSinceLastRun`:** gescheiterte Aufträge (Reports und Exports) der Connection mit `updated_at` nach dem Ende des vorigen
-    `reports-sync`-Laufs (`findPreviousJobRun`), am Anfang des Laufs gezählt (eigene Fehlschläge stehen in `failed`).
+    `reports-sync`-Laufs (`findPreviousJobRun`), am Anfang des Laufs gezählt (eigene Fehlschläge stehen in `failed`). Ist er größer als 0,
+    endet der Lauf nach getaner Arbeit als Fehlschlag (Healthchecks `/fail`), damit gescheiterte Aufträge Alarm schlagen.
   - **`amazon-requests-poll`:** `listDueAmazonRequests` (höchstens 20), je Auftrag `advanceAmazonRequest`, höchstens 5 Downloads und 5 Min.
     je Lauf (`POLL_LIMITS`), danach plant er sich zum frühesten `next_poll_at` der Connection neu ein (`schedulePoll`, mindestens 5 s;
     nichts offen: kein Poll). `entities-sync` und `reports-sync` planen ihn ebenso ein. Zähler `requested`, `reused`, `imported`, `rows`,
@@ -652,7 +654,10 @@ Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
   - **Kurz bleiben:** `entities-sync` und `reports-sync` enden nach `DATA_JOB_TIME_BUDGET_MS` (5 Min.) vor dem nächsten Profil und planen
     sich mit `resumeFromProfileId` neu ein (Zähler `continued`, `chain` bleibt erhalten; Reihenfolge der Profile nach Anlage). Scheitert ein
     Profil (nicht die Connection), laufen die übrigen weiter (Zähler `profileErrors`, Log `amazon_data_job.profile_failed`), der Lauf endet
-    danach als Fehlschlag mit Zählern. `handleAmazonError` behält beim Neu-Einplanen `chain` und `resumeFromProfileId`.
+    danach als Fehlschlag mit Zählern. Ein Fehler der Connection (`Retry-After`) plant den Job **ab dem betroffenen Profil** neu ein
+    (`handleProfileLoopError`, sonst träfen die vorderen Profile bei jedem Versuch erneut die Pause) und behält die Zähler bis dahin;
+    `chain` bleibt erhalten. Eine verlorene Lease (`LeaseLostError`) beendet den Lauf sofort. Fällt ein Folgejob weg, weil in der Queue
+    schon einer für die Connection wartet (`stately`), loggt `enqueueFollowUp` `job.follow_up_dropped`.
   - **Kette:** `chain` in den Jobdaten; nur `POST /api/connections/:id/sync` setzt es (nicht der OAuth-Callback, nicht der Cron).
     `profiles-sync` → `entities-sync` (`chain: true`) → `reports-sync` (erst nach dem letzten Profil).
   - **Zeitpläne** (`queues.ts`): `entities-sync-all` und `reports-sync-all` um 06:00 Berlin (beide gleichzeitig; die Lease reiht sie),
@@ -662,6 +667,14 @@ Connection bis zum Ablauf; Graceful Shutdown wartet nur 30 s).
   - **Sync-Status/i18n:** `CONNECTION_JOB_NAMES` um die drei Jobs erweitert, Texte `sync.job.*`/`sync.counter.*`, Reihenfolge in
     `COUNTER_ORDER`. Zählernamen in camelCase wie bisher (`placeholdersFilled`, `failedSinceLastRun` statt der Schreibweise oben).
   - **Healthchecks:** `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPORTS_SYNC_URL` (`.env.example`, `docs/deploy.md`).
+  - Review (unabhängig): Übernommen: Alarm bei gescheiterten Aufträgen, Fortsetzen nach `Retry-After` beim betroffenen Profil, Zähler
+    bei Abbruch, verlorene Lease als Abbruch, Log bei weggefallener Kette, Text für `continued`, wartende Exports erst zum Termin eines
+    laufenden, Kampagne über vorhandene Ad Groups. Nur festgehalten: `created_at` (Uhr der DB) wird mit `requested_at` (Uhr des Workers)
+    verglichen (in Produktion dieselbe Zeit; im DoD-Test mit fester Uhr kann deshalb nichts entfernt werden, `removed_at` testet
+    `import.test.ts`); ein neuer Auftrag kann bis zum schon eingeplanten nächsten Poll warten (höchstens 15 Min.); `PROFILE_PAUSED` gilt
+    weiter für die ganze Connection (1.3). **Offen:** pg-boss arbeitet je Queue und Prozess einen Job gleichzeitig ab (`localConcurrency`
+    1), ein langer Poll einer Connection verzögert also die anderen. Erhöhen, sobald mehrere Connections laufen (Speicher bei `inline`
+    beachten: bis zu 50 MB je Datei).
   - **DoD-Test** `apps/worker/src/jobs/data-sync.test.ts` (Mock, nur das DE-Profil): füllt alle Entity- und Kennzahl-Tabellen (große IDs,
     `0.005`, `1234567.89`), zweiter Lauf ohne Änderungen, lokal veränderte Werte kommen per Upsert zurück (der Mock hat keine veränderbaren
     Daten, daher so), Neustart (neuer Client) während laufender Reports verliert nichts.
@@ -690,7 +703,9 @@ Nach F11.
       Export-Status-Schreibweise, ob SP-Product-Ads im Export ASIN und SKU tragen, Limit von 5 laufenden Exports je Endpunkt,
       Form von `targetDetails` (flach oder verschachtelt, Log `amazon_ads.unexpected_shape`), `startDate` vs. `startDateTime` bei Kampagnen,
       ob `spSearchTerm` für Auto- und Produkt-Targets immer `keywordId` liefert, ob Vendor-Profile `advertisedSku` und die Same-SKU-Spalten
-      in `spAdvertisedProduct` annehmen (ein 400 dort ließe Vendor-Reports dauerhaft scheitern).
+      in `spAdvertisedProduct` annehmen (ein 400 dort ließe Vendor-Reports dauerhaft scheitern). Aus 1.7: ob die Aufbewahrungsgrenze
+      (`retentionDays`, ein Tag Abstand) hält (sonst scheitert das älteste Stück der Historie täglich), für wen das Export-Limit gilt
+      (`MAX_RUNNING_EXPORTS_PER_TYPE` je Connection), Laufzeiten von `entities-sync`/`reports-sync` mit echtem Budget.
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
 ### 1.11 Datei-Import (optional, nur mit Auslöser)

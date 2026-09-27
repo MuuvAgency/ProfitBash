@@ -13,7 +13,7 @@ import {
 } from '@profitbash/db';
 import type { ConnectionJobName, Logger } from '@profitbash/shared';
 import { z } from 'zod';
-import { JobFailure } from '../run-job';
+import { JobFailure, type JobCounters } from '../run-job';
 
 /** So oft wird ein Job nach `Retry-After` von Amazon neu eingeplant, danach erst im nächsten Zyklus. */
 export const MAX_RETRY_AFTER_ATTEMPTS = 3;
@@ -133,6 +133,8 @@ export async function handleAmazonError(
   job: ConnectionJobData,
   connection: LoadedConnection,
   err: unknown,
+  /** Zähler des Laufs bis zum Fehler (landen trotz Fehlschlag in `job_runs`). */
+  counters?: JobCounters,
 ): Promise<never> {
   if (err instanceof AmazonAdsReauthRequiredError) {
     // Abgelehnt wurde der Token, den der Job beim Start vorfand (oder ein älterer): Ein inzwischen
@@ -142,15 +144,18 @@ export async function handleAmazonError(
       organizationId: connection.organizationId,
       rejectedRefreshTokenEncrypted: connection.refreshTokenEncrypted,
     });
-    throw new JobFailure(REAUTH_REQUIRED_MESSAGE);
+    throw new JobFailure(REAUTH_REQUIRED_MESSAGE, counters);
   }
-  if (err instanceof ConnectionReauthRequiredError) throw new JobFailure(REAUTH_REQUIRED_MESSAGE);
+  if (err instanceof ConnectionReauthRequiredError) {
+    throw new JobFailure(REAUTH_REQUIRED_MESSAGE, counters);
+  }
   if (err instanceof AmazonAdsHttpError && err.retryAfterMs !== null) {
     const attempt = job.retryAttempt ?? 0;
     const startAfterSeconds = Math.max(1, Math.ceil(err.retryAfterMs / 1000));
     if (attempt >= MAX_RETRY_AFTER_ATTEMPTS || startAfterSeconds > MAX_RETRY_AFTER_SECONDS) {
       throw new JobFailure(
         `Amazon verlangt eine Pause (HTTP ${err.status}, ${startAfterSeconds} s); keine weiteren Versuche, der nächste reguläre Lauf holt es nach.`,
+        counters,
       );
     }
     const scheduled = await deps.scheduleRetry({
@@ -168,9 +173,41 @@ export async function handleAmazonError(
       scheduled
         ? `Amazon verlangt eine Pause (HTTP ${err.status}). Neuer Versuch in ${startAfterSeconds} s eingeplant.`
         : `Amazon verlangt eine Pause (HTTP ${err.status}). Für die Connection ist bereits ein Job eingeplant.`,
-      undefined,
+      counters,
       { alert: false },
     );
   }
   throw err;
+}
+
+/** Die Lease der Connection ist abgelaufen und gehört einem anderen Lauf: sofort aufhören. */
+export class LeaseLostError extends JobFailure {
+  constructor() {
+    super('Die Lease der Connection ist verloren gegangen.');
+    this.name = 'LeaseLostError';
+  }
+}
+
+/**
+ * Plant einen Folgejob ein (Kette, Fortsetzung). Wartet für die Connection in dieser Queue schon ein
+ * Job (`stately`), fällt er weg; der wartende erledigt die Arbeit meist mit, aber ohne `chain` bzw. von
+ * vorn. Das wird geloggt, damit ein ausbleibender Schritt der Kette nachvollziehbar ist.
+ */
+export async function enqueueFollowUp(
+  deps: ConnectionJobDeps,
+  from: ConnectionQueue,
+  queue: ConnectionQueue,
+  job: ConnectionJobData,
+): Promise<void> {
+  const queued = await deps.enqueue(queue, job);
+  if (!queued) {
+    deps.logger({
+      level: 'warn',
+      msg: 'job.follow_up_dropped',
+      job: from,
+      followUp: queue,
+      organizationId: job.organizationId,
+      connectionId: job.connectionId,
+    });
+  }
 }

@@ -8,7 +8,7 @@ import type { JobCounters, JobOutcome } from '../run-job';
 import {
   addCounters,
   createAmazonJobContext,
-  exportSlotFree,
+  exportSlot,
   MAX_RUNNING_EXPORTS_PER_TYPE,
 } from './amazon-context';
 import {
@@ -29,7 +29,7 @@ export { MAX_RUNNING_EXPORTS_PER_TYPE };
 export const POLL_LIMITS = { maxRequests: 20, maxDownloads: 5, timeBudgetMs: 5 * 60_000 };
 /** Frühester Neustart, wenn noch Arbeit fällig ist. */
 export const POLL_MIN_DELAY_SECONDS = 5;
-/** Ein Export ohne freien Platz wartet so lange. */
+/** Ein Export ohne freien Platz wartet mindestens so lange. */
 const EXPORT_WAIT_MS = 60_000;
 
 /**
@@ -69,16 +69,17 @@ export async function pollAmazonRequests(
       if (downloads >= POLL_LIMITS.maxDownloads) break;
       if (now().getTime() - startedAt > POLL_LIMITS.timeBudgetMs) break;
 
-      if (
-        request.kind === 'export' &&
-        request.status === 'pending_request' &&
-        !(await exportSlotFree(deps, connection, request.reportType))
-      ) {
-        await updateAmazonRequest(deps.db, request, {
-          nextPollAt: new Date(now().getTime() + EXPORT_WAIT_MS),
-        });
-        counters.exportsWaiting = (counters.exportsWaiting ?? 0) + 1;
-        continue;
+      if (request.kind === 'export' && request.status === 'pending_request') {
+        const slot = await exportSlot(deps, connection, request.reportType);
+        if (!slot.free) {
+          // Frei wird ein Platz erst, wenn ein laufender Export fertig ist (dessen nächste Abfrage).
+          const earliest = now().getTime() + EXPORT_WAIT_MS;
+          await updateAmazonRequest(deps.db, request, {
+            nextPollAt: new Date(Math.max(earliest, slot.retryAt?.getTime() ?? earliest)),
+          });
+          counters.exportsWaiting = (counters.exportsWaiting ?? 0) + 1;
+          continue;
+        }
       }
 
       await run.extendLease();
@@ -89,7 +90,7 @@ export async function pollAmazonRequests(
       downloads += (result.counters.imported ?? 0) - (result.counters.superseded ?? 0);
     }
   } catch (err) {
-    return handleAmazonError(deps, 'amazon-requests-poll', job, connection, err);
+    return handleAmazonError(deps, 'amazon-requests-poll', job, connection, err, counters);
   }
 
   await schedulePoll(deps, job, now());

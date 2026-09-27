@@ -201,9 +201,10 @@ describe('pollAmazonRequests', () => {
 
     expect(outcome.counters).toMatchObject({ requested: 1, exportsWaiting: 1 });
     const waiting = (await requests()).find((r) => r.reportType === 'campaigns');
+    // Erst wieder fällig, wenn einer der laufenden Exports fertig sein kann.
     expect(waiting).toMatchObject({
       status: 'pending_request',
-      nextPollAt: new Date(clock + 60_000),
+      nextPollAt: new Date(clock + 600_000),
     });
   });
 

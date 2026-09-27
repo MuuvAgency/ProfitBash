@@ -1,5 +1,5 @@
 import {
-  countRunningExports,
+  findRunningExports,
   errorLogFields,
   listJobProfiles,
   type JobProfile,
@@ -12,12 +12,15 @@ import {
   type AmazonRequestDeps,
 } from '../amazon-requests/state-machine';
 import type { JobCounters } from '../run-job';
-import type {
-  ConnectionJobData,
-  ConnectionJobDeps,
-  ConnectionJobRun,
-  ConnectionQueue,
-  LoadedConnection,
+import {
+  enqueueFollowUp,
+  handleAmazonError,
+  LeaseLostError,
+  type ConnectionJobData,
+  type ConnectionJobDeps,
+  type ConnectionJobRun,
+  type ConnectionQueue,
+  type LoadedConnection,
 } from './connection-job';
 
 /**
@@ -68,18 +71,23 @@ export async function createAmazonJobContext(
   return { profiles, machine: { db: deps.db, logger: deps.logger, port, now }, importer, now };
 }
 
-/** Ist für diesen Export-Typ an der Connection noch Platz (`MAX_RUNNING_EXPORTS_PER_TYPE`)? */
-export async function exportSlotFree(
+/**
+ * Ist für diesen Export-Typ an der Connection noch Platz (`MAX_RUNNING_EXPORTS_PER_TYPE`)? Sonst
+ * `retryAt`: frühester Termin eines laufenden Exports, vorher wird kein Platz frei.
+ */
+export async function exportSlot(
   deps: ConnectionJobDeps,
   connection: LoadedConnection,
   exportType: string,
-): Promise<boolean> {
-  const running = await countRunningExports(deps.db, {
+): Promise<{ free: true } | { free: false; retryAt: Date | null }> {
+  const running = await findRunningExports(deps.db, {
     organizationId: connection.organizationId,
     connectionId: connection.id,
     exportType,
   });
-  return running < MAX_RUNNING_EXPORTS_PER_TYPE;
+  return running.count < MAX_RUNNING_EXPORTS_PER_TYPE
+    ? { free: true }
+    : { free: false, retryAt: running.nextPollAt };
 }
 
 /** Addiert Zähler (Zustandsmaschine, Import) in die des Laufs. */
@@ -96,7 +104,8 @@ export function addCounters(
  * Arbeitet die Profile nacheinander ab (ab `job.resumeFromProfileId`). Nach `DATA_JOB_TIME_BUDGET_MS`
  * endet der Lauf vor dem nächsten Profil und plant denselben Job ab diesem Profil neu ein (Zähler
  * `continued`). Scheitert ein Profil nicht an der Connection, laufen die übrigen weiter (Zähler
- * `profileErrors`); Fehler der Connection gehen an den Aufrufer. `profiles` zählt die bearbeiteten.
+ * `profileErrors`); Fehler der Connection gehen als `ProfileConnectionError` an den Aufrufer (für
+ * `handleProfileLoopError`), eine verlorene Lease unverändert. `profiles` zählt die bearbeiteten.
  * Liefert `true`, wenn alle Profile bearbeitet sind.
  */
 export async function forEachProfileWithinBudget(input: {
@@ -117,7 +126,7 @@ export async function forEachProfileWithinBudget(input: {
 
   for (const [index, profile] of pending.entries()) {
     if (index > 0 && input.now().getTime() - startedAt > DATA_JOB_TIME_BUDGET_MS) {
-      await deps.enqueue(input.queue, {
+      await enqueueFollowUp(deps, input.queue, input.queue, {
         organizationId: job.organizationId,
         connectionId: job.connectionId,
         ...(job.chain && { chain: true }),
@@ -130,7 +139,8 @@ export async function forEachProfileWithinBudget(input: {
     try {
       await input.handle(profile);
     } catch (err) {
-      if (isConnectionError(err)) throw err;
+      if (err instanceof LeaseLostError) throw err;
+      if (isConnectionError(err)) throw new ProfileConnectionError(err, profile.id);
       counters.profileErrors += 1;
       deps.logger({
         level: 'warn',
@@ -143,4 +153,41 @@ export async function forEachProfileWithinBudget(input: {
     }
   }
   return true;
+}
+
+/** Fehler der Connection bei einem Profil: Ein Neu-Einplanen soll bei diesem Profil fortsetzen. */
+export class ProfileConnectionError extends Error {
+  constructor(
+    public readonly original: unknown,
+    public readonly profileId: string,
+  ) {
+    super(original instanceof Error ? original.message : 'Fehler der Connection.');
+    this.name = 'ProfileConnectionError';
+  }
+}
+
+/**
+ * Fehler aus `forEachProfileWithinBudget` an `handleAmazonError`: nach `Retry-After` beim betroffenen
+ * Profil fortsetzen (sonst träfen die vorderen Profile bei jedem Versuch erneut die Pause und die
+ * hinteren kämen nie dran), mit den Zählern bis dahin.
+ */
+export function handleProfileLoopError(
+  deps: ConnectionJobDeps,
+  queue: ConnectionQueue,
+  job: ConnectionJobData,
+  connection: LoadedConnection,
+  err: unknown,
+  counters: JobCounters,
+): Promise<never> {
+  if (err instanceof ProfileConnectionError) {
+    return handleAmazonError(
+      deps,
+      queue,
+      { ...job, resumeFromProfileId: err.profileId },
+      connection,
+      err.original,
+      counters,
+    );
+  }
+  return handleAmazonError(deps, queue, job, connection, err, counters);
 }

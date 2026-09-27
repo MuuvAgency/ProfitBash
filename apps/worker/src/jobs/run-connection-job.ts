@@ -14,6 +14,7 @@ import {
   CONNECTION_LEASE_SECONDS,
   CONNECTION_NOT_FOUND_MESSAGE,
   LEASE_DEFER_SECONDS,
+  LeaseLostError,
   type ConnectionJobData,
   type ConnectionJobDeps,
   type ConnectionJobRun,
@@ -107,7 +108,7 @@ export async function runConnectionJob(
         ttlSeconds: CONNECTION_LEASE_SECONDS,
       });
       // Abgelaufen und von einem anderen Lauf übernommen: weiterarbeiten wäre parallel zu ihm.
-      if (!extended) throw new JobFailure('Die Lease der Connection ist verloren gegangen.');
+      if (!extended) throw new LeaseLostError();
     },
   };
   try {

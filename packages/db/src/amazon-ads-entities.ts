@@ -294,6 +294,43 @@ export async function upsertProductAds(
   });
 }
 
+/**
+ * Amazon-Kampagnen-ID je Amazon-Ad-Group-ID für vorhandene Ad Groups des Profils (auch Platzhalter und
+ * entfernte). Der Entity-Sync (1.7) ergänzt damit die Kampagne von Ads und Targets, deren Ad Group im
+ * selben Export-Batch fehlt.
+ */
+export async function findAdGroupCampaignIds(
+  db: DbOrTx,
+  scope: EntityScope,
+  amazonAdGroupIds: readonly string[],
+): Promise<Map<string, string>> {
+  await assertProfileInOrganization(db, scope);
+  const result = new Map<string, string>();
+  for (const chunk of chunks([...new Set(amazonAdGroupIds)])) {
+    const rows = await db
+      .select({
+        amazonAdGroupId: amazonAdsAdGroups.amazonAdGroupId,
+        amazonCampaignId: amazonAdsCampaigns.amazonCampaignId,
+      })
+      .from(amazonAdsAdGroups)
+      .innerJoin(
+        amazonAdsCampaigns,
+        and(
+          eq(amazonAdsCampaigns.id, amazonAdsAdGroups.campaignId),
+          eq(amazonAdsCampaigns.profileId, amazonAdsAdGroups.profileId),
+        ),
+      )
+      .where(
+        and(
+          eq(amazonAdsAdGroups.profileId, scope.profileId),
+          inArray(amazonAdsAdGroups.amazonAdGroupId, chunk),
+        ),
+      );
+    for (const row of rows) result.set(row.amazonAdGroupId, row.amazonCampaignId);
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Entfernte Entities (Entity-Sync, 1.7)
 // ---------------------------------------------------------------------------

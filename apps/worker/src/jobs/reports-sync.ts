@@ -26,11 +26,11 @@ import {
   addCounters,
   createAmazonJobContext,
   forEachProfileWithinBudget,
+  handleProfileLoopError,
   type AmazonJobContext,
 } from './amazon-context';
 import { schedulePoll } from './amazon-requests-poll';
 import {
-  handleAmazonError,
   loadConnection,
   type ConnectionJobData,
   type ConnectionJobDeps,
@@ -55,7 +55,8 @@ export const RETENTION_MARGIN_DAYS = 1;
  * des Profils.
  *
  * Zähler `failedSinceLastRun`: Aufträge der Connection, die seit dem Ende des letzten Laufs gescheitert
- * sind (meist im Poll, der keinen Healthcheck pingt).
+ * sind (meist im Poll, der keinen Healthcheck pingt). Sind es mehr als 0, endet der Lauf nach getaner
+ * Arbeit als Fehlschlag, damit Healthchecks Alarm schlägt.
  */
 export async function syncConnectionReports(
   deps: ConnectionJobDeps,
@@ -86,16 +87,24 @@ export async function syncConnectionReports(
       handle: (profile) => syncProfile(deps, connection, run, context, profile, counters),
     });
   } catch (err) {
-    return handleAmazonError(deps, 'reports-sync', job, connection, err);
+    return handleProfileLoopError(deps, 'reports-sync', job, connection, err, counters);
   }
 
   await schedulePoll(deps, job, context.now());
+  const problems: string[] = [];
   if (counters.profileErrors) {
-    throw new JobFailure(
+    problems.push(
       `Report-Anforderung für ${counters.profileErrors} von ${counters.profiles} Profilen fehlgeschlagen.`,
-      counters,
     );
   }
+  // Der Poll pingt keinen Healthcheck; gescheiterte Aufträge schlagen hier Alarm (Healthchecks `/fail`).
+  if (counters.failedSinceLastRun) {
+    const failed = counters.failedSinceLastRun;
+    problems.push(
+      `${failed} Amazon-${failed === 1 ? 'Auftrag' : 'Aufträge'} seit dem letzten Lauf gescheitert (Gründe am Auftrag).`,
+    );
+  }
+  if (problems.length > 0) throw new JobFailure(problems.join(' '), counters);
   return { counters };
 }
 

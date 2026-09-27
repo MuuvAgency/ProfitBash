@@ -34,6 +34,7 @@ const COUNTER_ORDER = [
   'failed',
   'failedSinceLastRun',
   'profileErrors',
+  'continued',
   // Anfragen an Amazon und Lease der Connection (1.3), nach den fachlichen Zählern.
   'requests',
   'throttled',

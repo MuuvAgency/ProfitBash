@@ -273,6 +273,7 @@ export const de = {
       failed: 'Auftrag gescheitert | Aufträge gescheitert',
       failedSinceLastRun: 'seit dem letzten Lauf gescheitert | seit dem letzten Lauf gescheitert',
       profileErrors: 'Profil fehlgeschlagen | Profile fehlgeschlagen',
+      continued: 'Mal fortgesetzt | Mal fortgesetzt',
       requests: 'Anfrage | Anfragen',
       throttled: 'gedrosselt | gedrosselt',
       retries: 'Wiederholung | Wiederholungen',

@@ -3,6 +3,7 @@ import { createConnectionTokenStore, schema } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { JobFailure } from '../run-job';
 import { createConnection, createOrganization, testKeyring } from '../testing';
 import type { ConnectionJobData, ConnectionJobDeps, ConnectionQueue } from './connection-job';
 import { syncConnectionProfiles } from './profiles-sync';
@@ -184,7 +185,8 @@ describe('syncConnectionReports', () => {
     await setStatus('spSearchTerm', 'failed');
     clock += 10 * DAY_MS;
 
-    await sync();
+    // Die gescheiterten Aufträge melden sich als Alarm; die Stücke kommen trotzdem neu.
+    await expect(sync()).rejects.toThrow(/Amazon-Aufträge seit dem letzten Lauf gescheitert/);
 
     // Heute 07.10.: Suchbegriffe reichen bis 05.08. zurück, das Fenster beginnt am 07.09.
     const open = (await reportsOf('spSearchTerm')).filter((r) => r.status !== 'failed');
@@ -233,8 +235,12 @@ describe('syncConnectionReports', () => {
       .insert(jobRuns)
       .values({ organizationId, job: 'reports-sync', scope: connectionId })
       .returning({ id: jobRuns.id });
-    const outcome = await sync(current!.id);
+    // Der Lauf scheitert (Healthcheck-Alarm), erledigt seine Arbeit aber vorher.
+    const error = await sync(current!.id).catch((err: unknown) => err);
 
-    expect(outcome.counters?.failedSinceLastRun).toBe(1);
+    expect(error).toBeInstanceOf(JobFailure);
+    expect((error as JobFailure).message).toMatch(/1 Amazon-Auftrag .* gescheitert/);
+    expect((error as JobFailure).counters).toMatchObject({ failedSinceLastRun: 1 });
+    expect(enqueued).toContainEqual(expect.objectContaining({ queue: 'amazon-requests-poll' }));
   });
 });
