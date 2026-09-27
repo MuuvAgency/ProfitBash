@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
 import type { DbOrTx } from './audit';
-import { amazonAdsProfiles, connections } from './schema';
+import { amazonAdsProfiles, connections, jobRuns } from './schema';
 
 /**
  * Systemzugriff des Workers (Jobs je Connection, Profil-Sync). Kein Nutzerkontext: Sichtbarkeit für
@@ -222,4 +222,28 @@ export async function markProfilesRemoved(
     )
     .returning({ id: amazonAdsProfiles.id });
   return rows.length;
+}
+
+/**
+ * Letzter Lauf eines Jobs für einen Bezug (z. B. `reports-sync` einer Connection), ohne den laufenden
+ * (`excludeRunId`). `null`, wenn es keinen gibt.
+ */
+export async function findPreviousJobRun(
+  db: DbOrTx,
+  input: { organizationId: string; job: string; scope: string; excludeRunId: string | null },
+): Promise<{ startedAt: Date; finishedAt: Date | null } | null> {
+  const [row] = await db
+    .select({ startedAt: jobRuns.startedAt, finishedAt: jobRuns.finishedAt })
+    .from(jobRuns)
+    .where(
+      and(
+        eq(jobRuns.organizationId, input.organizationId),
+        eq(jobRuns.job, input.job),
+        eq(jobRuns.scope, input.scope),
+        ...(input.excludeRunId === null ? [] : [ne(jobRuns.id, input.excludeRunId)]),
+      ),
+    )
+    .orderBy(desc(jobRuns.startedAt))
+    .limit(1);
+  return row ?? null;
 }
