@@ -1,16 +1,16 @@
 import { EXPORT_TYPES } from '@profitbash/amazon-ads';
 import {
   createAmazonExportBatch,
-  errorLogFields,
   markEntitiesRemoved,
   upsertPortfolios,
   type JobProfile,
 } from '@profitbash/db';
-import { isConnectionError, submitAmazonExportBatch } from '../amazon-requests/state-machine';
+import { submitAmazonExportBatch } from '../amazon-requests/state-machine';
 import { JobFailure, type JobCounters, type JobOutcome } from '../run-job';
 import {
   addCounters,
   createAmazonJobContext,
+  forEachProfileWithinBudget,
   exportSlotFree,
   type AmazonJobContext,
 } from './amazon-context';
@@ -55,28 +55,24 @@ export async function syncConnectionEntities(
     profileErrors: 0,
   };
 
+  let finished: boolean;
   try {
-    for (const profile of profiles) {
-      try {
-        await syncProfile(deps, connection, run, context, profile, counters);
-      } catch (err) {
-        if (isConnectionError(err)) throw err;
-        counters.profileErrors = (counters.profileErrors ?? 0) + 1;
-        deps.logger({
-          level: 'warn',
-          msg: 'entities_sync.profile_failed',
-          connectionId: connection.id,
-          profileId: profile.id,
-          ...errorLogFields(err),
-        });
-      }
-    }
+    finished = await forEachProfileWithinBudget({
+      deps,
+      queue: 'entities-sync',
+      job,
+      profiles,
+      now: context.now,
+      counters,
+      handle: (profile) => syncProfile(deps, connection, run, context, profile, counters),
+    });
   } catch (err) {
     return handleAmazonError(deps, 'entities-sync', job, connection, err);
   }
 
   await schedulePoll(deps, job, context.now());
-  if (job.chain) {
+  // Die Kette geht erst nach dem letzten Profil weiter (eine Fortsetzung trägt `chain` mit).
+  if (finished && job.chain) {
     await deps.enqueue('reports-sync', {
       organizationId: job.organizationId,
       connectionId: job.connectionId,
@@ -84,7 +80,7 @@ export async function syncConnectionEntities(
   }
   if (counters.profileErrors) {
     throw new JobFailure(
-      `Entity-Sync für ${counters.profileErrors} von ${profiles.length} Profilen fehlgeschlagen.`,
+      `Entity-Sync für ${counters.profileErrors} von ${counters.profiles} Profilen fehlgeschlagen.`,
       counters,
     );
   }

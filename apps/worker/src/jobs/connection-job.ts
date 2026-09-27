@@ -45,6 +45,11 @@ export const connectionJobDataSchema = z.object({
    * Nur der manuelle Auslöser setzt es; die täglichen Läufe haben eigene Zeiten.
    */
   chain: z.boolean().optional(),
+  /**
+   * Fortsetzung nach Ablauf des Zeitbudgets (`entities-sync`, `reports-sync`): beginnt mit diesem
+   * Profil. Fehlt es inzwischen, beginnt der Lauf von vorn (die Jobs sind idempotent).
+   */
+  resumeFromProfileId: z.uuid().optional(),
 });
 
 export type ConnectionJobData = z.infer<typeof connectionJobDataSchema>;
@@ -155,6 +160,7 @@ export async function handleAmazonError(
         connectionId: job.connectionId,
         retryAttempt: attempt + 1,
         ...(job.chain && { chain: true }),
+        ...(job.resumeFromProfileId && { resumeFromProfileId: job.resumeFromProfileId }),
       },
       startAfterSeconds,
     });
