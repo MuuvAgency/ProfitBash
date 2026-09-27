@@ -29,6 +29,27 @@
       "when": 1790492249328,
       "tag": "0003_connection_job_leases",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790493799734,
+      "tag": "0004_amazon_ads_profiles_id_org_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790493800297,
+      "tag": "0005_amazon_ads_report_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790493800920,
+      "tag": "0006_amazon_ads_report_requests_open_nulls_not_distinct",
+      "breakpoints": true
     }
   ]
 }
