@@ -86,6 +86,7 @@ export function profileFixture(overrides: Partial<Profile> = {}): Profile {
     isHidden: false,
     removedAt: null,
     syncedAt: '2026-09-26T03:00:00.000Z',
+    metricsImportedThrough: '2026-09-25',
     ...overrides,
   };
 }

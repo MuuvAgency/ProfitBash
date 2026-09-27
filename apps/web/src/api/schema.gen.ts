@@ -1083,6 +1083,8 @@ export interface components {
             removedAt: string | null;
             /** Format: date-time */
             syncedAt: string | null;
+            /** Format: date */
+            metricsImportedThrough: string | null;
         };
         ProfilePatch: {
             /** Format: uuid */

@@ -276,6 +276,11 @@ export const profileSchema = z
     /** Gesetzt, wenn Amazon das Profil nicht mehr liefert. */
     removedAt: timestamp.nullable(),
     syncedAt: timestamp.nullable(),
+    /**
+     * „Daten bis“: letzter Tag (`YYYY-MM-DD`, Zeitzone des Profils) des zuletzt importierten
+     * Kampagnen-Reports; leer, solange noch keiner importiert ist.
+     */
+    metricsImportedThrough: z.iso.date().nullable(),
   })
   .meta({ id: 'Profile' });
 export type Profile = z.infer<typeof profileSchema>;

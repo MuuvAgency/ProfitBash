@@ -3,6 +3,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  formatDay,
   formatDuration,
   formatNumber,
   formatPercent,
@@ -98,6 +99,21 @@ describe('formatDate', () => {
   it('zeigt fehlende oder ungültige Werte als Platzhalter', () => {
     expect(formatDate(null, 'de-DE')).toBe(MISSING_VALUE);
     expect(formatDate('kein Datum', 'de-DE')).toBe(MISSING_VALUE);
+  });
+});
+
+describe('formatDay', () => {
+  it('formatiert einen Kalendertag ohne Verschiebung durch die Zeitzone', () => {
+    // Ein Kalendertag (`YYYY-MM-DD`) hat keine Zeitzone: Er bleibt in jeder Zeitzone derselbe Tag.
+    expect(formatDay('2026-09-25', 'de-DE')).toBe('25.09.2026');
+    expect(formatDay('2026-01-01', 'en-US')).toBe('Jan 1, 2026');
+  });
+
+  it('zeigt fehlende, ungültige oder nicht existierende Tage als Platzhalter', () => {
+    expect(formatDay(null, 'de-DE')).toBe(MISSING_VALUE);
+    expect(formatDay(undefined, 'de-DE')).toBe(MISSING_VALUE);
+    expect(formatDay('2026-09-25T00:00:00Z', 'de-DE')).toBe(MISSING_VALUE);
+    expect(formatDay('2026-02-30', 'de-DE')).toBe(MISSING_VALUE);
   });
 });
 

@@ -193,6 +193,7 @@ export const de = {
         type: 'Typ',
         currency: 'Währung',
         timezone: 'Zeitzone',
+        metricsImportedThrough: 'Daten bis',
         client: 'Client',
         hidden: 'Ausblenden',
       },

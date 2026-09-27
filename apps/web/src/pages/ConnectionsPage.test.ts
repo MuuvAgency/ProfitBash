@@ -24,6 +24,7 @@ const nordwindUk = profileFixture({
   currencyCode: 'GBP',
   timezone: 'Europe/London',
   clientId: nordwind.id,
+  metricsImportedThrough: null,
 });
 const lindenhofSe = profileFixture({
   accountName: 'Lindenhof Nordic AB',
@@ -123,6 +124,19 @@ describe('ConnectionsPage', () => {
     expect(uk.text()).toContain('Vereinigtes Königreich');
     await vi.waitFor(() => expect(uk.find('img[src*="gb.svg"]').exists()).toBe(true));
     expect(uk.get('[role="combobox"]').text()).toBe('Nordwind');
+  });
+
+  it('zeigt je Profil „Daten bis“ als Kalendertag, ohne Import einen Platzhalter', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountPage();
+    const de = await waitForRow(wrapper, 'Nordwind GmbH');
+
+    const headers = wrapper.findAll('[role="columnheader"]').map((h) => h.text());
+    expect(headers).toContain('Daten bis');
+    const dataThrough = (r: DOMWrapper<Element>) => r.get('[col-id="metricsImportedThrough"]');
+    expect(dataThrough(de).text()).toBe('25.09.2026');
+    expect(dataThrough(de).classes()).toContain('font-data');
+    expect(dataThrough(row(wrapper, 'Nordwind UK Ltd')!).text()).toBe('–');
   });
 
   it('blendet entfernte Profile nur mit dem Filter „Entfernte anzeigen“ ein', async () => {

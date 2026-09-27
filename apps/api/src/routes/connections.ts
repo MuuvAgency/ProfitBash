@@ -96,6 +96,7 @@ const profileColumns = {
   isHidden: amazonAdsProfiles.isHidden,
   removedAt: amazonAdsProfiles.removedAt,
   syncedAt: amazonAdsProfiles.syncedAt,
+  metricsImportedThrough: amazonAdsProfiles.metricsImportedThrough,
 };
 
 type ProfileRow = Pick<typeof amazonAdsProfiles.$inferSelect, keyof typeof profileColumns>;

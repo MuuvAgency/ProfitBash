@@ -618,6 +618,13 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "metricsImportedThrough": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           }
         },
         "required": [
@@ -634,7 +641,8 @@
           "accountType",
           "isHidden",
           "removedAt",
-          "syncedAt"
+          "syncedAt",
+          "metricsImportedThrough"
         ]
       },
       "ProfilePatch": {
