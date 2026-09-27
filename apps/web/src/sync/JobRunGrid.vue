@@ -2,16 +2,16 @@
 import type { JobRun } from '@profitbash/shared';
 import type {
   ColDef,
-  ColumnResizedEvent,
   GetRowIdParams,
   GridApi,
   GridReadyEvent,
   ModelUpdatedEvent,
 } from 'ag-grid-community';
 import { AgGridVue } from 'ag-grid-vue3';
-import { computed, markRaw, onBeforeUnmount, reactive, ref, watchEffect } from 'vue';
+import { computed, markRaw, onBeforeUnmount, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { gridStyleOptions, gridTheme } from '../grid/grid';
+import { useGridMinWidth } from '../grid/min-width';
 import DurationCell from './cells/DurationCell.vue';
 import ResultCell from './cells/ResultCell.vue';
 import StatusCell from './cells/StatusCell.vue';
@@ -44,25 +44,12 @@ const AUTO_SIZED = ['status', 'job', 'startedAt', 'duration'];
 /** Die Zellen bringen ihr Padding mit; die Voreinstellung (20 px) nähme den gekürzten Spalten Platz. */
 const AUTO_SIZE_PADDING = 4;
 
-/**
- * Mindestbreite des Grids = Breiten der festen Spalten + Mindestbreiten der Flex-Spalten. Darunter scrollt
- * die Tabelle im Container der Seite, statt Spalten zu beschneiden.
- */
-const minWidth = ref<number>();
-
-function updateMinWidth(api: GridApi<JobRun>) {
-  minWidth.value = api
-    .getAllDisplayedColumns()
-    .reduce(
-      (sum, column) => sum + (column.getFlex() ? column.getMinWidth() : column.getActualWidth()),
-      0,
-    );
-}
+const gridMinWidth = useGridMinWidth();
 
 function fitContents(api: GridApi<JobRun>) {
   if (api.isDestroyed()) return;
   api.autoSizeColumns(AUTO_SIZED);
-  updateMinWidth(api);
+  gridMinWidth.update(api);
 }
 
 /**
@@ -82,10 +69,6 @@ function onModelUpdated({ api }: ModelUpdatedEvent<JobRun>) {
   if (!fitPending) return;
   fitPending = false;
   fitContents(api);
-}
-
-function onColumnResized({ api, finished }: ColumnResizedEvent<JobRun>) {
-  if (finished) updateMinWidth(api);
 }
 
 /**
@@ -186,7 +169,7 @@ onBeforeUnmount(() => clearInterval(tick));
 <template>
   <AgGridVue
     class="w-full"
-    :style="minWidth ? { minWidth: `${minWidth}px` } : undefined"
+    :style="gridMinWidth.style()"
     :theme="gridTheme"
     :theme-css-layer="gridStyleOptions.themeCssLayer"
     :theme-style-container="gridStyleOptions.themeStyleContainer"
@@ -204,6 +187,6 @@ onBeforeUnmount(() => clearInterval(tick));
     @grid-ready="onGridReady"
     @row-data-updated="onRowDataUpdated"
     @model-updated="onModelUpdated"
-    @column-resized="onColumnResized"
+    @column-resized="gridMinWidth.onColumnResized"
   />
 </template>

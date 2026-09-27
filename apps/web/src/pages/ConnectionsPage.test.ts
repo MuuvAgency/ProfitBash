@@ -139,6 +139,17 @@ describe('ConnectionsPage', () => {
     expect(dataThrough(row(wrapper, 'Nordwind UK Ltd')!).text()).toBe('–');
   });
 
+  it('gibt der Profiltabelle eine Mindestbreite aus den Spalten, darunter scrollt die Kachel', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Nordwind GmbH');
+
+    const grid = wrapper.get('div[role="region"]').element.firstElementChild as HTMLElement;
+    // Feste Breiten plus Mindestbreiten der Flex-Spalten (Land, Konto, Zeitzone, Kunde), keine feste Zahl im Container.
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBe(1120));
+    expect(grid.className).not.toMatch(/min-w-/);
+  });
+
   it('blendet entfernte Profile nur mit dem Filter „Entfernte anzeigen“ ein', async () => {
     stubFetch(routes());
     const { wrapper } = await mountPage();
