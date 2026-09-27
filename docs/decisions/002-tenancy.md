@@ -46,8 +46,9 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   (`routes/amazon-oauth.ts`) nimmt die Organisation aus dem signierten `state` und prüft die Admin-Rolle selbst
   über `getOrgRole()`.
 - **Systemzugriffe ohne Nutzer:** Worker-Jobs, Token-Store, Wartung und Schlüsselrotation
-  (`packages/db/src/system-access.ts`, `connection-tokens.ts`, `maintenance.ts`, `key-rotation.ts`; `job_runs` schreibt
-  `runJob` in `apps/worker`). Zugriffe auf einzelne Connections sind an Organisation und Connection gebunden.
+  (`packages/db/src/system-access.ts`, `connection-tokens.ts`, `connection-leases.ts`, `amazon-requests.ts`,
+  `amazon-ads-entities.ts`, `amazon-ads-metrics.ts`, `maintenance.ts`, `key-rotation.ts`; `job_runs` schreibt
+  `runJob` in `apps/worker`). Zugriffe auf einzelne Connections bzw. Profile sind an Organisation und Connection bzw. Profil gebunden.
   Keiner dieser Zugriffe entscheidet über die Sichtbarkeit für Nutzer. Plattformweit arbeiten die Planung der Jobs (`listActiveConnections`), die Wartung
   (alte und abgebrochene Jobläufe, abgelaufene OAuth-Nonces) und die Schlüsselrotation.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;

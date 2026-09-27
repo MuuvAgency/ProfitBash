@@ -382,44 +382,93 @@ Allgemeine Regeln für alle Tabellen dieser Aufgabe:
 - `amazon_updated_at` (falls geliefert), `synced_at`, `removed_at` (Amazon liefert die Entity nicht mehr; wie bei Profilen umkehrbar, nie löschen).
 
 Entities:
-- [ ] `amazon_ads_portfolios`: Name, Status, Budget (`budget_amount`, `budget_currency_code`, Budget-Typ, Zeitraum), `in_budget`.
-- [ ] `amazon_ads_campaigns`: `portfolio_id` (nullable), Name, Status, Targeting-Typ (manuell/auto), Budget (Betrag, Währung, Typ),
+- [x] `amazon_ads_portfolios`: Name, Status, Budget (`budget_amount`, `budget_currency_code`, Budget-Typ, Zeitraum), `in_budget`.
+- [x] `amazon_ads_campaigns`: `portfolio_id` (nullable), Name, Status, Targeting-Typ (manuell/auto), Budget (Betrag, Währung, Typ),
       Gebotsstrategie, Start-/Enddatum, Platzierungs-Anpassungen in `extra`.
-- [ ] `amazon_ads_ad_groups`: `campaign_id`, Name, Status, Standardgebot (`default_bid`, Währung).
-- [ ] `amazon_ads_targets`: `campaign_id`, `ad_group_id` (nullable bei SB-Kampagnen-Targets), Art (`keyword` | `product` | `category` |
+- [x] `amazon_ads_ad_groups`: `campaign_id`, Name, Status, Standardgebot (`default_bid`, Währung).
+- [x] `amazon_ads_targets`: `campaign_id`, `ad_group_id` (nullable bei SB-Kampagnen-Targets), Art (`keyword` | `product` | `category` |
       `auto` | `audience`), Ausdruck (Keyword-Text + Match-Typ bzw. Target-Ausdruck als jsonb), Status, Gebot.
-- [ ] `amazon_ads_negative_targets`: Ebene (`campaign` | `ad_group`), `campaign_id`, `ad_group_id` (nullable), Art, Ausdruck, Match-Typ, Status.
+- [x] `amazon_ads_negative_targets`: Ebene (`campaign` | `ad_group`), `campaign_id`, `ad_group_id` (nullable), Art, Ausdruck, Match-Typ, Status.
       Eigene Tabelle, weil Negatives kein Gebot und keine Kennzahlen haben. Quelle: voraussichtlich `/targets/export` mit Negativ-Kennzeichen
       (kein eigener Endpunkt; beim Umsetzen prüfen).
-- [ ] `amazon_ads_product_ads`: `campaign_id`, `ad_group_id`, ASIN, SKU (nullable, Vendoren haben keine), Status.
+- [x] `amazon_ads_product_ads`: `campaign_id`, `ad_group_id`, ASIN, SKU (nullable, Vendoren haben keine), Status.
 
 Kennzahlen (je Tag, Datum in der Zeitzone des Profils, so liefert Amazon es):
-- [ ] `amazon_ads_campaign_daily_metrics`, `amazon_ads_ad_group_daily_metrics`, `amazon_ads_target_daily_metrics`,
+- [x] `amazon_ads_campaign_daily_metrics`, `amazon_ads_ad_group_daily_metrics`, `amazon_ads_target_daily_metrics`,
       `amazon_ads_product_ad_daily_metrics`, `amazon_ads_search_term_daily_metrics` (F6; Schlüssel zusätzlich Suchbegriff-Text, bezogen auf das Target).
-- [ ] Gemeinsame Spalten: `organization_id`, `profile_id`, FK auf die Entity, `date`, `ad_product`, `currency_code`, `impressions`, `clicks`,
+- [x] Gemeinsame Spalten: `organization_id`, `profile_id`, FK auf die Entity, `date`, `ad_product`, `currency_code`, `impressions`, `clicks`,
       `cost`, dazu Attribution nach F7 (`sales_7d`, `sales_14d`, `purchases_7d`, `purchases_14d`, `units_7d`, `units_14d`, `…_same_sku_…`),
       `extra` (jsonb) für weitere Spalten, `imported_at`.
   - `currency_code` kommt aus `amazon_ads_profiles.currency_code` (v3-Reports liefern je Zeile keine Währung, außer bei Budget-Spalten).
   - SB/SD liefern ein Fenster ohne Suffix (14 Tage) → `*_14d`; `*_7d` bleibt dort leer (`NULL`), nicht 0.
-- [ ] Schlüssel: `id` (uuid) als Primärschlüssel, unique (`profile_id`, `date`, Entity-FK) für den Upsert (Suchbegriffe zusätzlich mit
+- [x] Schlüssel: `id` (uuid) als Primärschlüssel, unique (`profile_id`, `date`, Entity-FK) für den Upsert (Suchbegriffe zusätzlich mit
       dem Text); Index (`profile_id`, `date`).
-- [ ] **Platzhalter:** Taucht in einem Report eine Entity auf, die der Entity-Sync (noch) nicht kennt (gerade angelegt oder schon entfernt),
+- [x] **Platzhalter:** Taucht in einem Report eine Entity auf, die der Entity-Sync (noch) nicht kennt (gerade angelegt oder schon entfernt),
       legt der Import sie als Platzhalter an, **Eltern zuerst** aus den IDs der Report-Zeile (Kampagne → Ad Group → Target/Product Ad).
       Platzhalter haben `synced_at = null`; Name, Status, Gebot, Budget und Währung sind dafür nullable (keine Ersatzwerte). Report-Spalten
       wie `campaignName` dürfen den Namen vorbelegen. Der nächste Entity-Sync füllt sie. So geht keine Kennzahl verloren und der FK bleibt hart.
-- [ ] **Neu geladenes Fenster ersetzen:** Amazon liefert nur Tage mit Aktivität; fehlende Zeilen bedeuten 0. Der Import ersetzt deshalb in
+- [x] **Neu geladenes Fenster ersetzen:** Amazon liefert nur Tage mit Aktivität; fehlende Zeilen bedeuten 0. Der Import ersetzt deshalb in
       derselben Transaktion genau den Ausschnitt (Profil, Ad-Typ, Tabelle, `start_date`–`end_date` **dieses** Auftrags): Upsert der gelieferten
       Zeilen, Löschen der übrigen in diesem Ausschnitt. **Kein Löschen**, wenn der Auftrag ungültige Zeilen hatte, oder wenn er 0 Zeilen liefert,
       der Ausschnitt aber Zeilen hat (dann Import `failed` mit Hinweis, kein stiller Datenverlust). Tests für alle drei Fälle und dafür, dass
       ein SP-Import keine SB/SD-Zeilen löscht.
-- [ ] Keine Partitionierung im Pilot (Volumen je Profil und Tag: einige Tausend Zeilen). Wiedervorlage bei Stufe C.
-- [ ] Systemzugriffe (Upserts, Platzhalter) in `packages/db/src/system-access.ts` bzw. einer neuen Datei daneben. Sie schreiben **keine**
+- [x] Keine Partitionierung im Pilot (Volumen je Profil und Tag: einige Tausend Zeilen). Wiedervorlage bei Stufe C.
+- [x] Systemzugriffe (Upserts, Platzhalter) in `packages/db/src/system-access.ts` bzw. einer neuen Datei daneben. Sie schreiben **keine**
       `audit_events` (wie `profiles-sync` in 0.7): Nachvollziehbar sind sie über `job_runs` und ihre Zähler; Audit gilt für Aktionen von
       Nutzern und Änderungen an Connections. Nutzerseitige Lesezugriffe
       gibt es in Phase 1 nicht (außer „Daten bis“ je Profil, 1.8, über `visibleProfilesScope`); der Access-Layer bekommt dafür keine neuen Regeln.
 - Umsetzung (Vorgabe aus 1.11, entschieden 2026-09-27, gilt auch für 1.7): Die Upserts für Entities und Kennzahlen nehmen **normalisierte
   Datensätze** entgegen (eigene Typen in `packages/db` bzw. das Modell aus 1.6), nie Antworttypen der Amazon-API. So kann ein späterer
   Datei-Import (1.11) dieselbe Schreibschicht nutzen. Der Datei-Import selbst wird hier **nicht** gebaut.
+- [x] Umsetzung (Stand für 1.6 und später):
+  - **Schema** in `packages/db/src/schema/amazon-ads-data.ts` (gemeinsame Spalten-Helfer jetzt in `schema/columns.ts`), Migrationen
+    `0008_amazon_ads_entities` und `0009_amazon_ads_daily_metrics`. Alle Tabellen neu, deshalb stehen die Unique-Constraints in den
+    `CREATE TABLE` vor den FKs (kein Aufteilen nötig wie in 1.4).
+    - FK-Namen `<tabelle>_profile_org_fk`, `<tabelle>_<eltern>_fk`; alle `ON DELETE NO ACTION`. Getestet: Organisation mit Entities und
+      Kennzahlen löschen gelingt; Profil, Kampagne mit Ad Groups bzw. Kampagne mit Kennzahlen löschen scheitert (23503).
+    - Jede FK-Prüfung hat einen passenden Index (Eltern-Indizes `…_campaign_idx`/`…_ad_group_idx`, Kennzahl-Schlüssel beginnen mit
+      (`profile_id`, Entity-ID)): Das Löschen einer Organisation prüft per Index statt per Scan. Kein Index auf `organization_id` (die
+      Kaskade beim Löschen einer Organisation scannt je Tabelle einmal; selten).
+    - Portfolios ohne `ad_product` (gelten für alle Ad-Typen). Platzhalter-fähige Spalten nullable (Name, Status, Budget, Gebot, Währung,
+      bei Targets auch `target_type`, bei Product Ads `asin`). Negatives haben keine Platzhalter: `target_type` und `state` Pflicht,
+      CHECK `amazon_ads_negative_targets_level_ck` (`campaign` ohne, `ad_group` mit Ad Group). `extra` ist `jsonb not null default '{}'`.
+    - Kennzahlen: Schlüssel unique (`profile_id`, Entity-ID, `date`) bzw. bei Suchbegriffen zusätzlich `search_term` (Suchbegriff bezogen
+      auf das Target), dazu Index (`profile_id`, `date`). Pflicht: `currency_code`, `impressions`, `clicks`, `cost`, `imported_at`;
+      Attribution nullable.
+    - Nicht erzwungen: dass die Ad Group eines Targets/Product Ads zur selben Kampagne gehört (Review-Befund, bewusst offen: Werte kommen
+      aus Amazons eigenen IDs, ein zusätzlicher FK (`ad_group_id`, `campaign_id`) erschwerte die Platzhalter ohne echten Gewinn).
+    - Offen für 1.10: Die Schlüssel (`profile_id`, `amazon_…_id`) nehmen an, dass sich Amazon-IDs über Ad-Typen eines Profils nicht
+      überschneiden. Falls doch, brauchen Entity- und Kennzahl-Schlüssel zusätzlich `ad_product`.
+  - **Entities** (`packages/db/src/amazon-ads-entities.ts`): `upsertPortfolios`, `upsertCampaigns`, `upsertAdGroups`, `upsertTargets`,
+    `upsertNegativeTargets`, `upsertProductAds` nehmen normalisierte Datensätze (`PortfolioRecord` …, Eltern als Amazon-IDs) und liefern
+    `{ created, updated, placeholdersFilled, placeholdersCreated }`. `updated` zählt nur tatsächlich geänderte Entities (Vergleich per
+    `IS DISTINCT FROM`, dazu Platzhalter und wieder aufgetauchte); unveränderte bekommen nur `synced_at` (`updated_at` bleibt).
+    `removed_at` wird beim Wiederauftauchen gelöscht; Setzen von `removed_at` ist Sache von 1.7. Doppelte IDs in einer Lieferung: der
+    letzte Datensatz gilt. Stücke zu 1000 Zeilen (Parametergrenze). Jeder Upsert in eigener Transaktion bzw. Savepoint.
+  - **Platzhalter:** `ensurePortfolios`, `ensureCampaigns`, `ensureAdGroups`, `ensureTargets`, `ensureProductAds` (Eltern zuerst, vorhandene
+    unberührt, Namen aus Report-Spalten nur beim Anlegen). Die Upserts nutzen sie für fehlende Eltern (Zähler `placeholdersCreated`).
+  - **Organisation:** `assertProfileInOrganization` in jedem Upsert und jedem `ensure*` (Review-Befund: `ON CONFLICT DO UPDATE` prüft
+    keine FKs, fremde Zeilen wären sonst überschreibbar), Fehler `ProfileNotFoundError`.
+  - **Kennzahlen** (`packages/db/src/amazon-ads-metrics.ts`): `replaceDailyMetrics(tx, { organizationId, profileId, adProduct, ranges,
+    invalidRowCount, now, level, rows })` mit `level` `campaign` | `adGroup` | `target` | `productAd` | `searchTerm` und normalisierten
+    Zeilen (`CampaignDailyMetric` …: Tag, Amazon-IDs, optionale Namen/ASIN/SKU für Platzhalter, `DailyMetricValues`). Währung aus dem
+    Profil. Ablauf: Zeilen auf `ranges` filtern (Zähler `skipped`), Platzhalter, Upsert, dann Löschen der übrigen Zeilen im Ausschnitt
+    (Profil, Ad-Typ, Tabelle, Tage in `ranges`) über `id <> all($ids::uuid[])` (ein Parameter, auch bei 150 000 Zeilen). Ergebnis
+    `{ rows, skipped, deleted, placeholdersCreated }`. `ranges` müssen im Zeitraum des Auftrags liegen (so liefert es 1.4).
+    - Kein Löschen bei `invalidRowCount > 0`. `MetricsImportRejectedError` bei: 0 Zeilen in den Tagen, obwohl der Ausschnitt Kennzahlen
+      hat (bewusst nach dem Filter auf `ranges`); Datei nur mit ungültigen Zeilen (sonst endete ein falsches Zeilen-Schema als „importiert“
+      und 1.7 setzte den Historien-Merker ohne Daten); doppelte Zeilen; Zeilen ohne Pflicht-ID. Die Zustandsmaschine (1.4) lässt den
+      Auftrag bei diesem Fehler **sofort** `failed` (statt dreimal dieselbe Datei zu laden).
+    - Die Kennzahlen im Fenster werden bei jedem Import neu geschrieben (kein Vergleich wie bei Entities; der Löschschritt braucht die IDs
+      aller gelieferten Zeilen). Bei spürbarem WAL-/Vacuum-Druck später vergleichen und anders löschen.
+  - **Für 1.6/1.7:** Der Port-`import` bildet die Report-Zeilen auf die normalisierten Typen ab (`spCampaigns` → `campaign` bzw. mit
+    `groupBy` Ad Group → `adGroup`, `spTargeting` → `target`, `spAdvertisedProduct` → `productAd`, `spSearchTerm` → `searchTerm`) und
+    ruft `replaceDailyMetrics` mit der Transaktion aus der Zustandsmaschine. Der Entity-Batch-Import (1.7) ruft die Upserts in
+    Hierarchie-Reihenfolge in einer Transaktion; seine Zähler `created`/`updated`/`placeholders_filled` kommen aus den Upserts, `removed`
+    aus einer neuen Funktion in 1.7.
+  - Review (unabhängig): Org-Bindung für vorhandene Zeilen, `updated_at` bei unveränderten Entities, Atomarität der Upserts, vollständig
+    ungültige Dateien und dauerhafte Fehler ohne Wiederholung behoben; Meldung der 0-Zeilen-Ablehnung präzisiert. Zurückgewiesen:
+    FK Ad Group ↔ Kampagne (siehe oben).
 
 ### 1.6 Amazon-Client: Entities und Reports (`packages/amazon-ads`)
 Endpunkte nach F1 (a), siehe ADR 004.

@@ -5,6 +5,7 @@ import {
   ensureCampaigns,
   ensureProductAds,
   ensureTargets,
+  ProfileNotFoundError,
   type EnsuredEntities,
   type EntityScope,
 } from './amazon-ads-entities';
@@ -36,8 +37,9 @@ export interface MetricsDateRange {
 }
 
 /**
- * Der Report widerspricht vorhandenen Kennzahlen so, dass Überschreiben Daten verlieren würde (0 Zeilen
- * für einen Ausschnitt, der schon Kennzahlen hat). Eine Wiederholung mit derselben Datei ändert nichts.
+ * Import abgelehnt, weil er Daten verlieren oder verfälschen würde (0 Zeilen für einen Ausschnitt, der
+ * schon Kennzahlen hat; nur ungültige Zeilen; doppelte oder unvollständige Zeilen). Eine Wiederholung mit
+ * derselben Datei ändert nichts; die Zustandsmaschine lässt den Auftrag deshalb sofort scheitern.
  */
 export class MetricsImportRejectedError extends Error {
   constructor(message: string) {
@@ -157,7 +159,11 @@ export async function replaceDailyMetrics(
           eq(amazonAdsProfiles.organizationId, input.organizationId),
         ),
       );
-    if (!profile) throw new Error('Profil nicht gefunden.');
+    if (!profile) throw new ProfileNotFoundError();
+    if (input.rows.length === 0 && input.invalidRowCount > 0) {
+      // Sonst endete ein falsches Zeilen-Schema (1.6) als „importiert“ ohne Daten.
+      throw new MetricsImportRejectedError('Der Report enthält nur ungültige Zeilen.');
+    }
 
     const level = LEVELS[input.level];
     const rows = (input.rows as readonly MetricRow[]).filter((row) =>
@@ -181,7 +187,7 @@ export async function replaceDailyMetrics(
     if (rows.length === 0) {
       if (input.invalidRowCount === 0 && (await hasRows(tx, level.view, slice))) {
         throw new MetricsImportRejectedError(
-          'Amazon hat für Tage mit vorhandenen Kennzahlen keine Zeilen geliefert; die vorhandenen Kennzahlen bleiben erhalten.',
+          'Der Report enthält für Tage mit vorhandenen Kennzahlen keine Zeilen; die vorhandenen Kennzahlen bleiben erhalten.',
         );
       }
       return result;
@@ -336,7 +342,7 @@ interface LevelConfig {
 }
 
 const required = (value: string | null | undefined, name: string): string => {
-  if (value == null) throw new Error(`Kennzahl-Zeile ohne ${name}.`);
+  if (value == null) throw new MetricsImportRejectedError(`Kennzahl-Zeile ohne ${name}.`);
   return value;
 };
 
@@ -457,7 +463,11 @@ function assertNoDuplicates(
   for (const row of rows) {
     const key = keyOf(row);
     // Ohne IDs und Suchbegriffe in der Meldung (landet in `failure_reason`).
-    if (seen.has(key)) throw new Error(`Report enthält doppelte Zeilen (${level}, ${row.date}).`);
+    if (seen.has(key)) {
+      throw new MetricsImportRejectedError(
+        `Report enthält doppelte Zeilen (${level}, ${row.date}).`,
+      );
+    }
     seen.add(key);
   }
 }
