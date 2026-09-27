@@ -1,6 +1,7 @@
 export * from './client';
 export * as schema from './schema';
 export * from './access';
+export * from './amazon-requests';
 export * from './audit';
 export * from './connection-leases';
 export * from './connection-tokens';

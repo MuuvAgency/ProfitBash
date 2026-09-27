@@ -1,8 +1,11 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
+  date,
   foreignKey,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -39,6 +42,14 @@ export const connectionProvider = pgEnum('connection_provider', ['amazon_ads']);
 export const connectionRegion = pgEnum('connection_region', ['eu', 'na', 'fe']);
 export const connectionStatus = pgEnum('connection_status', ['active', 'reauth_required', 'error']);
 export const jobRunStatus = pgEnum('job_run_status', ['running', 'success', 'failed']);
+export const amazonAdsRequestKind = pgEnum('amazon_ads_request_kind', ['report', 'export']);
+export const amazonAdsRequestStatus = pgEnum('amazon_ads_request_status', [
+  'pending_request',
+  'requested',
+  'completed',
+  'imported',
+  'failed',
+]);
 
 // ---------------------------------------------------------------------------
 // Entitlements: welche Features eine Organisation gebucht hat
@@ -173,6 +184,84 @@ export const amazonAdsProfiles = pgTable(
     index('amazon_ads_profiles_org_idx').on(t.organizationId),
     index('amazon_ads_profiles_connection_idx').on(t.connectionId),
     index('amazon_ads_profiles_client_idx').on(t.clientId),
+    // Ziel der zusammengesetzten Fremdschlüssel der Profildaten (Phase 1): keine Verknüpfung über Org-Grenzen
+    unique('amazon_ads_profiles_id_org_uq').on(t.id, t.organizationId),
+  ],
+);
+
+/** Offene Aufträge: höchstens einer je Schlüssel (siehe Index unten). */
+const OPEN_AMAZON_REQUEST = sql`status in ('pending_request', 'requested', 'completed')`;
+
+/**
+ * Asynchrone Aufträge an Amazon (Phase 1, 1.4): Reports (Reporting v3) und Exports (Entities). Der
+ * Zustand liegt in der DB, damit ein Neustart nichts verliert: Die Zeile entsteht **vor** dem Aufruf an
+ * Amazon (`pending_request`), danach `requested` → `completed` → `imported`, oder `failed`. Die
+ * Download-URL wird nie gespeichert (signiert, läuft ab). Zugriffe nur über `amazon-requests.ts`.
+ * Abgeschlossene Aufträge löscht `job-runs-cleanup` nach 30 Tagen (F5).
+ */
+export const amazonAdsReportRequests = pgTable(
+  'amazon_ads_report_requests',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: uuid('profile_id').notNull(),
+    kind: amazonAdsRequestKind('kind').notNull(),
+    /** Genau ein Ad-Typ je Auftrag (`SPONSORED_PRODUCTS` …), auch bei Exports. */
+    adProduct: text('ad_product').notNull(),
+    /** Report-Typ (`spCampaigns` …) bzw. Export-Typ (`campaigns`, `adGroups`, `targets`, `ads`). */
+    reportType: text('report_type').notNull(),
+    /** Zeitraum (nur Reports), Tage in der Zeitzone des Profils. */
+    startDate: date('start_date', { mode: 'string' }),
+    endDate: date('end_date', { mode: 'string' }),
+    /** Exports eines Entity-Syncs gehören zusammen und werden gemeinsam importiert (nur Exports). */
+    batchId: uuid('batch_id'),
+    /** Report- bzw. Export-ID von Amazon; leer bis zur Antwort. */
+    amazonRequestId: text('amazon_request_id'),
+    status: amazonAdsRequestStatus('status').notNull().default('pending_request'),
+    /** Status-Abfragen seit dem (letzten) Anfordern. */
+    attempts: integer('attempts').notNull().default(0),
+    /** Gescheiterte Importversuche (bei Exports je Batch gezählt). */
+    importAttempts: integer('import_attempts').notNull().default(0),
+    /** Nächste Bearbeitung; `null` = wartet auf andere Exports des Batches. */
+    nextPollAt: timestamp('next_poll_at', { withTimezone: true, mode: 'date' }),
+    /** Letztes erfolgreiches Anfordern bei Amazon. */
+    requestedAt: timestamp('requested_at', { withTimezone: true, mode: 'date' }),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    importedAt: timestamp('imported_at', { withTimezone: true, mode: 'date' }),
+    /** Gekürzt, ohne URLs und Rohdaten. */
+    failureReason: text('failure_reason'),
+    rowCount: integer('row_count'),
+    invalidRowCount: integer('invalid_row_count'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    // Betriebszustand, keine Historie: Die Aufträge verschwinden mit dem Profil.
+    foreignKey({
+      name: 'amazon_ads_report_requests_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    // Kein doppelter offener Auftrag, auch bei Exports (Daten leer) und nach einem Neustart. Die
+    // Migration `0006_amazon_ads_report_requests_open_nulls_not_distinct` legt den Index mit
+    // NULLS NOT DISTINCT neu an (Drizzle kennt die Option nur für Constraints, nicht für Indizes).
+    uniqueIndex('amazon_ads_report_requests_open_uq')
+      .on(t.profileId, t.kind, t.adProduct, t.reportType, t.startDate, t.endDate)
+      .where(OPEN_AMAZON_REQUEST),
+    index('amazon_ads_report_requests_profile_type_idx').on(
+      t.profileId,
+      t.kind,
+      t.adProduct,
+      t.reportType,
+    ),
+    index('amazon_ads_report_requests_batch_idx')
+      .on(t.batchId)
+      .where(sql`batch_id is not null`),
+    check(
+      'amazon_ads_report_requests_kind_ck',
+      sql`(kind = 'report' and start_date is not null and end_date is not null and start_date <= end_date and batch_id is null)
+        or (kind = 'export' and start_date is null and end_date is null and batch_id is not null)`,
+    ),
   ],
 );
 
