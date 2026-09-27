@@ -93,3 +93,28 @@ export class AmazonAdsDownloadTooLargeError extends AmazonAdsError {
     this.name = 'AmazonAdsDownloadTooLargeError';
   }
 }
+
+/**
+ * Reporting v3 antwortet mit 425: Eine identische Report-Anfrage läuft noch. Amazon nennt deren ID in
+ * `detail` („… duplicate of : <reportId>“); fehlt sie, ist `duplicateOfReportId` `null`.
+ */
+export class AmazonAdsDuplicateReportError extends AmazonAdsHttpError {
+  constructor(
+    operation: string,
+    public readonly duplicateOfReportId: string | null,
+    amazonRequestId: string | null,
+    details: string | null,
+  ) {
+    super(
+      `${operation}: Ein identischer Report läuft bereits` +
+        (duplicateOfReportId ? ` (${duplicateOfReportId}).` : '.'),
+      operation,
+      425,
+      '425',
+      amazonRequestId,
+      null,
+      details,
+    );
+    this.name = 'AmazonAdsDuplicateReportError';
+  }
+}

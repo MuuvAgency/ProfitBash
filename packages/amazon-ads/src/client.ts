@@ -23,6 +23,7 @@ import {
   type TokenSet,
 } from './lwa';
 import { listPortfolios, type AmazonAdsPortfolio } from './portfolios';
+import { getReport, requestReport, type GetReportInput, type RequestReportInput } from './reports';
 import { normalizeProfiles, profileResponseSchema, type AmazonAdsProfile } from './profiles';
 import { createProfileRateLimiter, type ProfileRateLimiterOptions } from './rate-limit';
 import { AMAZON_ADS_REGIONS, type AmazonAdsRegion, type AmazonAdsRegionEndpoints } from './regions';
@@ -83,6 +84,20 @@ export interface AmazonAdsClient {
   getExport(
     connection: ConnectionRef,
     input: GetExportInput,
+    options?: RequestOptions,
+  ): Promise<AmazonAdsAsyncStatus>;
+  /**
+   * Fordert einen Report an (asynchron, Status über `getReport`). 425 (identischer Report läuft) kommt als
+   * `AmazonAdsDuplicateReportError` mit der ID des laufenden Reports, falls Amazon sie nennt.
+   */
+  requestReport(
+    connection: ConnectionRef,
+    input: RequestReportInput,
+    options?: RequestOptions,
+  ): Promise<{ reportId: string }>;
+  getReport(
+    connection: ConnectionRef,
+    input: GetReportInput,
     options?: RequestOptions,
   ): Promise<AmazonAdsAsyncStatus>;
   /** Alle Portfolios eines Profils (synchron, paginiert). */
@@ -226,6 +241,10 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
       requestExport({ request, logger }, connection, input, requestOptions),
     getExport: (connection, input, requestOptions) =>
       getExport({ request, logger }, connection, input, requestOptions),
+    requestReport: (connection, input, requestOptions) =>
+      requestReport({ request, logger }, connection, input, requestOptions),
+    getReport: (connection, input, requestOptions) =>
+      getReport({ request, logger }, connection, input, requestOptions),
     listPortfolios: (connection, amazonProfileId, requestOptions) =>
       listPortfolios({ request, logger }, connection, amazonProfileId, requestOptions),
     downloadFile: (url) =>
