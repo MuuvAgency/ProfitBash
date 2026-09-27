@@ -159,7 +159,7 @@ const rowClassRules = {
 <template>
   <AgGridVue
     class="w-full"
-    :style="gridMinWidth.style()"
+    :style="gridMinWidth.style.value"
     :theme="gridTheme"
     :theme-css-layer="gridStyleOptions.themeCssLayer"
     :theme-style-container="gridStyleOptions.themeStyleContainer"

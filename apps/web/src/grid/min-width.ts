@@ -1,5 +1,5 @@
 import type { ColumnResizedEvent, GridApi, GridReadyEvent } from 'ag-grid-community';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 /**
  * Mindestbreite eines Grids = Breiten der festen Spalten + Mindestbreiten der Flex-Spalten. Als Stil am
@@ -19,10 +19,9 @@ export function useGridMinWidth() {
       );
   }
 
-  const style = () => (minWidth.value ? { minWidth: `${minWidth.value}px` } : undefined);
+  const style = computed(() => (minWidth.value ? { minWidth: `${minWidth.value}px` } : undefined));
 
   return {
-    minWidth,
     style,
     update,
     onGridReady: ({ api }: GridReadyEvent) => update(api),
