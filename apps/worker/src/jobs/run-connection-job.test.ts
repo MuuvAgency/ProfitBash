@@ -130,7 +130,7 @@ describe('runConnectionJob mit Lease (Amazon-Datenjobs)', () => {
   });
 
   it('gibt dem Lauf seine ID und verlängert die Lease auf Wunsch (lange Schritte)', async () => {
-    let seenRunId: string | undefined;
+    let seenRunId: string | null = null;
     let extended: Awaited<ReturnType<typeof lease>>;
     const definition: ConnectionJobDefinition = {
       lease: true,

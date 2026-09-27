@@ -200,7 +200,11 @@ export function registerConnectionRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
         action: 'connection.sync_request',
         target: { type: 'connection', id: connection.id },
       });
-      await deps.jobs.enqueueProfilesSync({ organizationId, connectionId: connection.id }, { tx });
+      // Kette (1.7): Profile → Entities → Reports.
+      await deps.jobs.enqueueProfilesSync(
+        { organizationId, connectionId: connection.id, chain: true },
+        { tx },
+      );
     });
     return c.json({ status: 'queued' as const }, 202);
   });

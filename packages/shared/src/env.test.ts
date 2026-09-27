@@ -104,11 +104,15 @@ describe('healthchecksEnvSchema', () => {
       source: {
         HEALTHCHECKS_TOKEN_REFRESH_URL: 'https://hc-ping.com/abc',
         HEALTHCHECKS_PROFILES_SYNC_URL: '',
+        HEALTHCHECKS_ENTITIES_SYNC_URL: 'https://hc-ping.com/entities',
+        HEALTHCHECKS_REPORTS_SYNC_URL: 'https://hc-ping.com/reports',
       },
     });
     expect(env).toEqual({
       HEALTHCHECKS_TOKEN_REFRESH_URL: 'https://hc-ping.com/abc',
       HEALTHCHECKS_PROFILES_SYNC_URL: undefined,
+      HEALTHCHECKS_ENTITIES_SYNC_URL: 'https://hc-ping.com/entities',
+      HEALTHCHECKS_REPORTS_SYNC_URL: 'https://hc-ping.com/reports',
     });
   });
 

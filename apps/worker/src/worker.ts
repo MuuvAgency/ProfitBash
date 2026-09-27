@@ -8,9 +8,12 @@ import {
   type ConnectionJobDeps,
   type ConnectionQueue,
 } from './jobs/connection-job';
+import { pollAmazonRequests } from './jobs/amazon-requests-poll';
 import { dispatchConnectionJobs } from './jobs/dispatch';
+import { syncConnectionEntities } from './jobs/entities-sync';
 import { cleanupJobRuns } from './jobs/job-runs-cleanup';
 import { syncConnectionProfiles } from './jobs/profiles-sync';
+import { syncConnectionReports } from './jobs/reports-sync';
 import { runConnectionJob, type ConnectionJobDefinition } from './jobs/run-connection-job';
 import { refreshConnectionToken } from './jobs/token-refresh';
 import {
@@ -26,11 +29,14 @@ import { createJobRunner, JobFailure, type JobRunnerDeps } from './run-job';
 
 /**
  * Jobs je Connection. `lease: true` = Amazon-Datenjob: höchstens einer je Connection gleichzeitig,
- * über alle Queues hinweg (1.3). Neue Datenjobs (1.7) melden sich hier mit `lease: true` an.
+ * über alle Queues hinweg (1.3).
  */
 const CONNECTION_JOBS: Record<ConnectionQueue, ConnectionJobDefinition> = {
   'token-refresh': { run: refreshConnectionToken, lease: false },
   'profiles-sync': { run: syncConnectionProfiles, lease: true },
+  'entities-sync': { run: syncConnectionEntities, lease: true },
+  'reports-sync': { run: syncConnectionReports, lease: true },
+  'amazon-requests-poll': { run: pollAmazonRequests, lease: true },
 };
 
 /** So lange wartet das Herunterfahren auf laufende Jobs. */
@@ -40,7 +46,7 @@ export interface StartWorkerOptions {
   /** Direkte Verbindung für pg-boss (`DATABASE_URL_DIRECT`), nie ein Transaction-Pooler. */
   connectionString: string;
   db: Db;
-  amazonAds: Pick<AmazonAdsClient, 'listProfiles' | 'getAccessToken' | 'invalidateAccessToken'>;
+  amazonAds: AmazonAdsClient;
   logger: Logger;
   healthchecks?: JobRunnerDeps['healthchecks'];
   fetch?: typeof fetch;
@@ -75,6 +81,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
     amazonAds: options.amazonAds,
     scheduleRetry: ({ queue, job, startAfterSeconds }) =>
       jobs.enqueueConnectionJob(queue, job, { startAfterSeconds }),
+    enqueue: (queue, job, enqueueOptions) => jobs.enqueueConnectionJob(queue, job, enqueueOptions),
   };
   const workOptions = {
     ...(options.pollingIntervalSeconds !== undefined && {

@@ -11,17 +11,31 @@ import type { ConnectionJobData, ConnectionQueue } from './jobs/connection-job';
  */
 export const CONNECTION_QUEUES: readonly ConnectionQueue[] = CONNECTION_JOB_NAMES;
 
-/** Cron-Auslöser, die für jede aktive Connection einen Job der Ziel-Queue einplanen. */
+/**
+ * Cron-Auslöser, die für jede aktive Connection einen Job der Ziel-Queue einplanen
+ * (`amazon-requests-poll-all` nur für Connections mit fälligen Aufträgen, siehe `worker.ts`).
+ */
 export const DISPATCH_QUEUES = {
   'token-refresh-all': 'token-refresh',
   'profiles-sync-all': 'profiles-sync',
+  'entities-sync-all': 'entities-sync',
+  'reports-sync-all': 'reports-sync',
+  'amazon-requests-poll-all': 'amazon-requests-poll',
 } as const satisfies Record<string, ConnectionQueue>;
 
 export const CLEANUP_QUEUE = 'job-runs-cleanup';
 
+/**
+ * Zeitpläne (F9): Profile um 05:00, Entities und Reports um 06:00 Berlin (die Lease der Connection
+ * reiht sie nacheinander). Der Poll plant sich selbst neu ein; der Auslöser alle 10 Min. holt nach
+ * Absturz oder Deploy auf.
+ */
 export const SCHEDULES = [
   { queue: 'token-refresh-all', cron: '0 * * * *' },
   { queue: 'profiles-sync-all', cron: '0 5 * * *', tz: 'Europe/Berlin' },
+  { queue: 'entities-sync-all', cron: '0 6 * * *', tz: 'Europe/Berlin' },
+  { queue: 'reports-sync-all', cron: '0 6 * * *', tz: 'Europe/Berlin' },
+  { queue: 'amazon-requests-poll-all', cron: '*/10 * * * *' },
   { queue: CLEANUP_QUEUE, cron: '30 3 * * *', tz: 'Europe/Berlin' },
 ] as const;
 
@@ -38,17 +52,23 @@ const QUEUE_OPTIONS: Omit<Queue, 'name'> = {
 const ALL_QUEUES = [...CONNECTION_QUEUES, ...Object.keys(DISPATCH_QUEUES), CLEANUP_QUEUE];
 
 /**
- * Legt die Queues an (idempotent). API und Worker rufen das beim Start auf. Achtung: Für bestehende
- * Queues ist `createQueue` wirkungslos; geänderte `QUEUE_OPTIONS` brauchen `boss.updateQueue`
- * (die Policy lässt sich gar nicht ändern, dann Queue neu anlegen).
+ * Legt die Queues an bzw. gleicht bestehende an `QUEUE_OPTIONS` an (idempotent). API und Worker rufen
+ * das beim Start auf. `createQueue` ist für bestehende Queues wirkungslos, deshalb `updateQueue`. Die
+ * Policy lässt sich so nicht ändern (dann Queue neu anlegen).
  */
 export async function createQueues(boss: PgBoss): Promise<void> {
-  for (const name of ALL_QUEUES) await boss.createQueue(name, QUEUE_OPTIONS);
+  const { policy: _policy, ...updatable } = QUEUE_OPTIONS;
+  for (const name of ALL_QUEUES) {
+    if (await boss.getQueue(name)) await boss.updateQueue(name, updatable);
+    else await boss.createQueue(name, QUEUE_OPTIONS);
+  }
 }
 
 export interface ProfilesSyncJob {
   organizationId: string;
   connectionId: string;
+  /** „Jetzt synchronisieren“: danach Entities und Reports (1.7). */
+  chain?: boolean;
 }
 
 export interface EnqueueOptions {
@@ -91,7 +111,11 @@ export function createJobQueue(boss: PgBoss): ConnectionJobQueue {
     async enqueueProfilesSync(job, options) {
       await enqueueConnectionJob(
         'profiles-sync',
-        { organizationId: job.organizationId, connectionId: job.connectionId },
+        {
+          organizationId: job.organizationId,
+          connectionId: job.connectionId,
+          ...(job.chain && { chain: true }),
+        },
         options,
       );
     },

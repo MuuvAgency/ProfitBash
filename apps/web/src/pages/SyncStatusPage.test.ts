@@ -167,6 +167,43 @@ describe('SyncStatusPage', () => {
     expect(runningRow.get('[col-id="duration"]').text()).toBe('–');
   });
 
+  it('zeigt die Amazon-Datenjobs (1.7) mit ihren Zählern in fester Reihenfolge', async () => {
+    const poll = jobRunFixture({
+      id: '55555555-5555-4555-8555-555555555555',
+      job: 'amazon-requests-poll',
+      counters: {
+        rows: 1200,
+        failed: 1,
+        imported: 5,
+        requests: 9,
+        requested: 3,
+        superseded: 1,
+        exportsWaiting: 0,
+        placeholdersCreated: 7,
+      },
+    });
+    const reports = jobRunFixture({
+      id: '66666666-6666-4666-8666-666666666666',
+      job: 'reports-sync',
+      startedAt: '2026-09-26T02:00:00.000Z',
+      counters: { profiles: 2, requested: 19, backfillsCompleted: 1, failedSinceLastRun: 2 },
+    });
+    stubFetch(routes([poll, reports]));
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, reports);
+
+    const pollRow = row(wrapper, poll);
+    expect(pollRow.text()).toContain('Amazon-Aufträge abholen');
+    expect(pollRow.get('[col-id="result"]').text()).toBe(
+      '3 angefordert · 5 Dateien importiert · 1 überholt · 1.200 Zeilen · 7 Platzhalter angelegt · 1 Auftrag gescheitert · 9 Anfragen',
+    );
+    const reportsRow = row(wrapper, reports);
+    expect(reportsRow.text()).toContain('Report-Anforderung');
+    expect(reportsRow.get('[col-id="result"]').text()).toBe(
+      '2 Profile · 19 angefordert · 1 Historie vollständig · 2 seit dem letzten Lauf gescheitert',
+    );
+  });
+
   it('zeigt statt einer fehlenden Connection den Platzhalter', async () => {
     const orphan = jobRunFixture({ connection: null });
     stubFetch(routes([orphan]));

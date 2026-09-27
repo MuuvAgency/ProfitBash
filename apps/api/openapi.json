@@ -1655,7 +1655,10 @@
               "type": "string",
               "enum": [
                 "token-refresh",
-                "profiles-sync"
+                "profiles-sync",
+                "entities-sync",
+                "reports-sync",
+                "amazon-requests-poll"
               ]
             },
             "required": false,

@@ -189,7 +189,7 @@ describe('GET /api/connections', () => {
 });
 
 describe('POST /api/connections/:id/sync', () => {
-  it('plant den Profil-Sync ein und schreibt ein Audit-Event', async () => {
+  it('plant den Profil-Sync mit Kette (Entities, Reports) ein und schreibt ein Audit-Event', async () => {
     const res = await request(ctx, `/api/connections/${ids.connection}/sync`, {
       method: 'POST',
       cookie: admin,
@@ -198,7 +198,7 @@ describe('POST /api/connections/:id/sync', () => {
     expect(res.status).toBe(202);
     expect(await res.json()).toEqual({ status: 'queued' });
     expect(ctx.jobs.profilesSync).toEqual([
-      { organizationId: orgId, connectionId: ids.connection },
+      { organizationId: orgId, connectionId: ids.connection, chain: true },
     ]);
     // Eingeplant in der Transaktion des Audit-Events: kein Job ohne Audit-Event.
     expect(ctx.jobs.enqueuedInTransaction).toEqual([true]);
