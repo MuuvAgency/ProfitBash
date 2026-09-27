@@ -86,17 +86,25 @@ export function formatDate(
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
- * Kalendertag (`YYYY-MM-DD`, z. B. ein Kennzahl-Tag in der Zeitzone des Profils), z. B. `25.09.2026`.
+ * Kalendertag (`YYYY-MM-DD`, z. B. ein Kennzahl-Tag in der Zeitzone des Profils), z. B. `25.09.2026`
+ * bzw. `09/25/2026` (en-US). Numerisch mit fester Breite, damit Tabellenspalten in jeder Sprache passen.
  * Anders als `formatDate` ohne Umrechnung: Der Tag bleibt in jeder Zeitzone des Browsers derselbe.
  */
 export function formatDay(value: string | null | undefined, locale: Locale): string {
   const match = value ? DAY.exec(value) : null;
   if (!match) return MISSING_VALUE;
   const [year, month, day] = match.slice(1).map(Number) as [number, number, number];
-  const date = new Date(Date.UTC(year, month - 1, day));
-  // Ungültige Tage (z. B. 30. Februar) rollt `Date.UTC` weiter; die zählen nicht als Tag.
+  const date = new Date(0);
+  // `setUTCFullYear` statt `Date.UTC`: Das deutete Jahre unter 100 als 19xx.
+  date.setUTCFullYear(year, month - 1, day);
+  // Ungültige Tage (z. B. 30. Februar) rollen weiter; die zählen nicht als Tag.
   if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return MISSING_VALUE;
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+  return new Intl.DateTimeFormat(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
 /**

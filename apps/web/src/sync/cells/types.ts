@@ -6,6 +6,8 @@ export interface JobRunGridContext {
   /** IDs der Läufe mit aufgeklapptem Fehlertext. */
   expanded: Set<string>;
   toggleError: (runId: string) => void;
+  /** Uhr (ms) für die Dauer laufender Jobs; tickt nur, solange einer läuft. */
+  now: number;
 }
 
 export type JobRunCellParams = ICellRendererParams<JobRun, unknown, JobRunGridContext>;
