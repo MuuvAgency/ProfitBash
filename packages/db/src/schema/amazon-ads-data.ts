@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   check,
   date,
@@ -284,5 +285,134 @@ export const amazonAdsProductAds = pgTable(
     unique('amazon_ads_product_ads_id_profile_uq').on(t.id, t.profileId),
     index('amazon_ads_product_ads_campaign_idx').on(t.campaignId),
     index('amazon_ads_product_ads_ad_group_idx').on(t.adGroupId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Tageskennzahlen (Reporting v3, ein Tag je Zeile in der Zeitzone des Profils)
+// ---------------------------------------------------------------------------
+
+/** Zähler: Tageswerte liegen weit unter 2^53; `mode: 'bigint'` wäre nicht JSON-serialisierbar. */
+const count = (name: string) => bigint(name, { mode: 'number' });
+
+const metricKeyColumns = () => ({
+  id: id(),
+  organizationId: organizationId(),
+  profileId: profileId(),
+  date: date('date', { mode: 'string' }).notNull(),
+  adProduct: adProduct(),
+});
+
+/**
+ * Attribution nach F7: 7 und 14 Tage, gesamt und „same SKU“. SB/SD liefern nur ein Fenster (14 Tage)
+ * ohne Suffix → `*_14d`, die `*_7d`-Spalten bleiben dort leer (nicht 0).
+ */
+const metricValueColumns = () => ({
+  /** Währung des Profils (v3-Reports liefern je Zeile keine). */
+  currencyCode: text('currency_code').notNull(),
+  impressions: count('impressions').notNull(),
+  clicks: count('clicks').notNull(),
+  cost: money('cost').notNull(),
+  sales7d: money('sales_7d'),
+  sales14d: money('sales_14d'),
+  salesSameSku7d: money('sales_same_sku_7d'),
+  salesSameSku14d: money('sales_same_sku_14d'),
+  purchases7d: count('purchases_7d'),
+  purchases14d: count('purchases_14d'),
+  purchasesSameSku7d: count('purchases_same_sku_7d'),
+  purchasesSameSku14d: count('purchases_same_sku_14d'),
+  units7d: count('units_7d'),
+  units14d: count('units_14d'),
+  unitsSameSku7d: count('units_same_sku_7d'),
+  unitsSameSku14d: count('units_same_sku_14d'),
+  /** Weitere Report-Spalten ohne eigene Spalte. */
+  extra: extra(),
+  importedAt: timestamp('imported_at', { withTimezone: true, mode: 'date' }).notNull(),
+});
+
+export const amazonAdsCampaignDailyMetrics = pgTable(
+  'amazon_ads_campaign_daily_metrics',
+  { ...metricKeyColumns(), campaignId: uuid('campaign_id').notNull(), ...metricValueColumns() },
+  (t) => [
+    profileFk('amazon_ads_campaign_daily_metrics', t.profileId, t.organizationId),
+    foreignKey({
+      name: 'amazon_ads_campaign_daily_metrics_campaign_fk',
+      columns: [t.campaignId, t.profileId],
+      foreignColumns: [amazonAdsCampaigns.id, amazonAdsCampaigns.profileId],
+    }),
+    // Upsert-Schlüssel; dient auch der FK-Prüfung beim Löschen einer Kampagne.
+    unique('amazon_ads_campaign_daily_metrics_key_uq').on(t.profileId, t.campaignId, t.date),
+    index('amazon_ads_campaign_daily_metrics_profile_date_idx').on(t.profileId, t.date),
+  ],
+);
+
+export const amazonAdsAdGroupDailyMetrics = pgTable(
+  'amazon_ads_ad_group_daily_metrics',
+  { ...metricKeyColumns(), adGroupId: uuid('ad_group_id').notNull(), ...metricValueColumns() },
+  (t) => [
+    profileFk('amazon_ads_ad_group_daily_metrics', t.profileId, t.organizationId),
+    foreignKey({
+      name: 'amazon_ads_ad_group_daily_metrics_ad_group_fk',
+      columns: [t.adGroupId, t.profileId],
+      foreignColumns: [amazonAdsAdGroups.id, amazonAdsAdGroups.profileId],
+    }),
+    unique('amazon_ads_ad_group_daily_metrics_key_uq').on(t.profileId, t.adGroupId, t.date),
+    index('amazon_ads_ad_group_daily_metrics_profile_date_idx').on(t.profileId, t.date),
+  ],
+);
+
+export const amazonAdsTargetDailyMetrics = pgTable(
+  'amazon_ads_target_daily_metrics',
+  { ...metricKeyColumns(), targetId: uuid('target_id').notNull(), ...metricValueColumns() },
+  (t) => [
+    profileFk('amazon_ads_target_daily_metrics', t.profileId, t.organizationId),
+    foreignKey({
+      name: 'amazon_ads_target_daily_metrics_target_fk',
+      columns: [t.targetId, t.profileId],
+      foreignColumns: [amazonAdsTargets.id, amazonAdsTargets.profileId],
+    }),
+    unique('amazon_ads_target_daily_metrics_key_uq').on(t.profileId, t.targetId, t.date),
+    index('amazon_ads_target_daily_metrics_profile_date_idx').on(t.profileId, t.date),
+  ],
+);
+
+export const amazonAdsProductAdDailyMetrics = pgTable(
+  'amazon_ads_product_ad_daily_metrics',
+  { ...metricKeyColumns(), productAdId: uuid('product_ad_id').notNull(), ...metricValueColumns() },
+  (t) => [
+    profileFk('amazon_ads_product_ad_daily_metrics', t.profileId, t.organizationId),
+    foreignKey({
+      name: 'amazon_ads_product_ad_daily_metrics_product_ad_fk',
+      columns: [t.productAdId, t.profileId],
+      foreignColumns: [amazonAdsProductAds.id, amazonAdsProductAds.profileId],
+    }),
+    unique('amazon_ads_product_ad_daily_metrics_key_uq').on(t.profileId, t.productAdId, t.date),
+    index('amazon_ads_product_ad_daily_metrics_profile_date_idx').on(t.profileId, t.date),
+  ],
+);
+
+/** Suchbegriffe (F6), bezogen auf das Target (Keyword bzw. Produkt-/Auto-Target), das sie ausgelöst hat. */
+export const amazonAdsSearchTermDailyMetrics = pgTable(
+  'amazon_ads_search_term_daily_metrics',
+  {
+    ...metricKeyColumns(),
+    targetId: uuid('target_id').notNull(),
+    searchTerm: text('search_term').notNull(),
+    ...metricValueColumns(),
+  },
+  (t) => [
+    profileFk('amazon_ads_search_term_daily_metrics', t.profileId, t.organizationId),
+    foreignKey({
+      name: 'amazon_ads_search_term_daily_metrics_target_fk',
+      columns: [t.targetId, t.profileId],
+      foreignColumns: [amazonAdsTargets.id, amazonAdsTargets.profileId],
+    }),
+    unique('amazon_ads_search_term_daily_metrics_key_uq').on(
+      t.profileId,
+      t.targetId,
+      t.date,
+      t.searchTerm,
+    ),
+    index('amazon_ads_search_term_daily_metrics_profile_date_idx').on(t.profileId, t.date),
   ],
 );

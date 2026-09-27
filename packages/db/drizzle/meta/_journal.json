@@ -64,6 +64,13 @@
       "when": 1790498035791,
       "tag": "0008_amazon_ads_entities",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790498339034,
+      "tag": "0009_amazon_ads_daily_metrics",
+      "breakpoints": true
     }
   ]
 }
