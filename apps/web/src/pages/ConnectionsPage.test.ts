@@ -224,6 +224,89 @@ describe('ConnectionsPage', () => {
     expect(assign).toHaveBeenCalledWith(url);
   });
 
+  describe('Ablauf der Einwilligung', () => {
+    beforeEach(() => {
+      // Nur die Uhr fälschen: Timer (Polling, TanStack Query) laufen normal.
+      vi.useFakeTimers({ now: new Date('2026-09-27T12:00:00.000Z'), toFake: ['Date'] });
+    });
+
+    function consentRoutes(consent: { consentedAt: string | null; expiresAt: string | null }) {
+      return routes({
+        'GET /api/connections': json({
+          connections: [
+            connectionFixture({
+              consentedAt: consent.consentedAt,
+              refreshTokenExpiresAt: consent.expiresAt,
+            }),
+          ],
+        }),
+        'POST /api/amazon/oauth/start': json({ url: 'https://eu.account.amazon.com/ap/oa?s=1' }),
+      });
+    }
+
+    it('zeigt das Ablaufdatum ohne Warnung, solange mehr als 30 Tage bleiben', async () => {
+      stubFetch(
+        consentRoutes({
+          consentedAt: '2026-09-20T12:00:00.000Z',
+          expiresAt: '2027-09-20T12:00:00.000Z',
+        }),
+      );
+      const { wrapper } = await mountPage();
+      await waitForRow(wrapper, 'Nordwind GmbH');
+
+      expect(wrapper.text()).toContain('Einwilligung läuft ab am 20.09.2027');
+      expect(wrapper.find('[data-testid="consent-warning"]').exists()).toBe(false);
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Neu verbinden')).toBe(false);
+    });
+
+    it('warnt ab 30 Tagen vor dem Ablauf und bietet „Neu verbinden“ neben dem Sync an', async () => {
+      const { requests } = stubFetch(
+        consentRoutes({
+          consentedAt: '2025-10-27T12:00:00.000Z',
+          expiresAt: '2026-10-27T12:00:00.000Z',
+        }),
+      );
+      const { wrapper } = await mountPage();
+      await waitForRow(wrapper, 'Nordwind GmbH');
+
+      expect(wrapper.text()).toContain('Einwilligung läuft ab am 27.10.2026');
+      const warning = wrapper.get('[data-testid="consent-warning"]');
+      expect(warning.text()).toContain('27.10.2026');
+      expect(warning.text()).toContain('neu verbinden');
+      button(wrapper, 'Jetzt synchronisieren');
+
+      await button(wrapper, 'Neu verbinden').trigger('click');
+      await flushPromises();
+      expect(requests.find((r) => r.path === '/api/amazon/oauth/start')?.body).toEqual({
+        connectionId: CONNECTION_ID,
+      });
+    });
+
+    it('meldet eine abgelaufene Einwilligung', async () => {
+      stubFetch(
+        consentRoutes({
+          consentedAt: '2025-09-01T12:00:00.000Z',
+          expiresAt: '2026-09-01T12:00:00.000Z',
+        }),
+      );
+      const { wrapper } = await mountPage();
+      await waitForRow(wrapper, 'Nordwind GmbH');
+
+      expect(wrapper.text()).toContain('Einwilligung abgelaufen am 01.09.2026');
+      expect(wrapper.get('[data-testid="consent-warning"]').text()).toContain('abgelaufen');
+      button(wrapper, 'Neu verbinden');
+    });
+
+    it('zeigt „unbekannt“, wenn der Einwilligungszeitpunkt fehlt', async () => {
+      stubFetch(consentRoutes({ consentedAt: null, expiresAt: null }));
+      const { wrapper } = await mountPage();
+      await waitForRow(wrapper, 'Nordwind GmbH');
+
+      expect(wrapper.text()).toContain('Ablauf der Einwilligung: unbekannt');
+      expect(wrapper.find('[data-testid="consent-warning"]').exists()).toBe(false);
+    });
+  });
+
   it('plant einen Sync ein und bestätigt es', async () => {
     const { requests } = stubFetch(
       routes({ [`POST ${SYNC_PATH}`]: json({ status: 'queued' }, 202) }),

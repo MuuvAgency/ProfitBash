@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import {
+  consentExpiryStatus,
+  formatDate,
   formatNumber,
   type Client,
   type Connection,
@@ -88,6 +90,19 @@ const lastRefreshed = computed(() => {
   );
 });
 
+// Stand beim Rendern: Die Seite lädt Connections ohnehin regelmäßig neu, ein Tageswechsel ist unkritisch.
+const consentStatus = computed(() =>
+  consentExpiryStatus(props.connection.refreshTokenExpiresAt, new Date()),
+);
+const consentExpiry = computed(() =>
+  formatDate(props.connection.refreshTokenExpiresAt, locale.value),
+);
+/** Warnung und „Neu verbinden“, solange Amazon den Token noch nicht abgelehnt hat (sonst reauthHint). */
+const consentWarning = computed(
+  () =>
+    !needsReauth.value && (consentStatus.value === 'expiring' || consentStatus.value === 'expired'),
+);
+
 const statusDot = computed(
   () =>
     ({ active: 'bg-lime', reauth_required: 'bg-warn', error: 'bg-loss' })[props.connection.status],
@@ -132,6 +147,23 @@ const statusDot = computed(
               {{ t('connections.lastRefreshed') }}:
               <span class="font-data text-ink">{{ lastRefreshed }}</span>
             </span>
+            <span v-if="consentStatus === 'unknown'">{{ t('connections.consent.unknown') }}</span>
+            <i18n-t
+              v-else
+              :keypath="
+                consentStatus === 'expired'
+                  ? 'connections.consent.expiredOn'
+                  : 'connections.consent.expiresOn'
+              "
+              tag="span"
+              scope="global"
+            >
+              <template #date>
+                <span :class="['font-data', consentWarning ? 'text-warn' : 'text-ink']">
+                  {{ consentExpiry }}
+                </span>
+              </template>
+            </i18n-t>
             <span v-if="profilesQuery.data.value">
               <span class="font-data text-ink">{{ formatNumber(activeCount, locale) }}</span>
               {{ t('connections.profileCount') }}
@@ -141,14 +173,14 @@ const statusDot = computed(
       </div>
       <div class="flex shrink-0 flex-wrap items-center gap-space-sm">
         <Button
-          v-if="needsReauth"
+          v-if="needsReauth || consentWarning"
           :label="t('connections.reconnect')"
           icon="pi pi-refresh"
           :loading="reconnecting"
           @click="emit('reconnect', connection)"
         />
         <Button
-          v-else
+          v-if="!needsReauth"
           :label="t('connections.sync')"
           icon="pi pi-sync"
           severity="secondary"
@@ -165,6 +197,18 @@ const statusDot = computed(
     >
       <i class="pi pi-exclamation-circle mt-0.5 text-warn" aria-hidden="true" />
       {{ t('connections.reauthHint') }}
+    </p>
+    <p
+      v-else-if="consentWarning"
+      data-testid="consent-warning"
+      class="flex items-start gap-space-sm rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
+    >
+      <i class="pi pi-exclamation-triangle mt-0.5 text-warn" aria-hidden="true" />
+      {{
+        consentStatus === 'expired'
+          ? t('connections.consent.expiredHint')
+          : t('connections.consent.expiringHint', { date: consentExpiry })
+      }}
     </p>
     <p
       v-if="sync.isSuccess.value"
