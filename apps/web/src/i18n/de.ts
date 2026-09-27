@@ -238,7 +238,7 @@ export const de = {
       'profiles-sync': 'Profil-Sync',
       'entities-sync': 'Entity-Sync',
       'reports-sync': 'Report-Anforderung',
-      'amazon-requests-poll': 'Amazon-Aufträge abholen',
+      'amazon-requests-poll': 'Aufträge abholen',
     },
     status: {
       running: 'Läuft',

@@ -1,6 +1,8 @@
 import {
   CellStyleModule,
   ClientSideRowModelModule,
+  ColumnApiModule,
+  ColumnAutoSizeModule,
   ModuleRegistry,
   RowAutoHeightModule,
   RowStyleModule,
@@ -17,6 +19,8 @@ ModuleRegistry.registerModules([
   ClientSideRowModelModule,
   RowStyleModule,
   CellStyleModule,
+  ColumnApiModule,
+  ColumnAutoSizeModule,
   RowAutoHeightModule,
   ...(import.meta.env.DEV ? [ValidationModule] : []),
 ]);

@@ -218,7 +218,7 @@ describe('SyncStatusPage', () => {
     await waitForRow(wrapper, reports);
 
     const pollRow = row(wrapper, poll);
-    expect(pollRow.text()).toContain('Amazon-Aufträge abholen');
+    expect(pollRow.get('[col-id="job"]').text()).toBe('Aufträge abholen');
     expect(pollRow.get('[col-id="result"]').text()).toBe(
       '3 angefordert · 5 Dateien importiert · 1 überholt · 1.200 Zeilen · 7 Platzhalter angelegt · 1 Auftrag gescheitert · 9 Anfragen',
     );
@@ -227,6 +227,25 @@ describe('SyncStatusPage', () => {
     expect(reportsRow.get('[col-id="result"]').text()).toBe(
       '2 Profile · 19 angefordert · 1 Historie vollständig · 2 seit dem letzten Lauf gescheitert · 1 Mal fortgesetzt',
     );
+  });
+
+  it('nennt gekürzte Texte (Amazon-Konto, Zähler) vollständig im Tooltip', async () => {
+    const longEmail = jobRunFixture({
+      connection: {
+        id: CONNECTION_ID,
+        externalAccountId: 'amzn1.account.MOCK',
+        externalAccountEmail: 'amazon-ads-sehr-lang@kunde.test',
+      },
+    });
+    stubFetch(routes([longEmail]));
+    const { wrapper } = await mountPage();
+    const longRow = await waitForRow(wrapper, longEmail);
+
+    const account = longRow.get('[col-id="connection"] [title]');
+    expect(account.attributes('title')).toBe('amazon-ads-sehr-lang@kunde.test');
+    expect(account.classes()).toContain('truncate');
+    const counters = longRow.get('[col-id="result"] .truncate');
+    expect(counters.attributes('title')).toBe(counters.text());
   });
 
   it('zeigt statt einer fehlenden Connection den Platzhalter', async () => {
