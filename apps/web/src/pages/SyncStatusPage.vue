@@ -181,14 +181,14 @@ async function refresh() {
       :text="t('sync.emptyText')"
     />
 
-    <!-- Mindestbreite = Summe der Mindestbreiten der Spalten (JobRunGrid): darunter scrollt die Tabelle. -->
+    <!-- Unter der Mindestbreite der Spalten (setzt JobRunGrid) scrollt die Tabelle hier. -->
     <section
       v-else
       class="overflow-x-auto rounded-tile bg-tile shadow-tile"
       role="region"
       :aria-label="t('sync.label')"
     >
-      <JobRunGrid class="min-w-[1090px]" :runs="runs" />
+      <JobRunGrid :runs="runs" />
     </section>
   </div>
 </template>

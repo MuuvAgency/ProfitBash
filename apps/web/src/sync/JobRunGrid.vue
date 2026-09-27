@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import type { JobRun } from '@profitbash/shared';
-import type { ColDef, GetRowIdParams } from 'ag-grid-community';
+import type {
+  ColDef,
+  GetRowIdParams,
+  GridApi,
+  GridReadyEvent,
+  ModelUpdatedEvent,
+} from 'ag-grid-community';
 import { AgGridVue } from 'ag-grid-vue3';
-import { computed, markRaw, onBeforeUnmount, reactive, watchEffect } from 'vue';
+import { computed, markRaw, onBeforeUnmount, reactive, ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { gridStyleOptions, gridTheme } from '../grid/grid';
 import DurationCell from './cells/DurationCell.vue';
 import ResultCell from './cells/ResultCell.vue';
 import StatusCell from './cells/StatusCell.vue';
+import TruncatedCell from './cells/TruncatedCell.vue';
 import type { JobRunGridContext } from './cells/types';
 import { elapsedMs, RUNNING_DURATION_TICK_MS, useJobRunLabels } from './labels';
 
@@ -28,25 +35,59 @@ const context = reactive<JobRunGridContext>({
 const CELL = 'flex items-center leading-normal';
 const DATA_CELL = `${CELL} font-data`;
 
+/**
+ * Spalten mit kurzem, nie gekürztem Inhalt passen sich ihm an (Locale des Zeitstempels, Minuten in der
+ * Dauer, „Fehlgeschlagen“). Den Rest teilen sich Amazon-Konto und Ergebnis, die gekürzt werden dürfen.
+ */
+const AUTO_SIZED = ['status', 'job', 'startedAt', 'duration'];
+/** Die Zellen bringen ihr Padding mit; die Voreinstellung (20 px) nähme den gekürzten Spalten Platz. */
+const AUTO_SIZE_PADDING = 4;
+
+/**
+ * Mindestbreite des Grids = angepasste Spalten + Mindestbreiten der Flex-Spalten. Darunter scrollt die
+ * Tabelle im Container der Seite, statt Spalten zu beschneiden.
+ */
+const minWidth = ref<number>();
+
+/**
+ * Nach `modelUpdated`: Dann stehen alle Zeilen im DOM (`rowDataUpdated` kommt, bevor sie gezeichnet
+ * sind; ohne Zeilen-Virtualisierung auch die außerhalb des Fensters). Neue Läufe können längere Inhalte
+ * bringen; manuell geänderte Breiten dieser Spalten gehen dabei verloren.
+ */
+function fitContents(api: GridApi<JobRun>) {
+  if (api.isDestroyed()) return;
+  api.autoSizeColumns(AUTO_SIZED);
+  minWidth.value = (api.getColumns() ?? []).reduce(
+    (sum, column) => sum + (column.getFlex() ? column.getMinWidth() : column.getActualWidth()),
+    0,
+  );
+}
+
+/** Gemessen mit der Ersatzschrift wäre der Zeitstempel in JetBrains Mono zu schmal: nach dem Laden neu. */
+function onGridReady({ api }: GridReadyEvent<JobRun>) {
+  void document.fonts?.ready.then(() => fitContents(api));
+}
+
+const onModelUpdated = ({ api }: ModelUpdatedEvent<JobRun>) => fitContents(api);
+
 const columnDefs = computed<ColDef<JobRun>[]>(() => [
   {
     colId: 'status',
     headerName: t('sync.column.status'),
     field: 'status',
     cellRenderer: markRaw(StatusCell),
-    width: 140,
   },
   {
     colId: 'job',
     headerName: t('sync.column.job'),
     valueGetter: ({ data }) => (data ? labels.job(data.job) : ''),
-    width: 140,
   },
   {
     colId: 'connection',
     headerName: t('sync.column.connection'),
     valueGetter: ({ data }) => (data ? labels.connection(data) : ''),
-    minWidth: 180,
+    cellRenderer: markRaw(TruncatedCell),
+    minWidth: 220,
     flex: 1,
   },
   {
@@ -56,7 +97,6 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     field: 'startedAt',
     valueFormatter: ({ data }) => (data ? labels.startedAt(data) : ''),
     cellClass: DATA_CELL,
-    width: 190,
   },
   {
     colId: 'duration',
@@ -65,7 +105,6 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     valueGetter: ({ data }) => (data ? elapsedMs(data) : null),
     cellRenderer: markRaw(DurationCell),
     cellClass: DATA_CELL,
-    width: 140,
   },
   {
     colId: 'result',
@@ -73,6 +112,9 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     // Zähler und (aufklappbarer) Fehlertext in einer Spalte: Der Fehler bleibt ohne Scrollen sichtbar.
     valueGetter: ({ data }) => (data ? labels.counters(data) : ''),
     cellRenderer: markRaw(ResultCell),
+    // Kein Flex: Der Wrapper der autoHeight-Zelle schrumpfte sonst nicht unter seine Inhaltsbreite und
+    // ragte über die Zelle hinaus. Vertikal zentriert die Zelle selbst.
+    cellClass: 'leading-normal',
     // Aufgeklappt wächst die Zeile mit dem Fehlertext.
     autoHeight: true,
     sortable: false,
@@ -113,6 +155,7 @@ onBeforeUnmount(() => clearInterval(tick));
 <template>
   <AgGridVue
     class="w-full"
+    :style="minWidth ? { minWidth: `${minWidth}px` } : undefined"
     :theme="gridTheme"
     :theme-css-layer="gridStyleOptions.themeCssLayer"
     :theme-style-container="gridStyleOptions.themeStyleContainer"
@@ -123,7 +166,11 @@ onBeforeUnmount(() => clearInterval(tick));
     :row-height="52"
     dom-layout="autoHeight"
     :suppress-column-virtualisation="true"
+    :suppress-row-virtualisation="true"
     :suppress-cell-focus="true"
     :default-col-def="defaultColDef"
+    :auto-size-padding="AUTO_SIZE_PADDING"
+    @grid-ready="onGridReady"
+    @model-updated="onModelUpdated"
   />
 </template>
