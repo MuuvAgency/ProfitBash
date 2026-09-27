@@ -206,6 +206,33 @@ export const jobRuns = pgTable(
   ],
 );
 
+/**
+ * Sperre je Connection für die Amazon-Datenjobs (Phase 1, 1.3): höchstens ein Datenjob je Connection
+ * gleichzeitig, auch über Queues hinweg (pg-boss `stately` gilt nur je Queue). Die Lease läuft ab
+ * (`expires_at`), damit ein abgestürzter Halter die Connection nicht dauerhaft sperrt. Zugriffe nur
+ * über `connection-leases.ts`.
+ */
+export const connectionJobLeases = pgTable(
+  'connection_job_leases',
+  {
+    connectionId: uuid('connection_id').primaryKey(),
+    organizationId: organizationId(),
+    /** Queue des Halters, z. B. `profiles-sync`. */
+    job: text('job').notNull(),
+    /** `job_runs.id` des Halters (ohne FK: die Lease entsteht vor dem Lauf, siehe Worker). */
+    jobRunId: uuid('job_run_id').notNull(),
+    acquiredAt: timestamp('acquired_at', { withTimezone: true, mode: 'date' }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'connection_job_leases_connection_org_fk',
+      columns: [t.connectionId, t.organizationId],
+      foreignColumns: [connections.id, connections.organizationId],
+    }).onDelete('cascade'),
+  ],
+);
+
 export const auditEvents = pgTable(
   'audit_events',
   {
