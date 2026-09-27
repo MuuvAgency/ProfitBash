@@ -13,7 +13,13 @@ export {
   type RequestOptions,
 } from './client';
 export { createAmazonAdsClientFromConfig, type AmazonAdsClientConfig } from './configure';
-export { decodeGzipJson, type DecodeGzipJsonOptions } from './download';
+export {
+  AMAZON_ADS_DOWNLOAD_HOST_PATTERNS,
+  decodeGzipJson,
+  isAllowedDownloadUrl,
+  type AmazonAdsDownload,
+  type DecodeGzipJsonOptions,
+} from './download';
 export {
   AmazonAdsDownloadTooLargeError,
   AmazonAdsError,
