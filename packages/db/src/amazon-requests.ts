@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, asc, eq, gt, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
 import type { DbOrTx } from './audit';
 import { amazonAdsProfiles, amazonAdsReportRequests } from './schema';
@@ -45,6 +46,8 @@ export type AmazonRequestPatch = Partial<
     | 'status'
     | 'attempts'
     | 'importAttempts'
+    | 'errorCount'
+    | 'requestCount'
     | 'nextPollAt'
     | 'requestedAt'
     | 'completedAt'
@@ -103,6 +106,61 @@ export async function createAmazonRequest(
   // Zwischen beiden Abfragen abgeschlossen: selten, der Aufrufer versucht es im nächsten Lauf erneut.
   if (!open) throw new Error('Offener Amazon-Auftrag wurde zwischenzeitlich abgeschlossen.');
   return { created: false, request: open };
+}
+
+/**
+ * Legt alle Exports eines Entity-Syncs (ein Profil, ein Ad-Typ) in einer Transaktion als
+ * `pending_request` mit gemeinsamer `batch_id` an. Ein Batch ist damit vollständig oder gar nicht da;
+ * ein Absturz beim Anlegen hinterlässt keinen halben Batch. Ist für Profil und Ad-Typ noch ein Export
+ * offen, entsteht kein neuer Batch (`created: false`, `requests` = die offenen Exports): Sonst mischten
+ * sich Stände zweier Batches.
+ */
+export async function createAmazonExportBatch(
+  db: DbOrTx,
+  input: {
+    organizationId: string;
+    profileId: string;
+    adProduct: string;
+    exportTypes: readonly string[];
+    now: Date;
+  },
+): Promise<{ created: boolean; requests: AmazonRequest[] }> {
+  return db.transaction(async (tx) => {
+    const open = await tx
+      .select()
+      .from(amazonAdsReportRequests)
+      .where(
+        and(
+          eq(amazonAdsReportRequests.organizationId, input.organizationId),
+          eq(amazonAdsReportRequests.profileId, input.profileId),
+          eq(amazonAdsReportRequests.kind, 'export'),
+          eq(amazonAdsReportRequests.adProduct, input.adProduct),
+          inArray(amazonAdsReportRequests.status, OPEN_AMAZON_REQUEST_STATUSES),
+        ),
+      )
+      .orderBy(asc(amazonAdsReportRequests.createdAt), asc(amazonAdsReportRequests.id));
+    if (open.length > 0) return { created: false, requests: open };
+
+    const batchId = randomUUID();
+    const requests = await tx
+      .insert(amazonAdsReportRequests)
+      .values(
+        input.exportTypes.map((reportType) => ({
+          organizationId: input.organizationId,
+          profileId: input.profileId,
+          kind: 'export' as const,
+          adProduct: input.adProduct,
+          reportType,
+          batchId,
+          status: 'pending_request' as const,
+          nextPollAt: input.now,
+          createdAt: input.now,
+          updatedAt: input.now,
+        })),
+      )
+      .returning();
+    return { created: true, requests };
+  });
 }
 
 export async function findAmazonRequest(

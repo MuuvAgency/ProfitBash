@@ -1,0 +1,2 @@
+ALTER TABLE "amazon_ads_report_requests" ADD COLUMN "error_count" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "amazon_ads_report_requests" ADD COLUMN "request_count" integer DEFAULT 0 NOT NULL;

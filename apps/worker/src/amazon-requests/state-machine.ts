@@ -6,6 +6,7 @@ import {
 } from '@profitbash/amazon-ads';
 import {
   ConnectionReauthRequiredError,
+  createAmazonExportBatch,
   createAmazonRequest,
   findAmazonRequest,
   listAmazonRequestBatch,
@@ -112,6 +113,14 @@ export const DUPLICATE_RETRY_MINUTES = 15;
 /** Nach einem gescheiterten Import so viel später erneut laden. */
 export const IMPORT_RETRY_MINUTES = 5;
 export const MAX_IMPORT_ATTEMPTS = 3;
+/**
+ * Vorübergehende Fehler in Folge (5xx, Netzwerk), bis ein Auftrag scheitert. Mit dem Backoff sind das
+ * rund 2 h ohne Antwort von Amazon. Bewusst kein Alter: Ein Auftrag, den nur wir lange nicht abgefragt
+ * haben (Absturz, Deploy), scheitert nicht am ersten Fehler danach.
+ */
+export const MAX_CONSECUTIVE_ERRORS = 10;
+/** So oft wird ein Report höchstens angefordert (erstes Anfordern plus Neu-Anfordern, wenn die Datei fehlt). */
+export const MAX_REQUESTS = 3;
 /** Amazon braucht bis zu 3 h; danach gilt ein Auftrag als verloren. */
 export const MAX_REQUEST_AGE_MS = 4 * 60 * 60 * 1000;
 /** Entpackte Größe je Datei. Schützt den Speicher, auch bei `WORKER_MODE=inline`. */
@@ -128,17 +137,62 @@ const TOO_OLD_REASON = 'Amazon hat den Auftrag nicht innerhalb von 4 h fertigges
 // Einstiegspunkte
 // ---------------------------------------------------------------------------
 
+/** Ein Report-Auftrag (Exports laufen immer als Batch, siehe `submitAmazonExportBatch`). */
+export type NewAmazonReportRequest = Omit<NewAmazonRequest, 'now' | 'kind' | 'batchId'> & {
+  kind: 'report';
+  batchId?: null;
+};
+
 /**
- * Legt einen Auftrag an und fordert ihn bei Amazon an: erst die Zeile (`pending_request`), dann der
- * Aufruf, dann die ID. Ist schon ein gleicher Auftrag offen, bleibt es bei diesem (kein Aufruf).
+ * Legt einen Report-Auftrag an und fordert ihn bei Amazon an: erst die Zeile (`pending_request`),
+ * dann der Aufruf, dann die ID. Ist schon ein gleicher Auftrag offen, bleibt es bei diesem (kein Aufruf).
  */
 export async function submitAmazonRequest(
   deps: AmazonRequestDeps,
-  input: Omit<NewAmazonRequest, 'now'>,
+  input: NewAmazonReportRequest,
 ): Promise<AmazonRequestResult> {
-  const { created, request } = await createAmazonRequest(deps.db, { ...input, now: deps.now() });
+  const { created, request } = await createAmazonRequest(deps.db, {
+    ...input,
+    batchId: null,
+    now: deps.now(),
+  });
   if (!created) return { request, counters: {} };
   return sendRequest(deps, request);
+}
+
+/**
+ * Legt die Exports eines Entity-Syncs (ein Profil, ein Ad-Typ) als Batch an (alle Zeilen in einer
+ * Transaktion) und fordert sie nacheinander an. Scheitert einer endgültig, scheitert der Batch und die
+ * übrigen werden nicht mehr angefordert. Ist für Profil und Ad-Typ noch ein Export offen, entsteht kein
+ * neuer Batch (Ergebnis: die offenen Exports, keine Aufrufe). Bleiben Zeilen nach einem Fehler der
+ * Connection auf `pending_request`, fordert sie der nächste Poll an.
+ */
+export async function submitAmazonExportBatch(
+  deps: AmazonRequestDeps,
+  input: {
+    organizationId: string;
+    profileId: string;
+    adProduct: string;
+    exportTypes: readonly string[];
+  },
+): Promise<{ requests: AmazonRequest[]; counters: AmazonRequestCounters }> {
+  const { created, requests } = await createAmazonExportBatch(deps.db, {
+    ...input,
+    now: deps.now(),
+  });
+  if (!created) return { requests, counters: {} };
+
+  const counters: AmazonRequestCounters = {};
+  for (const request of requests) {
+    const result = await sendRequest(deps, request);
+    addCounters(counters, result.counters);
+    if (result.request.status === 'failed') break;
+  }
+  const batch = await listAmazonRequestBatch(deps.db, {
+    organizationId: input.organizationId,
+    batchId: requireBatchId(requests[0]!),
+  });
+  return { requests: batch, counters };
 }
 
 /** Führt den nächsten Schritt eines Auftrags aus (je nach Zustand anfordern, abfragen, importieren). */
@@ -178,7 +232,11 @@ async function sendRequest(
   } catch (error) {
     if (isConnectionError(error)) throw error;
     if (isPermanentHttpError(error)) {
-      return fail(deps, request, `Amazon hat die Anfrage abgelehnt: ${errorMessage(error)}`);
+      return failRequestOrBatch(
+        deps,
+        request,
+        `Amazon hat die Anfrage abgelehnt: ${errorMessage(error)}`,
+      );
     }
     return retryLater(deps, request, error);
   }
@@ -191,9 +249,14 @@ async function sendRequest(
       reportType: request.reportType,
     });
     if (isTooOld(request, now)) {
-      return fail(deps, request, `Amazon meldet seit über 4 h eine laufende identische Anfrage.`);
+      return failRequestOrBatch(
+        deps,
+        request,
+        'Amazon meldet seit über 4 h eine laufende identische Anfrage.',
+      );
     }
     const updated = await update(deps, request, {
+      errorCount: 0,
       nextPollAt: addMinutes(now, DUPLICATE_RETRY_MINUTES),
     });
     return { request: updated, counters: {} };
@@ -202,8 +265,12 @@ async function sendRequest(
   const updated = await update(deps, request, {
     status: 'requested',
     amazonRequestId: submission.amazonRequestId,
+    // Bei 425 mit ID lief der übernommene Report schon etwas früher; für die Reihenfolge (neuere
+    // Importe gewinnen) ist der Zeitpunkt damit höchstens etwas zu spät angesetzt.
     requestedAt: now,
     attempts: 0,
+    errorCount: 0,
+    requestCount: request.requestCount + 1,
     nextPollAt: addMinutes(now, POLL_BACKOFF_MINUTES[0]),
     failureReason: null,
   });
@@ -213,16 +280,27 @@ async function sendRequest(
   };
 }
 
-/** Setzt einen Report zurück auf `pending_request` und fordert ihn sofort neu an. */
+/**
+ * Setzt einen Report zurück auf `pending_request` und fordert ihn sofort neu an, höchstens bis
+ * `MAX_REQUESTS` Anforderungen (sonst forderte ein dauerhaft fehlender Download endlos neu an).
+ */
 async function requestAgain(
   deps: AmazonRequestDeps,
   request: AmazonRequest,
 ): Promise<AmazonRequestResult> {
+  if (request.requestCount >= MAX_REQUESTS) {
+    return fail(
+      deps,
+      request,
+      `Amazon liefert den Report nicht mehr; nach ${MAX_REQUESTS} Anforderungen aufgegeben.`,
+    );
+  }
   const reset = await update(deps, request, {
     status: 'pending_request',
     amazonRequestId: null,
     attempts: 0,
     importAttempts: 0,
+    errorCount: 0,
     // Beginn des neuen Anforderns (für die 4-h-Regel, falls Amazon wieder mit 425 antwortet).
     requestedAt: deps.now(),
     completedAt: null,
@@ -245,6 +323,13 @@ async function pollStatus(
     state = await deps.port.getStatus(request);
   } catch (error) {
     if (isConnectionError(error)) throw error;
+    if (isPermanentHttpError(error)) {
+      return failRequestOrBatch(
+        deps,
+        request,
+        `Amazon hat die Status-Abfrage abgelehnt: ${errorMessage(error)}`,
+      );
+    }
     return retryLater(deps, request, error);
   }
 
@@ -255,6 +340,7 @@ async function pollStatus(
       const attempts = request.attempts + 1;
       const updated = await update(deps, request, {
         attempts,
+        errorCount: 0,
         nextPollAt: addMinutes(now, backoffMinutes(attempts)),
         failureReason: null,
       });
@@ -276,8 +362,10 @@ async function pollStatus(
         status: 'completed',
         completedAt: now,
         attempts: request.attempts + 1,
-        // Exports warten auf ihren Batch; der letzte fertige Export stößt den Import an.
-        nextPollAt: request.kind === 'report' ? now : null,
+        errorCount: 0,
+        // Bleibt fällig, bis der Import gelaufen ist: Bricht er ab (Absturz, Drosselung), holt der
+        // nächste Poll ihn nach. Exports, deren Batch noch nicht fertig ist, warten ohne Termin.
+        nextPollAt: now,
         failureReason: null,
       });
       return completed.kind === 'report'
@@ -336,10 +424,38 @@ async function loadFile(
   return { status: 'ok', file: validateRows(deps, request, content) };
 }
 
+/**
+ * Fehler der Status-Abfrage beim Laden: kein gescheiterter Import, sondern wie ein Fehler der
+ * Status-Abfrage behandelt (später erneut bzw. bei 4xx endgültig).
+ */
+class StatusQueryError extends Error {
+  constructor(public readonly original: unknown) {
+    super(errorMessage(original));
+    this.name = 'StatusQueryError';
+  }
+}
+
 /** Frische Download-URL per Status-Abfrage; `null`, wenn Amazon keine (mehr) liefert. */
 async function freshUrl(deps: AmazonRequestDeps, request: AmazonRequest): Promise<string | null> {
-  const state = await deps.port.getStatus(request);
+  let state: AmazonRequestState;
+  try {
+    state = await deps.port.getStatus(request);
+  } catch (error) {
+    if (isConnectionError(error)) throw error;
+    throw new StatusQueryError(error);
+  }
   return state.status === 'COMPLETED' ? state.url : null;
+}
+
+/** Fehler der Status-Abfrage beim Laden: bei 4xx endgültig, sonst später erneut. */
+function statusQueryFailed(
+  deps: AmazonRequestDeps,
+  request: AmazonRequest,
+  error: StatusQueryError,
+): Promise<AmazonRequestResult> {
+  return isPermanentHttpError(error.original)
+    ? failRequestOrBatch(deps, request, `Amazon hat die Status-Abfrage abgelehnt: ${error.message}`)
+    : retryLater(deps, request, error.original);
 }
 
 function validateRows(
@@ -410,6 +526,7 @@ async function fetchAndImportReport(
         importedAt: deps.now(),
         rowCount: file.rows.length,
         invalidRowCount: file.invalidRowCount,
+        errorCount: 0,
         nextPollAt: null,
         failureReason: null,
       });
@@ -417,6 +534,7 @@ async function fetchAndImportReport(
     });
   } catch (error) {
     if (isConnectionError(error)) throw error;
+    if (error instanceof StatusQueryError) return statusQueryFailed(deps, request, error);
     return importFailed(deps, request, error);
   }
 }
@@ -458,12 +576,10 @@ async function importFailed(
     reportType: request.reportType,
     importAttempts,
   });
-  if (importAttempts >= MAX_IMPORT_ATTEMPTS) {
-    await update(deps, request, { importAttempts });
-    return fail(deps, { ...request, importAttempts }, reason);
-  }
+  if (importAttempts >= MAX_IMPORT_ATTEMPTS) return fail(deps, request, reason, { importAttempts });
   const updated = await update(deps, request, {
     importAttempts,
+    errorCount: 0,
     nextPollAt: addMinutes(deps.now(), IMPORT_RETRY_MINUTES),
     failureReason: sanitizeReason(reason),
   });
@@ -489,7 +605,9 @@ async function importExportBatch(
     batchId,
   });
   if (!batch.every((request) => request.status === 'completed')) {
-    return { request: trigger, counters: {} };
+    // Der Import wartet auf die übrigen Exports; der zuletzt fertige stößt ihn an.
+    const waiting = await update(deps, trigger, { nextPollAt: null });
+    return { request: waiting, counters: {} };
   }
 
   try {
@@ -526,6 +644,7 @@ async function importExportBatch(
     });
   } catch (error) {
     if (isConnectionError(error)) throw error;
+    if (error instanceof StatusQueryError) return statusQueryFailed(deps, trigger, error);
     return batchImportFailed(deps, trigger, batch, error);
   }
 }
@@ -547,19 +666,22 @@ async function batchImportFailed(
     importAttempts,
   });
   const batchRef = { organizationId: trigger.organizationId, batchId: requireBatchId(trigger) };
-  if (importAttempts >= MAX_IMPORT_ATTEMPTS) {
-    await updateAmazonRequestBatch(deps.db, batchRef, { importAttempts });
-    return failBatch(deps, { ...trigger, importAttempts }, reason);
-  }
-  await updateAmazonRequestBatch(deps.db, batchRef, {
-    importAttempts,
-    nextPollAt: null,
-    failureReason: sanitizeReason(reason),
+  // Eine Transaktion: Ein Absturz dazwischen ließe sonst keinen fälligen Auftrag im Batch zurück.
+  return deps.db.transaction(async (tx) => {
+    if (importAttempts >= MAX_IMPORT_ATTEMPTS) {
+      await updateAmazonRequestBatch(tx, batchRef, { importAttempts });
+      return failBatch(deps, trigger, reason, tx);
+    }
+    await updateAmazonRequestBatch(tx, batchRef, {
+      importAttempts,
+      nextPollAt: null,
+      failureReason: sanitizeReason(reason),
+    });
+    const updated = await updateAmazonRequest(tx, trigger, {
+      nextPollAt: addMinutes(deps.now(), IMPORT_RETRY_MINUTES),
+    });
+    return { request: updated, counters: {} };
   });
-  const updated = await update(deps, trigger, {
-    nextPollAt: addMinutes(deps.now(), IMPORT_RETRY_MINUTES),
-  });
-  return { request: updated, counters: {} };
 }
 
 /** Der Auftrag scheitert mit `reason`, die übrigen offenen Exports seines Batches mit Verweis darauf. */
@@ -567,9 +689,10 @@ async function failBatch(
   deps: AmazonRequestDeps,
   request: AmazonRequest,
   reason: string,
+  db: DbOrTx = deps.db,
 ): Promise<AmazonRequestResult> {
   const batchId = requireBatchId(request);
-  return deps.db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const batch = await listAmazonRequestBatch(tx, {
       organizationId: request.organizationId,
       batchId,
@@ -615,8 +738,10 @@ async function fail(
   deps: AmazonRequestDeps,
   request: AmazonRequest,
   reason: string,
+  extra: AmazonRequestPatch = {},
 ): Promise<AmazonRequestResult> {
   const updated = await update(deps, request, {
+    ...extra,
     status: 'failed',
     nextPollAt: null,
     failureReason: sanitizeReason(reason),
@@ -630,21 +755,28 @@ async function fail(
   return { request: updated, counters: { failed: 1 } };
 }
 
-/** Vorübergehender Fehler beim Anfordern oder Abfragen: mit Backoff später erneut, höchstens 4 h. */
+/**
+ * Vorübergehender Fehler beim Anfordern oder Abfragen: mit Backoff später erneut, nach
+ * `MAX_CONSECUTIVE_ERRORS` Fehlern in Folge endgültig.
+ */
 async function retryLater(
   deps: AmazonRequestDeps,
   request: AmazonRequest,
   error: unknown,
 ): Promise<AmazonRequestResult> {
-  const now = deps.now();
   const reason = errorMessage(error);
-  if (isTooOld(request, now)) {
-    return failRequestOrBatch(deps, request, `${TOO_OLD_REASON} Letzter Fehler: ${reason}`);
+  const errorCount = request.errorCount + 1;
+  if (errorCount >= MAX_CONSECUTIVE_ERRORS) {
+    return failRequestOrBatch(
+      deps,
+      request,
+      `${errorCount} Fehler in Folge bei Amazon. Letzter Fehler: ${reason}`,
+    );
   }
-  const attempts = request.attempts + 1;
   const updated = await update(deps, request, {
-    attempts,
-    nextPollAt: addMinutes(now, backoffMinutes(attempts)),
+    attempts: request.attempts + 1,
+    errorCount,
+    nextPollAt: addMinutes(deps.now(), backoffMinutes(errorCount)),
     failureReason: sanitizeReason(reason),
   });
   return { request: updated, counters: {} };
@@ -665,6 +797,14 @@ function backoffMinutes(attempts: number): number {
 }
 
 const addMinutes = (date: Date, minutes: number) => new Date(date.getTime() + minutes * MINUTE_MS);
+
+function addCounters(target: AmazonRequestCounters, source: AmazonRequestCounters): void {
+  for (const [key, value] of Object.entries(source) as Array<
+    [keyof AmazonRequestCounters, number]
+  >) {
+    target[key] = (target[key] ?? 0) + value;
+  }
+}
 
 function requireBatchId(request: AmazonRequest): string {
   if (!request.batchId) throw new Error('Export ohne Batch.');

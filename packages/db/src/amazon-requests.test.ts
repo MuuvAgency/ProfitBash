@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
+  createAmazonExportBatch,
   createAmazonRequest,
   deleteFinishedAmazonRequestsBefore,
   findAmazonRequest,
@@ -134,6 +135,8 @@ describe('createAmazonRequest', () => {
       amazonRequestId: null,
       attempts: 0,
       importAttempts: 0,
+      errorCount: 0,
+      requestCount: 0,
       nextPollAt: now,
       createdAt: now,
       startDate: '2026-08-27',
@@ -192,6 +195,52 @@ describe('createAmazonRequest', () => {
     await expect(create(report({ batchId: randomUUID() }))).rejects.toThrow();
     await expect(create(exportRequest({ batchId: null }))).rejects.toThrow();
     await expect(create(exportRequest({ startDate: '2026-09-25' }))).rejects.toThrow();
+  });
+});
+
+describe('createAmazonExportBatch', () => {
+  const batchInput = (overrides: { profileId?: string; adProduct?: string } = {}) => ({
+    organizationId,
+    profileId: overrides.profileId ?? profileId,
+    adProduct: overrides.adProduct ?? 'SPONSORED_PRODUCTS',
+    exportTypes: ['campaigns', 'adGroups', 'targets', 'ads'],
+    now,
+  });
+
+  it('legt alle Exports eines Batches auf einmal an', async () => {
+    const result = await createAmazonExportBatch(testDb.db, batchInput());
+
+    expect(result.created).toBe(true);
+    expect(result.requests.map((row) => row.reportType).sort()).toEqual(
+      ['adGroups', 'ads', 'campaigns', 'targets'].sort(),
+    );
+    expect(new Set(result.requests.map((row) => row.batchId)).size).toBe(1);
+    expect(result.requests.every((row) => row.status === 'pending_request')).toBe(true);
+  });
+
+  it('legt keinen neuen Batch an, solange ein Export für Profil und Ad-Typ offen ist', async () => {
+    const first = await createAmazonExportBatch(testDb.db, batchInput());
+    // Drei Exports fertig, einer noch offen: Der neue Batch würde sich sonst mit dem alten mischen.
+    for (const row of first.requests.slice(1)) {
+      await updateAmazonRequest(testDb.db, row, { status: 'imported' });
+    }
+
+    const second = await createAmazonExportBatch(testDb.db, batchInput());
+
+    expect(second.created).toBe(false);
+    expect(second.requests.map((row) => row.id)).toEqual([first.requests[0]!.id]);
+    expect(await testDb.db.select().from(amazonAdsReportRequests)).toHaveLength(4);
+  });
+
+  it('trennt Batches nach Profil und Ad-Typ', async () => {
+    await createAmazonExportBatch(testDb.db, batchInput());
+
+    const results = await Promise.all([
+      createAmazonExportBatch(testDb.db, batchInput({ adProduct: 'SPONSORED_BRANDS' })),
+      createAmazonExportBatch(testDb.db, batchInput({ profileId: secondProfileId })),
+    ]);
+
+    expect(results.map((result) => result.created)).toEqual([true, true]);
   });
 });
 

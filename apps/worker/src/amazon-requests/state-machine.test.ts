@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { AmazonAdsHttpError, AmazonAdsReauthRequiredError } from '@profitbash/amazon-ads';
 import {
@@ -17,6 +16,9 @@ import { z } from 'zod';
 import { createConnection, createOrganization } from '../testing';
 import {
   advanceAmazonRequest,
+  MAX_CONSECUTIVE_ERRORS,
+  MAX_REQUESTS,
+  submitAmazonExportBatch,
   submitAmazonRequest,
   type AmazonDownload,
   type AmazonImportInput,
@@ -126,7 +128,11 @@ function deps(overrides: Partial<AmazonRequestDeps> = {}): AmazonRequestDeps {
 // Hilfen
 // ---------------------------------------------------------------------------
 
-const reportInput = (overrides: Partial<NewAmazonRequest> = {}) => ({
+type ReportOverrides = Partial<
+  Pick<NewAmazonRequest, 'profileId' | 'adProduct' | 'reportType' | 'startDate' | 'endDate'>
+>;
+
+const reportInput = (overrides: ReportOverrides = {}) => ({
   organizationId,
   profileId,
   kind: 'report' as const,
@@ -138,19 +144,15 @@ const reportInput = (overrides: Partial<NewAmazonRequest> = {}) => ({
   ...overrides,
 });
 
-const exportInput = (batchId: string, reportType: string) => ({
+const batchInput = (exportTypes: string[]) => ({
   organizationId,
   profileId,
-  kind: 'export' as const,
   adProduct: 'SPONSORED_PRODUCTS',
-  reportType,
-  startDate: null,
-  endDate: null,
-  batchId,
+  exportTypes,
 });
 
 /** Zeile wie nach einem Absturz direkt nach dem Anlegen (Amazon wurde nie oder ohne Antwort gerufen). */
-async function pendingRow(overrides: Partial<NewAmazonRequest> = {}) {
+async function pendingRow(overrides: ReportOverrides = {}) {
   const { request } = await createAmazonRequest(testDb.db, {
     ...reportInput(overrides),
     now: clock,
@@ -168,7 +170,7 @@ const advance = (request: { id: string }, overrides: Partial<AmazonRequestDeps> 
   advanceAmazonRequest(deps(overrides), { organizationId, id: request.id });
 
 /** Auftrag bis `requested` bringen. */
-async function requestedRow(overrides: Partial<NewAmazonRequest> = {}) {
+async function requestedRow(overrides: ReportOverrides = {}) {
   const { request } = await submitAmazonRequest(deps(), reportInput(overrides));
   calls = [];
   return request;
@@ -235,6 +237,7 @@ describe('submitAmazonRequest', () => {
       amazonRequestId: 'amz-42',
       requestedAt: start,
       attempts: 0,
+      requestCount: 1,
       nextPollAt: at(MINUTE),
     });
     expect(counters).toEqual({ requested: 1 });
@@ -391,7 +394,54 @@ describe('Status-Abfrage', () => {
 
     const { request } = await advance(requested);
 
-    expect(request).toMatchObject({ status: 'requested', attempts: 1, nextPollAt: at(2 * MINUTE) });
+    expect(request).toMatchObject({
+      status: 'requested',
+      attempts: 1,
+      errorCount: 1,
+      nextPollAt: at(2 * MINUTE),
+    });
+  });
+
+  it('nach langem Ausfall scheitert ein Auftrag nicht am ersten vorübergehenden Fehler', async () => {
+    const requested = await requestedRow();
+    advanceClock(5 * HOUR);
+    fake.getStatus = () => Promise.reject(new Error('Netzwerk weg'));
+
+    const { request } = await advance(requested);
+
+    expect(request).toMatchObject({ status: 'requested', errorCount: 1 });
+  });
+
+  it('scheitert nach zu vielen vorübergehenden Fehlern in Folge; eine Antwort setzt sie zurück', async () => {
+    const requested = await requestedRow();
+    fake.getStatus = () => Promise.reject(new Error('Netzwerk weg'));
+    for (let i = 1; i < MAX_CONSECUTIVE_ERRORS; i += 1) {
+      const { request } = await advance(requested);
+      expect(request).toMatchObject({ status: 'requested', errorCount: i });
+    }
+    fake.getStatus = () => Promise.resolve({ status: 'PROCESSING' });
+    expect((await advance(requested)).request.errorCount).toBe(0);
+
+    fake.getStatus = () => Promise.reject(new Error('Netzwerk weg'));
+    for (let i = 1; i < MAX_CONSECUTIVE_ERRORS; i += 1) await advance(requested);
+    const { request, counters } = await advance(requested);
+
+    expect(request.status).toBe('failed');
+    expect(request.failureReason).toMatch(/Netzwerk weg/);
+    expect(counters).toEqual({ failed: 1 });
+  });
+
+  it('Amazon verweigert die Abfrage (4xx): Auftrag scheitert sofort', async () => {
+    const requested = await requestedRow();
+    fake.getStatus = () =>
+      Promise.reject(new AmazonAdsHttpError('HTTP 403', 'reports.get', 403, null, null));
+
+    const { request } = await advance(requested);
+
+    expect(request).toMatchObject({
+      status: 'failed',
+      failureReason: expect.stringMatching(/403/) as unknown,
+    });
   });
 
   it('FAILURE: Auftrag scheitert mit gekürztem Grund ohne URLs', async () => {
@@ -448,6 +498,24 @@ describe('Status-Abfrage', () => {
 // ---------------------------------------------------------------------------
 // Laden und Importieren
 // ---------------------------------------------------------------------------
+
+describe('Neu anfordern', () => {
+  it('fordert höchstens MAX_REQUESTS-mal an, danach scheitert der Auftrag', async () => {
+    const requested = await requestedRow();
+    fake.getStatus = () => Promise.resolve({ status: 'NOT_FOUND' });
+
+    for (let count = 2; count <= MAX_REQUESTS; count += 1) {
+      const { request } = await advance(requested);
+      expect(request).toMatchObject({ status: 'requested', requestCount: count });
+    }
+    const { request, counters } = await advance(requested);
+
+    expect(request.status).toBe('failed');
+    expect(request.failureReason).toMatch(/nicht mehr/);
+    expect(counters).toEqual({ failed: 1 });
+    expect(calls.filter((call) => call.startsWith('request:'))).toHaveLength(MAX_REQUESTS - 1);
+  });
+});
 
 describe('Laden und Importieren (Reports)', () => {
   it('lädt, validiert und importiert in einer Transaktion, Beträge verlustfrei', async () => {
@@ -576,6 +644,21 @@ describe('Laden und Importieren (Reports)', () => {
     expect(await testDb.db.select().from(jobRuns)).toEqual([]);
   });
 
+  it('ein vorübergehender Fehler beim frischen Holen der URL zählt nicht als Importversuch', async () => {
+    const requested = await requestedRow();
+    fake.import = () => Promise.reject(new Error('Import kaputt'));
+    const first = await advance(requested);
+    expect(first.request).toMatchObject({ status: 'completed', importAttempts: 1 });
+
+    clock = first.request.nextPollAt!;
+    fake.getStatus = () =>
+      Promise.reject(new AmazonAdsHttpError('HTTP 503', 'reports.get', 503, null, null));
+    const { request } = await advance(requested);
+
+    expect(request).toMatchObject({ status: 'completed', importAttempts: 1, errorCount: 1 });
+    expect(request.nextPollAt!.getTime()).toBeGreaterThan(clock.getTime());
+  });
+
   it('eine Datei, die kein Array ist, zählt als gescheiterter Import', async () => {
     const requested = await requestedRow();
     fake.download = () => Promise.resolve({ status: 'ok', body: gzipBody('{"rows":[]}') });
@@ -624,13 +707,78 @@ describe('Reihenfolge', () => {
 
 describe('Exports je Batch', () => {
   async function submitBatch() {
-    const batchId = randomUUID();
-    const campaigns = (await submitAmazonRequest(deps(), exportInput(batchId, 'campaigns')))
-      .request;
-    const adGroups = (await submitAmazonRequest(deps(), exportInput(batchId, 'adGroups'))).request;
+    const { requests } = await submitAmazonExportBatch(
+      deps(),
+      batchInput(['campaigns', 'adGroups']),
+    );
+    const campaigns = requests.find((request) => request.reportType === 'campaigns')!;
+    const adGroups = requests.find((request) => request.reportType === 'adGroups')!;
     calls = [];
-    return { batchId, campaigns, adGroups };
+    return { batchId: campaigns.batchId!, campaigns, adGroups };
   }
+
+  const dueRows = () =>
+    listDueAmazonRequests(testDb.db, { organizationId, connectionId, now: clock, limit: 10 });
+
+  it('fordert alle Exports eines neuen Batches an, aber keinen zweiten Batch daneben', async () => {
+    const first = await submitAmazonExportBatch(deps(), batchInput(['campaigns', 'adGroups']));
+
+    expect(first.requests.map((request) => request.status)).toEqual(['requested', 'requested']);
+    expect(first.counters).toEqual({ requested: 2 });
+    expect(calls.filter((call) => call.startsWith('request:')).sort()).toEqual([
+      'request:adGroups',
+      'request:campaigns',
+    ]);
+
+    calls = [];
+    const second = await submitAmazonExportBatch(deps(), batchInput(['campaigns', 'adGroups']));
+
+    expect(second.counters).toEqual({});
+    expect(second.requests.map((request) => request.id).sort()).toEqual(
+      first.requests.map((request) => request.id).sort(),
+    );
+    expect(calls).toEqual([]);
+  });
+
+  it('lehnt Amazon einen Export ab (4xx), scheitert der ganze Batch', async () => {
+    fake.request = (request) =>
+      request.reportType === 'adGroups'
+        ? Promise.reject(new AmazonAdsHttpError('HTTP 400', 'exports.request', 400, null, null))
+        : Promise.resolve({ status: 'requested', amazonRequestId: `amz-${++requestCounter}` });
+
+    const { requests, counters } = await submitAmazonExportBatch(
+      deps(),
+      batchInput(['campaigns', 'adGroups', 'targets']),
+    );
+
+    expect(requests.map((request) => request.status)).toEqual(['failed', 'failed', 'failed']);
+    expect(counters).toEqual({ requested: 1, failed: 3 });
+    expect(calls).not.toContain('request:targets');
+  });
+
+  it('429 beim Laden des Batches: der zuletzt fertige Export bleibt fällig', async () => {
+    const { campaigns, adGroups } = await submitBatch();
+    await advance(campaigns);
+    const throttled = new AmazonAdsHttpError('HTTP 429', 'exports.get', 429, null, null, 120_000);
+    let statusCalls = 0;
+    fake.getStatus = (request) => {
+      statusCalls += 1;
+      // Erst die Abfrage des auslösenden Exports, dann die frische URL der Geschwister: gedrosselt.
+      return statusCalls === 1
+        ? Promise.resolve({
+            status: 'COMPLETED',
+            url: `https://s3.example/${request.amazonRequestId}`,
+          })
+        : Promise.reject(throttled);
+    };
+
+    await expect(advance(adGroups)).rejects.toBe(throttled);
+
+    expect((await dueRows()).map((row) => row.id)).toEqual([adGroups.id]);
+    fake = defaultFake();
+    const { counters } = await advance(adGroups);
+    expect(counters).toEqual({ imported: 2, rows: 4 });
+  });
 
   it('wartet, bis alle Exports fertig sind, und importiert sie gemeinsam', async () => {
     const { batchId, campaigns, adGroups } = await submitBatch();
@@ -701,8 +849,7 @@ describe('Exports je Batch', () => {
   it('Importversuche zählen je Batch, nach dem dritten scheitert der Batch', async () => {
     const { campaigns, adGroups } = await submitBatch();
     fake.import = () => Promise.reject(new Error('Import kaputt'));
-    const due = () =>
-      listDueAmazonRequests(testDb.db, { organizationId, connectionId, now: clock, limit: 10 });
+    const due = dueRows;
 
     await advance(campaigns);
     const afterFirst = await advance(adGroups);
