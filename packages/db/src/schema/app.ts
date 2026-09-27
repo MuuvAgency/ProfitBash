@@ -222,6 +222,10 @@ export const amazonAdsReportRequests = pgTable(
     attempts: integer('attempts').notNull().default(0),
     /** Gescheiterte Importversuche (bei Exports je Batch gezählt). */
     importAttempts: integer('import_attempts').notNull().default(0),
+    /** Vorübergehende Fehler in Folge (5xx, Netzwerk) beim Anfordern oder Abfragen; jede Antwort setzt zurück. */
+    errorCount: integer('error_count').notNull().default(0),
+    /** Erfolgreiche Anforderungen bei Amazon (inkl. übernommener 425); begrenzt das Neu-Anfordern. */
+    requestCount: integer('request_count').notNull().default(0),
     /** Nächste Bearbeitung; `null` = wartet auf andere Exports des Batches. */
     nextPollAt: timestamp('next_poll_at', { withTimezone: true, mode: 'date' }),
     /** Letztes erfolgreiches Anfordern bei Amazon. */
