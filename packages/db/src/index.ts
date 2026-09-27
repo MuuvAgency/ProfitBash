@@ -1,6 +1,7 @@
 export * from './client';
 export * as schema from './schema';
 export * from './access';
+export * from './amazon-backfills';
 export * from './amazon-ads-entities';
 export * from './amazon-ads-metrics';
 export * from './amazon-requests';
