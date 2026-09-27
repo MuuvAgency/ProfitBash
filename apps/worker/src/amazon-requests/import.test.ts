@@ -2,6 +2,7 @@ import type {
   AmazonAdsAdGroup,
   AmazonAdsAdGroupDailyMetric,
   AmazonAdsCampaign,
+  AmazonAdsCampaignDailyMetric,
   AmazonAdsExportedTarget,
   AmazonAdsProductAd,
 } from '@profitbash/amazon-ads';
@@ -17,6 +18,7 @@ import type { AmazonRequestFile } from './state-machine';
 const {
   amazonAdsAdGroupDailyMetrics,
   amazonAdsAdGroups,
+  amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
   amazonAdsNegativeTargets,
   amazonAdsProductAds,
@@ -222,6 +224,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await testDb.db.delete(amazonAdsAdGroupDailyMetrics);
+  await testDb.db.delete(amazonAdsCampaignDailyMetrics);
   await testDb.db.delete(amazonAdsProductAds);
   await testDb.db.delete(amazonAdsNegativeTargets);
   await testDb.db.delete(amazonAdsTargets);
@@ -396,5 +399,94 @@ describe('Import eines Reports', () => {
       expect.objectContaining({ date: '2026-09-26', cost: '0.005', sales7d: '1234567.89' }),
     ]);
     expect(importer.takeCounters()).toEqual({});
+  });
+});
+
+describe('„Daten bis“ am Profil', () => {
+  const campaignRow = (date: string): AmazonAdsCampaignDailyMetric => ({
+    date,
+    amazonCampaignId: 'c-1',
+    campaignName: 'Aus dem Report',
+    impressions: 10,
+    clicks: 1,
+    cost: '0.1',
+    sales7d: null,
+    sales14d: null,
+    salesSameSku7d: null,
+    salesSameSku14d: null,
+    purchases7d: null,
+    purchases14d: null,
+    purchasesSameSku7d: null,
+    purchasesSameSku14d: null,
+    units7d: null,
+    units14d: null,
+    unitsSameSku7d: null,
+    unitsSameSku14d: null,
+    extra: {},
+  });
+
+  async function importedThrough() {
+    const [row] = await testDb.db
+      .select({ date: amazonAdsProfiles.metricsImportedThrough })
+      .from(amazonAdsProfiles)
+      .where(eq(amazonAdsProfiles.id, profileId));
+    return row!.date;
+  }
+
+  function importReport(
+    reportType: string,
+    period: { startDate: string; endDate: string },
+    ranges: Array<{ startDate: string; endDate: string }>,
+    rows: unknown[],
+  ) {
+    const importer = setup();
+    return testDb.db.transaction((tx) =>
+      importer.import(tx, {
+        kind: 'report',
+        ranges,
+        request: request(reportType, { kind: 'report', batchId: null, ...period }),
+        rows,
+        invalidRowCount: 0,
+      }),
+    );
+  }
+
+  beforeEach(async () => {
+    await testDb.db
+      .update(amazonAdsProfiles)
+      .set({ metricsImportedThrough: null })
+      .where(eq(amazonAdsProfiles.id, profileId));
+  });
+
+  it('setzt das Ende des Kampagnen-Reports, auch wenn neuere Reports einen Teil schon abdecken', async () => {
+    const period = { startDate: '2026-08-28', endDate: '2026-09-26' };
+    // Die letzten Tage deckt ein neuerer, schon importierter Report ab (nicht in `ranges`).
+    await importReport(
+      'spCampaigns',
+      period,
+      [{ startDate: '2026-08-28', endDate: '2026-09-20' }],
+      [campaignRow('2026-09-01')],
+    );
+    expect(await importedThrough()).toBe('2026-09-26');
+  });
+
+  it('setzt das Datum auch ohne Zeilen (Profil ohne Aktivität)', async () => {
+    const period = { startDate: '2026-08-28', endDate: '2026-09-26' };
+    await importReport('spCampaigns', period, [period], []);
+    expect(await importedThrough()).toBe('2026-09-26');
+  });
+
+  it('setzt ein älteres Stück der Historie nicht zurück', async () => {
+    const window = { startDate: '2026-08-28', endDate: '2026-09-26' };
+    const history = { startDate: '2026-07-28', endDate: '2026-08-27' };
+    await importReport('spCampaigns', window, [window], []);
+    await importReport('spCampaigns', history, [history], []);
+    expect(await importedThrough()).toBe('2026-09-26');
+  });
+
+  it('bleibt bei Reports anderer Ebenen unverändert', async () => {
+    const period = { startDate: '2026-08-28', endDate: '2026-09-26' };
+    await importReport('spAdGroups', period, [period], []);
+    expect(await importedThrough()).toBeNull();
   });
 });

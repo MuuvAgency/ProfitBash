@@ -146,6 +146,12 @@ export const amazonAdsProfiles = pgTable(
     /** Amazon liefert das Profil nicht mehr. Wird beim erneuten Auftauchen zurückgesetzt. */
     removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
     syncedAt: timestamp('synced_at', { withTimezone: true, mode: 'date' }),
+    /**
+     * Letzter Tag (Zeitzone des Profils), bis zu dem Kampagnen-Kennzahlen importiert sind („Daten bis“, 1.8):
+     * Ende des zuletzt importierten Kampagnen-Reports, nie zurückgesetzt. Bewusst nicht `max(date)` der
+     * Kennzahlen (ein pausiertes Profil hätte sonst ein altes Datum).
+     */
+    metricsImportedThrough: date('metrics_imported_through', { mode: 'string' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

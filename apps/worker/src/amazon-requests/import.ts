@@ -9,6 +9,7 @@ import {
 import {
   findAdGroupCampaignIds,
   markEntitiesRemoved,
+  markMetricsImportedThrough,
   replaceDailyMetrics,
   upsertAdGroups,
   upsertCampaigns,
@@ -83,6 +84,7 @@ async function importReport(
   if (!isReportType(request.reportType)) {
     throw new Error(`Report-Typ ${request.reportType} ist nicht im Katalog.`);
   }
+  const { level } = REPORT_DEFINITIONS[request.reportType];
   const result = await replaceDailyMetrics(tx, {
     organizationId: request.organizationId,
     profileId: request.profileId,
@@ -91,11 +93,17 @@ async function importReport(
     invalidRowCount: input.invalidRowCount,
     now,
     // Das Zeilen-Schema des Report-Typs (Port, 1.6) liefert genau die Zeilen dieser Ebene.
-    ...({
-      level: REPORT_DEFINITIONS[request.reportType].level,
-      rows: input.rows,
-    } as DailyMetricsRows),
+    ...({ level, rows: input.rows } as DailyMetricsRows),
   });
+  // „Daten bis“ (1.8) aus dem Kampagnen-Report: Das Ende des Auftrags, nicht das der `ranges`. Tage
+  // außerhalb der `ranges` deckt ein neuerer, schon importierter Report ab.
+  if (level === 'campaign' && request.endDate) {
+    await markMetricsImportedThrough(tx, {
+      organizationId: request.organizationId,
+      profileId: request.profileId,
+      date: request.endDate,
+    });
+  }
   return { placeholdersCreated: result.placeholdersCreated };
 }
 

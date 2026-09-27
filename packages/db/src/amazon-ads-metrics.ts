@@ -138,6 +138,31 @@ export interface ReplaceDailyMetricsResult {
 }
 
 /**
+ * Merkt „Daten bis“ am Profil (1.8): der letzte Tag eines importierten Kampagnen-Reports. Rückt nur vor
+ * (`greatest`), damit ein später importiertes Stück der Historie das Datum nicht zurücksetzt. `updated_at`
+ * bleibt unverändert: Das ist ein Datenstand, keine Änderung der Stammdaten.
+ */
+export async function markMetricsImportedThrough(
+  db: DbOrTx,
+  input: { organizationId: string; profileId: string; date: string },
+): Promise<void> {
+  const updated = await db
+    .update(amazonAdsProfiles)
+    .set({
+      metricsImportedThrough: sql`greatest(${amazonAdsProfiles.metricsImportedThrough}, ${input.date}::date)`,
+      updatedAt: sql`${amazonAdsProfiles.updatedAt}`,
+    })
+    .where(
+      and(
+        eq(amazonAdsProfiles.id, input.profileId),
+        eq(amazonAdsProfiles.organizationId, input.organizationId),
+      ),
+    )
+    .returning({ id: amazonAdsProfiles.id });
+  if (updated.length === 0) throw new ProfileNotFoundError();
+}
+
+/**
  * Ersetzt die Kennzahlen einer Ebene in den übergebenen Tagen (eigene Transaktion bzw. Savepoint in der
  * des Aufrufers). Fehlende Entities entstehen als Platzhalter, Eltern zuerst.
  *

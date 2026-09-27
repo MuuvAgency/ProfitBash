@@ -1,6 +1,8 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ProfileNotFoundError } from './amazon-ads-entities';
 import {
+  markMetricsImportedThrough,
   MetricsImportRejectedError,
   replaceDailyMetrics,
   type DailyMetricValues,
@@ -510,6 +512,58 @@ describe('replaceDailyMetrics: weitere Ebenen', () => {
       { date: '2026-09-01', searchTerm: 'laufschuhe', clicks: 4 },
       { date: '2026-09-02', searchTerm: 'laufschuhe', clicks: 3 },
     ]);
+  });
+});
+
+describe('markMetricsImportedThrough', () => {
+  async function profileState() {
+    const [row] = await testDb.db
+      .select({
+        metricsImportedThrough: amazonAdsProfiles.metricsImportedThrough,
+        updatedAt: amazonAdsProfiles.updatedAt,
+      })
+      .from(amazonAdsProfiles)
+      .where(eq(amazonAdsProfiles.id, secondProfileId));
+    return row!;
+  }
+  const mark = (
+    date: string,
+    overrides: Partial<{ organizationId: string; profileId: string }> = {},
+  ) =>
+    markMetricsImportedThrough(testDb.db, {
+      organizationId,
+      profileId: secondProfileId,
+      date,
+      ...overrides,
+    });
+
+  it('setzt den Tag und rückt nur vor, nie zurück (Historie nach dem Fenster)', async () => {
+    expect((await profileState()).metricsImportedThrough).toBeNull();
+    await mark('2026-09-26');
+    expect((await profileState()).metricsImportedThrough).toBe('2026-09-26');
+    await mark('2026-08-01');
+    expect((await profileState()).metricsImportedThrough).toBe('2026-09-26');
+    await mark('2026-09-27');
+    expect((await profileState()).metricsImportedThrough).toBe('2026-09-27');
+  });
+
+  it('lässt updated_at des Profils unverändert (Datenstand, keine Stammdaten)', async () => {
+    const before = await profileState();
+    await mark('2026-09-30');
+    const after = await profileState();
+    expect(after.metricsImportedThrough).toBe('2026-09-30');
+    expect(after.updatedAt).toEqual(before.updatedAt);
+  });
+
+  it('lehnt ein Profil einer anderen Organisation ab', async () => {
+    await expect(mark('2026-09-26', { profileId: foreignProfileId })).rejects.toBeInstanceOf(
+      ProfileNotFoundError,
+    );
+    const [foreign] = await testDb.db
+      .select({ metricsImportedThrough: amazonAdsProfiles.metricsImportedThrough })
+      .from(amazonAdsProfiles)
+      .where(eq(amazonAdsProfiles.id, foreignProfileId));
+    expect(foreign!.metricsImportedThrough).toBeNull();
   });
 });
 
