@@ -50,6 +50,15 @@ function counterRank(key: string) {
   return index === -1 ? COUNTER_ORDER.length : index;
 }
 
+/**
+ * Dauer in ms: abgeschlossen bis zum Ende, laufend bis jetzt. `null` für Läufe ohne Ende, die nicht
+ * laufen (dürfte es nicht geben).
+ */
+export function elapsedMs(run: JobRun, now = Date.now()): number | null {
+  const end = run.finishedAt ? Date.parse(run.finishedAt) : run.status === 'running' ? now : null;
+  return end === null ? null : end - Date.parse(run.startedAt);
+}
+
 /** Texte einer Zeile des Sync-Status (Grid und Zellen nutzen dieselben). */
 export function useJobRunLabels() {
   const { t, te } = useI18n();
@@ -72,9 +81,12 @@ export function useJobRunLabels() {
     return formatDateTime(run.startedAt, locale.value);
   }
 
+  /**
+   * Dauer abgeschlossener Läufe; laufende zeigen, wie lange sie schon laufen (hängende Jobs erkennen).
+   * Ohne „seit“: Der Status daneben sagt „Läuft“, und die Spalte bleibt schmal.
+   */
   function duration(run: JobRun) {
-    if (!run.finishedAt) return MISSING_VALUE;
-    return formatDuration(Date.parse(run.finishedAt) - Date.parse(run.startedAt), locale.value);
+    return formatDuration(elapsedMs(run), locale.value);
   }
 
   /** Zähler als Zahl (formatiert) und Bezeichnung, z. B. `{ value: '4', label: 'Profile' }`. */
