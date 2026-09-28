@@ -194,6 +194,10 @@ export interface AmazonAdsDailyMetricValues {
   units14d: number | null;
   unitsSameSku7d: number | null;
   unitsSameSku14d: number | null;
+  /** Nur Klicks (SB/SD, 14 Tage); `*14d` zählt dort Klicks und Views. SP: `null` (nur klick-basiert). */
+  salesClicks14d: string | null;
+  purchasesClicks14d: number | null;
+  unitsClicks14d: number | null;
   extra: Record<string, unknown>;
 }
 
@@ -440,6 +444,9 @@ function metricBase(row: MetricColumns): MetricRowBase {
     units14d: row.unitsSoldClicks14d,
     unitsSameSku7d: row.unitsSoldSameSku7d,
     unitsSameSku14d: row.unitsSoldSameSku14d,
+    salesClicks14d: null,
+    purchasesClicks14d: null,
+    unitsClicks14d: null,
     extra: {},
   };
 }

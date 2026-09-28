@@ -67,6 +67,10 @@ export interface DailyMetricValues {
   units14d: number | null;
   unitsSameSku7d: number | null;
   unitsSameSku14d: number | null;
+  /** Nur Klicks (SB/SD, 14 Tage); `*14d` zählt dort Klicks und Views. SP: `null` (nur klick-basiert). */
+  salesClicks14d: string | null;
+  purchasesClicks14d: number | null;
+  unitsClicks14d: number | null;
   /** Weitere Report-Spalten ohne eigene Spalte. */
   extra: Record<string, unknown>;
 }
@@ -342,6 +346,9 @@ const METRIC_VALUE_KEYS = [
   'units14d',
   'unitsSameSku7d',
   'unitsSameSku14d',
+  'salesClicks14d',
+  'purchasesClicks14d',
+  'unitsClicks14d',
   'extra',
   'importedAt',
 ] as const;
@@ -378,6 +385,9 @@ function metricValues(row: DailyMetricValues): DailyMetricValues {
     units14d: row.units14d,
     unitsSameSku7d: row.unitsSameSku7d,
     unitsSameSku14d: row.unitsSameSku14d,
+    salesClicks14d: row.salesClicks14d,
+    purchasesClicks14d: row.purchasesClicks14d,
+    unitsClicks14d: row.unitsClicks14d,
     extra: row.extra,
   };
 }

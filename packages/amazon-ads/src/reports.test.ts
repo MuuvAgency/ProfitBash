@@ -337,6 +337,10 @@ const VALUES = {
   units14d: 4,
   unitsSameSku7d: 1,
   unitsSameSku14d: 1,
+  // SP ist nur klick-basiert: Der Klick-Anteil (SB/SD) bleibt leer.
+  salesClicks14d: null,
+  purchasesClicks14d: null,
+  unitsClicks14d: null,
   extra: {},
 };
 
