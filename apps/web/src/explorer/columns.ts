@@ -9,8 +9,10 @@ import {
   type Locale,
 } from '@profitbash/shared';
 import type { CellClassParams, ColDef, ValueGetterParams } from 'ag-grid-community';
+import { markRaw } from 'vue';
 import type { ExplorerRowsData } from '../api/client';
 import { changeTone, formatChange, type MetricKey } from '../analytics/metrics';
+import DecimalFilter from './DecimalFilter.vue';
 
 /**
  * Spalten des Explorers je Ebene (`phase-2.md` F6, F7, 2.8). Beträge bleiben Decimal-Strings: `valueGetter` liefert den
@@ -241,7 +243,7 @@ export function buildColumnDefs(
     useValueFormatterForExport: false,
     type: 'rightAligned',
     cellClass: DATA_CELL,
-    filter: 'decimalFilter',
+    filter: markRaw(DecimalFilter),
   });
 
   const changeColumn = (id: string, key: MetricKey): ColDef<GridRow> => ({
