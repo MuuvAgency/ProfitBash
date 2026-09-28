@@ -40,12 +40,15 @@ export function compareDecimal(a: string, b: string): number {
 }
 
 /**
- * Vergleich für Grid-Spalten (Signatur wie der `comparator` von AG Grid): Fehlende Werte stehen in beide Richtungen
- * am Ende. AG Grid kehrt das Ergebnis bei absteigender Sortierung um, deshalb gilt `null` dann als kleiner.
+ * Vergleich für Grid-Spalten, direkt als `comparator` von AG Grid nutzbar (`(valueA, valueB, nodeA, nodeB,
+ * isDescending)`): Fehlende Werte stehen in beide Richtungen am Ende. AG Grid kehrt das Ergebnis bei absteigender
+ * Sortierung um, deshalb gilt `null` dann als kleiner.
  */
 export function compareDecimalNullsLast(
   a: string | null | undefined,
   b: string | null | undefined,
+  _nodeA?: unknown,
+  _nodeB?: unknown,
   isDescending = false,
 ): number {
   const missingA = a === null || a === undefined;
