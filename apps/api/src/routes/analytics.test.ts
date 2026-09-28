@@ -437,9 +437,7 @@ describe('POST /api/ads/dashboard', () => {
     expect(res.body.byClient.every((group) => group.share === undefined)).toBe(true);
     expect(res.body.status).toEqual({
       lastSyncAt: null,
-      adProducts: [
-        expect.objectContaining({ adProduct: SP, profilesBehind: 0 }),
-      ],
+      adProducts: [expect.objectContaining({ adProduct: SP, profilesBehind: 0 })],
       sbCampaignsWithoutMetrics: 0,
     });
   });
