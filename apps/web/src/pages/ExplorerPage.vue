@@ -40,7 +40,7 @@ import { useSessionStore } from '../stores/session';
  * Sortierung und Filter im Browser, CSV-Export. Zustand in der URL (Ebene als Pfad, Drill-Down, Filterleiste), die
  * Spaltenauswahl je Ebene in `ui_state`.
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
@@ -64,9 +64,10 @@ const data = computed(() => rows.data.value);
 type Crumbs = Partial<Record<'portfolio' | 'campaign' | 'adGroup', string>>;
 const CRUMBS_KEY = 'explorerCrumbs';
 
-function link(path: string, query: LocationQueryRaw, crumbs: Crumbs = currentCrumbs.value) {
+function link(path: string, query: LocationQueryRaw, crumbs: Crumbs = knownCrumbs.value) {
   const base = filters.linkTo(path, {}) as { state: Record<string, unknown> };
-  return { path, query, state: { ...base.state, [CRUMBS_KEY]: { ...crumbs } } };
+  const known = Object.fromEntries(Object.entries(crumbs).filter(([, name]) => name !== undefined));
+  return { path, query, state: { ...base.state, [CRUMBS_KEY]: known } };
 }
 
 const tabs = computed(() =>
@@ -90,6 +91,18 @@ const firstAttribute = (key: string) => {
   const value = data.value?.rows[0]?.attributes[key];
   return typeof value === 'string' ? value : undefined;
 };
+/** Echte Namen (aus dem Verlauf oder den Zeilen), ohne die allgemeinen Ersatztexte: nur sie werden weitergegeben. */
+const knownCrumbs = computed<Crumbs>(() => ({
+  ...(state.value.drill.portfolioId && {
+    portfolio: storedCrumbs.value.portfolio ?? firstAttribute('portfolioName'),
+  }),
+  ...(state.value.drill.campaignId && {
+    campaign: storedCrumbs.value.campaign ?? firstAttribute('campaignName'),
+  }),
+  ...(state.value.drill.adGroupId && {
+    adGroup: storedCrumbs.value.adGroup ?? firstAttribute('adGroupName'),
+  }),
+}));
 const currentCrumbs = computed<Crumbs>(() => ({
   ...(state.value.drill.portfolioId && {
     portfolio:
@@ -148,7 +161,7 @@ const breadcrumbs = computed(() => {
   for (const step of steps) {
     if (!step.id) continue;
     query[step.param] = step.id;
-    kept[step.key] = crumbs[step.key];
+    kept[step.key] = knownCrumbs.value[step.key];
     const last = step === steps.filter((s) => s.id).at(-1);
     items.push({
       key: step.key,
@@ -169,7 +182,7 @@ function linkFor(row: GridRow) {
   const target = drillQuery(baseQuery.value, level.value, row.id, parents);
   const crumbKey = level.value as keyof Crumbs;
   return link(target.path, target.query, {
-    ...currentCrumbs.value,
+    ...knownCrumbs.value,
     [crumbKey]: row.name ?? t('explorer.unknownName'),
   });
 }
@@ -243,6 +256,7 @@ const columnDefs = computed(() =>
     level: level.value,
     visible: visibleColumns.value,
     t,
+    te,
     locale: locale.value,
     attribution: filters.state.value.attribution,
     accountTypeOf: (profileId) => accountTypes.value.get(profileId),
@@ -256,7 +270,11 @@ const total = computed(() =>
 );
 
 const selectedIds = ref<string[]>([]);
-watch(level, () => (selectedIds.value = []));
+// Neue Auswahl, anderer Zeitraum, Drill-Down …: das Grid baut neu auf, alte Markierungen gelten nicht mehr.
+watch(
+  () => JSON.stringify(rows.body.value),
+  () => (selectedIds.value = []),
+);
 const series = useExplorerSeries(
   rows.body,
   computed(() => selectedIds.value),
@@ -275,13 +293,17 @@ function exportCsv() {
         total: formatNumber(d.totalRows, locale.value),
       })
     : undefined;
-  const content = grid.value.csv(note);
+  // BOM, damit Excel die Datei als UTF-8 liest (Umlaute). Trennzeichen Komma, Beträge mit Punkt (F7).
+  const content = `\uFEFF${grid.value.csv(note)}`;
   const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = `profitbash-${level.value}-${range.value.from}_${range.value.to}.csv`;
+  document.body.append(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  // Später freigeben: Manche Browser brechen den Download sonst ab.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 const truncatedText = computed(() => {
@@ -410,7 +432,13 @@ const truncatedText = computed(() => {
           </label>
           <span class="flex-1" />
           <span v-if="data" class="font-data text-data-sm text-ink-tertiary">
-            {{ t('explorer.rowCount', data.rows.length) }}
+            {{
+              t(
+                'explorer.rowCount',
+                { count: formatNumber(data.rows.length, locale) },
+                data.rows.length,
+              )
+            }}
           </span>
           <Button
             data-explorer-export

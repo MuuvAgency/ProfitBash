@@ -561,6 +561,7 @@ export const de = {
       units: 'Einheiten',
       cvr: 'CVR',
       viewableImpressions: 'Sichtbare Impr.',
+      cpm: 'CPM',
       vcpm: 'vCPM',
       changeCost: 'Δ Spend',
       changeSales: 'Δ Umsatz',
