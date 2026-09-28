@@ -63,7 +63,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Die URL enthält nur Kurzes (Zeitraum, Ebene, Drill-Down, Client-IDs oder die ID einer gespeicherten Ansicht), damit man Links
     teilen und mit der Zurück-Taste arbeiten kann. Eine lange Liste einzelner Profile kommt nicht in die URL (Regel in `CLAUDE.md`),
     sondern in die zuletzt benutzte Auswahl je Nutzer (`ui_state`) bzw. in eine gespeicherte Ansicht (F8).
-  **Entschieden (Dominik, 2026-09-28): wie empfohlen.**
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen.** Dazu (2026-09-28): Die Auswahl der Filterleiste ist **zwischen Dashboard
+  und Explorer geteilt** (eine zuletzt benutzte Auswahl je Nutzer).
 - **F3 – Währung.** Empfehlung: Stammen alle ausgewählten Profile aus einer Währung, zeigt die App diese Währung. Sonst rechnet sie
   **in EUR um, je Tag mit dem EZB-Kurs dieses Tages** (für Wochenenden und Feiertage gilt der letzte Kurs davor), und kennzeichnet
   Summen mit „≈“ (`plan.md` §5). Keine wählbare Anzeigewährung (später nachrüstbar). Der Explorer zeigt je Zeile die
@@ -434,6 +435,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     1-s-Grenze der DoD (1,6–1,8 s bzw. 2,5–2,9 s mit ~12 000 Targets). Vorschläge: (a) der Explorer lädt den Vergleich erst auf Wunsch
     oder nach den Zeilen, (b) Voraggregation (z. B. je Entity und Woche) für lange Zeiträume, (c) Infinite Row Model mit
     Sortierung auf dem Server (F7). Kampagnen, Dashboard, Drill-Down und ein Client bleiben unter 1 s.
+    **Entschieden (Dominik, 2026-09-28): (a) Vergleich nachladen.** Der Explorer lädt die Zeilen ohne Vergleich (unter 1 s) und
+    den Vergleich danach; die Spalten „Veränderung“ füllen sich, sobald er da ist (2.8).
 
 ### 2.5 API (`apps/api`)
 - [x] Middleware `requireFeature(key, 'view')`: prüft Entitlement und Rolle serverseitig (`resolveFeatureAccess`), `403` mit
@@ -493,6 +496,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 - [ ] Filterleiste (F2, F3, F4, F5) als eigene Komponente (Clients/Profile, Anzeigewährung, Attribution, Zeitraum, Vergleich), kurzer
       Zustand in der URL, letzte Auswahl in `ui_state`.
 - [ ] Bausteine: KPI-Kachel mit Veränderung, Hinweise „≈“, „gemischte Attribution“ und „Wert fehlt“, Kennzeichnung vorläufiger Tage.
+      **Entschieden (Dominik, 2026-09-28): Farbe der Veränderung nach Bedeutung:** Umsatz, ROAS, Käufe, Klicks, Impressionen, CTR,
+      CVR: mehr = gut (Lime); ACoS, CPC, CPM: mehr = schlecht (rot); Spend neutral (nur Pfeil).
 
 ### 2.7 Dashboard (`/dashboard`)
 - [ ] Inhalt nach F11 im Kinetic-Bento-Look (Referenzen als Stil, nicht als Inhalt), Zustände je Widget.
