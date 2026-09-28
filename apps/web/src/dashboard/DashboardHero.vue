@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, defineAsyncComponent, h } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ChangePill from '../analytics/ChangePill.vue';
 import HintBadge from '../analytics/HintBadge.vue';
 import type { DateRange } from '../analytics/periods';
-import TimeSeriesChart from '../charts/TimeSeriesChart.vue';
 import { fillDays, type ChartSeriesDef } from '../charts/time-series';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
@@ -12,6 +11,12 @@ import { useSessionStore } from '../stores/session';
 import { formatMetricValue } from '../analytics/metrics';
 import { metricView } from './format';
 import type { useDashboardQueries } from './queries';
+
+/** AG Charts ist groß (rund 400 kB gzip): eigener Chunk, damit Kacheln und Zahlen nicht auf ihn warten. */
+const TimeSeriesChart = defineAsyncComponent({
+  loader: () => import('../charts/TimeSeriesChart.vue'),
+  loadingComponent: { render: () => h(SkeletonBlock, { height: '13rem', shape: 'tile' }) },
+});
 
 /** Hero-Kachel (F11): Spend und Umsatz mit Veränderung und Tagesverlauf, dunkel wie „Netto-Profit“ der Referenz. */
 const props = defineProps<{
