@@ -180,3 +180,44 @@ describe('Sync-Status', () => {
     ]);
   });
 });
+
+describe('Auswertungen (/api/ads/*)', () => {
+  it('sendet POST mit der Auswahl im Body und liefert die Antwort', async () => {
+    const options = {
+      clients: [],
+      profiles: [],
+      currencies: ['EUR', 'USD'],
+      fxRatesThrough: '2026-09-25',
+      fxRatesStale: false,
+    };
+    const { requests } = stubFetch({
+      'POST /api/ads/filter-options': json(options),
+      'POST /api/ads/dashboard': json({ ok: 'dashboard' }),
+      'POST /api/ads/timeseries': json({ ok: 'timeseries' }),
+      'POST /api/ads/explorer/rows': json({ ok: 'rows' }),
+    });
+    const api = createApi();
+    const query = {
+      period: { from: '2026-09-01', to: '2026-09-10' },
+      comparison: null,
+      currency: 'auto',
+      attribution: 'console' as const,
+    };
+    await expect(api.analytics.filterOptions()).resolves.toEqual(options);
+    await expect(api.analytics.dashboard(query)).resolves.toEqual({ ok: 'dashboard' });
+    await expect(
+      api.analytics.timeSeries({ ...query, level: 'campaign', filter: { includeRemoved: true } }),
+    ).resolves.toEqual({ ok: 'timeseries' });
+    await expect(api.analytics.explorerRows({ ...query, level: 'campaign' })).resolves.toEqual({
+      ok: 'rows',
+    });
+    expect(requests.map((r) => [r.method, r.path, r.search])).toEqual([
+      ['POST', '/api/ads/filter-options', ''],
+      ['POST', '/api/ads/dashboard', ''],
+      ['POST', '/api/ads/timeseries', ''],
+      ['POST', '/api/ads/explorer/rows', ''],
+    ]);
+    expect(requests[1]!.body).toEqual(query);
+    expect(requests[2]!.body).toMatchObject({ filter: { includeRemoved: true } });
+  });
+});
