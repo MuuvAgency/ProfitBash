@@ -51,7 +51,7 @@ Die lokale DB neu füllen:
    pnpm demo:load
    ```
 
-   `demo:load` dauert einige Minuten (der Poll wartet wie im Betrieb mindestens 1 Minute bis zur ersten
+   `demo:load` dauert rund 15 Minuten (der Poll wartet wie im Betrieb mindestens 1 Minute bis zur ersten
    Abfrage; rund 2 Mio. Kennzahl-Zeilen). Der Befehl ist wiederholbar: Connection und Clients werden wiederverwendet; eine von Hand geänderte
    Zuordnung der Demo-Profile setzt er zurück. Die Läufe stehen wie im Betrieb im Sync-Status. Scheitert ein Lauf, bricht
    der Befehl mit dessen Meldung ab.

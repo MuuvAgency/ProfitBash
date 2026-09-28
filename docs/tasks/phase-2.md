@@ -337,6 +337,9 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     (`docs/development.md`). Der CLI verlangt `AMAZON_ADS_USE_MOCK=true` und lehnt `NODE_ENV=production` ab.
     Der Mock läuft mit `processingMs: 0`, die Wartezeiten sind die echten Poll-Abstände (mindestens 1 Min.; Exports warten auf
     freie Plätze, 5 je Typ).
+  - **Gemessen** (lokal, 2026-09-28, frische DB): `pnpm demo:load` 13 Min., 2 Report-Runden, 0 gescheiterte Aufträge, keine offene
+    Historie. Kennzahl-Zeilen: Kampagnen 23 699, Ad Groups 48 747, Targets 937 494, Product Ads 110 261, Suchbegriffe 862 653
+    (zusammen rund 2 Mio.), SP-Historie 93 Tage; DB 1 GB.
   - **Doku:** `docs/development.md` (lokale DB, Mock-Anbieter, Demo-Daten neu laden), Verweis im README.
   - Review (unabhängig): Übernommen: doppelte Suchbegriffe bei Auto-Targets (jeder große `spSearchTerm`-Report wäre abgelehnt
     worden, `demo:load` brach ab; neuer Test über alle Report-Typen), Ende der Report-Runden über offene Merker statt über
