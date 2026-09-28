@@ -377,6 +377,7 @@ const truncatedText = computed(() => {
               option-value="value"
               :placeholder="t('explorer.allAdProducts')"
               :max-selected-labels="1"
+              :selected-items-label="t('explorer.selectedItems', { count: '{0}' })"
               size="small"
               @update:model-value="onAdProducts"
             />
@@ -392,6 +393,7 @@ const truncatedText = computed(() => {
               option-label="label"
               option-value="value"
               :max-selected-labels="2"
+              :selected-items-label="t('explorer.selectedItems', { count: '{0}' })"
               size="small"
               @update:model-value="onColumns"
             />

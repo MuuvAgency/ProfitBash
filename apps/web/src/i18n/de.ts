@@ -497,6 +497,8 @@ export const de = {
     allAdProducts: 'Alle Ad-Typen',
     includeRemoved: 'Entfernte anzeigen',
     columns: 'Spalten',
+    /** `{count}` wird zu PrimeVues Platzhalter `{0}`. */
+    selectedItems: '{count} gewählt',
     exportCsv: 'CSV exportieren',
     csvTruncatedNote:
       'Hinweis: nur die {shown} Zeilen mit dem höchsten Spend von {total}; die Summenzeile im Explorer gilt für alle.',
