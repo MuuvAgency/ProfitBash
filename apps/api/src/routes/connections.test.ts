@@ -1,6 +1,6 @@
 import { schema } from '@profitbash/db';
 import type { ErrorResponse, Profile } from '@profitbash/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createTestContext,
@@ -12,6 +12,7 @@ import {
 } from '../testing';
 
 const {
+  amazonAdsCampaigns,
   amazonAdsProfileMetricsImportedThrough,
   amazonAdsProfiles,
   auditEvents,
@@ -124,7 +125,7 @@ beforeAll(async () => {
   ids.removed = removed!.id;
   ids.otherOrgProfile = otherOrgProfile!.id;
 
-  // „Daten bis“ je Ad-Typ: Der Sync fordert Reports nur für SP an, SB zählt nicht.
+  // „Daten bis“ je Ad-Typ: SP zählt immer, SB nur für Profile mit SB-Kampagne (hier keines).
   await db.insert(amazonAdsProfileMetricsImportedThrough).values([
     {
       organizationId: orgId,
@@ -310,6 +311,38 @@ describe('GET /api/connections/:id/profiles', () => {
     expect(profiles.find((p) => p.id === ids.removed)?.removedAt).toMatch(/Z$/);
     // „Daten bis“ (1.8): Tag im Format YYYY-MM-DD, kein Zeitstempel; aus den Ad-Typen des Syncs.
     expect(profiles.find((p) => p.id === ids.hidden)?.metricsImportedThrough).toBe('2026-09-26');
+  });
+
+  it('rechnet „Daten bis“ über SB, sobald das Profil eine SB-Kampagne hat (1.9)', async () => {
+    const { db } = ctx.testDb;
+    const dataThrough = async () => {
+      const res = await request(ctx, `/api/connections/${ids.connection}/profiles`, {
+        cookie: admin,
+      });
+      const { profiles } = await readJson<{ profiles: Profile[] }>(res);
+      return profiles.find((p) => p.id === ids.hidden)?.metricsImportedThrough;
+    };
+    const sb = { organizationId: orgId, profileId: ids.hidden, adProduct: 'SPONSORED_BRANDS' };
+    await db.insert(amazonAdsCampaigns).values({ ...sb, amazonCampaignId: 'sb-1' });
+    try {
+      // SB ohne importierten Tag hält „Daten bis“ auf.
+      expect(await dataThrough()).toBeNull();
+      await db.insert(amazonAdsProfileMetricsImportedThrough).values({
+        ...sb,
+        importedThrough: '2026-09-20',
+      });
+      expect(await dataThrough()).toBe('2026-09-20');
+    } finally {
+      await db
+        .delete(amazonAdsProfileMetricsImportedThrough)
+        .where(
+          and(
+            eq(amazonAdsProfileMetricsImportedThrough.profileId, ids.hidden),
+            eq(amazonAdsProfileMetricsImportedThrough.adProduct, sb.adProduct),
+          ),
+        );
+      await db.delete(amazonAdsCampaigns).where(eq(amazonAdsCampaigns.profileId, ids.hidden));
+    }
   });
 
   it('lehnt Connections fremder Organisationen mit 404 ab', async () => {

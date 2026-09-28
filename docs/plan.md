@@ -117,6 +117,10 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
   `amazonDecimalSchema` normalisiert sie mit `decimal.js` (ADR 003, umgesetzt in Phase 1, 1.1).
 - **Ablauf der Refresh-Tokens:** Amazon-Refresh-Tokens ab 30.07.2026 laufen 365 Tage nach der Einwilligung ab. Den Zeitpunkt
   der Einwilligung je Connection festhalten und rechtzeitig zum Neu-Verbinden auffordern (spätestens mit den Notifications in Phase 5).
+- **Kennzahlen je Ad-Typ (für Phase 2, Details in `phase-1.md` 1.9):** SP-Attribution ist klick-basiert (`*_7d`, `*_14d`). SB (und
+  SD) liefern nur 14 Tage, `*_14d` zählt dort Klicks **und** Views (wie die Konsole), der Klick-Anteil steht in `*_clicks_14d`. Summen
+  über Ad-Typen müssen das kennzeichnen. SB-Reports sind in v3 „Preview“: SB-Kampagnen mit `isMultiAdGroupsEnabled=false` haben
+  Entities, aber keine Kennzahlen; die UI erklärt das bei SB-Summen.
 
 ## 6. Betriebskosten-Stufen
 

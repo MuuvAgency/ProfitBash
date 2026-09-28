@@ -1,14 +1,4 @@
-import {
-  and,
-  between,
-  eq,
-  getTableColumns,
-  getTableName,
-  inArray,
-  or,
-  sql,
-  type SQL,
-} from 'drizzle-orm';
+import { and, between, eq, getTableColumns, getTableName, or, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import {
   assertProfileInOrganization,
@@ -201,6 +191,24 @@ export interface ReportAdProductSelection {
   withCampaigns: readonly string[];
 }
 
+/** Spalte über einen Alias, qualifiziert (in `select`-Feldern rendert Drizzle Spalten sonst ohne Tabelle). */
+const aliased = (alias: string, column: PgColumn) =>
+  sql`${sql.identifier(alias)}.${sql.identifier(column.name)}`;
+
+/**
+ * Die Ad-Typen aus `adProducts`, für die das Profil (`profileId`: Wert oder Spalte) mindestens eine
+ * Kampagne hat. `exists` hält bei der ersten passenden Kampagne an.
+ */
+function adProductsWithCampaignsSql(adProducts: readonly string[], profileId: SQL | string): SQL {
+  const campaign = 'campaign';
+  return sql`select used.ad_product from unnest(${sql.param([...adProducts])}::text[]) as used(ad_product)
+    where exists (
+      select 1 from ${amazonAdsCampaigns} as ${sql.identifier(campaign)}
+      where ${aliased(campaign, amazonAdsCampaigns.profileId)} = ${profileId}
+        and ${aliased(campaign, amazonAdsCampaigns.adProduct)} = used.ad_product
+    )`;
+}
+
 /** Die Ad-Typen eines Profils nach `selection`, in deren Reihenfolge (`always` zuerst). */
 export async function selectReportAdProducts(
   db: DbOrTx,
@@ -212,16 +220,10 @@ export async function selectReportAdProducts(
   const used =
     optional.length === 0
       ? []
-      : await db
-          .selectDistinct({ adProduct: amazonAdsCampaigns.adProduct })
-          .from(amazonAdsCampaigns)
-          .where(
-            and(
-              eq(amazonAdsCampaigns.profileId, scope.profileId),
-              inArray(amazonAdsCampaigns.adProduct, optional),
-            ),
-          );
-  const usedSet = new Set(used.map((row) => row.adProduct));
+      : await db.execute<{ ad_product: string }>(
+          adProductsWithCampaignsSql(optional, scope.profileId),
+        );
+  const usedSet = new Set(used.map((row) => row.ad_product));
   return [...new Set([...selection.always, ...optional.filter((p) => usedSet.has(p))])];
 }
 
@@ -235,22 +237,23 @@ export function metricsImportedThroughSql(selection: ReportAdProductSelection): 
   const always = [...new Set(selection.always)];
   const withCampaigns = [...new Set(selection.withCampaigns)];
   if (always.length === 0 && withCampaigns.length === 0) return sql<null>`null::text`;
-  // Ausdrücklich qualifiziert: In `select`-Feldern rendert Drizzle Spalten ohne Tabelle, `"id"` träfe in
-  // der Unterabfrage sonst die Kampagne statt des Profils.
-  const profileId = sql`${sql.identifier(getTableName(amazonAdsProfiles))}.${sql.identifier(amazonAdsProfiles.id.name)}`;
+  const marks = amazonAdsProfileMetricsImportedThrough;
+  const mark = 'mark';
+  const importedThrough = aliased(mark, marks.importedThrough);
+  // Ausdrücklich qualifiziert: `"id"` träfe in den Unterabfragen sonst nicht das Profil.
+  const profileId = aliased(getTableName(amazonAdsProfiles), amazonAdsProfiles.id);
   // Als Text (`YYYY-MM-DD`, unabhängig von `DateStyle`): Ein Tag ohne Uhrzeit, keine Umrechnung durch den Treiber.
   return sql<string | null>`(
-    select case when count(*) > 0 and count(*) = count(mark.imported_through)
-      then to_char(min(mark.imported_through), 'YYYY-MM-DD') end
+    select case when count(*) > 0 and count(*) = count(${importedThrough})
+      then to_char(min(${importedThrough}), 'YYYY-MM-DD') end
     from (
       select unnest(${sql.param(always)}::text[]) as ad_product
       union
-      select campaign.ad_product from ${amazonAdsCampaigns} as campaign
-      where campaign.profile_id = ${profileId}
-        and campaign.ad_product = any(${sql.param(withCampaigns)}::text[])
+      ${adProductsWithCampaignsSql(withCampaigns, profileId)}
     ) as selected
-    left join ${amazonAdsProfileMetricsImportedThrough} as mark
-      on mark.profile_id = ${profileId} and mark.ad_product = selected.ad_product
+    left join ${marks} as ${sql.identifier(mark)}
+      on ${aliased(mark, marks.profileId)} = ${profileId}
+        and ${aliased(mark, marks.adProduct)} = selected.ad_product
   )`;
 }
 

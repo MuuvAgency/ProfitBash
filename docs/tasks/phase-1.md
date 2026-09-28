@@ -763,7 +763,7 @@ Nach F11.
   - **Target-IDs:** `sbTargeting` liefert `keywordId` („keyword or targeting expression“) und `targetingId` getrennt, der Export legt
     beide in `targetId` zusammen. Abbildung: `keywordId`, sonst `targetingId`; weicht `targetingId` ab, steht sie in `extra`. 1.10 prüft
     das gegen echte Daten.
-  - **Hinweis für die UI-Doku von Phase 2:** SB-Reports in v3 sind „Preview“: Kampagnen mit `isMultiAdGroupsEnabled=false` (ältere
+  - **Hinweis für die UI-Doku von Phase 2** (Verweis auch in `docs/plan.md` §5): SB-Reports in v3 sind „Preview“: Kampagnen mit `isMultiAdGroupsEnabled=false` (ältere
     SB-Kampagnen) fehlen in den Reports. Ihre Entities kommen über den Export, Kennzahlen nicht; die UI muss das bei SB-Summen erklären.
   - Umsetzung (Stand für SD und 1.10):
     - **Klick-Spalten:** `sales_clicks_14d` (`numeric`), `purchases_clicks_14d`, `units_clicks_14d` (`bigint`) in allen fünf
@@ -777,7 +777,8 @@ Nach F11.
     - **Ad-Typen je Profil:** `REPORT_AD_PRODUCT_SELECTION` (`@profitbash/amazon-ads`: `always` SP, `withCampaigns` SB) steuert beides:
       `selectReportAdProducts` (`amazon-ads-metrics.ts`, prüft die Organisation) liefert die Ad-Typen, für die `reports-sync` ein Profil
       anfordert; `metricsImportedThroughSql(selection)` rechnet „Daten bis“ über dieselben (SQL mit ausdrücklich qualifizierten
-      Spalten: In `select`-Feldern rendert Drizzle Spalten ohne Tabelle, ein `"id"` in einer Unterabfrage träfe sonst die falsche).
+      Spalten: In `select`-Feldern rendert Drizzle Spalten ohne Tabelle, ein `"id"` in einer Unterabfrage träfe sonst die falsche;
+      `exists` je Ad-Typ statt aller Kampagnen des Profils).
       `REPORT_AD_PRODUCTS` bleibt die Liste aller Ad-Typen im Katalog.
     - **Entities:** `ENTITY_AD_PRODUCTS` = SP und SB, für **jedes** Profil (erst der Export zeigt, ob es SB nutzt). Folgen: je Profil
       täglich ein zweiter Export-Batch; das Limit `MAX_RUNNING_EXPORTS_PER_TYPE` (5 je Connection) greift ab dem dritten Profil, die
@@ -795,6 +796,9 @@ Nach F11.
     - Test-Stabilität: `entities-sync.test.ts` prüft das erste Profil in Job-Reihenfolge, nicht DE (Profile aus einer Transaktion
       sortieren nach zufälliger UUID). `data-sync.test.ts` ist im vollen Lauf einmal auf Dateiebene gescheitert (einzeln und im
       zweiten Lauf grün, vermutlich Last wie bei `worker.test.ts`); weiter beobachten.
+    - Review (unabhängig): keine kritischen oder wichtigen Befunde. Übernommen: `exists` statt Lesen aller Kampagnen, Spalten der
+      „Daten bis“-SQL über Drizzle statt als Text, API-Test mit SB-Kampagne (`null`, dann Minimum), 1.10-Punkte zu `sbSearchTerm` und
+      SB-Negatives, Verweis in `plan.md`. Nur festgehalten: Flake von `data-sync.test.ts` (siehe oben).
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
       view-basiert, Spalten entsprechend (`extra` oder eigene Spalten, beim Umsetzen entscheiden).
 
@@ -814,7 +818,10 @@ Nach F11.
       scheitern und Alarm schlagen; dann SB-Exports je Profil abschalten), wie sich der zweite Export-Batch je Profil auf das Export-Limit
       auswirkt, ob `sbTargeting` `keywordId` und `targetingId` wie angenommen füllt und welche davon der Export-`targetId` entspricht
       (`extra.targetingId` bei Abweichung), ob `sbTargeting` `unitsSoldClicks` doch annimmt (Doku widersprüchlich, heute nicht
-      angefordert), ob SB-Kennzahlen (`sales` inkl. Views) zur Konsole passen, ob SB-Ads im Export `creative.products` tragen.
+      angefordert), ob SB-Kennzahlen (`sales` inkl. Views) zur Konsole passen, ob SB-Ads im Export `creative.products` tragen, ob
+      `sbSearchTerm` für Themen- und Produkt-Targets immer `keywordId` liefert (sonst zählen die Zeilen als ungültig: kein Löschen im
+      Fenster, bei nur ungültigen Zeilen Ablehnung), ob SB-Exports Negatives ohne Ad Group (Kampagnenebene) enthalten und ob sie dann
+      `campaignId` tragen (sonst nicht auflösbar: der SB-Batch setzt nie `removed_at`).
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
 ### 1.11 Datei-Import (optional, nur mit Auslöser)
