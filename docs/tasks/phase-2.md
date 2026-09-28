@@ -488,16 +488,54 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     ausgeblendete IDs in Auswahl und Drill-Down.
 
 ### 2.6 Web-Grundlagen
-- [ ] **AG Charts Community** einführen (ADR 001; Version exakt pinnen, Lizenz und Mindestalter prüfen), Theme aus den Tokens
+- [x] **AG Charts Community** einführen (ADR 001; Version exakt pinnen, Lizenz und Mindestalter prüfen), Theme aus den Tokens
       (Hell/Dunkel), Achsen und Tooltips in Mono über die Formatierungs-Helper. Prüfen, wie sich vorläufige Tage markieren lassen
       (F5; z. B. Bereich über `crossLines`).
-- [ ] AG Grid: deutsche `localeText` mit `LocaleModule` (offen seit Phase 0), benötigte Module registrieren (Sortierung, Filter, CSV
+- [x] AG Grid: deutsche `localeText` mit `LocaleModule` (offen seit Phase 0), benötigte Module registrieren (Sortierung, Filter, CSV
       nach F6). Nur registrierte Module nutzen, Konsole prüfen. Vergleich für Decimal-Strings (F7) in `packages/shared`.
-- [ ] Filterleiste (F2, F3, F4, F5) als eigene Komponente (Clients/Profile, Anzeigewährung, Attribution, Zeitraum, Vergleich), kurzer
+- [x] Filterleiste (F2, F3, F4, F5) als eigene Komponente (Clients/Profile, Anzeigewährung, Attribution, Zeitraum, Vergleich), kurzer
       Zustand in der URL, letzte Auswahl in `ui_state`.
-- [ ] Bausteine: KPI-Kachel mit Veränderung, Hinweise „≈“, „gemischte Attribution“ und „Wert fehlt“, Kennzeichnung vorläufiger Tage.
+- [x] Bausteine: KPI-Kachel mit Veränderung, Hinweise „≈“, „gemischte Attribution“ und „Wert fehlt“, Kennzeichnung vorläufiger Tage.
       **Entschieden (Dominik, 2026-09-28): Farbe der Veränderung nach Bedeutung:** Umsatz, ROAS, Käufe, Klicks, Impressionen, CTR,
       CVR: mehr = gut (Lime); ACoS, CPC, CPM: mehr = schlecht (rot); Spend neutral (nur Pfeil).
+- [x] Umsetzung (Stand für 2.7 und später):
+  - **AG Charts Community 14.2.0** (`ag-charts-community`, `ag-charts-vue3`, `ag-charts-locale`, exakt gepinnt; MIT, veröffentlicht
+    2026-09-16, passt zu AG Grid 36.2.0). Nur registrierte Module (`src/charts/modules.ts`: Balken, Linie, Zahlen- und Zeitachse,
+    `CrossLinesModule`, Legende, Locale), deutsches Chart-Locale (`AG_CHARTS_LOCALE_DE_DE`). Theme `chartTheme(scheme)` aus
+    `tokens.ts` (Canvas kennt keine CSS-Variablen; Hell/Dunkel über `useColorScheme`), Achsen in Mono, Beschriftung über
+    `formatNumber`/`formatDay`. `buildTimeSeriesOptions` (`src/charts/time-series.ts`): bis zu zwei Reihen (Balken/Linie, Achse
+    links/rechts); Werte gehen **nur für die Position** als `Number()` an den Chart, der Tooltip formatiert den Decimal-String.
+    Vorläufige Tage = `crossLines` vom Typ `range` von `provisionalFrom` bis zum letzten Tag, beschriftet „Vorläufig“.
+    `fillDays` füllt fehlende Tage: zwischen `earliestDate` und `dataThrough` 0 (keine Aktivität), davor/danach Lücke (F5).
+    `TimeSeriesChart.vue` (Canvas mit `role="img"` und `aria-label`). Tests prüfen die Optionen (happy-dom hat kein Canvas;
+    `ag-charts-vue3` ist dort gemockt).
+  - **AG Grid:** `LocaleModule` mit `AG_GRID_LOCALE_DE` aus `@ag-grid-community/locale` 36.2.0 (`gridLocaleText`, auch in
+    Sync-Status und Profiltabelle). Neu registriert: `TextFilterModule`, `CustomFilterModule` (Filter für Beträge ohne `number` in
+    2.8), `PinnedRowModule` (Summenzeile), `CsvExportModule`; Sortieren gehört zum Kern. Weiter nicht registriert: `TooltipModule`,
+    `RenderApiModule`. Ein Test nutzt Sortierung, Textfilter, Summenzeile und CSV und prüft, dass AG Grid nichts meldet.
+  - **Decimal-Vergleich** (`@profitbash/shared`, `decimal-compare.ts`): `compareDecimal` (ziffernweise, auch jenseits von
+    `Number.MAX_SAFE_INTEGER`, `-0` = 0, wirft bei Nicht-Decimal-Strings), `compareDecimalNullsLast(a, b, isDescending)` mit der
+    Signatur des AG-Grid-`comparator` (fehlende Werte in beide Richtungen am Ende), `decimalSign`.
+  - **Filterleiste** (`src/analytics/`): `periods.ts` (Voreinstellungen F5; „Letzte N Tage“ enden gestern, „Diese Woche/Dieser
+    Monat/Dieses Jahr bis jetzt“ enden heute, Wochen ab Montag, „Letzte 12 Monate“ = 12 volle Monate vor dem laufenden; Vergleich
+    Vorperiode gleicher Länge bzw. Vorjahr mit 29.02. → 28.02.; „heute“ in der Zeitzone des Browsers). `filters.ts`: URL-Parameter
+    `clients`, `nc` (Ohne Client), `pf=1` (Profilauswahl aktiv; die IDs stehen nur in `ui_state`), `period`, `from`/`to`, `cmp`,
+    `cur`, `attr`; Standardwerte fehlen in der URL. Ohne Filter-Parameter gilt die letzte Auswahl (`ui_state` `analytics/filters`,
+    **geteilt** zwischen Dashboard und Explorer) und wird per `replace` in die URL übernommen; Änderungen per `push`
+    (Zurück-Taste). Ein Link ohne `pf=1` zeigt die Clients ganz. `sanitizeFilterState` entfernt Unsichtbares (Clients, Profile,
+    Profile außerhalb der Clients, nicht wählbare Währung → automatisch). Auswahl als Baum (PrimeVue `TreeSelect`, Checkboxen):
+    Clients › Profile, „Ohne Client“; alles oder nichts gewählt = keine Einschränkung, Teilauswahl = `clientIds` plus
+    `profileIds` (Server verknüpft mit UND). `useAnalyticsFilters()` liefert `state`, `options` (`/filter-options`), `ready`
+    (erst dann laden Widgets), `update`, `query` (Body für `/api/ads/*`). `FilterBar.vue`: fünf Felder mit sichtbaren Labels,
+    „Frei wählen“ mit Datumsbereich (übernimmt erst beide Enden), Anzeige der Tage von Zeitraum und Vergleich in Mono, „Vorjahr“
+    gesperrt, solange `earliestDate` nach dessen Beginn liegt (Prop der Seite aus `meta.earliestDate`).
+  - **Bausteine:** `metrics.ts` (`formatMetricValue` je Art, `formatChange` mit Vorzeichen, `changeTone` nach Bedeutung),
+    `hints.ts` (`metricHints`: „≈“ nur an Beträgen, „Ohne Kurs nicht gezählt“ an allen Summen, gemischte Attribution bzw. „Wert
+    fehlt“/„unvollständig“ an Umsatz, Käufen, Einheiten, ACoS, ROAS, CVR nach `coverage`), `HintBadge.vue` (Schalter mit Popover,
+    lesbar auch auf Touch), `KpiTile.vue` (Überzeile, Wert in Mono mit „≈“, Veränderung als Pille mit Pfeil und Text für
+    Screenreader, Vergleichswert, Skeleton). Die API-Funktionen stehen unter `api.analytics.*` (`filterOptions`, `dashboard`,
+    `timeSeries`, `explorerRows`).
+
 
 ### 2.7 Dashboard (`/dashboard`)
 - [ ] Inhalt nach F11 im Kinetic-Bento-Look (Referenzen als Stil, nicht als Inhalt), Zustände je Widget.
