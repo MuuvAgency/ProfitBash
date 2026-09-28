@@ -13,12 +13,20 @@ import { REPORT_DEFINITIONS, type AmazonAdsReportType } from './reports';
  * SB (1.9) nur für das DE-Profil (die übrigen nutzen SB nicht): Keyword-, Themen- und Produkt-Targets, ein
  * Negative, ein Video-Ad mit einem und ein Kollektions-Ad mit drei ASINs. SB-Reports liefern Klick + View
  * (`sales` …) und den Klick-Anteil (`salesClicks` …); Report-Zeilen enthalten nur die angeforderten Spalten.
+ *
+ * SD (1.9) ebenfalls nur für das DE-Profil: eine vCPM-Kampagne mit Zielgruppe (Taktik `T00030`) und eine
+ * CPC-Kampagne mit Produkt- und Kategorie-Target (`T00020`), ein Negative, ein Product-Ad nur mit SKU (wie
+ * bei Sellern) und ein Bild-Ad mit zwei ASINs. SD-Reports wie SB, dazu Same-SKU nach Klick und sichtbare
+ * Impressionen; `sdTargeting` nennt alle Targets per `targetingId`, `sdAdvertisedProduct` ASIN und SKU.
  */
 
 const SP = 'SPONSORED_PRODUCTS';
 const SB = 'SPONSORED_BRANDS';
+const SD = 'SPONSORED_DISPLAY';
 /** Profile mit SB-Kampagnen. */
 const BRANDS_PROFILE_IDS: ReadonlySet<string> = new Set(['9007199254740993']);
+/** Profile mit SD-Kampagnen. */
+const DISPLAY_PROFILE_IDS: ReadonlySet<string> = new Set(['9007199254740993']);
 
 export interface MockProfile {
   amazonProfileId: string;
@@ -53,7 +61,10 @@ interface MockCampaign {
   adProduct: string;
   name: string;
   state: string;
-  targeting: 'MANUAL' | 'AUTO';
+  /** SP: `MANUAL` | `AUTO`; SD: Taktik (`T00020`, `T00030`); SB: ohne Bedeutung. */
+  targeting: string;
+  /** SB/SD: `CPC` | `VCPM`. */
+  costType?: string;
   budget: string;
   portfolioId: string | null;
 }
@@ -345,6 +356,106 @@ export function mockAccount(profile: MockProfile): MockAccount {
       },
     );
   }
+  if (DISPLAY_PROFILE_IDS.has(profile.amazonProfileId)) {
+    campaigns.push(
+      {
+        id: id(901),
+        adProduct: SD,
+        name: 'Mock SD Zielgruppen',
+        state: 'ENABLED',
+        targeting: 'T00030',
+        costType: 'VCPM',
+        budget: '20.005',
+        portfolioId: null,
+      },
+      {
+        id: id(902),
+        adProduct: SD,
+        name: 'Mock SD Produkte',
+        state: 'ENABLED',
+        targeting: 'T00020',
+        costType: 'CPC',
+        budget: '7.5',
+        portfolioId: id(2),
+      },
+    );
+    adGroups.push(
+      {
+        id: id(911),
+        campaignId: id(901),
+        name: 'Mock SD AG Zielgruppe',
+        state: 'ENABLED',
+        defaultBid: '4.25',
+      },
+      {
+        id: id(912),
+        campaignId: id(902),
+        name: 'Mock SD AG Produkte',
+        state: 'ENABLED',
+        defaultBid: '0.55',
+      },
+    );
+    targets.push(
+      {
+        id: id(951),
+        campaignId: id(901),
+        adGroupId: id(911),
+        state: 'ENABLED',
+        negative: false,
+        targetType: 'AUDIENCE',
+        details: { event: 'VIEWS', lookback: 30 },
+        bid: null,
+      },
+      {
+        id: id(952),
+        campaignId: id(902),
+        adGroupId: id(912),
+        state: 'ENABLED',
+        negative: false,
+        targetType: 'PRODUCT',
+        details: { matchType: 'PRODUCT_EXACT', asin: 'B0MOCKFREMD' },
+        bid: '0.6',
+      },
+      {
+        id: id(953),
+        campaignId: id(902),
+        adGroupId: id(912),
+        state: 'PAUSED',
+        negative: false,
+        targetType: 'PRODUCT_CATEGORY',
+        details: { productCategoryId: '12345678901', productCategoryResolved: 'Mock Schuhe' },
+        bid: '0.45',
+      },
+      {
+        id: id(961),
+        campaignId: id(902),
+        adGroupId: id(912),
+        state: 'ENABLED',
+        negative: true,
+        targetType: 'PRODUCT',
+        details: { matchType: 'PRODUCT_EXACT', asin: 'B0MOCK0003' },
+        bid: null,
+      },
+    );
+    ads.push(
+      {
+        id: id(971),
+        campaignId: id(901),
+        adGroupId: id(911),
+        state: 'ENABLED',
+        adType: 'PRODUCT_AD',
+        asins: ['B0MOCK0001'],
+      },
+      {
+        id: id(972),
+        campaignId: id(902),
+        adGroupId: id(912),
+        state: 'ENABLED',
+        adType: 'IMAGE',
+        asins: ['B0MOCK0002', 'B0MOCK0003'],
+      },
+    );
+  }
   return {
     profile,
     portfolios: [
@@ -416,15 +527,16 @@ export function mockExportRows(
           ...(c.portfolioId && { portfolioId: c.portfolioId }),
           name: c.name,
           startDate: '2026-01-15',
-          ...(c.adProduct === SP
-            ? {
-                targetingSettings: c.targeting,
-                optimization: {
-                  bidStrategy: 'SALES_DOWN_ONLY',
-                  placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 25 }],
-                },
-              }
-            : { costType: 'CPC', brandEntityId: 'ENTITYMOCKBRAND01' }),
+          ...(c.adProduct === SP && {
+            targetingSettings: c.targeting,
+            optimization: {
+              bidStrategy: 'SALES_DOWN_ONLY',
+              placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 25 }],
+            },
+          }),
+          ...(c.adProduct === SB && { costType: 'CPC', brandEntityId: 'ENTITYMOCKBRAND01' }),
+          // SD: Taktik in `targetingSettings` (gemeinsames Modell), Kostenart CPC oder vCPM.
+          ...(c.adProduct === SD && { targetingSettings: c.targeting, costType: c.costType }),
           budgetCaps: {
             recurrenceTimePeriod: 'DAILY',
             budgetType: 'MONETARY',
@@ -450,7 +562,7 @@ export function mockExportRows(
         const adProduct = adProductOfCampaign(t.campaignId);
         rows.push({
           targetId: raw(t.id),
-          // SP-Targets tragen die Kampagne, SB-Targets nicht (gemeinsames Modell).
+          // SP-Targets tragen die Kampagne, SB- und SD-Targets nicht (gemeinsames Modell).
           ...(adProduct === SP && { campaignId: raw(t.campaignId) }),
           ...(t.adGroupId && { adGroupId: raw(t.adGroupId) }),
           negative: t.negative,
@@ -463,10 +575,14 @@ export function mockExportRows(
       break;
     case 'ads':
       for (const ad of account.ads) {
-        const products: Array<{ productIdType: string; productId: string }> = ad.asins.map(
-          (asin) => ({ productIdType: 'ASIN', productId: asin }),
-        );
-        if (ad.adType === 'PRODUCT_AD' && account.profile.accountType !== 'vendor') {
+        const seller = account.profile.accountType !== 'vendor';
+        // SD-Product-Ads nennen bei Sellern nur die SKU (ASIN oder SKU laut gemeinsamem Modell).
+        const skuOnly =
+          seller && ad.adType === 'PRODUCT_AD' && adProductOfCampaign(ad.campaignId) === SD;
+        const products: Array<{ productIdType: string; productId: string }> = skuOnly
+          ? []
+          : ad.asins.map((asin) => ({ productIdType: 'ASIN', productId: asin }));
+        if (ad.adType === 'PRODUCT_AD' && seller) {
           products.push({ productIdType: 'SKU', productId: mockSku(ad.asins[0]!) });
         }
         rows.push({
@@ -504,6 +620,8 @@ interface MockMetrics {
   units14d: number;
   /** Zusätzliche Käufe nach einem View (nur SB/SD: `purchases` = Klick + View). */
   viewPurchases: number;
+  /** Sichtbare Impressionen (nur SD), höchstens `impressions`. */
+  viewableImpressions: number;
 }
 
 /** FNV-1a: stabile Pseudo-Zufallszahl aus Text. */
@@ -522,8 +640,9 @@ function metricsFor(key: string, date: string): MockMetrics | null {
   if (seed % 7 === 0) return null;
   const clicks = seed % 23;
   const purchases7d = clicks > 4 ? seed % 3 : 0;
+  const impressions = 150 + (seed % 2400);
   return {
-    impressions: 150 + (seed % 2400),
+    impressions,
     clicks,
     costMilli: clicks * (180 + (seed % 900)) + (seed % 11),
     sales7dMilli: purchases7d * 24_990,
@@ -533,6 +652,7 @@ function metricsFor(key: string, date: string): MockMetrics | null {
     units7d: purchases7d,
     units14d: purchases7d + (seed % 2),
     viewPurchases: (seed >>> 3) % 3 === 0 ? 1 : 0,
+    viewableImpressions: Math.floor((impressions * (40 + ((seed >>> 5) % 50))) / 100),
   };
 }
 
@@ -548,6 +668,7 @@ function addMetrics(a: MockMetrics, b: MockMetrics): MockMetrics {
     units7d: a.units7d + b.units7d,
     units14d: a.units14d + b.units14d,
     viewPurchases: a.viewPurchases + b.viewPurchases,
+    viewableImpressions: a.viewableImpressions + b.viewableImpressions,
   };
 }
 
@@ -560,6 +681,24 @@ function milli(value: number): RawNumber {
 
 /** Spalten je Ad-Typ; `mockReportRows` behält davon nur die angeforderten. */
 function metricColumns(adProduct: string, m: MockMetrics): Record<string, unknown> {
+  if (adProduct === SD) {
+    // Wie SB, Same-SKU aber nur nach Klick (Teilmenge des Klick-Anteils); dazu sichtbare Impressionen.
+    const viewSalesMilli = m.viewPurchases * 24_990;
+    return {
+      impressions: m.impressions,
+      clicks: m.clicks,
+      cost: milli(m.costMilli),
+      impressionsViews: m.viewableImpressions,
+      sales: milli(m.sales14dMilli + viewSalesMilli),
+      salesClicks: milli(m.sales14dMilli),
+      salesPromotedClicks: milli(m.sales7dMilli),
+      purchases: m.purchases14d + m.viewPurchases,
+      purchasesClicks: m.purchases14d,
+      purchasesPromotedClicks: m.purchases7d,
+      unitsSold: m.units14d + m.viewPurchases,
+      unitsSoldClicks: m.units14d,
+    };
+  }
   if (adProduct === SB) {
     // Ein Fenster (14 Tage): Klick + View ohne Suffix, der Klick-Anteil in `…Clicks`.
     const viewSalesMilli = m.viewPurchases * 24_990;
@@ -678,9 +817,11 @@ export function mockReportRows(
       case 'searchTerm':
         for (const target of ofAdProduct(account.targets)) {
           if (target.negative || !target.adGroupId) continue;
-          // SB-Targeting: Keywords über `keywordId`, Themen und Produkte über `targetingId`.
+          // SB-Targeting: Keywords über `keywordId`, Themen und Produkte über `targetingId`; SD kennt nur
+          // `targetingId`.
           const idColumn =
-            level === 'target' && adProduct === SB && target.targetType !== 'KEYWORD'
+            level === 'target' &&
+            (adProduct === SD || (adProduct === SB && target.targetType !== 'KEYWORD'))
               ? 'targetingId'
               : 'keywordId';
           const base = {
@@ -713,9 +854,10 @@ export function mockReportRows(
             adGroupId: raw(ad.adGroupId),
             adGroupName: adGroupName.get(ad.adGroupId),
             adId: raw(ad.id),
-            advertisedAsin: ad.asins[0],
+            // SD heißt `promoted…`, SP `advertised…`; je Ad eine Zeile mit dem ersten Produkt.
+            [adProduct === SD ? 'promotedAsin' : 'advertisedAsin']: ad.asins[0],
             ...(account.profile.accountType !== 'vendor' && {
-              advertisedSku: mockSku(ad.asins[0]!),
+              [adProduct === SD ? 'promotedSku' : 'advertisedSku']: mockSku(ad.asins[0]!),
             }),
             ...values(metrics),
           });
