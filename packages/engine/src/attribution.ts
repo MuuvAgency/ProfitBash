@@ -1,3 +1,4 @@
+import { AD_PRODUCTS, type AdProduct, type AttributionSetting } from '@profitbash/shared/analytics';
 import type { Coverage } from './metrics';
 
 /**
@@ -6,8 +7,9 @@ import type { Coverage } from './metrics';
  * gemischte Attribution enthält oder Werte fehlen.
  */
 
-export const AD_PRODUCTS = ['SPONSORED_PRODUCTS', 'SPONSORED_BRANDS', 'SPONSORED_DISPLAY'] as const;
-export type AdProduct = (typeof AD_PRODUCTS)[number];
+// Ad-Typen und Einstellung kommen aus `@profitbash/shared/analytics` (auch fürs Web, ohne `decimal.js`, ADR 003;
+// eigener Einstiegspunkt, weil die Wurzel Node-/DOM-Typen braucht).
+export { AD_PRODUCTS, type AdProduct, type AttributionSetting };
 
 /** Ebenen der Kennzahl-Tabellen (wie `AmazonAdsMetricsLevel` in `@profitbash/amazon-ads`). */
 export const METRICS_LEVELS = ['campaign', 'adGroup', 'target', 'productAd', 'searchTerm'] as const;
@@ -33,9 +35,6 @@ export const METRIC_COLUMNS = [
   'viewableImpressions',
 ] as const;
 export type MetricColumn = (typeof METRIC_COLUMNS)[number];
-
-/** Standard „wie Konsole“ oder einheitlich „14 Tage, nur Klicks“ (F4). */
-export type AttributionSetting = 'console' | 'clicks14d';
 
 /** Grundlage der Zuordnung: Fenster in Tagen und ob Views (nicht nur Klicks) zählen. */
 export interface AttributionBasis {

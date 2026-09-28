@@ -3,9 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "zod-Schemas, Feature-Keys, Formatierung, Verschl\u00fcsselung, Env-Validierung",
+  "description": "zod-Schemas, Feature-Keys, Formatierung, Verschlüsselung, Env-Validierung",
   "exports": {
     ".": "./src/index.ts",
+    "./analytics": "./src/analytics.ts",
     "./env": "./src/env.ts",
     "./crypto": "./src/crypto.ts",
     "./access-control": "./src/access-control.ts"
