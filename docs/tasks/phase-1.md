@@ -804,6 +804,23 @@ Nach F11.
       SB-Negatives, Verweis in `plan.md`. Flake von `data-sync.test.ts` danach behoben (siehe oben).
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
       view-basiert, Spalten entsprechend (`extra` oder eigene Spalten, beim Umsetzen entscheiden).
+  - **Doku-Abgleich 2026-09-28** (Report-Typ-Seiten Campaign, Ad group, Targeting, Advertised product, Spalten-Seite, Exports-Guide):
+    `sdCampaigns` (groupBy `campaign`), `sdAdGroup` (`adGroup`), `sdTargeting` (`targeting`), `sdAdvertisedProduct` (`advertiser`),
+    alle 65 Tage Aufbewahrung, höchstens 31 Tage je Anfrage; `matchedTarget` bewusst nicht. Die Spalten-Seite schreibt
+    `sdAdGroups` (wie `sbAdGroups`), gemeint ist `sdAdGroup`. Auf beiden Seiten für alle vier Typen: `impressions`, `clicks`,
+    `cost`, `sales`, `salesClicks`, `salesPromotedClicks`, `purchases`, `purchasesClicks`, `purchasesPromotedClicks`, `unitsSold`,
+    `unitsSoldClicks`, `impressionsViews`, `date`, `campaignId`, `campaignName`; `adGroupId`/`adGroupName` außer bei `sdCampaigns`;
+    `targetingId` nur `sdTargeting` (kein `keywordId`); `adId`, `promotedAsin`, `promotedSku` nur `sdAdvertisedProduct` (nicht
+    `advertisedAsin` wie SP). `sales`/`purchases`/`unitsSold` zählen Klick **oder** View, `…Clicks` nur Klick, `…PromotedClicks`
+    = Same-SKU **nur nach Klick**. Eigene `…Views`-Spalten gibt es für SD nicht (View-Anteil = gesamt − Klick). `costType`
+    (CPC/VCPM) steht nur in `sdCampaigns`, kommt aber schon über den Export (`extra.costType`).
+    Export: Kampagnen `targetingSettings` = Taktik (`T00020`/`T00030`), Targets ohne `campaignId`, `targetId` = SD-`targetId`
+    (entspricht `targetingId` im Report), Ads `PRODUCT_AD`/`IMAGE`/`VIDEO` mit ASIN **oder** SKU.
+  - **Entschieden (Dominik, 2026-09-28):**
+    - `impressionsViews` (sichtbare Impressionen nach MRC, Abrechnungsbasis bei vCPM) in allen vier SD-Reports, neue Spalte
+      `viewable_impressions` (`bigint`) in allen fünf Kennzahl-Tabellen (SP/SB `null`). Mehr View-Kennzahlen nicht.
+    - SD-Same-SKU (`salesPromotedClicks`, `purchasesPromotedClicks`) in `sales_same_sku_14d`/`purchases_same_sku_14d`; bei SD
+      klick-basiert, also gegen `*_clicks_14d` zu lesen (Hinweis in `plan.md` §5). `units_same_sku_14d` bleibt `null`.
 
 ### 1.10 Erster echter Lauf (nach der Freigabe)
 - [ ] Ein Profil mit echten Kampagnen synchronisieren, Zählwerte gegen die Amazon-Konsole abgleichen (Stichprobe: Kosten und Klicks einer
