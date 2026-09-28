@@ -36,8 +36,9 @@ let foreignProfileId = '';
 
 const SP = 'SPONSORED_PRODUCTS';
 const SB = 'SPONSORED_BRANDS';
-const SD = 'SPONSORED_DISPLAY';
-/** Wie `REPORT_AD_PRODUCT_SELECTION` in `@profitbash/amazon-ads` (1.9). */
+/** Ad-Typ außerhalb der Auswahl (kein Report im Katalog). */
+const OUTSIDE = 'SPONSORED_TELEVISION';
+/** Wie `REPORT_AD_PRODUCT_SELECTION` in `@profitbash/amazon-ads` (1.9), SD verhält sich dort wie SB. */
 const SELECTION = { always: [SP], withCampaigns: [SB] };
 const now = new Date('2026-09-27T06:00:00Z');
 const later = new Date('2026-09-28T06:00:00Z');
@@ -650,7 +651,7 @@ describe('selectReportAdProducts', () => {
   it('nimmt SP immer, SB erst mit einer Kampagne dieses Ad-Typs (auch als Platzhalter)', async () => {
     expect(await select()).toEqual([SP]);
     await ensureCampaigns(testDb.db, { organizationId, profileId: secondProfileId }, [
-      { amazonCampaignId: 'sd-1', adProduct: SD },
+      { amazonCampaignId: 'st-1', adProduct: OUTSIDE },
     ]);
     expect(await select()).toEqual([SP]);
     await ensureCampaigns(testDb.db, { organizationId, profileId: secondProfileId }, [
@@ -719,8 +720,8 @@ describe('metricsImportedThroughSql', () => {
 
   it('ignoriert Ad-Typen außerhalb der Auswahl, auch mit Kampagnen', async () => {
     await mark(SP, '2026-09-27');
-    await mark(SD, '2026-09-01');
-    await campaign(SD);
+    await mark(OUTSIDE, '2026-09-01');
+    await campaign(OUTSIDE);
     expect(await dataThrough()).toBe('2026-09-27');
   });
 

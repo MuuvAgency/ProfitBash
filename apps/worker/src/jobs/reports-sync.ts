@@ -143,7 +143,7 @@ async function syncProfile(
     endDate: yesterday,
   };
 
-  // SP immer, SB nur mit Kampagnen (1.9): Ad-Typen, die das Profil nicht nutzt, kosten keine Aufträge
+  // SP immer, SB und SD nur mit Kampagnen (1.9): Ad-Typen, die das Profil nicht nutzt, kosten keine Aufträge
   // und halten „Daten bis“ nicht auf.
   const adProducts = await selectReportAdProducts(
     deps.db,

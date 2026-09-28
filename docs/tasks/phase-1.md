@@ -845,6 +845,12 @@ Nach F11.
     - **Bekannte Lücke (1.10 prüfen):** Der Export überschreibt die ASIN, die ein Report-Platzhalter mitgebracht hat. Nennt Amazon
       bei SD-Product-Ads von Sellern nur die SKU, bleibt `asin` in `amazon_ads_product_ads` leer, obwohl `sdAdvertisedProduct` sie
       liefert. Falls ja: ASIN aus dem Report übernehmen, wenn der Export keine nennt.
+    - Review (unabhängig): keine kritischen oder wichtigen Befunde. Übernommen: Kommentare in `reports-sync.ts` und
+      `connections.ts` nennen SD, der zweite DoD-Lauf vergleicht auch Same-SKU, Klick-Anteil, sichtbare Impressionen und die
+      Zeilen aller Kennzahl-Tabellen, der Warte-Test in `entities-sync.test.ts` rechnet aus den vorbelegten Batches, der
+      DB-Test „außerhalb der Auswahl“ nutzt einen fiktiven Ad-Typ statt SD, vCPM-Gebote in `plan.md` §5. Die ASIN-Lücke
+      bleibt bewusst offen (Verhalten des echten Exports unbekannt, Kennzahlen gehen nicht verloren); der DoD-Test hält sie
+      sichtbar fest.
 
 ### 1.10 Erster echter Lauf (nach der Freigabe)
 - [ ] Ein Profil mit echten Kampagnen synchronisieren, Zählwerte gegen die Amazon-Konsole abgleichen (Stichprobe: Kosten und Klicks einer

@@ -120,8 +120,9 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 - **Kennzahlen je Ad-Typ (für Phase 2, Details in `phase-1.md` 1.9):** SP-Attribution ist klick-basiert (`*_7d`, `*_14d`). SB (und
   SD) liefern nur 14 Tage, `*_14d` zählt dort Klicks **und** Views (wie die Konsole), der Klick-Anteil steht in `*_clicks_14d`. Summen
   über Ad-Typen müssen das kennzeichnen. SD: Same-SKU (`*_same_sku_14d`) zählt nur Klicks (gegen `*_clicks_14d` lesen),
-  `viewable_impressions` (nur SD) ist die Basis für vCPM. SB-Reports sind in v3 „Preview“: SB-Kampagnen mit `isMultiAdGroupsEnabled=false` haben
-  Entities, aber keine Kennzahlen; die UI erklärt das bei SB-Summen.
+  `viewable_impressions` (nur SD) ist die Basis für vCPM. Bei SD-Kampagnen mit `costType` VCPM (`extra.costType` der Kampagne)
+  gelten Gebote je 1000 sichtbare Impressionen, nicht je Klick; Gebotsregeln müssen das trennen. SB-Reports sind in v3 „Preview“:
+  SB-Kampagnen mit `isMultiAdGroupsEnabled=false` haben Entities, aber keine Kennzahlen; die UI erklärt das bei SB-Summen.
 
 ## 6. Betriebskosten-Stufen
 

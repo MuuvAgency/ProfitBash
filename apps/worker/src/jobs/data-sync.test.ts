@@ -146,6 +146,9 @@ async function campaignMetrics() {
       cost: amazonAdsCampaignDailyMetrics.cost,
       sales7d: amazonAdsCampaignDailyMetrics.sales7d,
       sales14d: amazonAdsCampaignDailyMetrics.sales14d,
+      salesSameSku14d: amazonAdsCampaignDailyMetrics.salesSameSku14d,
+      salesClicks14d: amazonAdsCampaignDailyMetrics.salesClicks14d,
+      viewableImpressions: amazonAdsCampaignDailyMetrics.viewableImpressions,
     })
     .from(amazonAdsCampaignDailyMetrics)
     .where(eq(amazonAdsCampaignDailyMetrics.profileId, profileId))
@@ -225,7 +228,14 @@ describe('Sync mit dem Mock-Anbieter (DoD Phase 1)', () => {
       'PRODUCT_COLLECTION',
       'VIDEO',
     ]);
-    expect((await adsOf(SD)).map((ad) => ad.extra.adType).sort()).toEqual(['IMAGE', 'PRODUCT_AD']);
+    const sdAds = await adsOf(SD);
+    expect(sdAds.map((ad) => ad.extra.adType).sort()).toEqual(['IMAGE', 'PRODUCT_AD']);
+    // Bekannte Lücke (1.10 prüft): Nennt der Export nur die SKU, bleibt die ASIN leer, obwohl
+    // `sdAdvertisedProduct` sie liefert.
+    expect(sdAds.find((ad) => ad.extra.adType === 'PRODUCT_AD')).toMatchObject({
+      asin: null,
+      sku: 'MOCK-SKU-0001',
+    });
     const dataThrough = async () => {
       const [row] = await testDb.db
         .select({ date: metricsImportedThroughSql(REPORT_AD_PRODUCT_SELECTION) })
@@ -277,12 +287,14 @@ describe('Sync mit dem Mock-Anbieter (DoD Phase 1)', () => {
   it('ändert bei einem zweiten Lauf nichts', async () => {
     const before = await campaignMetrics();
     const entitiesBefore = await rowCounts(ENTITY_TABLES);
+    const metricsBefore = await rowCounts(METRIC_TABLES);
 
     const counters = await fullSync();
 
     expect(counters).toMatchObject({ created: 0, updated: 0, removed: 0, failed: 0 });
     expect(await campaignMetrics()).toEqual(before);
     expect(await rowCounts(ENTITY_TABLES)).toEqual(entitiesBefore);
+    expect(await rowCounts(METRIC_TABLES)).toEqual(metricsBefore);
   });
 
   it('übernimmt geänderte Werte per Upsert', async () => {

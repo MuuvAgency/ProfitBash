@@ -98,7 +98,7 @@ const profileColumns = {
   isHidden: amazonAdsProfiles.isHidden,
   removedAt: amazonAdsProfiles.removedAt,
   syncedAt: amazonAdsProfiles.syncedAt,
-  // „Daten bis“: Minimum über die Ad-Typen, die der Sync für das Profil anfordert (SB nur mit Kampagnen).
+  // „Daten bis“: Minimum über die Ad-Typen, die der Sync für das Profil anfordert (SB und SD nur mit Kampagnen).
   metricsImportedThrough: metricsImportedThroughSql(REPORT_AD_PRODUCT_SELECTION),
 };
 
