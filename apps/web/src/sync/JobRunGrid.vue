@@ -10,7 +10,7 @@ import type {
 import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, onBeforeUnmount, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { gridStyleOptions, gridTheme } from '../grid/grid';
+import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
 import { useGridMinWidth } from '../grid/min-width';
 import DurationCell from './cells/DurationCell.vue';
 import ResultCell from './cells/ResultCell.vue';
@@ -173,6 +173,7 @@ onBeforeUnmount(() => clearInterval(tick));
     :theme="gridTheme"
     :theme-css-layer="gridStyleOptions.themeCssLayer"
     :theme-style-container="gridStyleOptions.themeStyleContainer"
+    :locale-text="gridLocaleText"
     :row-data="runs"
     :column-defs="columnDefs"
     :context="context"

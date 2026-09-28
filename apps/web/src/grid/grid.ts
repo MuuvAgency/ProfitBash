@@ -1,19 +1,27 @@
+import { AG_GRID_LOCALE_DE } from '@ag-grid-community/locale';
 import {
   CellStyleModule,
   ClientSideRowModelModule,
   ColumnApiModule,
   ColumnAutoSizeModule,
+  CsvExportModule,
+  CustomFilterModule,
+  LocaleModule,
   ModuleRegistry,
+  PinnedRowModule,
   RowAutoHeightModule,
   RowStyleModule,
+  TextFilterModule,
   themeQuartz,
   ValidationModule,
 } from 'ag-grid-community';
 
 /**
  * AG Grid Community (ADR 001). Nur die Module, die die App nutzt, damit das Bundle klein bleibt.
- * Braucht eine neue Tabelle mehr (Sortieren über Filter, Tooltips …), hier ergänzen; in der
- * Entwicklung meldet das `ValidationModule` fehlende Module in der Konsole.
+ * Sortieren gehört zum Kern. Für den Explorer (`phase-2.md` F6/F7): Textfilter, eigene Filter (Beträge als
+ * Decimal-Strings, ohne `number`), Summenzeile (angeheftete Zeile) und CSV-Export. Nicht registriert sind u. a.
+ * `TooltipModule` und `RenderApiModule`: Tooltips kommen von PrimeVue. Braucht eine Tabelle mehr, hier ergänzen;
+ * in der Entwicklung meldet das `ValidationModule` fehlende Module in der Konsole.
  */
 ModuleRegistry.registerModules([
   ClientSideRowModelModule,
@@ -22,8 +30,16 @@ ModuleRegistry.registerModules([
   ColumnApiModule,
   ColumnAutoSizeModule,
   RowAutoHeightModule,
+  LocaleModule,
+  TextFilterModule,
+  CustomFilterModule,
+  PinnedRowModule,
+  CsvExportModule,
   ...(import.meta.env.DEV ? [ValidationModule] : []),
 ]);
+
+/** Deutsche Texte des Grids (Filter, Sortierung, leere Tabelle), Paket `@ag-grid-community/locale`. */
+export const gridLocaleText: Record<string, string> = AG_GRID_LOCALE_DE;
 
 /**
  * Grid-Styles liegen im CSS-Layer `ag-grid` (Reihenfolge in src/styles/main.css), damit Tailwind-Utilities

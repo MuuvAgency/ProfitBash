@@ -9,7 +9,7 @@ import type {
 import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { gridStyleOptions, gridTheme } from '../grid/grid';
+import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
 import { useGridMinWidth } from '../grid/min-width';
 import { useSessionStore } from '../stores/session';
 import { countryName } from './country';
@@ -163,6 +163,7 @@ const rowClassRules = {
     :theme="gridTheme"
     :theme-css-layer="gridStyleOptions.themeCssLayer"
     :theme-style-container="gridStyleOptions.themeStyleContainer"
+    :locale-text="gridLocaleText"
     :row-data="profiles"
     :column-defs="columnDefs"
     :context="context"
