@@ -128,8 +128,9 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   Rechtsabteilung zum Umgang mit personenbezogenen Daten, keine Frage fehlender Unterlagen); der Weg als Direct Advertiser gilt nur
   für das eigene Werbekonto, Agenturarbeit ist 3P. Der erneute Antrag unter „Muuv“ wurde abgelehnt (Registrierung nicht
   validierbar). Damit gibt es vorerst **keinen Ads-API-Zugang**; er kommt erst mit einer eingetragenen Gesellschaft (Dominiks
-  Entscheidung, ohne Termin). Folgen: 1.10 und die offenen DoD-Punkte warten weiter; Phase 2 wird gegen die Mock-Daten gebaut
-  (`docs/tasks/phase-2.md`); danach greift der Auslöser von 1.11. `phase-0.md` 0.0c bleibt bis zur Entscheidung unverändert.
+  Entscheidung, ohne Termin). **Entschieden (Dominik, 2026-09-28): Phase 2 jetzt beginnen, gegen die Mock-Daten**
+  (`docs/tasks/phase-2.md`); 1.10 und die offenen DoD-Punkte warten auf den Zugang, danach greift der Auslöser von 1.11.
+  `phase-0.md` 0.0c bleibt bis zur Entscheidung über den Zugang unverändert.
 - **F13 – Decimal-Library (ADR 003).** Empfehlung `decimal.js` (Begründung und Alternativen in 1.1).
   **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F14 – Ausgeblendete Profile.** Synchronisieren? Empfehlung **ja**: Ausblenden ist Darstellung, keine Datenentscheidung, und
@@ -883,7 +884,9 @@ Nach F11.
       entspricht, ob SD-Product-Ads im Export ASIN und SKU tragen (siehe bekannte Lücke in 1.9), ob `sdAdvertisedProduct` je Ad und
       Tag genau eine Zeile liefert (Bild-/Video-Ads mit mehreren ASINs; doppelte Zeilen lassen den Import scheitern), ob Vendor-
       Profile `promotedSku` annehmen (ein 400 ließe SD-Reports dauerhaft scheitern), ob `sales` inkl. Views und
-      `impressionsViews` zur Konsole passen und `vCPM`-Kosten sich aus `cost` und `viewable_impressions` nachrechnen lassen.
+      `impressionsViews` zur Konsole passen und `vCPM`-Kosten sich aus `cost` und `viewable_impressions` nachrechnen lassen. Aus
+      Phase 2 (`phase-2.md` F4): ob die Konsole bei Agency-Profilen SP mit 7 Tagen zeigt (wie bei Sellern) und welche Einheiten sie
+      bei SB-Targets zählt (`unitsSoldClicks` fehlt dort).
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
 ### 1.11 Datei-Import (optional, nur mit Auslöser)
