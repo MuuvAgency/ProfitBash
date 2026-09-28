@@ -802,7 +802,7 @@ Nach F11.
     - Review (unabhängig): keine kritischen oder wichtigen Befunde. Übernommen: `exists` statt Lesen aller Kampagnen, Spalten der
       „Daten bis“-SQL über Drizzle statt als Text, API-Test mit SB-Kampagne (`null`, dann Minimum), 1.10-Punkte zu `sbSearchTerm` und
       SB-Negatives, Verweis in `plan.md`. Flake von `data-sync.test.ts` danach behoben (siehe oben).
-- [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
+- [x] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
       view-basiert, Spalten entsprechend (`extra` oder eigene Spalten, beim Umsetzen entscheiden).
   - **Doku-Abgleich 2026-09-28** (Report-Typ-Seiten Campaign, Ad group, Targeting, Advertised product, Spalten-Seite, Exports-Guide):
     `sdCampaigns` (groupBy `campaign`), `sdAdGroup` (`adGroup`), `sdTargeting` (`targeting`), `sdAdvertisedProduct` (`advertiser`),
@@ -821,6 +821,30 @@ Nach F11.
       `viewable_impressions` (`bigint`) in allen fünf Kennzahl-Tabellen (SP/SB `null`). Mehr View-Kennzahlen nicht.
     - SD-Same-SKU (`salesPromotedClicks`, `purchasesPromotedClicks`) in `sales_same_sku_14d`/`purchases_same_sku_14d`; bei SD
       klick-basiert, also gegen `*_clicks_14d` zu lesen (Hinweis in `plan.md` §5). `units_same_sku_14d` bleibt `null`.
+  - Umsetzung (Stand für 1.10 und Phase 2):
+    - **Sichtbare Impressionen:** `viewable_impressions` (`bigint`) in allen fünf Kennzahl-Tabellen (Migration
+      `0014_amazon_ads_metrics_viewable_impressions`), in `DailyMetricValues` und `AmazonAdsDailyMetricValues` als
+      `viewableImpressions`; SP und SB setzen `null`.
+    - **Reports** (`reports.ts`): `sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct` (Ebenen `campaign`, `adGroup`,
+      `target`, `productAd`, kein Suchbegriff-Report), `retentionDays` 65, Spalten siehe Doku-Abgleich; ein Test prüft die Listen
+      genau. Zeilen-Schemas: `sales`/`purchases`/`unitsSold` → `*14d`, `…Clicks` → `*Clicks14d`, `…PromotedClicks` →
+      `*SameSku14d`, `impressionsViews` → `viewableImpressions`; `targetingId` ist die Target-ID (Pflicht), `promotedAsin`/
+      `promotedSku` → `asin`/`sku`. Gemeinsame Ad-Group-Spalten von SB und SD heißen jetzt `AD_GROUP_REPORT_COLUMNS`.
+    - **Ad-Typen je Profil:** SD in `REPORT_AD_PRODUCT_SELECTION.withCampaigns` (wie SB: Reports und „Daten bis“ nur für Profile mit
+      SD-Kampagne) und in `ENTITY_AD_PRODUCTS` (für jedes Profil). Folge: je Profil täglich drei Export-Batches; das Limit
+      `MAX_RUNNING_EXPORTS_PER_TYPE` (5 je Connection) greift schon ab dem zweiten Profil, die übrigen warten auf den Poll. Die
+      Historie (65 Tage) braucht zwei 31-Tage-Stücke je Typ, zusammen mit dem Fenster zwölf SD-Reports beim ersten Lauf.
+    - **Exports:** keine Code-Änderung nötig; ein Test belegt Taktik als `targetingType`, `costType` in `extra`, Targets ohne
+      `campaignId` (Zielgruppe, Produkt, Kategorie, Negative auf Ad-Group-Ebene), Product-Ads nur mit SKU (`asin` `null`) und
+      Bild-Ads mit mehreren ASINs (`extra.asins`). Kommentare in `exports.ts` nennen SD.
+    - **Mock** (`mock-data.ts`): SD nur für das DE-Profil (vCPM-Kampagne `T00030` mit Zielgruppe, CPC-Kampagne `T00020` mit
+      Produkt- und Kategorie-Target, ein Negative, ein Product-Ad nur mit SKU, ein Bild-Ad mit zwei ASINs). SD-Reports mit
+      View-Anteil, Same-SKU als Teil des Klick-Anteils und sichtbaren Impressionen (Kampagne = Summe der Ad Groups).
+    - **DoD-Test** (`data-sync.test.ts`): SD-Entities mit dem ersten Lauf, SD-Kennzahlen in vier Tabellen (keine Suchbegriffe) mit dem
+      nächsten `reports-sync`, `viewable_impressions` nur bei SD; „Daten bis“ wartet auf SB und SD.
+    - **Bekannte Lücke (1.10 prüfen):** Der Export überschreibt die ASIN, die ein Report-Platzhalter mitgebracht hat. Nennt Amazon
+      bei SD-Product-Ads von Sellern nur die SKU, bleibt `asin` in `amazon_ads_product_ads` leer, obwohl `sdAdvertisedProduct` sie
+      liefert. Falls ja: ASIN aus dem Report übernehmen, wenn der Export keine nennt.
 
 ### 1.10 Erster echter Lauf (nach der Freigabe)
 - [ ] Ein Profil mit echten Kampagnen synchronisieren, Zählwerte gegen die Amazon-Konsole abgleichen (Stichprobe: Kosten und Klicks einer
@@ -841,7 +865,13 @@ Nach F11.
       angefordert), ob SB-Kennzahlen (`sales` inkl. Views) zur Konsole passen, ob SB-Ads im Export `creative.products` tragen, ob
       `sbSearchTerm` für Themen- und Produkt-Targets immer `keywordId` liefert (sonst zählen die Zeilen als ungültig: kein Löschen im
       Fenster, bei nur ungültigen Zeilen Ablehnung), ob SB-Exports Negatives ohne Ad Group (Kampagnenebene) enthalten und ob sie dann
-      `campaignId` tragen (sonst nicht auflösbar: der SB-Batch setzt nie `removed_at`).
+      `campaignId` tragen (sonst nicht auflösbar: der SB-Batch setzt nie `removed_at`). Aus 1.9 (SD): ob Amazon SD-Exports und
+      -Reports für Profile ohne SD (Vendor ohne SD, Marktplatz ohne SD) leer liefert oder ablehnt (wie bei SB), wie sich der dritte
+      Export-Batch je Profil auf das Export-Limit und die Laufzeit auswirkt, ob `sdTargeting` `targetingId` der Export-`targetId`
+      entspricht, ob SD-Product-Ads im Export ASIN und SKU tragen (siehe bekannte Lücke in 1.9), ob `sdAdvertisedProduct` je Ad und
+      Tag genau eine Zeile liefert (Bild-/Video-Ads mit mehreren ASINs; doppelte Zeilen lassen den Import scheitern), ob Vendor-
+      Profile `promotedSku` annehmen (ein 400 ließe SD-Reports dauerhaft scheitern), ob `sales` inkl. Views und
+      `impressionsViews` zur Konsole passen und `vCPM`-Kosten sich aus `cost` und `viewable_impressions` nachrechnen lassen.
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
 ### 1.11 Datei-Import (optional, nur mit Auslöser)
