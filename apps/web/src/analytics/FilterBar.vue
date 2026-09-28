@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ATTRIBUTION_SETTINGS, formatDay } from '@profitbash/shared';
+import { ATTRIBUTION_SETTINGS, formatDay, MAX_ANALYTICS_RANGE_DAYS } from '@profitbash/shared';
 import DatePicker from 'primevue/datepicker';
 import Select from 'primevue/select';
 import TreeSelect from 'primevue/treeselect';
-import { computed, useId } from 'vue';
+import { computed, ref, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
@@ -20,6 +20,7 @@ import {
   COMPARISON_MODES,
   comparisonRange,
   PERIOD_PRESETS,
+  rangeDays,
   resolvePeriod,
   todayInBrowser,
   type ComparisonMode,
@@ -52,7 +53,6 @@ const ids = {
 
 const state = computed(() => props.filters.state.value);
 const options = computed(() => props.filters.options.data.value);
-const today = todayInBrowser();
 
 // --- Clients und Profile ----------------------------------------------------------------
 
@@ -108,7 +108,7 @@ const periodOptions = computed(() =>
   PERIOD_PRESETS.map((preset) => ({ value: preset, label: t(`analytics.period.${preset}`) })),
 );
 
-const range = computed(() => resolvePeriod(state.value.period, today));
+const range = computed(() => resolvePeriod(state.value.period, props.filters.today.value));
 const comparison = computed(() => comparisonRange(range.value, state.value.comparison));
 
 function onPresetChange(preset: PeriodPreset) {
@@ -126,14 +126,18 @@ const pickerValue = computed(() =>
   }),
 );
 
+/** Zu langer Zeitraum: Hinweis statt still auf den Standard zurückzufallen (die API nimmt höchstens 400 Tage). */
+const rangeError = ref(false);
+
 function onRangeChange(value: unknown) {
   if (!Array.isArray(value)) return;
   const [from, to] = value as (Date | null)[];
   // Erst mit beiden Enden übernehmen, sonst stünde ein halber Zeitraum in der URL.
   if (!(from instanceof Date) || !(to instanceof Date)) return;
-  props.filters.update({
-    period: { preset: 'custom', range: { from: todayInBrowser(from), to: todayInBrowser(to) } },
-  });
+  const picked = { from: todayInBrowser(from), to: todayInBrowser(to) };
+  rangeError.value = rangeDays(picked) > MAX_ANALYTICS_RANGE_DAYS;
+  if (rangeError.value) return;
+  props.filters.update({ period: { preset: 'custom', range: picked } });
 }
 
 const previousYearAvailable = computed(() => {
@@ -253,7 +257,6 @@ const day = (value: string) => formatDay(value, locale.value);
           :options="currencyOptions"
           option-label="label"
           option-value="value"
-          :title="t('analytics.currency.autoHint')"
           class="w-full"
           @update:model-value="(currency: string) => filters.update({ currency })"
         />
@@ -277,6 +280,10 @@ const day = (value: string) => formatDay(value, locale.value);
       </div>
     </div>
 
+    <InlineError
+      v-if="rangeError"
+      :message="t('analytics.filter.rangeTooLong', { days: MAX_ANALYTICS_RANGE_DAYS })"
+    />
     <div
       v-if="options"
       class="flex flex-wrap items-center gap-x-space-md gap-y-space-xs text-body-sm text-ink-secondary"

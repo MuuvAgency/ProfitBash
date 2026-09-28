@@ -125,4 +125,72 @@ describe('useAnalyticsFilters', () => {
     expect(filters.ready.value).toBe(true);
     expect(filters.state.value).toEqual(DEFAULT_FILTER_STATE);
   });
+
+  it('Zurück nach der ersten Änderung zeigt wieder den vorigen Zustand', async () => {
+    stubFetch(routes(null));
+    const { router } = await mountWithApp(Probe, { path: '/dashboard' });
+    await flushPromises();
+    filters.update({ period: { preset: 'last7' } });
+    await flushPromises();
+    expect(filters.state.value.period).toEqual({ preset: 'last7' });
+
+    router.back();
+    await vi.waitFor(() => expect(router.currentRoute.value.query).toEqual({}));
+    await flushPromises();
+    expect(filters.state.value).toEqual(DEFAULT_FILTER_STATE);
+  });
+
+  it('Zurück stellt auch die Profilauswahl wieder her (je Verlaufseintrag)', async () => {
+    stubFetch(routes(null));
+    const { router } = await mountWithApp(Probe, { path: '/dashboard' });
+    await flushPromises();
+    filters.update({ clientIds: [C1, C2], profileIds: [P1, P2] });
+    await flushPromises();
+    filters.update({ clientIds: [C1, C2], profileIds: [P2] });
+    await flushPromises();
+    expect(filters.state.value.profileIds).toEqual([P2]);
+
+    router.back();
+    await vi.waitFor(() => expect(filters.state.value.profileIds).toEqual([P1, P2]));
+  });
+
+  it('Änderung, während die gespeicherte Auswahl noch lädt, wird nicht überschrieben', async () => {
+    let resolveStored: (response: Response) => void = () => {};
+    stubFetch({
+      ...routes(null),
+      'GET /api/settings/ui-state/analytics/filters': () =>
+        new Promise<Response>((resolve) => (resolveStored = resolve)),
+    });
+    await mountWithApp(Probe, { path: '/dashboard' });
+    await flushPromises();
+    expect(filters.ready.value).toBe(false);
+    filters.update({ clientIds: [C1], profileIds: [P1] });
+    await flushPromises();
+    resolveStored(json({ value: { ...DEFAULT_FILTER_STATE, clientIds: [C2], profileIds: [P2] } }));
+    await flushPromises();
+    expect(filters.state.value).toMatchObject({ clientIds: [C1], profileIds: [P1] });
+  });
+
+  it('schnelle Änderungen: gespeichert wird nacheinander, zuletzt der letzte Stand', async () => {
+    const bodies: unknown[] = [];
+    let release: () => void = () => {};
+    stubFetch({
+      ...routes(null),
+      'PUT /api/settings/ui-state/analytics/filters': async ({ body }) => {
+        bodies.push(body);
+        if (bodies.length === 1) await new Promise<void>((resolve) => (release = resolve));
+        return new Response(null, { status: 204 });
+      },
+    });
+    await mountWithApp(Probe, { path: '/dashboard' });
+    await flushPromises();
+    filters.update({ period: { preset: 'last7' } });
+    filters.update({ period: { preset: 'last14' } });
+    filters.update({ period: { preset: 'lastMonth' } });
+    await flushPromises();
+    expect(bodies).toHaveLength(1);
+    release();
+    await vi.waitFor(() => expect(bodies).toHaveLength(2));
+    expect((bodies[1] as { value: FilterState }).value.period).toEqual({ preset: 'lastMonth' });
+  });
 });

@@ -46,8 +46,8 @@ export const DEFAULT_FILTER_STATE: FilterState = Object.freeze({
   attribution: DEFAULT_ATTRIBUTION_SETTING,
 }) as FilterState;
 
-/** Höchstzahl gespeicherter Profile (ui_state hat 16 KB). */
-const MAX_STORED_PROFILES = 300;
+/** Höchstzahl gespeicherter Profile, wie die API (`profileIds` bis 1000). `ui_state` fasst 16 KB, also rund 400 IDs. */
+const MAX_STORED_PROFILES = 1000;
 
 /** Parameter der Filterleiste in der URL. Andere Parameter (Reiter, Drill-Down) gehören der Seite. */
 export const FILTER_QUERY_KEYS = [
@@ -104,11 +104,12 @@ export function parseStoredFilters(value: unknown): FilterState | null {
   if (typeof value !== 'object' || value === null) return null;
   const v = value as Record<string, unknown>;
   const clientIds = uuidList(v.clientIds, 500);
-  const profileIds = v.profileIds === null ? null : uuidList(v.profileIds, MAX_STORED_PROFILES);
+  // Eine ungültige Profilliste kostet nur die Profilauswahl, nicht die ganze Auswahl.
+  const profileIds =
+    v.profileIds === null ? null : (uuidList(v.profileIds, MAX_STORED_PROFILES) ?? null);
   const p = v.period as Record<string, unknown> | undefined;
   if (
     clientIds === undefined ||
-    profileIds === undefined ||
     typeof v.withoutClient !== 'boolean' ||
     !isPeriodPreset(p?.preset) ||
     !isComparisonMode(v.comparison) ||
@@ -196,9 +197,10 @@ export interface FilterOptionsLike {
  */
 export function sanitizeFilterState(state: FilterState, options: FilterOptionsLike): FilterState {
   const clientIds = state.clientIds.filter((id) => options.clients.some((c) => c.id === id));
-  const all = clientIds.length === 0 && !state.withoutClient;
+  const withoutClient = state.withoutClient && options.profiles.some((p) => p.clientId === null);
+  const all = clientIds.length === 0 && !withoutClient;
   const inSelection = (clientId: string | null) =>
-    all || (clientId === null ? state.withoutClient : clientIds.includes(clientId));
+    all || (clientId === null ? withoutClient : clientIds.includes(clientId));
   const profileIds =
     state.profileIds?.filter((id) => {
       const profile = options.profiles.find((p) => p.id === id);
@@ -208,7 +210,13 @@ export function sanitizeFilterState(state: FilterState, options: FilterOptionsLi
     state.currency !== 'auto' && options.currencies && !options.currencies.includes(state.currency)
       ? 'auto'
       : state.currency;
-  return { ...state, clientIds, profileIds: profileIds?.length ? profileIds : null, currency };
+  return {
+    ...state,
+    clientIds,
+    withoutClient,
+    profileIds: profileIds?.length ? profileIds : null,
+    currency,
+  };
 }
 
 export interface AnalyticsQueryBody {
