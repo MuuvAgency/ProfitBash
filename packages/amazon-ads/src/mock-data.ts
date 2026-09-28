@@ -111,6 +111,11 @@ export interface MockAccount {
   adGroups: MockAdGroup[];
   targets: MockTarget[];
   ads: MockAd[];
+  /**
+   * Feste Prüfwerte am ersten Tag jedes Report-Zeitraums (`adGroupMetrics`). Standard ja; die Demo-Daten mit Volumen
+   * schalten sie ab, sonst hätte jeder Tag eines täglichen Imports einen Umsatz von 1,2 Mio.
+   */
+  exactValueProbe?: boolean;
 }
 
 /**
@@ -758,7 +763,7 @@ function daysBetween(startDate: string, endDate: string): string[] {
  * (`0.005` Kosten, `1234567.89` Umsatz), damit exakte Beträge im Demo-Betrieb sichtbar geprüft werden.
  */
 function adGroupMetrics(account: MockAccount, adGroupId: string, date: string, first: boolean) {
-  if (first && adGroupId === account.adGroups[0]?.id) {
+  if (first && account.exactValueProbe !== false && adGroupId === account.adGroups[0]?.id) {
     return {
       ...(metricsFor(adGroupId, date) ?? metricsFor(adGroupId, `${date}+`)!),
       costMilli: 5,

@@ -204,7 +204,15 @@ function seedOf(text: string): number {
 /** Konto eines Demo-Profils. Unbekannte Profile bekommen ein leeres Konto. */
 export function largeMockAccount(profile: MockProfile): MockAccount {
   const index = LARGE_MOCK_PROFILES.findIndex((p) => p.amazonProfileId === profile.amazonProfileId);
-  const empty = { profile, portfolios: [], campaigns: [], adGroups: [], targets: [], ads: [] };
+  const empty = {
+    profile,
+    portfolios: [],
+    campaigns: [],
+    adGroups: [],
+    targets: [],
+    ads: [],
+    exactValueProbe: false,
+  };
   if (index < 0) return empty;
 
   const rnd = random(seedOf(`profitbash-demo-${profile.amazonProfileId}`));
@@ -516,5 +524,5 @@ export function largeMockAccount(profile: MockProfile): MockAccount {
     }
   }
 
-  return { profile, portfolios, campaigns, adGroups, targets, ads };
+  return { profile, portfolios, campaigns, adGroups, targets, ads, exactValueProbe: false };
 }
