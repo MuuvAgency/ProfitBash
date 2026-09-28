@@ -2,7 +2,7 @@ import type { AmazonAdsExportType } from './exports';
 import { REPORT_DEFINITIONS, type AmazonAdsReportType } from './reports';
 
 /**
- * Synthetische Werbedaten für den Mock-Anbieter (SP, SB): Entities je Profil und Tageskennzahlen je Ebene.
+ * Synthetische Werbedaten für den Mock-Anbieter (SP, SB, SD): Entities je Profil und Tageskennzahlen je Ebene.
  * Deterministisch (gleiche Eingabe, gleiche Datei), damit ein zweiter Sync nichts ändert.
  *
  * Abgedeckt: große IDs als JSON-Zahl (über `Number.MAX_SAFE_INTEGER`), Beträge mit vielen Nachkommastellen
