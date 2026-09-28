@@ -91,10 +91,12 @@ describe('buildTimeSeriesOptions', () => {
       type: 'range',
       label: { text: 'Vorläufig' },
     });
-    // Ein halber Tag zu beiden Seiten, damit auch der Balken des Randtages ganz im Bereich liegt.
+    // Tagesachse mit Bändern (`unit-time`): Der Bereich deckt die Bänder der Randtage ganz ab.
+    expect((options.axes?.x as { type: string; unit: string }).type).toBe('unit-time');
+    expect((options.axes?.x as { unit: string }).unit).toBe('day');
     const [start, end] = (crossLines[0] as { range: [Date, Date] }).range;
-    expect(start).toEqual(new Date(2026, 8, 1, 12));
-    expect(end).toEqual(new Date(2026, 8, 2, 12));
+    expect(start).toEqual(new Date(2026, 8, 2));
+    expect(end).toEqual(new Date(2026, 8, 2));
   });
 
   it('ohne vorläufige Tage im Zeitraum kein Bereich', () => {

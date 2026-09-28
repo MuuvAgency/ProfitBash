@@ -95,7 +95,10 @@ const points = computed(() => {
             <h3 class="text-body-sm text-on-panel-muted">{{ metric.label }}</h3>
             <HintBadge v-for="hint in metric.hints" :key="hint.kind" :hint="hint" on-dark />
           </div>
-          <p data-kpi-value class="font-data text-headline-lg text-on-panel sm:text-data-hero">
+          <p
+            data-kpi-value
+            class="whitespace-nowrap font-data text-headline-lg text-on-panel 2xl:text-data-hero"
+          >
             <span v-if="metric.hints.some((h) => h.kind === 'approx')" aria-hidden="true">≈ </span
             >{{ metric.value }}
           </p>

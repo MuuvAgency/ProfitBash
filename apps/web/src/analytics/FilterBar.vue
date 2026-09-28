@@ -186,14 +186,14 @@ const day = (value: string) => formatDay(value, locale.value);
     />
     <div
       v-else-if="!options"
-      class="grid grid-cols-1 gap-space-md sm:grid-cols-2 xl:grid-cols-[2fr_1.4fr_1fr_1fr_1.2fr]"
+      class="grid grid-cols-1 gap-space-md sm:grid-cols-2 xl:grid-cols-[1.7fr_1.3fr_1.15fr_1.15fr_1.25fr]"
       aria-hidden="true"
     >
       <SkeletonBlock v-for="n in 5" :key="n" height="3.5rem" />
     </div>
     <div
       v-else
-      class="grid grid-cols-1 gap-space-md sm:grid-cols-2 xl:grid-cols-[2fr_1.4fr_1fr_1fr_1.2fr]"
+      class="grid grid-cols-1 gap-space-md sm:grid-cols-2 xl:grid-cols-[1.7fr_1.3fr_1.15fr_1.15fr_1.25fr]"
     >
       <div class="flex min-w-0 flex-col gap-space-xs sm:col-span-2 xl:col-span-1">
         <label :for="ids.selection" class="text-label-eyebrow uppercase text-ink-tertiary">
