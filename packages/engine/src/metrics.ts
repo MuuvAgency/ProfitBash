@@ -2,7 +2,9 @@ import { Dec, formatDecimal, parseDecimal, type DecimalString } from './decimal'
 
 /**
  * Summen einer Zeile oder Auswahl in einer Währung. `null` heißt: Amazon liefert den Wert für diesen Ad-Typ
- * oder diese Ebene nicht (Anzeige „–“, nie 0).
+ * oder diese Ebene nicht (Anzeige „–“, nie 0). `sales` und `purchases` stammen aus denselben Zeilen wie
+ * `cost`; fehlen sie in einem Teil der Zeilen (`summarizeAttribution`: `partial`), übergibt der Aufrufer
+ * `null`, damit ACoS, ROAS und CVR nicht aus ungleichen Mengen entstehen.
  */
 export interface MetricTotals {
   impressions: DecimalString;
@@ -12,6 +14,8 @@ export interface MetricTotals {
   purchases: DecimalString | null;
   /** Sichtbare Impressionen (nur SD, Basis für vCPM). */
   viewableImpressions: DecimalString | null;
+  /** Kosten nur der Zeilen mit sichtbaren Impressionen (SD), damit vCPM gemischter Summen stimmt. */
+  viewableCost: DecimalString | null;
 }
 
 /** Abgeleitete Kennzahlen; Anteile als Bruch (0.25 = 25 %), `null` bei fehlendem Wert oder Division durch 0. */
@@ -32,7 +36,10 @@ export function sumDecimals(values: readonly DecimalString[]): DecimalString {
   return formatDecimal(values.reduce((sum, value) => sum.plus(parseDecimal(value)), new Dec(0)));
 }
 
-/** Summe über Werte, die fehlen können: Fehlende zählen nicht als 0, die Lücke steht in `coverage`. */
+/**
+ * Summe über Werte, die fehlen können: Fehlende zählen nicht als 0, die Lücke steht in `coverage`. Eine leere
+ * Liste ergibt `0` (vollständig); ob es überhaupt Zeilen gibt, zeigt die Oberfläche als Empty-Zustand.
+ */
 export function sumWithGaps(values: readonly (DecimalString | null)[]): {
   value: DecimalString | null;
   coverage: Coverage;
@@ -57,7 +64,7 @@ function ratio(
 }
 
 export function deriveMetrics(totals: MetricTotals): DerivedMetrics {
-  const { impressions, clicks, cost, sales, purchases, viewableImpressions } = totals;
+  const { impressions, clicks, cost, sales, purchases, viewableImpressions, viewableCost } = totals;
   return {
     ctr: ratio(clicks, impressions),
     cpc: ratio(cost, clicks),
@@ -65,7 +72,7 @@ export function deriveMetrics(totals: MetricTotals): DerivedMetrics {
     acos: ratio(cost, sales),
     roas: ratio(sales, cost),
     cpm: ratio(cost, impressions, 1000),
-    vcpm: ratio(cost, viewableImpressions, 1000),
+    vcpm: ratio(viewableCost, viewableImpressions, 1000),
   };
 }
 

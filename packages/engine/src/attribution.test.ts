@@ -209,6 +209,26 @@ describe('summarizeAttribution', () => {
     ).toBe('none');
   });
 
+  it('nennt keine Same-SKU-Grundlage, wo Amazon kein Same-SKU liefert (SB-Suchbegriffe)', () => {
+    expect(select('SPONSORED_BRANDS', 'searchTerm', 'console').sameSkuBasis).toBeNull();
+    const summary = summarizeAttribution([
+      select('SPONSORED_PRODUCTS', 'searchTerm', 'console'),
+      select('SPONSORED_BRANDS', 'searchTerm', 'console'),
+    ]);
+    expect(summary.sameSkuMixed).toBe(false);
+    expect(summary.mixed).toBe(true);
+  });
+
+  it('nennt keine Grundlage für Ebenen ohne Report und zählt sie nicht als gemischt', () => {
+    const sdSearchTerm = select('SPONSORED_DISPLAY', 'searchTerm', 'console');
+    expect(sdSearchTerm.basis).toBeNull();
+    expect(sdSearchTerm.sameSkuBasis).toBeNull();
+    expect(
+      summarizeAttribution([select('SPONSORED_PRODUCTS', 'searchTerm', 'console'), sdSearchTerm])
+        .mixed,
+    ).toBe(false);
+  });
+
   it('ist ohne Auswahl vollständig und nicht gemischt', () => {
     const summary = summarizeAttribution([]);
     expect(summary.mixed).toBe(false);
