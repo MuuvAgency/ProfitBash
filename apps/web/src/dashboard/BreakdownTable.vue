@@ -35,10 +35,7 @@ const viewOptions = computed(() => [
 ]);
 
 const COLUMNS: MetricKey[] = ['cost', 'sales', 'acos', 'roas', 'purchases', 'clicks', 'cpc'];
-const columnLabel = (key: MetricKey) =>
-  key === 'cpc'
-    ? 'CPC'
-    : t(`dashboard.kpi.${key as 'cost' | 'sales' | 'acos' | 'roas' | 'purchases' | 'clicks'}`);
+const columnLabel = (key: MetricKey) => t(`dashboard.kpi.${key}`);
 
 const sort = ref<{ key: MetricKey; descending: boolean } | null>(null);
 function toggleSort(key: MetricKey) {

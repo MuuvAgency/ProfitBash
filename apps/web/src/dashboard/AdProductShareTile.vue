@@ -28,6 +28,7 @@ const rows = computed(() => {
     key: group.key ?? '',
     label: t(`analytics.adProduct.${group.key}`),
     spend: metricView('cost', group, d.meta, locale.value),
+    sales: metricView('sales', group, d.meta, locale.value),
     acos: metricView('acos', group, d.meta, locale.value),
     shareCost: group.share?.cost ?? null,
     shareSales: group.share?.sales ?? null,
@@ -69,14 +70,21 @@ const sbGap = computed(() =>
         <div class="flex flex-wrap items-baseline justify-between gap-x-space-sm">
           <span class="flex items-center gap-space-xs text-body-md font-medium text-ink">
             {{ row.label }}
-            <HintBadge v-for="hint in row.acos.hints" :key="hint.kind" :hint="hint" />
+            <HintBadge
+              v-for="hint in [...row.spend.hints, ...row.acos.hints].filter(
+                (h, i, all) => h.kind !== 'approx' && all.findIndex((o) => o.kind === h.kind) === i,
+              )"
+              :key="hint.kind"
+              :hint="hint"
+            />
           </span>
           <span class="font-data text-data-md text-ink">
             <span v-if="row.spend.hints.some((h) => h.kind === 'approx')" aria-hidden="true"
               >≈ </span
             >{{ row.spend.value }}
             <span class="text-ink-tertiary">
-              · {{ t('dashboard.adProducts.acos', { value: row.acos.value }) }}</span
+              · {{ t('dashboard.adProducts.sales', { value: row.sales.value }) }} ·
+              {{ t('dashboard.adProducts.acos', { value: row.acos.value }) }}</span
             >
           </span>
         </div>

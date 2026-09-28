@@ -431,23 +431,23 @@ export const de = {
       roas: 'ROAS',
       purchases: 'Käufe (Ads)',
       clicks: 'Klicks',
-      cpc: 'CPC {value}',
+      cpc: 'CPC',
     },
     adProducts: {
       title: 'Anteil je Ad-Typ',
       spendShare: 'Anteil am Spend',
       salesShare: 'Anteil am Umsatz',
       acos: 'ACoS {value}',
+      sales: 'Umsatz {value}',
       empty: 'Keine Kennzahlen im gewählten Zeitraum.',
       sbGap: '{count} SB-Kampagne ohne Kennzahlen | {count} SB-Kampagnen ohne Kennzahlen',
       sbGapText:
-        'Amazon liefert für Sponsored-Brands-Kampagnen ohne mehrere Ad Groups über Reporting v3 noch keine Kennzahlen (Preview). Ihr Spend und Umsatz fehlen in allen Summen.',
+        'Diese Kampagnen haben noch nie Kennzahlen geliefert. Meist liegt das daran, dass Amazon für Sponsored-Brands-Kampagnen ohne mehrere Ad Groups über Reporting v3 noch keine Kennzahlen liefert (Preview); neue Kampagnen ohne Auslieferung zählen hier ebenfalls mit. Ihr Spend und Umsatz fehlen in allen Summen.',
     },
     breakdown: {
       title: 'Nach Client und Profil',
       byClient: 'Clients',
       byProfile: 'Profile',
-      view: 'Ansicht',
       name: 'Name',
       withoutClient: 'Ohne Client',
       openExplorer: 'Im Explorer öffnen: {name}',
@@ -467,7 +467,8 @@ export const de = {
         'Die Wechselkurse sind älter als 5 Tage. Umgerechnete Summen nutzen den letzten Kurs.',
       profilesWithoutData:
         '{count} Profil hat noch keinen Datenstand. | {count} Profile haben noch keinen Datenstand.',
-      adProductBehind: '{adProduct}: Daten bis {date}',
+      adProductBehind:
+        '{adProduct}: Daten bis {date}, in {count} Profil hinter den anderen Ad-Typen | {adProduct}: Daten bis {date}, in {count} Profilen hinter den anderen Ad-Typen',
       adProductMissing: '{adProduct}: noch kein Datenstand',
       beforeEarliest: 'Der Zeitraum beginnt vor dem ersten Tag mit Daten ({date}).',
     },

@@ -312,20 +312,6 @@ describe('POST /api/ads/filter-options', () => {
     expect(res.body.fxRatesThrough).toBe('2026-09-02');
     expect(res.body.fxRatesStale).toBe(true);
   });
-
-  it('Anteil je Ad-Typ an Spend und Umsatz, dazu der Datenstand (F11)', async () => {
-    const res = await post<DashboardResponse>('/api/ads/dashboard', query(), admin);
-    expect(res.status).toBe(200);
-    expect(res.body.byAdProduct.map((group) => group.share)).toEqual([
-      { cost: '1', sales: expect.anything() },
-    ]);
-    expect(res.body.byClient.every((group) => group.share === undefined)).toBe(true);
-    expect(res.body.status).toEqual({
-      lastSyncAt: null,
-      adProducts: [expect.objectContaining({ adProduct: SP })],
-      sbCampaignsWithoutMetrics: 0,
-    });
-  });
 });
 
 describe('POST /api/ads/explorer/rows', () => {
@@ -445,12 +431,15 @@ describe('POST /api/ads/dashboard', () => {
     const res = await post<DashboardResponse>('/api/ads/dashboard', query(), admin);
     expect(res.status).toBe(200);
     expect(res.body.byAdProduct.map((group) => group.share)).toEqual([
-      { cost: '1', sales: expect.anything() },
+      // Nur SP in der Auswahl: ganzer Anteil (Decimal aus der Engine).
+      { cost: '1', sales: '1' },
     ]);
     expect(res.body.byClient.every((group) => group.share === undefined)).toBe(true);
     expect(res.body.status).toEqual({
       lastSyncAt: null,
-      adProducts: [expect.objectContaining({ adProduct: SP })],
+      adProducts: [
+        expect.objectContaining({ adProduct: SP, profilesBehind: 0 }),
+      ],
       sbCampaignsWithoutMetrics: 0,
     });
   });

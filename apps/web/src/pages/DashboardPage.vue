@@ -4,8 +4,8 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { RouterLink } from 'vue-router';
 import FilterBar from '../analytics/FilterBar.vue';
+import ChangePill from '../analytics/ChangePill.vue';
 import KpiTile from '../analytics/KpiTile.vue';
-import { formatMetricValue } from '../analytics/metrics';
 import { resolvePeriod } from '../analytics/periods';
 import { useAnalyticsFilters } from '../analytics/useAnalyticsFilters';
 import EmptyState from '../components/common/EmptyState.vue';
@@ -46,12 +46,13 @@ const kpis = computed(() => {
   });
   return {
     tiles: [view('acos'), view('roas'), view('purchases'), view('clicks')],
-    cpc: formatMetricValue('cpc', d.total.current.derived.cpc, {
-      currency: d.meta.currency,
-      locale: locale.value,
-    }),
+    cpc: metricView('cpc', d.total, d.meta, locale.value),
   };
 });
+/** Neue Auswahl lädt, die Werte der vorigen stehen noch da (`keepPreviousData`). */
+const refreshing = computed(
+  () => queries.dashboard.isPlaceholderData.value || queries.heroSeries.isPlaceholderData.value,
+);
 const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
 </script>
 
@@ -76,7 +77,12 @@ const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
       </RouterLink>
     </EmptyState>
 
-    <div v-else class="grid grid-cols-1 gap-gutter lg:grid-cols-12">
+    <div
+      v-else-if="!filters.options.isError.value"
+      class="grid grid-cols-1 gap-gutter transition-opacity lg:grid-cols-12"
+      :class="{ 'opacity-60': refreshing }"
+      :aria-busy="refreshing"
+    >
       <DashboardHero :queries="queries" :range="range" class="lg:col-span-8" />
 
       <div class="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:col-span-4 lg:grid-cols-2">
@@ -100,7 +106,14 @@ const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
             :hints="kpi.hints"
           >
             <template v-if="kpi.key === 'clicks'" #detail>
-              {{ t('dashboard.kpi.cpc', { value: kpis.cpc }) }}
+              <span class="inline-flex flex-wrap items-center gap-space-xs">
+                <span>
+                  {{ t('dashboard.kpi.cpc') }}
+                  <template v-if="kpis.cpc.hints.some((h) => h.kind === 'approx')">≈ </template
+                  >{{ kpis.cpc.value }}
+                </span>
+                <ChangePill metric="cpc" :change="kpis.cpc.change" />
+              </span>
             </template>
           </KpiTile>
         </template>

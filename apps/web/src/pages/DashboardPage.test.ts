@@ -66,13 +66,13 @@ function total(cost: string, sales: string | null, mixed = false) {
     comparison: period('200', '800'),
     change: {
       impressions: noChange,
-      clicks: noChange,
+      clicks: { absolute: '40', relative: '0.1' },
       cost: { absolute: '50', relative: '0.25' },
       sales: { absolute: '200', relative: '0.25' },
       purchases: noChange,
       units: noChange,
       ctr: noChange,
-      cpc: noChange,
+      cpc: { absolute: '-0.01', relative: '-0.02' },
       cvr: noChange,
       acos: { absolute: '0.01', relative: '0.04' },
       roas: noChange,
@@ -110,8 +110,9 @@ function dashboard(patch: Partial<DashboardData> = {}): DashboardData {
     status: {
       lastSyncAt: '2026-09-26T04:10:00.000Z',
       adProducts: [
-        { adProduct: SB, dataThrough: '2026-09-20', profilesWithoutData: 0 },
-        { adProduct: SP, dataThrough: '2026-09-25', profilesWithoutData: 0 },
+        // SB hängt in einem Profil; SP ist nur in einem Profil anderer Zeitzone einen Tag älter (kein Alarm).
+        { adProduct: SB, dataThrough: '2026-09-20', profilesWithoutData: 0, profilesBehind: 1 },
+        { adProduct: SP, dataThrough: '2026-09-19', profilesWithoutData: 0, profilesBehind: 0 },
       ],
       sbCampaignsWithoutMetrics: 3,
     },
@@ -192,7 +193,9 @@ describe('DashboardPage', () => {
     // ACoS gestiegen = schlecht
     expect(acos.find('[data-kpi-change]').attributes('data-tone')).toBe('negative');
     const clicks = tiles.find((tile) => tile.find('[data-kpi-label]').text() === 'Klicks')!;
-    expect(text(clicks)).toContain('CPC 0,50 €');
+    // CPC mit „≈“ (umgerechneter Betrag) und eigener Veränderung
+    expect(text(clicks)).toContain('CPC ≈ 0,50 €');
+    expect(clicks.findAll('[data-kpi-change]')).toHaveLength(2);
     // Hero: Spend und Umsatz, umgerechnet
     const hero = wrapper.find('[data-dashboard-hero]');
     expect(text(hero)).toContain('≈ 250,00 €');
@@ -232,6 +235,8 @@ describe('DashboardPage', () => {
     const share = wrapper.find('[data-dashboard-ad-products]');
     expect(text(share)).toContain('Sponsored Products');
     expect(text(share)).toContain('80,0 %');
+    // Umsatz je Ad-Typ als Betrag
+    expect(text(share)).toContain('900,00 €');
     expect(text(share)).toContain('3 SB-Kampagnen ohne Kennzahlen');
   });
 
@@ -258,6 +263,7 @@ describe('DashboardPage', () => {
     expect(status).toContain('12.09.2026');
     expect(status).toContain('Kurse bis');
     expect(status).toContain('Sponsored Brands: Daten bis 20.09.2026');
+    expect(status).not.toContain('Sponsored Products: Daten bis');
     expect(status).not.toContain('älter als 5 Tage');
   });
 
@@ -334,6 +340,20 @@ describe('DashboardPage', () => {
     expect(text(mounted.wrapper)).toContain('Die Kennzahlen konnten nicht geladen werden.');
     expect(text(mounted.wrapper)).toContain('Erneut versuchen');
     expect(mounted.wrapper.find('section[aria-label="Filter"]').exists()).toBe(true);
+  });
+
+  it('Filteroptionen nicht ladbar: keine ewigen Skeletons, der Fehler steht in der Filterleiste', async () => {
+    stubFetch(
+      routes({
+        'POST /api/ads/filter-options': json({ error: { code: 'SERVER', message: 'x' } }, 500),
+      }),
+    );
+    const { wrapper } = await mountWithApp(undefined, { path: '/dashboard' });
+    await flushPromises();
+    await vi.waitFor(() =>
+      expect(text(wrapper)).toContain('Die Filter konnten nicht geladen werden.'),
+    );
+    expect(wrapper.find('[data-dashboard-hero]').exists()).toBe(false);
   });
 
   it('ohne sichtbare Profile: Hinweis mit Weg zu den Connections (Admin)', async () => {

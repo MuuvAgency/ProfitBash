@@ -1323,13 +1323,25 @@ export async function queryDataStatus(
 }
 
 export interface DashboardStatus {
-  /** Letzter erfolgreicher `reports-sync` einer Connection der Auswahl (ISO-Zeitpunkt). */
+  /**
+   * Ältester „letzter erfolgreicher `reports-sync`“ über die Connections der Auswahl (ISO-Zeitpunkt), damit eine hängende
+   * Connection auffällt; `null`, wenn eine Connection noch nie erfolgreich synchronisiert hat.
+   */
   lastSyncAt: string | null;
   /**
    * „Daten bis“ je Ad-Typ, den die Auswahl nutzt (wie der Sync: `always` immer, sonst nur mit Kampagnen); `null`, solange
    * einem Profil dieser Tag fehlt. Ein Ad-Typ hinter den anderen = hängender Import.
    */
-  adProducts: { adProduct: string; dataThrough: string | null; profilesWithoutData: number }[];
+  adProducts: {
+    adProduct: string;
+    dataThrough: string | null;
+    profilesWithoutData: number;
+    /**
+     * Profile, in denen dieser Ad-Typ hinter einem anderen genutzten Ad-Typ desselben Profils steht (hängender Import).
+     * Je Profil verglichen: Profile in anderen Zeitzonen oder Connections mit späterem Sync lösen nichts aus.
+     */
+    profilesBehind: number;
+  }[];
   /** SB-Kampagnen (nicht entfernt) ohne jede Kennzahl-Zeile: v3-Preview-Lücke (`plan.md` §5). */
   sbCampaignsWithoutMetrics: number;
 }
@@ -1358,25 +1370,38 @@ export async function queryDashboardStatus(
       select distinct c.profile_id, c.ad_product from amazon_ads_campaigns c
         where c.profile_id in (select id from sel) and c.ad_product = any(${textArray(withCampaigns)})
     ),
-    per_product as (
-      select u.ad_product,
-        case when count(*) = count(m.imported_through)
-          then to_char(min(m.imported_through), 'YYYY-MM-DD') end as data_through,
-        (count(*) - count(m.imported_through))::int as profiles_without_data
+    marked as (
+      select u.profile_id, u.ad_product, m.imported_through,
+        max(m.imported_through) over (partition by u.profile_id) as profile_newest
       from used u
       left join amazon_ads_profile_metrics_imported_through m
         on m.profile_id = u.profile_id and m.ad_product = u.ad_product
-      group by u.ad_product
+    ),
+    per_product as (
+      select ad_product,
+        case when count(*) = count(imported_through)
+          then to_char(min(imported_through), 'YYYY-MM-DD') end as data_through,
+        (count(*) - count(imported_through))::int as profiles_without_data,
+        (count(*) filter (where imported_through < profile_newest))::int as profiles_behind
+      from marked
+      group by ad_product
+    ),
+    last_success as (
+      select c.connection_id, max(j.finished_at) as finished_at
+      from (select distinct p.connection_id from amazon_ads_profiles p where p.id in (select id from sel)) c
+      left join job_runs j
+        on j.organization_id = ${selection.orgId} and j.job = 'reports-sync' and j.status = 'success'
+          and j.scope = c.connection_id::text
+      group by c.connection_id
     )
     select
-      (select to_char(max(j.finished_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-        from job_runs j
-        where j.organization_id = ${selection.orgId}
-          and j.job = 'reports-sync' and j.status = 'success'
-          and j.scope in (select p.connection_id::text from amazon_ads_profiles p where p.id in (select id from sel))
+      (select case when count(*) = count(finished_at)
+          then to_char(min(finished_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end
+        from last_success
       ) as last_sync_at,
       (select json_agg(json_build_object('adProduct', ad_product, 'dataThrough', data_through,
-          'profilesWithoutData', profiles_without_data) order by ad_product) from per_product) as ad_products,
+          'profilesWithoutData', profiles_without_data, 'profilesBehind', profiles_behind)
+          order by ad_product) from per_product) as ad_products,
       (select count(*)::int from amazon_ads_campaigns c
         where c.profile_id in (select id from sel) and c.ad_product = 'SPONSORED_BRANDS' and c.removed_at is null
           and not exists (select 1 from amazon_ads_campaign_daily_metrics m
