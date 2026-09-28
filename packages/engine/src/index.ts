@@ -1,2 +1,28 @@
-// Inhalt folgt in späteren Aufgaben von Phase 0 (siehe docs/tasks/phase-0.md).
-export {};
+export { Dec, DECIMAL_PRECISION, formatDecimal, parseDecimal, type DecimalString } from './decimal';
+export {
+  change,
+  deriveMetrics,
+  sumDecimals,
+  sumWithGaps,
+  type Coverage,
+  type DerivedMetrics,
+  type MetricTotals,
+} from './metrics';
+export {
+  AD_PRODUCTS,
+  ATTRIBUTED_FIELDS,
+  METRIC_AVAILABILITY,
+  METRIC_COLUMNS,
+  METRICS_LEVELS,
+  selectAttribution,
+  summarizeAttribution,
+  type AdProduct,
+  type AttributedField,
+  type AttributionBasis,
+  type AttributionSelection,
+  type AttributionSetting,
+  type AttributionSummary,
+  type MetricColumn,
+  type MetricsLevel,
+  type SelectAttributionInput,
+} from './attribution';
