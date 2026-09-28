@@ -2012,6 +2012,9 @@
               "$ref": "#/components/schemas/DashboardGroup"
             }
           },
+          "status": {
+            "$ref": "#/components/schemas/DashboardStatus"
+          },
           "fxRatesThrough": {
             "type": [
               "string",
@@ -2029,6 +2032,7 @@
           "byClient",
           "byProfile",
           "byAdProduct",
+          "status",
           "fxRatesThrough",
           "fxRatesStale"
         ]
@@ -2079,6 +2083,27 @@
           },
           "currencyCode": {
             "type": "string"
+          },
+          "share": {
+            "type": "object",
+            "properties": {
+              "cost": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sales": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "cost",
+              "sales"
+            ]
           }
         },
         "required": [
@@ -2088,6 +2113,51 @@
           "attribution",
           "key",
           "label"
+        ]
+      },
+      "DashboardStatus": {
+        "type": "object",
+        "properties": {
+          "lastSyncAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "adProduct": {
+                  "type": "string"
+                },
+                "dataThrough": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date"
+                },
+                "profilesWithoutData": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "adProduct",
+                "dataThrough",
+                "profilesWithoutData"
+              ]
+            }
+          },
+          "sbCampaignsWithoutMetrics": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lastSyncAt",
+          "adProducts",
+          "sbCampaignsWithoutMetrics"
         ]
       },
       "AnalyticsQuery": {

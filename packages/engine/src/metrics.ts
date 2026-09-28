@@ -63,6 +63,14 @@ function ratio(
   return formatDecimal(parseDecimal(numerator).times(factor).div(divisor));
 }
 
+/** Anteil `part` an `total` als Bruch (0.25 = 25 %); `null` ohne Werte oder bei Gesamtwert 0. */
+export function share(
+  part: DecimalString | null,
+  total: DecimalString | null,
+): DecimalString | null {
+  return ratio(part, total);
+}
+
 export function deriveMetrics(totals: MetricTotals): DerivedMetrics {
   const { impressions, clicks, cost, sales, purchases, viewableImpressions, viewableCost } = totals;
   return {

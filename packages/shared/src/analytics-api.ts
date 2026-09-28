@@ -292,8 +292,28 @@ const dashboardGroupSchema = metricsTotalSchema
     label: z.string().nullable(),
     countryCode: z.string().optional(),
     currencyCode: z.string().optional(),
+    /** Nur je Ad-Typ: Anteil an Spend und Umsatz der Gesamtsumme (Bruch), `null` ohne Gesamtwert. */
+    share: z.object({ cost: amount, sales: amount }).optional(),
   })
   .meta({ id: 'DashboardGroup' });
+
+/** Datenstand des Dashboards (F11) über die Auswahl. */
+export const dashboardStatusSchema = z
+  .object({
+    /** Letzter erfolgreicher Report-Sync einer Connection der Auswahl (ISO-Zeitpunkt). */
+    lastSyncAt: z.string().nullable(),
+    /** „Daten bis“ je genutztem Ad-Typ; `null`, solange einem Profil der Stand fehlt (hängender Import). */
+    adProducts: z.array(
+      z.object({
+        adProduct: z.string(),
+        dataThrough: z.iso.date().nullable(),
+        profilesWithoutData: z.number().int(),
+      }),
+    ),
+    /** SB-Kampagnen ohne Kennzahlen (v3-Preview-Lücke, `plan.md` §5). */
+    sbCampaignsWithoutMetrics: z.number().int(),
+  })
+  .meta({ id: 'DashboardStatus' });
 
 export const dashboardResponseSchema = z
   .object({
@@ -302,6 +322,7 @@ export const dashboardResponseSchema = z
     byClient: z.array(dashboardGroupSchema),
     byProfile: z.array(dashboardGroupSchema),
     byAdProduct: z.array(dashboardGroupSchema),
+    status: dashboardStatusSchema,
     /** Letzter EZB-Kurs („Kurse bis“) und ob er veraltet ist (mehr als 5 Kalendertage). */
     fxRatesThrough: z.iso.date().nullable(),
     fxRatesStale: z.boolean(),

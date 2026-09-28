@@ -6,6 +6,7 @@ import {
   listVisibleClientsAndProfiles,
   MAX_ANALYTICS_ROWS,
   queryDashboard,
+  queryDashboardStatus,
   queryDataStatus,
   queryExplorerRows,
   queryNegatives,
@@ -20,7 +21,7 @@ import {
   type ExplorerRow,
   type MetricSums,
 } from '@profitbash/db';
-import { change, deriveMetrics } from '@profitbash/engine';
+import { change, deriveMetrics, share } from '@profitbash/engine';
 import {
   analyticsQuerySchema,
   asinSearchRequestSchema,
@@ -266,10 +267,11 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
   app.openapi({ ...dashboardRoute, middleware: guard('dashboard') }, async (c) => {
     const body = c.req.valid('json');
     const query = await toQuery(visibility(c), body);
-    const [result, meta, fxRatesThrough] = await Promise.all([
+    const [result, meta, fxRatesThrough, status] = await Promise.all([
       queryDashboard(db, query),
       dataStatus(db, query),
       latestFxRateDate(db),
+      queryDashboardStatus(db, query, REPORT_AD_PRODUCT_SELECTION),
     ]);
     const group = (g: (typeof result.byClient)[number]) => ({
       key: g.key,
@@ -289,7 +291,14 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
         total: totalOf(result.totals),
         byClient: result.byClient.map(group),
         byProfile: result.byProfile.map(group),
-        byAdProduct: result.byAdProduct.map(group),
+        byAdProduct: result.byAdProduct.map((g) => ({
+          ...group(g),
+          share: {
+            cost: share(g.current.cost, result.totals.current.cost),
+            sales: share(g.current.sales, result.totals.current.sales),
+          },
+        })),
+        status,
         fxRatesThrough,
         fxRatesStale: isFxRateStale(fxRatesThrough, new Date()),
       },

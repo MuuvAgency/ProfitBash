@@ -1700,6 +1700,7 @@ export interface components {
             byClient: components["schemas"]["DashboardGroup"][];
             byProfile: components["schemas"]["DashboardGroup"][];
             byAdProduct: components["schemas"]["DashboardGroup"][];
+            status: components["schemas"]["DashboardStatus"];
             /** Format: date */
             fxRatesThrough: string | null;
             fxRatesStale: boolean;
@@ -1713,6 +1714,20 @@ export interface components {
             label: string | null;
             countryCode?: string;
             currencyCode?: string;
+            share?: {
+                cost: string | null;
+                sales: string | null;
+            };
+        };
+        DashboardStatus: {
+            lastSyncAt: string | null;
+            adProducts: {
+                adProduct: string;
+                /** Format: date */
+                dataThrough: string | null;
+                profilesWithoutData: number;
+            }[];
+            sbCampaignsWithoutMetrics: number;
         };
         AnalyticsQuery: {
             clientIds?: string[];
