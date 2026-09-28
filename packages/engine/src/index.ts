@@ -26,3 +26,4 @@ export {
   type MetricsLevel,
   type SelectAttributionInput,
 } from './attribution';
+export { convertAmount, type DailyRates } from './fx';
