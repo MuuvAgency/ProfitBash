@@ -2,6 +2,7 @@ export { Dec, DECIMAL_PRECISION, formatDecimal, parseDecimal, type DecimalString
 export {
   change,
   deriveMetrics,
+  share,
   sumDecimals,
   sumWithGaps,
   type Coverage,

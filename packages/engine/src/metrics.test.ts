@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { change, deriveMetrics, sumDecimals, sumWithGaps, type MetricTotals } from './metrics';
+import {
+  change,
+  deriveMetrics,
+  share,
+  sumDecimals,
+  sumWithGaps,
+  type MetricTotals,
+} from './metrics';
 
 const totals = (overrides: Partial<MetricTotals> = {}): MetricTotals => ({
   impressions: '2000',
@@ -124,5 +131,15 @@ describe('change', () => {
   it('ergibt null, wenn ein Wert fehlt', () => {
     expect(change(null, '10')).toEqual({ absolute: null, relative: null });
     expect(change('10', null)).toEqual({ absolute: null, relative: null });
+  });
+});
+
+describe('share', () => {
+  it('Anteil als Bruch; ohne Gesamtwert oder bei 0 null', () => {
+    expect(share('25', '100')).toBe('0.25');
+    expect(share('1', '3')).toBe('0.3333333333333333333333333333333333');
+    expect(share('5', '0')).toBeNull();
+    expect(share(null, '10')).toBeNull();
+    expect(share('5', null)).toBeNull();
   });
 });
