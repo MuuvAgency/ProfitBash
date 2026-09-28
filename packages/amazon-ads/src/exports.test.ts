@@ -501,6 +501,80 @@ describe('Zeilen-Schemas der Exports', () => {
     expect(results[2]?.data?.extra).not.toHaveProperty('asins');
   });
 
+  it('normalisiert SD-Entities: Taktik als targetingType, Targets ohne Kampagne, Ads mit ASIN oder SKU (1.9)', () => {
+    const logs: LogEntry[] = [];
+    const [campaign] = parseRows(
+      'campaigns',
+      `[{"campaignId": 901, "adProduct": "SPONSORED_DISPLAY", "name": "SD", "state": "ENABLED",
+         "startDate": "2026-01-15", "targetingSettings": "T00030", "costType": "VCPM",
+         "budgetCaps": {"recurrenceTimePeriod": "DAILY", "budgetType": "MONETARY",
+                        "budgetValue": {"monetaryBudget": {"currencyCode": "EUR", "amount": 12.5}}}}]`,
+      logs,
+    );
+    expect(campaign?.data).toMatchObject({
+      adProduct: 'SPONSORED_DISPLAY',
+      targetingType: 'T00030',
+      budgetAmount: '12.5',
+      extra: { costType: 'VCPM' },
+    });
+    const [adGroup] = parseRows(
+      'adGroups',
+      `[{"adGroupId": 911, "campaignId": 901, "adProduct": "SPONSORED_DISPLAY", "name": "AG", "state": "ENABLED",
+         "creativeType": "IMAGE", "bid": {"defaultBid": 0.85, "currencyCode": "EUR"},
+         "optimization": {"goalSettings": {"goal": "REACH"}}}]`,
+      logs,
+    );
+    expect(adGroup?.data).toMatchObject({
+      defaultBid: '0.85',
+      extra: { creativeType: 'IMAGE', optimization: { goalSettings: { goal: 'REACH' } } },
+    });
+    const targets = parseRows(
+      'targets',
+      `[{"targetId": 951, "adGroupId": 911, "adProduct": "SPONSORED_DISPLAY", "state": "ENABLED",
+         "negative": false, "targetType": "AUDIENCE", "bid": {"bid": 1.1},
+         "targetDetails": {"event": "VIEWS", "lookback": 30, "audienceId": "amzn1.audience.x"}},
+        {"targetId": 952, "adGroupId": 911, "adProduct": "SPONSORED_DISPLAY", "state": "ENABLED",
+         "negative": true, "targetType": "PRODUCT", "targetDetails": {"asin": "B000FREMD1"}}]`,
+      logs,
+    );
+    expect(targets.map((r) => r.data)).toMatchObject([
+      {
+        kind: 'target',
+        target: {
+          amazonTargetId: '951',
+          amazonCampaignId: null,
+          targetType: 'audience',
+          bid: '1.1',
+        },
+      },
+      {
+        kind: 'negative',
+        target: { amazonTargetId: '952', amazonCampaignId: null, level: 'ad_group' },
+      },
+    ]);
+    // Seller bewerben per SKU (ohne ASIN), Vendoren per ASIN; Bild- und Video-Ads zeigen ASINs.
+    const ads = parseRows(
+      'ads',
+      `[{"adId": 961, "adGroupId": 911, "adProduct": "SPONSORED_DISPLAY", "state": "ENABLED",
+         "adType": "PRODUCT_AD", "creative": {"products": [{"productIdType": "SKU", "productId": "SKU-1"}]}},
+        {"adId": 962, "adGroupId": 911, "adProduct": "SPONSORED_DISPLAY", "state": "ENABLED",
+         "adType": "IMAGE", "name": "Bild",
+         "creative": {"products": [{"productIdType": "ASIN", "productId": "B000TEST01"},
+                                   {"productIdType": "ASIN", "productId": "B000TEST02"}]}}]`,
+      logs,
+    );
+    expect(ads.map((r) => r.data)).toMatchObject([
+      { amazonAdId: '961', asin: null, sku: 'SKU-1', extra: { adType: 'PRODUCT_AD' } },
+      {
+        amazonAdId: '962',
+        asin: null,
+        sku: null,
+        extra: { adType: 'IMAGE', name: 'Bild', asins: ['B000TEST01', 'B000TEST02'] },
+      },
+    ]);
+    expect(logs).toEqual([]);
+  });
+
   it('verwirft keine Entity, nur weil Felder für extra eine unerwartete Form haben', () => {
     const [campaign] = parseRows(
       'campaigns',
