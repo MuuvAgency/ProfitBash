@@ -793,6 +793,76 @@ describe('queryExplorerRows: Kennzahlen und Attribution', () => {
   });
 });
 
+describe('queryExplorerRows: Review-Befunde', () => {
+  it('meldet die Attribution je Zeile nach Ad-Typ (SB-Targets: Same-SKU-Einheiten fehlen)', async () => {
+    const result = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'target',
+      clientIds: [ids.clientA],
+    });
+    const sb = result.rows.find((row) => row.id === ids.tSbCampaign)!;
+    expect(sb.hasMetrics).toBe(true);
+    expect(sb.attribution.coverage.unitsSameSku).toBe('none');
+    expect(sb.current.unitsSameSku).toBeNull();
+    const sp = result.rows.find((row) => row.id === ids.tKeyword)!;
+    expect(sp.attribution.coverage.unitsSameSku).toBe('full');
+  });
+
+  it('zählt Zeilen ohne Kurs in umgerechneten Summen gar nicht (Klicks und Kosten aus denselben Zeilen)', async () => {
+    const result = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      comparison: COMPARISON,
+    });
+    // Vergleich: DE 8 Klicks, UK 2 Klicks; SE (1 Klick) hat vor dem 01.09. keinen SEK-Kurs.
+    expect(result.totals.comparison!.clicks).toBe('10');
+    expect(result.totals.current.clicks).toBe('31');
+    const dashboard = await queryDashboard(testDb.db, { ...base(), comparison: COMPARISON });
+    expect(dashboard.totals.comparison!.clicks).toBe('10');
+    const series = await queryTimeSeries(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      comparison: COMPARISON,
+    });
+    expect(series.comparisonDays.find((day) => day.date === '2026-08-31')!.current.clicks).toBe(
+      '8',
+    );
+  });
+
+  it('lässt fremde oder ausgeblendete IDs im Drill-Down und in der Suche nichts sichtbar machen', async () => {
+    const foreign = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'adGroup',
+      filter: { campaignIds: [ids.spForeign, ids.spHidden] },
+    });
+    expect(foreign.rows).toEqual([]);
+    expect(foreign.totals.current.cost).toBe('0');
+    const byClient = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      clientIds: [ids.clientA],
+      profileIds: [ids.hidden],
+    });
+    expect(byClient.rows).toEqual([]);
+  });
+
+  it('wählt mit withoutClient nur Profile ohne Client bzw. zusätzlich zu Clients', async () => {
+    const only = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      withoutClient: true,
+    });
+    expect(new Set(only.rows.map((row) => row.profileId))).toEqual(new Set([ids.se]));
+    const plus = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      clientIds: [ids.clientB],
+      withoutClient: true,
+    });
+    expect(new Set(plus.rows.map((row) => row.profileId))).toEqual(new Set([ids.uk, ids.se]));
+  });
+});
+
 describe('queryExplorerRows: Ebenen und Filter', () => {
   it('zeigt Platzhalter und SB-Targets ohne Ad Group, entfernte Targets nur auf Wunsch', async () => {
     const targets = await queryExplorerRows(testDb.db, {

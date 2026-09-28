@@ -390,10 +390,16 @@ function fxCtes(target: string, periods: Periods): SQL {
 function sumColumns(
   prefix: string,
   flag: 'in_cur' | 'in_cmp' | 'all',
-  options: { converted: boolean; combos: boolean; moneyOnly?: boolean },
+  options: { converted: boolean; combos: boolean },
 ): SQL[] {
   const money = (column: string) => (options.converted ? `x.${column} * x.factor` : `x.${column}`);
-  const when = flag === 'all' ? '' : ` filter (where x.${flag})`;
+  // Umgerechnet zählen nur Zeilen mit Kurs, auch bei Klicks und Impressionen: Sonst stammten CPC, CPM usw. aus
+  // ungleichen Mengen. Welche Währung fehlte, melden die Merker `missing…`.
+  const conditions = [
+    ...(flag === 'all' ? [] : [`x.${flag}`]),
+    ...(options.converted ? ['x.factor is not null'] : []),
+  ];
+  const when = conditions.length > 0 ? ` filter (where ${conditions.join(' and ')})` : '';
   const col = (name: string, expr: string) => `sum(${expr})${when} as ${prefix}_${name}`;
   const viewableCost = options.converted
     ? '(case when x.viewable_impressions is not null then x.cost end) * x.factor'
@@ -404,7 +410,6 @@ function sumColumns(
     col('sales_same_sku', money('a_sales_same_sku')),
     col('viewable_cost', viewableCost),
   ];
-  if (options.moneyOnly) return moneyColumns.map((column) => sql.raw(column));
   const columns = [
     ...moneyColumns,
     col('impressions', 'x.impressions'),
@@ -722,8 +727,7 @@ function sumsJson(prefix: string, combos: boolean): SQL {
 function totalsOver(prefix: string, rowsPrefix: string, level: AnalyticsLevel): SQL {
   const sums = SUM_KEYS.map((key) => {
     const name = SUM_SQL_NAMES[key];
-    // Beträge aus den umgerechneten Summen (`prefix`), Zähler aus denen der Zeilen (`rowsPrefix`).
-    return `sum(f.${MONEY_KEYS.has(key) ? prefix : rowsPrefix}_${name}) as ${prefix}_${name}`;
+    return `sum(f.${prefix}_${name}) as ${prefix}_${name}`;
   });
   const combos = COMBOS.map((combo, index) =>
     level === 'portfolio'
@@ -733,7 +737,7 @@ function totalsOver(prefix: string, rowsPrefix: string, level: AnalyticsLevel): 
           as ${prefix}_c${index}`,
   );
   return sql.raw(
-    `${[...sums, ...combos].join(', ')}, coalesce(sum(f.${rowsPrefix}_rows), 0) as ${prefix}_rows`,
+    `${[...sums, ...combos].join(', ')}, coalesce(sum(f.${prefix}_rows), 0) as ${prefix}_rows`,
   );
 }
 
@@ -824,11 +828,10 @@ export async function queryExplorerRows(
       converted: false,
       combos: portfolio,
     }),
-    // Umgerechnet nur die Beträge (für Summenzeile und Sortierung); Zähler sind in beiden Währungen gleich.
+    // Umgerechnet für Summenzeile und Sortierung (nur Zeilen mit Kurs).
     ...sumColumns(`${prefix}x`, prefix === 'cur' ? 'in_cur' : 'in_cmp', {
       converted: true,
       combos: false,
-      moneyOnly: true,
     }),
   ];
   const searchTerms = input.level === 'searchTerm';
@@ -935,8 +938,9 @@ export async function queryExplorerRows(
       hasMetrics,
       current: sums(row.cur)!,
       comparison: sums(row.cmp),
+      // Eine Zeile hat genau einen Ad-Typ und Kontotyp; nur Portfolios fassen mehrere zusammen.
       attribution: summarizeAttribution(
-        hasMetrics
+        portfolio && hasMetrics
           ? selectionsOf(level, input.attribution, combosOf(row.cur, ''))
           : own
             ? [own]
