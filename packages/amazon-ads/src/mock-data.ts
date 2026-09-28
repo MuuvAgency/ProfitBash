@@ -2,14 +2,23 @@ import type { AmazonAdsExportType } from './exports';
 import { REPORT_DEFINITIONS, type AmazonAdsReportType } from './reports';
 
 /**
- * Synthetische Werbedaten für den Mock-Anbieter (SP): Entities je Profil und Tageskennzahlen je Ebene.
+ * Synthetische Werbedaten für den Mock-Anbieter (SP, SB): Entities je Profil und Tageskennzahlen je Ebene.
  * Deterministisch (gleiche Eingabe, gleiche Datei), damit ein zweiter Sync nichts ändert.
  *
  * Abgedeckt: große IDs als JSON-Zahl (über `Number.MAX_SAFE_INTEGER`), Beträge mit vielen Nachkommastellen
  * (auch als JSON-Zahl), eine archivierte Kampagne, Negatives auf Kampagnen- und Ad-Group-Ebene, Vendoren ohne
  * SKU, Tage ohne Aktivität (fehlen im Report). Kampagnen-Kennzahlen sind die Summe ihrer Ad Groups; Targets,
  * Product Ads und Suchbegriffe sind unabhängige Aufteilungen (Summen stimmen dort nicht überein).
+ *
+ * SB (1.9) nur für das DE-Profil (die übrigen nutzen SB nicht): Keyword-, Themen- und Produkt-Targets, ein
+ * Negative, ein Video-Ad mit einem und ein Kollektions-Ad mit drei ASINs. SB-Reports liefern Klick + View
+ * (`sales` …) und den Klick-Anteil (`salesClicks` …); Report-Zeilen enthalten nur die angeforderten Spalten.
  */
+
+const SP = 'SPONSORED_PRODUCTS';
+const SB = 'SPONSORED_BRANDS';
+/** Profile mit SB-Kampagnen. */
+const BRANDS_PROFILE_IDS: ReadonlySet<string> = new Set(['9007199254740993']);
 
 export interface MockProfile {
   amazonProfileId: string;
@@ -41,6 +50,7 @@ export function toAmazonJson(value: unknown): string {
 
 interface MockCampaign {
   id: string;
+  adProduct: string;
   name: string;
   state: string;
   targeting: 'MANUAL' | 'AUTO';
@@ -53,7 +63,8 @@ interface MockAdGroup {
   campaignId: string;
   name: string;
   state: string;
-  defaultBid: string;
+  /** SB-Ad-Groups haben kein Standardgebot (Gebote an den Targets). */
+  defaultBid: string | null;
 }
 
 interface MockTarget {
@@ -72,7 +83,8 @@ interface MockAd {
   campaignId: string;
   adGroupId: string;
   state: string;
-  asin: string;
+  adType: string;
+  asins: string[];
 }
 
 interface MockAccount {
@@ -93,6 +105,7 @@ export function mockAccount(profile: MockProfile): MockAccount {
   const campaigns: MockCampaign[] = [
     {
       id: id(101),
+      adProduct: SP,
       name: 'Mock SP Manuell',
       state: 'ENABLED',
       targeting: 'MANUAL',
@@ -101,6 +114,7 @@ export function mockAccount(profile: MockProfile): MockAccount {
     },
     {
       id: id(102),
+      adProduct: SP,
       name: 'Mock SP Auto',
       state: 'PAUSED',
       targeting: 'AUTO',
@@ -109,6 +123,7 @@ export function mockAccount(profile: MockProfile): MockAccount {
     },
     {
       id: id(103),
+      adProduct: SP,
       name: 'Mock SP Archiv',
       state: 'ARCHIVED',
       targeting: 'MANUAL',
@@ -218,12 +233,118 @@ export function mockAccount(profile: MockProfile): MockAccount {
       bid: null,
     },
   ];
+  const productAd = (n: number, campaign: number, adGroup: number, state: string): MockAd => ({
+    id: id(n),
+    campaignId: id(campaign),
+    adGroupId: id(adGroup),
+    state,
+    adType: 'PRODUCT_AD',
+    asins: [`B0MOCK000${n - 400}`],
+  });
   const ads: MockAd[] = [
-    { id: id(401), campaignId: id(101), adGroupId: id(201), state: 'ENABLED', asin: 'B0MOCK0001' },
-    { id: id(402), campaignId: id(101), adGroupId: id(202), state: 'ENABLED', asin: 'B0MOCK0002' },
-    { id: id(403), campaignId: id(102), adGroupId: id(203), state: 'ENABLED', asin: 'B0MOCK0003' },
-    { id: id(404), campaignId: id(103), adGroupId: id(204), state: 'ARCHIVED', asin: 'B0MOCK0004' },
+    productAd(401, 101, 201, 'ENABLED'),
+    productAd(402, 101, 202, 'ENABLED'),
+    productAd(403, 102, 203, 'ENABLED'),
+    productAd(404, 103, 204, 'ARCHIVED'),
   ];
+  if (BRANDS_PROFILE_IDS.has(profile.amazonProfileId)) {
+    campaigns.push(
+      {
+        id: id(501),
+        adProduct: SB,
+        name: 'Mock SB Video',
+        state: 'ENABLED',
+        targeting: 'MANUAL',
+        budget: '15.75',
+        portfolioId: id(1),
+      },
+      {
+        id: id(502),
+        adProduct: SB,
+        name: 'Mock SB Kollektion',
+        state: 'PAUSED',
+        targeting: 'MANUAL',
+        budget: '8.125',
+        portfolioId: null,
+      },
+    );
+    adGroups.push(
+      {
+        id: id(601),
+        campaignId: id(501),
+        name: 'Mock SB AG Video',
+        state: 'ENABLED',
+        defaultBid: null,
+      },
+      {
+        id: id(602),
+        campaignId: id(502),
+        name: 'Mock SB AG Kollektion',
+        state: 'ENABLED',
+        defaultBid: null,
+      },
+    );
+    targets.push(
+      {
+        id: id(701),
+        campaignId: id(501),
+        adGroupId: id(601),
+        state: 'ENABLED',
+        negative: false,
+        targetType: 'KEYWORD',
+        details: { matchType: 'BROAD', keyword: 'mock marke schuhe' },
+        bid: '1.05',
+      },
+      {
+        id: id(702),
+        campaignId: id(501),
+        adGroupId: id(601),
+        state: 'ENABLED',
+        negative: false,
+        targetType: 'THEME',
+        details: { matchType: 'KEYWORDS_RELATED_TO_YOUR_BRAND' },
+        bid: '0.9',
+      },
+      {
+        id: id(703),
+        campaignId: id(502),
+        adGroupId: id(602),
+        state: 'ENABLED',
+        negative: false,
+        targetType: 'PRODUCT',
+        details: { matchType: 'PRODUCT_EXACT', asin: 'B0MOCKFREMD' },
+        bid: '0.65',
+      },
+      {
+        id: id(751),
+        campaignId: id(501),
+        adGroupId: id(601),
+        state: 'ENABLED',
+        negative: true,
+        targetType: 'KEYWORD',
+        details: { matchType: 'EXACT', keyword: 'mock billig' },
+        bid: null,
+      },
+    );
+    ads.push(
+      {
+        id: id(801),
+        campaignId: id(501),
+        adGroupId: id(601),
+        state: 'ENABLED',
+        adType: 'VIDEO',
+        asins: ['B0MOCK0001'],
+      },
+      {
+        id: id(802),
+        campaignId: id(502),
+        adGroupId: id(602),
+        state: 'ENABLED',
+        adType: 'PRODUCT_COLLECTION',
+        asins: ['B0MOCK0001', 'B0MOCK0002', 'B0MOCK0003'],
+      },
+    );
+  }
   return {
     profile,
     portfolios: [
@@ -265,22 +386,28 @@ export function mockPortfolios(account: MockAccount): unknown[] {
   }));
 }
 
-/** Zeilen eines Exports wie im gemeinsamen Modell von Amazon (nur SP, gefiltert nach Zustand). */
+/** Ad-Typ je Kampagne (Ad Groups, Targets und Ads gehören über ihre Kampagne dazu). */
+function adProductOf(account: MockAccount): (campaignId: string) => string {
+  const byCampaign = new Map(account.campaigns.map((c) => [c.id, c.adProduct]));
+  return (campaignId) => byCampaign.get(campaignId) ?? SP;
+}
+
+/** Zeilen eines Exports wie im gemeinsamen Modell von Amazon (gefiltert nach Ad-Typ und Zustand). */
 export function mockExportRows(
   account: MockAccount,
   exportType: AmazonAdsExportType,
   filter: { adProducts: readonly string[]; states: readonly string[] },
 ): unknown[] {
-  if (!filter.adProducts.includes('SPONSORED_PRODUCTS')) return [];
   const currencyCode = account.profile.currencyCode;
-  const common = (state: string) => ({
-    adProduct: 'SPONSORED_PRODUCTS',
+  const adProductOfCampaign = adProductOf(account);
+  const common = (campaignId: string, state: string) => ({
+    adProduct: adProductOfCampaign(campaignId),
     state,
     deliveryStatus: state === 'ENABLED' ? 'DELIVERING' : 'NOT_DELIVERING',
     creationDateTime: TIMESTAMP,
     lastUpdatedDateTime: TIMESTAMP,
   });
-  const rows: Array<{ state: string } & Record<string, unknown>> = [];
+  const rows: Array<{ adProduct: string; state: string } & Record<string, unknown>> = [];
   switch (exportType) {
     case 'campaigns':
       for (const c of account.campaigns) {
@@ -289,17 +416,21 @@ export function mockExportRows(
           ...(c.portfolioId && { portfolioId: c.portfolioId }),
           name: c.name,
           startDate: '2026-01-15',
-          targetingSettings: c.targeting,
-          optimization: {
-            bidStrategy: 'SALES_DOWN_ONLY',
-            placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 25 }],
-          },
+          ...(c.adProduct === SP
+            ? {
+                targetingSettings: c.targeting,
+                optimization: {
+                  bidStrategy: 'SALES_DOWN_ONLY',
+                  placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 25 }],
+                },
+              }
+            : { costType: 'CPC', brandEntityId: 'ENTITYMOCKBRAND01' }),
           budgetCaps: {
             recurrenceTimePeriod: 'DAILY',
             budgetType: 'MONETARY',
             budgetValue: { monetaryBudget: { currencyCode, amount: raw(c.budget) } },
           },
-          ...common(c.state),
+          ...common(c.id, c.state),
         });
       }
       break;
@@ -309,45 +440,52 @@ export function mockExportRows(
           adGroupId: raw(g.id),
           campaignId: raw(g.campaignId),
           name: g.name,
-          bid: { defaultBid: raw(g.defaultBid), currencyCode },
-          ...common(g.state),
+          ...(g.defaultBid !== null && { bid: { defaultBid: raw(g.defaultBid), currencyCode } }),
+          ...common(g.campaignId, g.state),
         });
       }
       break;
     case 'targets':
       for (const t of account.targets) {
+        const adProduct = adProductOfCampaign(t.campaignId);
         rows.push({
           targetId: raw(t.id),
-          campaignId: raw(t.campaignId),
+          // SP-Targets tragen die Kampagne, SB-Targets nicht (gemeinsames Modell).
+          ...(adProduct === SP && { campaignId: raw(t.campaignId) }),
           ...(t.adGroupId && { adGroupId: raw(t.adGroupId) }),
           negative: t.negative,
           targetType: t.targetType,
           targetDetails: t.details,
           ...(t.bid && { bid: { bid: raw(t.bid), currencyCode } }),
-          ...common(t.state),
+          ...common(t.campaignId, t.state),
         });
       }
       break;
     case 'ads':
       for (const ad of account.ads) {
-        const products: Array<{ productIdType: string; productId: string }> = [
-          { productIdType: 'ASIN', productId: ad.asin },
-        ];
-        if (account.profile.accountType !== 'vendor') {
-          products.push({ productIdType: 'SKU', productId: `MOCK-SKU-${ad.asin.slice(-4)}` });
+        const products: Array<{ productIdType: string; productId: string }> = ad.asins.map(
+          (asin) => ({ productIdType: 'ASIN', productId: asin }),
+        );
+        if (ad.adType === 'PRODUCT_AD' && account.profile.accountType !== 'vendor') {
+          products.push({ productIdType: 'SKU', productId: mockSku(ad.asins[0]!) });
         }
         rows.push({
           adId: raw(ad.id),
           adGroupId: raw(ad.adGroupId),
-          adType: 'PRODUCT_AD',
+          adType: ad.adType,
+          ...(ad.adType !== 'PRODUCT_AD' && { name: `Mock ${ad.adType}` }),
           creative: { products },
-          ...common(ad.state),
+          ...common(ad.campaignId, ad.state),
         });
       }
       break;
   }
-  return rows.filter((row) => filter.states.includes(row.state));
+  return rows.filter(
+    (row) => filter.adProducts.includes(row.adProduct) && filter.states.includes(row.state),
+  );
 }
+
+const mockSku = (asin: string) => `MOCK-SKU-${asin.slice(-4)}`;
 
 // ---------------------------------------------------------------------------
 // Kennzahlen
@@ -364,6 +502,8 @@ interface MockMetrics {
   purchases14d: number;
   units7d: number;
   units14d: number;
+  /** Zusätzliche Käufe nach einem View (nur SB/SD: `purchases` = Klick + View). */
+  viewPurchases: number;
 }
 
 /** FNV-1a: stabile Pseudo-Zufallszahl aus Text. */
@@ -392,6 +532,7 @@ function metricsFor(key: string, date: string): MockMetrics | null {
     purchases14d: purchases7d + (seed % 2),
     units7d: purchases7d,
     units14d: purchases7d + (seed % 2),
+    viewPurchases: (seed >>> 3) % 3 === 0 ? 1 : 0,
   };
 }
 
@@ -406,6 +547,7 @@ function addMetrics(a: MockMetrics, b: MockMetrics): MockMetrics {
     purchases14d: a.purchases14d + b.purchases14d,
     units7d: a.units7d + b.units7d,
     units14d: a.units14d + b.units14d,
+    viewPurchases: a.viewPurchases + b.viewPurchases,
   };
 }
 
@@ -416,7 +558,25 @@ function milli(value: number): RawNumber {
   return raw(`${whole}.${fraction}`);
 }
 
-function metricColumns(m: MockMetrics): Record<string, unknown> {
+/** Spalten je Ad-Typ; `mockReportRows` behält davon nur die angeforderten. */
+function metricColumns(adProduct: string, m: MockMetrics): Record<string, unknown> {
+  if (adProduct === SB) {
+    // Ein Fenster (14 Tage): Klick + View ohne Suffix, der Klick-Anteil in `…Clicks`.
+    const viewSalesMilli = m.viewPurchases * 24_990;
+    return {
+      impressions: m.impressions,
+      clicks: m.clicks,
+      cost: milli(m.costMilli),
+      sales: milli(m.sales14dMilli + viewSalesMilli),
+      salesClicks: milli(m.sales14dMilli),
+      salesPromoted: milli(m.sales14dMilli + viewSalesMilli),
+      purchases: m.purchases14d + m.viewPurchases,
+      purchasesClicks: m.purchases14d,
+      purchasesPromoted: m.purchases14d + m.viewPurchases,
+      unitsSold: m.units14d + m.viewPurchases,
+      unitsSoldClicks: m.units14d,
+    };
+  }
   return {
     impressions: m.impressions,
     clicks: m.clicks,
@@ -463,25 +623,31 @@ function adGroupMetrics(account: MockAccount, adGroupId: string, date: string, f
   return metricsFor(adGroupId, date);
 }
 
-/** Zeilen eines Reports wie von Amazon (nur Tage mit Aktivität). */
+/** Zeilen eines Reports wie von Amazon: nur Tage mit Aktivität, nur die angeforderten Spalten. */
 export function mockReportRows(
   account: MockAccount,
   reportType: AmazonAdsReportType,
   startDate: string,
   endDate: string,
 ): unknown[] {
-  const rows: unknown[] = [];
+  const rows: Array<Record<string, unknown>> = [];
   const days = daysBetween(startDate, endDate);
+  const { adProduct, level, columns } = REPORT_DEFINITIONS[reportType];
+  const adProductOfCampaign = adProductOf(account);
+  const ofAdProduct = <T extends { campaignId: string }>(entities: readonly T[]) =>
+    entities.filter((entity) => adProductOfCampaign(entity.campaignId) === adProduct);
+  const campaigns = account.campaigns.filter((c) => c.adProduct === adProduct);
+  const adGroups = ofAdProduct(account.adGroups);
   const campaignName = new Map(account.campaigns.map((c) => [c.id, c.name]));
   const adGroupName = new Map(account.adGroups.map((g) => [g.id, g.name]));
-  const level = REPORT_DEFINITIONS[reportType].level;
+  const values = (m: MockMetrics) => metricColumns(adProduct, m);
 
   for (const [index, date] of days.entries()) {
     const first = index === 0;
     switch (level) {
       case 'campaign':
-        for (const campaign of account.campaigns) {
-          const parts = account.adGroups
+        for (const campaign of campaigns) {
+          const parts = adGroups
             .filter((g) => g.campaignId === campaign.id)
             .map((g) => adGroupMetrics(account, g.id, date, first))
             .filter((m): m is MockMetrics => m !== null);
@@ -490,12 +656,12 @@ export function mockReportRows(
             date,
             campaignId: raw(campaign.id),
             campaignName: campaign.name,
-            ...metricColumns(parts.reduce(addMetrics)),
+            ...values(parts.reduce(addMetrics)),
           });
         }
         break;
       case 'adGroup':
-        for (const group of account.adGroups) {
+        for (const group of adGroups) {
           const metrics = adGroupMetrics(account, group.id, date, first);
           if (!metrics) continue;
           rows.push({
@@ -504,35 +670,40 @@ export function mockReportRows(
             campaignName: campaignName.get(group.campaignId),
             adGroupId: raw(group.id),
             adGroupName: group.name,
-            ...metricColumns(metrics),
+            ...values(metrics),
           });
         }
         break;
       case 'target':
       case 'searchTerm':
-        for (const target of account.targets) {
+        for (const target of ofAdProduct(account.targets)) {
           if (target.negative || !target.adGroupId) continue;
+          // SB-Targeting: Keywords über `keywordId`, Themen und Produkte über `targetingId`.
+          const idColumn =
+            level === 'target' && adProduct === SB && target.targetType !== 'KEYWORD'
+              ? 'targetingId'
+              : 'keywordId';
           const base = {
             date,
             campaignId: raw(target.campaignId),
             campaignName: campaignName.get(target.campaignId),
             adGroupId: raw(target.adGroupId),
             adGroupName: adGroupName.get(target.adGroupId),
-            keywordId: raw(target.id),
+            [idColumn]: raw(target.id),
           };
           if (level === 'target') {
             const metrics = metricsFor(target.id, date);
-            if (metrics) rows.push({ ...base, ...metricColumns(metrics) });
+            if (metrics) rows.push({ ...base, ...values(metrics) });
             continue;
           }
           for (const term of ['mock suchbegriff eins', 'mock suchbegriff zwei']) {
             const metrics = metricsFor(`${target.id}|${term}`, date);
-            if (metrics) rows.push({ ...base, searchTerm: term, ...metricColumns(metrics) });
+            if (metrics) rows.push({ ...base, searchTerm: term, ...values(metrics) });
           }
         }
         break;
       case 'productAd':
-        for (const ad of account.ads) {
+        for (const ad of ofAdProduct(account.ads)) {
           const metrics = metricsFor(ad.id, date);
           if (!metrics) continue;
           rows.push({
@@ -542,15 +713,18 @@ export function mockReportRows(
             adGroupId: raw(ad.adGroupId),
             adGroupName: adGroupName.get(ad.adGroupId),
             adId: raw(ad.id),
-            advertisedAsin: ad.asin,
+            advertisedAsin: ad.asins[0],
             ...(account.profile.accountType !== 'vendor' && {
-              advertisedSku: `MOCK-SKU-${ad.asin.slice(-4)}`,
+              advertisedSku: mockSku(ad.asins[0]!),
             }),
-            ...metricColumns(metrics),
+            ...values(metrics),
           });
         }
         break;
     }
   }
-  return rows;
+  const requested = new Set<string>(columns);
+  return rows.map((row) =>
+    Object.fromEntries(Object.entries(row).filter(([key]) => requested.has(key))),
+  );
 }
