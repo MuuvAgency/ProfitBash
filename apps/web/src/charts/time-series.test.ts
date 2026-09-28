@@ -67,6 +67,21 @@ describe('buildTimeSeriesOptions', () => {
     expect(Object.keys(options.axes ?? {})).toEqual(['x', 'left', 'right']);
   });
 
+  it('Achsen beginnen bei 0, solange kein Wert negativ ist (sonst wirken Schwankungen größer)', () => {
+    expect((options.axes?.left as { min?: number }).min).toBe(0);
+    expect((options.axes?.right as { min?: number }).min).toBe(0);
+    const negative = buildTimeSeriesOptions({
+      points: [{ day: '2026-09-01', values: { cost: '-2' } }],
+      series: [{ key: 'cost', label: 'Spend', kind: 'line', axis: 'left', format: String }],
+      provisionalFrom: null,
+      provisionalLabel: 'Vorläufig',
+      formatDay: String,
+      formatAxisValue: String,
+      theme: palette,
+    });
+    expect((negative.axes?.left as { min?: number }).min).toBeUndefined();
+  });
+
   it('Werte als Zahl nur für die Position; fehlende Werte bleiben leer', () => {
     const data = options.data as Record<string, unknown>[];
     expect(data[0]).toMatchObject({ day: '2026-09-01', cost: 10.5, sales: 30 });

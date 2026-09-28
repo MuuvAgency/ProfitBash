@@ -139,6 +139,15 @@ export function buildTimeSeriesOptions(input: TimeSeriesChartInput): AgCartesian
         ]
       : [];
 
+  // Beide Achsen ab 0 (sonst wirkt eine Achse mit anderem Nullpunkt dramatischer); negative Korrekturen: frei.
+  const hasNegative = (axis: 'left' | 'right') =>
+    series.some(
+      (def) =>
+        def.axis === axis &&
+        points.some((point) => point.values[def.key]?.startsWith('-') === true),
+    );
+  const zeroBased = (axis: 'left' | 'right') => (hasNegative(axis) ? {} : { min: 0 });
+
   const axisLabel = { fontFamily: theme.monoFont, fontSize: 11, color: theme.colors.subtle };
   const usesRight = series.some((def) => def.axis === 'right');
 
@@ -158,6 +167,7 @@ export function buildTimeSeriesOptions(input: TimeSeriesChartInput): AgCartesian
       left: {
         type: 'number',
         position: 'left',
+        ...zeroBased('left'),
         label: {
           ...axisLabel,
           formatter: ({ value }: { value: number }) => input.formatAxisValue(value),
@@ -167,6 +177,7 @@ export function buildTimeSeriesOptions(input: TimeSeriesChartInput): AgCartesian
         right: {
           type: 'number',
           position: 'right',
+          ...zeroBased('right'),
           gridLine: { enabled: false },
           label: {
             ...axisLabel,
