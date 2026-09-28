@@ -68,16 +68,41 @@ async function withMaintenanceConnection<T>(
   }
 }
 
+/**
+ * `DROP DATABASE … WITH (FORCE)`, bei `42501` wiederholt: Die Test-Rolle ist kein Superuser und darf einen
+ * Autovacuum-Worker in der Datenbank nicht beenden („permission denied to terminate process“). Der Worker
+ * endet nach kurzer Zeit von selbst; andere Fehler gehen sofort weiter.
+ */
+export async function dropDatabaseForce(
+  execute: (statement: string) => Promise<unknown>,
+  name: string,
+  options: { attempts?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<void> {
+  const attempts = options.attempts ?? 10;
+  const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await execute(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
+      return;
+    } catch (error) {
+      const code = (error as { code?: unknown }).code;
+      if (code !== '42501' || attempt >= attempts) throw error;
+      await sleep(Math.min(200 * attempt, 1000));
+    }
+  }
+}
+
 /** Globale Test-Einrichtung: räumt alte Klone auf und baut die Template-DB neu. */
 export async function prepareTestTemplate(): Promise<void> {
   const { url, template, maintenance } = testDatabaseUrls();
   await withMaintenanceConnection(maintenance, async (sql) => {
     const leftovers = await sql<{ datname: string }[]>`
       select datname from pg_database where datname ~ ${`^${template}_[0-9a-f]{12}$`}`;
+    const execute = (statement: string) => sql.unsafe(statement);
     for (const { datname } of leftovers) {
-      await sql.unsafe(`DROP DATABASE IF EXISTS "${datname}" WITH (FORCE)`);
+      await dropDatabaseForce(execute, datname);
     }
-    await sql.unsafe(`DROP DATABASE IF EXISTS "${template}" WITH (FORCE)`);
+    await dropDatabaseForce(execute, template);
     await sql.unsafe(`CREATE DATABASE "${template}"`);
   });
   await runMigrations(url.toString());
@@ -108,7 +133,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     close: async () => {
       await close();
       await withMaintenanceConnection(maintenance, (sql) =>
-        sql.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`),
+        dropDatabaseForce((statement) => sql.unsafe(statement), name),
       );
     },
   };

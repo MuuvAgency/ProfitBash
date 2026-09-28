@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafeTestDatabase } from './testing';
+import { assertSafeTestDatabase, dropDatabaseForce } from './testing';
 
 const test = 'postgres://u:p@localhost:5432/profitbash_test';
 
@@ -28,5 +28,58 @@ describe('assertSafeTestDatabase', () => {
     expect(() =>
       assertSafeTestDatabase(test, ['postgres://u:p@db.example.com:5432/profitbash_test']),
     ).not.toThrow();
+  });
+});
+
+describe('dropDatabaseForce', () => {
+  const denied = Object.assign(new Error('permission denied to terminate process'), {
+    code: '42501',
+  });
+
+  it('wiederholt, wenn ein fremder Prozess (Autovacuum) nicht beendet werden darf', async () => {
+    const statements: string[] = [];
+    const pauses: number[] = [];
+    let calls = 0;
+    await dropDatabaseForce(
+      async (statement) => {
+        statements.push(statement);
+        calls += 1;
+        if (calls < 3) throw denied;
+      },
+      'profitbash_test_abc',
+      { sleep: async (ms) => void pauses.push(ms) },
+    );
+    expect(statements).toEqual(
+      Array(3).fill('DROP DATABASE IF EXISTS "profitbash_test_abc" WITH (FORCE)'),
+    );
+    expect(pauses).toHaveLength(2);
+  });
+
+  it('gibt nach den erlaubten Versuchen und bei anderen Fehlern auf', async () => {
+    let calls = 0;
+    const always = dropDatabaseForce(
+      async () => {
+        calls += 1;
+        throw denied;
+      },
+      'profitbash_test_abc',
+      { sleep: async () => {}, attempts: 4 },
+    );
+    await expect(always).rejects.toBe(denied);
+    expect(calls).toBe(4);
+
+    const other = Object.assign(new Error('kaputt'), { code: '3D000' });
+    calls = 0;
+    await expect(
+      dropDatabaseForce(
+        async () => {
+          calls += 1;
+          throw other;
+        },
+        'profitbash_test_abc',
+        { sleep: async () => {} },
+      ),
+    ).rejects.toBe(other);
+    expect(calls).toBe(1);
   });
 });
