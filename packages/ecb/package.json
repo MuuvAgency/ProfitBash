@@ -1,0 +1,19 @@
+{
+  "name": "@profitbash/ecb",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Euro-Referenzkurse der EZB (SDMX Data API)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "msw": "^2.15.0"
+  }
+}
