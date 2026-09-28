@@ -5,6 +5,7 @@ import {
   queryDashboard,
   queryDataStatus,
   queryExplorerRows,
+  queryNegatives,
   queryTimeSeries,
   type AnalyticsQuery,
 } from './ads-analytics';
@@ -15,6 +16,7 @@ import {
   amazonAdsAdGroups,
   amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
+  amazonAdsNegativeTargets,
   amazonAdsPortfolios,
   amazonAdsProductAdDailyMetrics,
   amazonAdsProductAds,
@@ -997,5 +999,74 @@ describe('queryDataStatus', () => {
       earliestDate: '2026-08-30',
       profilesWithoutData: 1,
     });
+  });
+});
+
+describe('queryNegatives', () => {
+  it('listet Negatives sichtbarer Profile auf beiden Ebenen, filterbar nach Kampagne', async () => {
+    await testDb.db.insert(amazonAdsNegativeTargets).values([
+      {
+        organizationId: ids.org,
+        profileId: ids.de,
+        adProduct: SP,
+        level: 'campaign',
+        campaignId: ids.spDe,
+        amazonTargetId: 'n1',
+        targetType: 'keyword',
+        keywordText: 'gratis',
+        matchType: 'NEGATIVE_EXACT',
+        state: 'ENABLED',
+        syncedAt: new Date(),
+      },
+      {
+        organizationId: ids.org,
+        profileId: ids.de,
+        adProduct: SP,
+        level: 'ad_group',
+        campaignId: ids.spDe,
+        adGroupId: ids.agDe,
+        amazonTargetId: 'n2',
+        targetType: 'keyword',
+        keywordText: 'billig',
+        matchType: 'NEGATIVE_PHRASE',
+        state: 'ENABLED',
+        syncedAt: new Date(),
+      },
+      {
+        organizationId: ids.org,
+        profileId: ids.hidden,
+        adProduct: SP,
+        level: 'campaign',
+        campaignId: ids.spHidden,
+        amazonTargetId: 'n3',
+        targetType: 'keyword',
+        keywordText: 'versteckt',
+        matchType: 'NEGATIVE_EXACT',
+        state: 'ENABLED',
+        syncedAt: new Date(),
+      },
+    ]);
+    const all = await queryNegatives(testDb.db, { userId: ids.viewer, orgId: ids.org });
+    expect(all.rows.map((row) => row.name).sort()).toEqual(['billig', 'gratis']);
+    expect(all.rows.find((row) => row.name === 'billig')).toMatchObject({
+      currencyCode: 'EUR',
+      adProduct: SP,
+      attributes: {
+        level: 'ad_group',
+        adGroupName: 'AG DE',
+        campaignName: 'SP DE',
+        matchType: 'NEGATIVE_PHRASE',
+      },
+    });
+    expect(all.truncated).toBe(false);
+    const byAdGroup = await queryNegatives(testDb.db, {
+      userId: ids.viewer,
+      orgId: ids.org,
+      filter: { adGroupIds: [ids.agDe] },
+    });
+    expect(byAdGroup.rows.map((row) => row.name)).toEqual(['billig']);
+    expect(await queryNegatives(testDb.db, { userId: ids.outsider, orgId: ids.org })).toMatchObject(
+      { rows: [] },
+    );
   });
 });
