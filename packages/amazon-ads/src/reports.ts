@@ -75,12 +75,33 @@ const SB_METRIC_COLUMNS = [
   'unitsSold',
 ] as const;
 const SB_PROMOTED_COLUMNS = ['salesPromoted', 'purchasesPromoted'] as const;
-const SB_AD_GROUP_COLUMNS = [
+const AD_GROUP_REPORT_COLUMNS = [
   'date',
   'campaignId',
   'campaignName',
   'adGroupId',
   'adGroupName',
+] as const;
+
+/**
+ * SD (1.9): ein Fenster (14 Tage) ohne Suffix wie SB. `sales`, `purchases`, `unitsSold` zählen Klicks und
+ * Views, `…Clicks` nur Klicks, `…PromotedClicks` ist Same-SKU **nur nach Klick** (anders als SB).
+ * `impressionsViews` sind die sichtbaren Impressionen (MRC, Basis für vCPM). Alle Spalten stehen auf den
+ * Seiten der Report-Typen und in der Spalten-Referenz (Stand 2026-09-28, dort `sdAdGroups` geschrieben).
+ */
+const SD_METRIC_COLUMNS = [
+  'impressions',
+  'clicks',
+  'cost',
+  'sales',
+  'salesClicks',
+  'salesPromotedClicks',
+  'purchases',
+  'purchasesClicks',
+  'purchasesPromotedClicks',
+  'unitsSold',
+  'unitsSoldClicks',
+  'impressionsViews',
 ] as const;
 
 /**
@@ -186,7 +207,7 @@ export const REPORT_DEFINITIONS = {
     reportTypeId: 'sbAdGroup',
     groupBy: ['adGroup'],
     columns: [
-      ...SB_AD_GROUP_COLUMNS,
+      ...AD_GROUP_REPORT_COLUMNS,
       ...SB_METRIC_COLUMNS,
       'unitsSoldClicks',
       ...SB_PROMOTED_COLUMNS,
@@ -200,7 +221,7 @@ export const REPORT_DEFINITIONS = {
     groupBy: ['targeting'],
     // Keywords tragen `keywordId`, Produkt- und Themen-Targets ggf. nur `targetingId` (1.10: gegen den Export prüfen).
     columns: [
-      ...SB_AD_GROUP_COLUMNS,
+      ...AD_GROUP_REPORT_COLUMNS,
       'keywordId',
       'targetingId',
       ...SB_METRIC_COLUMNS,
@@ -214,7 +235,7 @@ export const REPORT_DEFINITIONS = {
     reportTypeId: 'sbAds',
     groupBy: ['ads'],
     columns: [
-      ...SB_AD_GROUP_COLUMNS,
+      ...AD_GROUP_REPORT_COLUMNS,
       'adId',
       ...SB_METRIC_COLUMNS,
       'unitsSoldClicks',
@@ -227,14 +248,54 @@ export const REPORT_DEFINITIONS = {
     level: 'searchTerm',
     reportTypeId: 'sbSearchTerm',
     groupBy: ['searchTerm'],
-    columns: [...SB_AD_GROUP_COLUMNS, 'keywordId', 'searchTerm', ...SB_METRIC_COLUMNS],
+    columns: [...AD_GROUP_REPORT_COLUMNS, 'keywordId', 'searchTerm', ...SB_METRIC_COLUMNS],
     retentionDays: 60,
+  },
+  sdCampaigns: {
+    adProduct: 'SPONSORED_DISPLAY',
+    level: 'campaign',
+    reportTypeId: 'sdCampaigns',
+    groupBy: ['campaign'],
+    columns: ['date', 'campaignId', 'campaignName', ...SD_METRIC_COLUMNS],
+    retentionDays: 65,
+  },
+  sdAdGroup: {
+    adProduct: 'SPONSORED_DISPLAY',
+    level: 'adGroup',
+    reportTypeId: 'sdAdGroup',
+    groupBy: ['adGroup'],
+    columns: [...AD_GROUP_REPORT_COLUMNS, ...SD_METRIC_COLUMNS],
+    retentionDays: 65,
+  },
+  sdTargeting: {
+    adProduct: 'SPONSORED_DISPLAY',
+    level: 'target',
+    reportTypeId: 'sdTargeting',
+    groupBy: ['targeting'],
+    // Nur `targetingId` (kein `keywordId`); entspricht der `targetId` im Export (1.10: prüfen).
+    columns: [...AD_GROUP_REPORT_COLUMNS, 'targetingId', ...SD_METRIC_COLUMNS],
+    retentionDays: 65,
+  },
+  sdAdvertisedProduct: {
+    adProduct: 'SPONSORED_DISPLAY',
+    level: 'productAd',
+    reportTypeId: 'sdAdvertisedProduct',
+    groupBy: ['advertiser'],
+    // `promotedAsin`/`promotedSku` statt `advertisedAsin`/`advertisedSku` wie bei SP.
+    columns: [
+      ...AD_GROUP_REPORT_COLUMNS,
+      'adId',
+      'promotedAsin',
+      'promotedSku',
+      ...SD_METRIC_COLUMNS,
+    ],
+    retentionDays: 65,
   },
 } as const satisfies Record<string, ReportDefinition>;
 
 export type AmazonAdsReportType = keyof typeof REPORT_DEFINITIONS;
 
-/** Report-Typen je Ad-Typ in Hierarchie-Reihenfolge (SD folgt mit 1.9). */
+/** Report-Typen je Ad-Typ in Hierarchie-Reihenfolge. */
 export const REPORT_TYPES_BY_AD_PRODUCT = {
   SPONSORED_PRODUCTS: [
     'spCampaigns',
@@ -244,6 +305,7 @@ export const REPORT_TYPES_BY_AD_PRODUCT = {
     'spSearchTerm',
   ],
   SPONSORED_BRANDS: ['sbCampaigns', 'sbAdGroup', 'sbTargeting', 'sbAds', 'sbSearchTerm'],
+  SPONSORED_DISPLAY: ['sdCampaigns', 'sdAdGroup', 'sdTargeting', 'sdAdvertisedProduct'],
 } as const satisfies Record<string, readonly AmazonAdsReportType[]>;
 
 /** Ad-Typen mit Reports im Katalog (Reihenfolge von `REPORT_TYPES_BY_AD_PRODUCT`). */
@@ -253,12 +315,12 @@ export const REPORT_AD_PRODUCTS = Object.keys(REPORT_TYPES_BY_AD_PRODUCT) as Rea
 
 /**
  * Für welche Ad-Typen der Sync je Profil Reports anfordert (1.9, für `selectReportAdProducts` und
- * `metricsImportedThroughSql` in `@profitbash/db`): SP immer (F2), SB (SD folgt) nur für Profile mit
+ * `metricsImportedThroughSql` in `@profitbash/db`): SP immer (F2), SB und SD nur für Profile mit
  * mindestens einer Kampagne dieses Ad-Typs. Auch „Daten bis“ rechnet über genau diese Auswahl.
  */
 export const REPORT_AD_PRODUCT_SELECTION = {
   always: ['SPONSORED_PRODUCTS'],
-  withCampaigns: ['SPONSORED_BRANDS'],
+  withCampaigns: ['SPONSORED_BRANDS', 'SPONSORED_DISPLAY'],
 } as const satisfies {
   always: readonly (typeof REPORT_AD_PRODUCTS)[number][];
   withCampaigns: readonly (typeof REPORT_AD_PRODUCTS)[number][];
@@ -348,6 +410,10 @@ export interface AmazonAdsReportRows {
   sbTargeting: AmazonAdsTargetDailyMetric;
   sbAds: AmazonAdsProductAdDailyMetric;
   sbSearchTerm: AmazonAdsSearchTermDailyMetric;
+  sdCampaigns: AmazonAdsCampaignDailyMetric;
+  sdAdGroup: AmazonAdsAdGroupDailyMetric;
+  sdTargeting: AmazonAdsTargetDailyMetric;
+  sdAdvertisedProduct: AmazonAdsProductAdDailyMetric;
 }
 
 // ---------------------------------------------------------------------------
@@ -611,6 +677,55 @@ function sbMetricBase(row: SbMetricColumns): MetricRowBase {
   };
 }
 
+const sdMetricColumns = {
+  date: z.string().regex(ISO_DATE),
+  campaignId: amazonIdSchema,
+  campaignName: optionalText,
+  impressions: counter,
+  clicks: counter,
+  cost: amazonDecimalSchema,
+  sales: optionalAmount,
+  salesClicks: optionalAmount,
+  salesPromotedClicks: optionalAmount,
+  purchases: optionalCounter,
+  purchasesClicks: optionalCounter,
+  purchasesPromotedClicks: optionalCounter,
+  unitsSold: optionalCounter,
+  unitsSoldClicks: optionalCounter,
+  impressionsViews: optionalCounter,
+};
+
+type SdMetricColumns = z.output<z.ZodObject<typeof sdMetricColumns>>;
+
+/** SD: ein Fenster (14 Tage) wie SB; Same-SKU nur nach Klick, dazu die sichtbaren Impressionen. */
+function sdMetricBase(row: SdMetricColumns): MetricRowBase {
+  return {
+    date: row.date,
+    amazonCampaignId: row.campaignId,
+    campaignName: row.campaignName,
+    impressions: row.impressions,
+    clicks: row.clicks,
+    cost: row.cost,
+    sales7d: null,
+    sales14d: row.sales,
+    salesSameSku7d: null,
+    salesSameSku14d: row.salesPromotedClicks,
+    purchases7d: null,
+    purchases14d: row.purchases,
+    purchasesSameSku7d: null,
+    purchasesSameSku14d: row.purchasesPromotedClicks,
+    units7d: null,
+    units14d: row.unitsSold,
+    unitsSameSku7d: null,
+    unitsSameSku14d: null,
+    salesClicks14d: row.salesClicks,
+    purchasesClicks14d: row.purchasesClicks,
+    unitsClicks14d: row.unitsSoldClicks,
+    viewableImpressions: row.impressionsViews,
+    extra: {},
+  };
+}
+
 const optionalId = amazonIdSchema.nullish().transform((value) => value ?? null);
 
 const REPORT_ROW_SCHEMAS: { [K in AmazonAdsReportType]: z.ZodType<AmazonAdsReportRows[K]> } = {
@@ -712,6 +827,36 @@ const REPORT_ROW_SCHEMAS: { [K in AmazonAdsReportType]: z.ZodType<AmazonAdsRepor
       adGroupName: row.adGroupName,
       amazonTargetId: row.keywordId,
       searchTerm: row.searchTerm,
+    })),
+  sdCampaigns: z.object(sdMetricColumns).transform(sdMetricBase),
+  sdAdGroup: z.object({ ...sdMetricColumns, ...adGroupColumns }).transform((row) => ({
+    ...sdMetricBase(row),
+    amazonAdGroupId: row.adGroupId,
+    adGroupName: row.adGroupName,
+  })),
+  sdTargeting: z
+    .object({ ...sdMetricColumns, ...adGroupColumns, targetingId: amazonIdSchema })
+    .transform((row) => ({
+      ...sdMetricBase(row),
+      amazonAdGroupId: row.adGroupId,
+      adGroupName: row.adGroupName,
+      amazonTargetId: row.targetingId,
+    })),
+  sdAdvertisedProduct: z
+    .object({
+      ...sdMetricColumns,
+      ...adGroupColumns,
+      adId: amazonIdSchema,
+      promotedAsin: optionalText,
+      promotedSku: optionalText,
+    })
+    .transform((row) => ({
+      ...sdMetricBase(row),
+      amazonAdGroupId: row.adGroupId,
+      adGroupName: row.adGroupName,
+      amazonAdId: row.adId,
+      asin: row.promotedAsin,
+      sku: row.promotedSku,
     })),
 };
 
