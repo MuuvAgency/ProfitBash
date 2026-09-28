@@ -300,7 +300,7 @@ const dashboardGroupSchema = metricsTotalSchema
 /** Datenstand des Dashboards (F11) über die Auswahl. */
 export const dashboardStatusSchema = z
   .object({
-    /** Letzter erfolgreicher Report-Sync einer Connection der Auswahl (ISO-Zeitpunkt). */
+    /** Ältester letzter Erfolg des Report-Syncs über die Connections der Auswahl; `null`, wenn eine noch nie lief. */
     lastSyncAt: z.string().nullable(),
     /** „Daten bis“ je genutztem Ad-Typ; `null`, solange einem Profil der Stand fehlt (hängender Import). */
     adProducts: z.array(
@@ -308,6 +308,8 @@ export const dashboardStatusSchema = z
         adProduct: z.string(),
         dataThrough: z.iso.date().nullable(),
         profilesWithoutData: z.number().int(),
+        /** Profile, in denen dieser Ad-Typ hinter einem anderen des Profils steht (hängender Import). */
+        profilesBehind: z.number().int(),
       }),
     ),
     /** SB-Kampagnen ohne Kennzahlen (v3-Preview-Lücke, `plan.md` §5). */

@@ -1726,6 +1726,7 @@ export interface components {
                 /** Format: date */
                 dataThrough: string | null;
                 profilesWithoutData: number;
+                profilesBehind: number;
             }[];
             sbCampaignsWithoutMetrics: number;
         };

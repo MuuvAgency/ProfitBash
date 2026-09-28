@@ -2141,12 +2141,16 @@
                 },
                 "profilesWithoutData": {
                   "type": "integer"
+                },
+                "profilesBehind": {
+                  "type": "integer"
                 }
               },
               "required": [
                 "adProduct",
                 "dataThrough",
-                "profilesWithoutData"
+                "profilesWithoutData",
+                "profilesBehind"
               ]
             }
           },

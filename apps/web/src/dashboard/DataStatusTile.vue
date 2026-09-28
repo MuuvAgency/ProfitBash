@@ -55,20 +55,23 @@ const warnings = computed(() => {
   if (!d) return [];
   const list: string[] = [];
   if (d.fxRatesStale) list.push(t('dashboard.status.fxStale'));
-  if (d.meta.profilesWithoutData > 0) {
+  const missing = d.status.adProducts.filter((p) => p.dataThrough === null);
+  // Fehlt der Stand eines Ad-Typs, nennt der Hinweis dazu genauer, was fehlt.
+  if (d.meta.profilesWithoutData > 0 && missing.length === 0) {
     list.push(t('dashboard.status.profilesWithoutData', d.meta.profilesWithoutData));
   }
-  const dates = d.status.adProducts
-    .map((p) => p.dataThrough)
-    .filter((v): v is string => v !== null);
-  const newest = dates.sort().at(-1);
   for (const product of d.status.adProducts) {
     const adProduct = t(`analytics.adProduct.${product.adProduct}`);
     if (product.dataThrough === null) {
       list.push(t('dashboard.status.adProductMissing', { adProduct }));
-    } else if (newest && product.dataThrough < newest) {
+    } else if (product.profilesBehind > 0) {
+      // Je Profil verglichen (API): andere Zeitzonen oder Connections lösen nichts aus.
       list.push(
-        t('dashboard.status.adProductBehind', { adProduct, date: day(product.dataThrough) }),
+        t(
+          'dashboard.status.adProductBehind',
+          { adProduct, date: day(product.dataThrough), count: product.profilesBehind },
+          product.profilesBehind,
+        ),
       );
     }
   }

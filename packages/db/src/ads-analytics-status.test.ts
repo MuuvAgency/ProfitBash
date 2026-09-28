@@ -23,7 +23,18 @@ const SD = 'SPONSORED_DISPLAY';
 const SELECTION = { always: [SP], withCampaigns: [SB, SD] };
 
 let testDb: TestDatabase;
-const ids = { org: '', other: '', viewer: '', connA: '', connB: '', de: '', fr: '', hidden: '' };
+const ids = {
+  org: '',
+  other: '',
+  viewer: '',
+  connA: '',
+  connB: '',
+  connC: '',
+  de: '',
+  fr: '',
+  it: '',
+  hidden: '',
+};
 
 beforeAll(async () => {
   testDb = await createTestDatabase();
@@ -40,6 +51,8 @@ beforeAll(async () => {
     .values({ organizationId: ids.org, userId: ids.viewer, role: 'viewer', createdAt: new Date() });
   ids.connA = await createTestConnection(db, ids.org, 'amzn1.account.A');
   ids.connB = await createTestConnection(db, ids.org, 'amzn1.account.B');
+  // Neu verbunden: noch kein erfolgreicher Report-Sync, noch kein Datenstand.
+  ids.connC = await createTestConnection(db, ids.org, 'amzn1.account.C');
   ids.de = await createTestProfile(db, {
     organizationId: ids.org,
     connectionId: ids.connA,
@@ -49,6 +62,11 @@ beforeAll(async () => {
     organizationId: ids.org,
     connectionId: ids.connB,
     amazonProfileId: '2',
+  });
+  ids.it = await createTestProfile(db, {
+    organizationId: ids.org,
+    connectionId: ids.connC,
+    amazonProfileId: '4',
   });
   ids.hidden = await createTestProfile(db, {
     organizationId: ids.org,
@@ -140,26 +158,38 @@ afterAll(() => testDb?.close());
 describe('queryDashboardStatus', () => {
   const viewer = () => ({ userId: ids.viewer, orgId: ids.org });
 
-  it('letzter erfolgreicher Report-Sync der Connections in der Auswahl', async () => {
-    const all = await queryDashboardStatus(testDb.db, viewer(), SELECTION);
-    expect(all.lastSyncAt).toBe('2026-09-11T05:00:00.000Z');
-    const onlyDe = await queryDashboardStatus(
-      testDb.db,
-      { ...viewer(), profileIds: [ids.de] },
-      SELECTION,
+  const deFr = () => ({ ...viewer(), profileIds: [ids.de, ids.fr] });
+
+  it('„Letzter Sync“ = der älteste letzte Erfolg der Connections (eine hängende Connection fällt auf)', async () => {
+    // A 04:00, B 05:00 → 04:00; der fehlgeschlagene Lauf und andere Jobs zählen nicht.
+    expect((await queryDashboardStatus(testDb.db, deFr(), SELECTION)).lastSyncAt).toBe(
+      '2026-09-11T04:00:00.000Z',
     );
-    // Der fehlgeschlagene Lauf und andere Jobs zählen nicht.
-    expect(onlyDe.lastSyncAt).toBe('2026-09-11T04:00:00.000Z');
+    expect(
+      (await queryDashboardStatus(testDb.db, { ...viewer(), profileIds: [ids.fr] }, SELECTION))
+        .lastSyncAt,
+    ).toBe('2026-09-11T05:00:00.000Z');
+    // Eine Connection ohne jeden Erfolg: „noch nie“.
+    expect((await queryDashboardStatus(testDb.db, viewer(), SELECTION)).lastSyncAt).toBeNull();
   });
 
-  it('„Daten bis“ je Ad-Typ, den die Auswahl nutzt; fehlt ein Profil, ist der Ad-Typ offen', async () => {
-    const status = await queryDashboardStatus(testDb.db, viewer(), SELECTION);
+  it('„Daten bis“ je Ad-Typ und hängende Ad-Typen je Profil (nicht über verschiedene Profile verglichen)', async () => {
+    const status = await queryDashboardStatus(testDb.db, deFr(), SELECTION);
     expect(status.adProducts).toEqual([
-      { adProduct: SB, dataThrough: '2026-09-07', profilesWithoutData: 0 },
+      // In DE steht SB (07.09.) hinter SP (10.09.).
+      { adProduct: SB, dataThrough: '2026-09-07', profilesWithoutData: 0, profilesBehind: 1 },
       // FR hat SD-Kampagnen, aber noch keinen Datenstand dafür.
-      { adProduct: SD, dataThrough: null, profilesWithoutData: 1 },
-      { adProduct: SP, dataThrough: '2026-09-09', profilesWithoutData: 0 },
+      { adProduct: SD, dataThrough: null, profilesWithoutData: 1, profilesBehind: 0 },
+      // FR-SP (09.09.) liegt hinter DE-SP (10.09.), ist aber in FR nicht hinter einem anderen Ad-Typ: kein Alarm.
+      { adProduct: SP, dataThrough: '2026-09-09', profilesWithoutData: 0, profilesBehind: 0 },
     ]);
+    const all = await queryDashboardStatus(testDb.db, viewer(), SELECTION);
+    expect(all.adProducts.find((p) => p.adProduct === SP)).toEqual({
+      adProduct: SP,
+      dataThrough: null,
+      profilesWithoutData: 1,
+      profilesBehind: 0,
+    });
   });
 
   it('SB-Kampagnen ohne jede Kennzahl (Preview-Lücke), ohne entfernte und ausgeblendete', async () => {
