@@ -69,6 +69,8 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 - `entitled` = die Organisation hat das Feature gebucht (`org_entitlements`).
 - `view` / `write` = Rechte des Users, abgeleitet aus seiner Rolle (admin/editor = write, viewer = nur view).
 - Neue Features = neuer Key in `packages/shared/src/features.ts`. Keine DB-Enum-Migration nötig (Key als Text).
+- `sp-explorer` meint **Sponsored Ads** (SP, SB und SD in einem Explorer, im Gegensatz zu `dsp-explorer`); der Name bleibt, um die
+  Entitlements nicht zu migrieren (`phase-2.md` F1). Das ASIN-Quick-Tool hängt am selben Key.
 
 ## 4. Rollen
 
@@ -103,7 +105,8 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 ### Festlegungen für Phase 1 und später
 
 - **Geld und Währungen:** Beträge in Originalwährung plus Währungscode speichern (`numeric`), eine
-  Decimal-Library für Berechnungen (Auswahl in Phase 1, z. B. `decimal.js`). Reporting-Währung EUR.
+  Decimal-Library für Berechnungen (Auswahl in Phase 1, z. B. `decimal.js`). Reporting-Währung EUR (Standard; Anzeigewährung
+  wählbar, `phase-2.md` F3).
   Tageskurse (z. B. EZB) in einer eigenen Tabelle, umgerechnete Summen in der UI mit „≈" kennzeichnen.
   Im EU-Konto kommen EUR, GBP, SEK, PLN und TRY gemischt vor.
 - **Amazon-Kennzahlen sind vorläufig:** Amazon korrigiert jüngere Werte, bis die Attributionsfenster

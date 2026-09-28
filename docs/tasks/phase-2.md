@@ -4,9 +4,8 @@
 > `docs/tasks/phase-1.md` (Umsetzungsnotizen 1.5–1.9, F8, F12), `docs/decisions/` (001 Stack, 002 Mandanten-Modell,
 > 003 Decimal-Library, 004 Amazon-API), `design/DESIGN.md` und die Referenzen `dashboard_home`, `werbekosten_ppc`.
 >
-> **Status: in Abstimmung (2026-09-28).** Entschieden: F1, F2, F10, F12, Zeiträume aus F5. Offen: Rest. Fragen stehen als **F1–F14** unter „Fragen an Dominik“, jeweils mit
-> Empfehlung (die Nummern gelten nur in dieser Datei; `phase-1.md` hat eigene F1–F14). Umgesetzt wird erst, wenn die Fragen
-> entschieden sind. Aufgaben, die von einer Frage abhängen, verweisen darauf.
+> **Status: abgestimmt (2026-09-28).** Alle Fragen **F1–F14** unter „Fragen an Dominik“ sind entschieden (die Nummern gelten nur
+> in dieser Datei; `phase-1.md` hat eigene F1–F14). Aufgaben, die von einer Frage abhängen, verweisen darauf.
 >
 > **Ausgangslage:** Es gibt vorerst keinen Ads-API-Zugang (`phase-1.md` F12). Entschieden (Dominik, 2026-09-28): Phase 2 wird
 > jetzt gegen den Mock-Anbieter gebaut, 1.10 wartet. Phase 2 liest nur aus den Tabellen von Phase 1; von außen kommen nur die
@@ -20,12 +19,12 @@ Die Agentur sieht ihre Amazon-Werbung, ohne die Konsole zu öffnen:
   Drill-Down von oben nach unten, Chart über dem Grid, Filter, gespeicherte Ansichten.
 - **Mitglieder** verwalten (anlegen, Rolle ändern, entfernen).
 - **ASIN-Quick-Tool:** Wo wird eine ASIN beworben, und was bringt sie?
-- Summen über Währungen hinweg in EUR (EZB-Tageskurse, `phase-1.md` F8).
+- Summen über Währungen hinweg in einer wählbaren Anzeigewährung, Standard EUR (EZB-Tageskurse, `phase-1.md` F8, F3).
 
 ## Definition of Done
 
 - [ ] Dashboard und Explorer zeigen mit den Mock-Daten (SP, SB, SD; EUR, GBP, SEK) dieselben Summen wie eine unabhängige
-      SQL-Prüfung (Test), in Originalwährung bei einer Währung, sonst in EUR mit „≈“.
+      SQL-Prüfung (Test), in Originalwährung bei einer Währung, sonst in der Anzeigewährung (Standard EUR) mit „≈“ (F3).
 - [ ] Kennzahlen je Ad-Typ werden richtig gelesen und gekennzeichnet (`plan.md` §5, Tabelle unter F4): Attributionsfenster, Klick-
       und View-Anteil bei SB/SD, SD-Same-SKU nur nach Klick, vCPM-Kampagnen, SB-Preview-Lücke, Spalten, die Amazon für einen Ad-Typ
       oder eine Ebene nicht liefert („–“, nie 0). Ein Test deckt jede dieser Regeln ab.
@@ -69,6 +68,12 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   **in EUR um, je Tag mit dem EZB-Kurs dieses Tages** (für Wochenenden und Feiertage gilt der letzte Kurs davor), und kennzeichnet
   Summen mit „≈“ (`plan.md` §5). Keine wählbare Anzeigewährung (später nachrüstbar). Der Explorer zeigt je Zeile die
   Originalwährung, Summenzeilen folgen derselben Regel.
+  **Entschieden (Dominik, 2026-09-28): Anzeigewährung wählbar.** In der Filterleiste (F2) eine Auswahl „Währung“, Standard
+  **automatisch**: eine Währung in der Auswahl → diese, sonst EUR. Wählbar sind EUR, USD und die Währungen der sichtbaren Profile
+  (Liste über den Access-Layer), soweit die EZB sie veröffentlicht. Umgerechnet wird je Tag über EUR mit den EZB-Kursen dieses Tages
+  (Betrag ÷ Kurs der Quellwährung × Kurs der Zielwährung; Wochenenden und Feiertage wie oben), Summen mit „≈“, sobald etwas
+  umgerechnet wurde. Der Explorer zeigt je Zeile weiter die Originalwährung, Summenzeilen und Dashboard die Anzeigewährung. Die
+  Auswahl wird mit der Filterleiste gespeichert (`ui_state`, gespeicherte Ansichten).
 - **F4 – Attributionsfenster.** SP liefert 7 und 14 Tage nur nach Klick, SB/SD nur 14 Tage nach Klick **oder** View.
   Empfehlung: Umschalter mit zwei Einstellungen, Standard **„wie Konsole“**: SP 7 Tage bei Seller- und Agency-Profilen, 14 Tage bei
   Vendoren (`amazon_ads_profiles.account_type`; Agency = 7 Tage ist eine Annahme, 1.10 prüft sie), SB/SD 14 Tage inkl. Views.
@@ -86,6 +91,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   | Sichtbare Impressionen (Basis für vCPM) | – | – | ja |
 
   Folge für „14 Tage, nur Klicks“: SB-Same-SKU ist dort „–“. Welche Einheiten „wie Konsole“ bei SB-Targets zählen, zeigt 1.10.
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen** (Standard „wie Konsole“, Umschalter „14 Tage, nur Klicks“).
 - **F5 – Zeitraum und Vergleich.** Empfehlung: Voreinstellungen Gestern, Letzte 7 / 14 / 30 Tage, Dieser Monat, Letzter Monat,
   frei wählbar; Standard **Letzte 30 Tage**.
   - Vergleich: **Vorperiode gleicher Länge** (Standard; bei „Dieser Monat“ am 10. also die 10 Tage davor, nicht der ganze
@@ -97,8 +103,11 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   **Entschieden (Dominik, 2026-09-28), Voreinstellungen:** Letzte 30 Tage (Standard), Letzte 14 Tage, Diese Woche, Letzte Woche,
   Letzter Monat, Vorletzter Monat, Vor-vorletzter Monat, Letzte 12 Monate, Dieses Jahr bis jetzt, Letztes Jahr, dazu frei wählbar.
   Wochen beginnen am Montag. Reichen die Daten nicht so weit zurück (Historie ab dem ersten Sync, höchstens 95 Tage davor),
-  zeigt die App ab wann Daten vorliegen, statt Lücken als 0 zu zeigen. **Noch offen:** Vergleich (Empfehlung oben unverändert) und
-  ob „Gestern“, „Letzte 7 Tage“ und „Dieser Monat“ bewusst fehlen.
+  zeigt die App ab wann Daten vorliegen, statt Lücken als 0 zu zeigen.
+  **Entschieden (Dominik, 2026-09-28), Rest:** „Gestern“, „Letzte 7 Tage“ und „Dieser Monat“ kommen dazu. Vergleich wie empfohlen:
+  Vorperiode gleicher Länge (Standard), Vorjahr, aus.
+  Damit die Voreinstellungen: Gestern, Letzte 7 Tage, Letzte 14 Tage, Letzte 30 Tage (Standard), Diese Woche, Letzte Woche, Dieser
+  Monat, Letzter Monat, Vorletzter Monat, Vor-vorletzter Monat, Letzte 12 Monate, Dieses Jahr bis jetzt, Letztes Jahr, frei wählbar.
 - **F6 – Explorer-Ebenen und Drill-Down.** Empfehlung: Reiter **Portfolios · Kampagnen · Ad Groups · Targets · Product Ads ·
   Suchbegriffe · Negatives**. Ein Klick auf eine Zeile filtert die nächste Ebene darauf (Brotkrumen oben: Client › Profil ›
   Kampagne › Ad Group), die Reiter bleiben erreichbar. SB-Targets ohne Ad Group (Kampagnenebene) erscheinen beim Drill-Down von der
@@ -107,8 +116,9 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   Zeilen). Dazu **CSV-Export** der geladenen Zeilen (Community-Modul von AG Grid, wenig Aufwand). Frage: CSV-Export jetzt
   oder später?
   **Stand (2026-09-28):** Dominik hat nachgefragt; einfach erklärt: Reiter je Ebene, Klick auf eine Kampagne zeigt nur noch deren
-  Ad Groups usw., Pfad oben zum Zurückspringen, Chart über der Tabelle. Offen: diese Erklärung bestätigen und CSV-Export
-  (Tabelle als Datei für Excel herunterladen) jetzt oder später.
+  Ad Groups usw., Pfad oben zum Zurückspringen, Chart über der Tabelle.
+  **Entschieden (Dominik, 2026-09-28): Aufbau wie beschrieben, CSV-Export jetzt** (die geladenen Zeilen in der aktuellen
+  Filterung und Sortierung).
 - **F7 – Datenmenge im Grid.** Empfehlung: Der Server rechnet Summen je Zeile, das Grid bekommt alle Zeilen der Auswahl
   (Sortieren und Filtern im Browser, schnell und einfach) bis zu einer Obergrenze von **10 000 Zeilen**.
   - Bei mehr Zeilen lädt es die 10 000 mit dem höchsten Spend und sagt das deutlich: Filter und Sortierung wirken dann nur auf diese
@@ -118,6 +128,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Die Antwort wird komprimiert (10 000 Zeilen mit Vergleichszeitraum sind sonst mehrere MB).
   - Wird das bei echten Konten zu eng, kommt das Infinite Row Model (Community) mit Sortierung und Filter auf dem Server als eigene
     Aufgabe.
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen, Obergrenze 10 000 Zeilen.**
 - **F8 – Gespeicherte Filter.** Empfehlung: **gespeicherte Ansichten** (Filterleiste, Reiter, Spalten, Sortierung, Chart-Kennzahlen)
   in einer eigenen Tabelle `saved_views` (Organisation, Besitzer, Name, Bereich `dashboard`/`explorer`, Zustand als jsonb,
   `shared`).
@@ -126,6 +137,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Beim Laden einer Ansicht filtert der Access-Layer die darin genannten Profile und Clients (wichtig ab Phase 6, wenn nicht jeder
     alles sieht). `saved_views` kommt in ADR 002 unter „Geltungsbereich“.
   - Alternative: nur persönlich in `ui_state` (weniger Aufwand, aber ohne Teilen im Team).
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen, persönlich und im Team teilbar.**
 - **F9 – Mitglieder anlegen ohne E-Mail-Versand.** Es gibt noch keinen E-Mail-Dienst, die Registrierung ist aus. Empfehlung: Der
   Admin legt das Mitglied an (E-Mail, Name, Rolle); die App erzeugt einen **einmaligen Link zum Setzen des Passworts** (7 Tage
   gültig), den der Admin selbst weitergibt. Dazu: Rolle ändern, Mitglied entfernen, Link neu erzeugen; der letzte Admin kann weder
@@ -139,6 +151,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     Links auf 7 Tage setzen.
   - Entfernen eines Mitglieds beendet dessen Sessions.
   Alternative: jetzt einen E-Mail-Dienst anbinden (neues Konto, neue Abhängigkeit, DNS-Einträge für die Domain).
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen, Einmal-Link ohne E-Mail-Versand.**
 - **F10 – ASIN-Quick-Tool.** Der Plan nennt nur den Namen. Empfehlung: Popover in den Quick-Tools: eine oder mehrere ASINs eingeben
   (auch aus der Zwischenablage, getrennt durch Leerzeichen, Komma oder Zeilenumbruch) → Liste der Product Ads mit Profil, Kampagne,
   Ad Group, Ad-Typ, Status und Kennzahlen im gewählten Zeitraum; Klick springt in den Explorer (Reiter Product Ads, gefiltert).
@@ -160,8 +173,9 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Kein TACoS und kein Profit (Phase 7), keine erfundenen Kacheln wie „Market Velocity“.
   **Stand (2026-09-28):** Dominik fragt nach organischen Umsätzen. Die gibt es nicht über die Ads-API, nur über die SP-API (Phase 7;
   laut `plan.md` §2 ginge ein schmaler „Sales-Import“ früher, sobald die SP-API freigegeben ist). Ohne SP-API-Zugang bleibt Phase 2
-  bei Ads-Kennzahlen. Offen: ob der Kachel-Inhalt oben so passt, und ob die SP-API-Registrierung (`phase-0.md` 0.0e) für ein
-  Einzelunternehmen dieselbe Hürde hat wie das Partner Network (Dominik prüft).
+  bei Ads-Kennzahlen.
+  **Entschieden (Dominik, 2026-09-28): Kacheln wie empfohlen, nur Ads-Kennzahlen.** Außerhalb von Phase 2 offen: ob die
+  SP-API-Registrierung (`phase-0.md` 0.0e) für ein Einzelunternehmen dieselbe Hürde hat wie das Partner Network (Dominik prüft).
 - **F12 – Demo-Daten mit Volumen.** Die Mock-Daten haben 16 Kampagnen und 26 Targets; Grid-Layout, Filter und Abfragetempo lassen
   sich daran nicht prüfen. Empfehlung: ein **Generator im Mock-Anbieter** (deterministisch, eigener Schalter, z. B.
   `AMAZON_ADS_MOCK_SCALE=large`): 6 Profile in EUR/GBP/SEK/PLN (neue Mock-Profile), ~300 Kampagnen, **~12 000 Targets** (über der
@@ -172,11 +186,14 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 - **F13 – Mobil.** Empfehlung: Dashboard **voll responsive** (eine Spalte unter 768 px, `DESIGN.md` §6). Explorer ab Tablet voll
   nutzbar; auf dem Handy dieselbe Seite, das Grid scrollt waagerecht in seiner Kachel, Chart und Filterleiste stapeln sich. Keine
   eigene Handy-Ansicht des Explorers in Phase 2.
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen.**
 - **F14 – Tabellen bei klassischer Scrollbar (offen aus Phase 1).** Sync-Status und Profiltabelle passen bei 1440 px nur mit
   Overlay-Scrollbars ohne waagerechtes Scrollen; mit klassischer Scrollbar scrollen sie waagerecht (Amazon-Konto und Ergebnis sind
   schon heute gekürzt, der volle Text steht im Tooltip, der auf Touch fehlt). Empfehlung: **so lassen**. Die Tabellen im Dashboard
   (F11) von vornherein so bauen, dass sie bei 1440 px auch mit klassischer Scrollbar passen. Das Explorer-Grid hat mehr Spalten als
   1440 px fassen und scrollt immer waagerecht (erste Spalte fest).
+  **Entschieden (Dominik, 2026-09-28): jetzt anpassen** (eigene Aufgabe 2.12): Sync-Status und Profiltabelle passen bei 1440 px
+  auch mit klassischer Scrollbar ohne waagerechtes Scrollen.
 
 ## Aufgaben
 
@@ -200,8 +217,10 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 - [ ] **Überwachung:** Plattformweite Läufe (`job_runs.organization_id` leer) erscheinen nicht im Sync-Status der Organisation.
       Deshalb Healthcheck **Pflicht** (`HEALTHCHECKS_FX_RATES_SYNC_URL`) und „Kurse bis“ im Datenstand des Dashboards (F11), damit ein
       hängender Kursabruf auffällt, bevor Summen nur noch mit Hinweis erscheinen.
+- [ ] Alle von der EZB veröffentlichten Währungen speichern (die Anzeigewährung ist wählbar, F3; USD gehört immer zur Auswahl).
 - [ ] Kurs für Tag *d* = letzter veröffentlichter Kurs an oder vor *d*. Fehlt er (neue Währung, von der EZB nicht veröffentlicht),
-      bleibt der Betrag unumgerechnet und die Summe zeigt einen Hinweis statt einer falschen Zahl.
+      bleibt der Betrag unumgerechnet und die Summe zeigt einen Hinweis statt einer falschen Zahl. Umrechnung zwischen zwei
+      Nicht-EUR-Währungen über EUR mit den Kursen desselben Tages (F3).
 - [ ] Tests mit msw (kein Aufruf der echten EZB), inkl. Wochenende, Feiertag, fehlender Währung, Wiederholung ohne Duplikate.
 
 ### 2.3 Demo-Daten mit Volumen (F12)
@@ -214,7 +233,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
       nach Clients, Profilen, Ad-Typen, Zeitraum; Summen in SQL (`sum()` auf `numeric`/`bigint`, als String zurück).
 - [ ] Clients für die Filterleiste (F2) aus den sichtbaren Profilen abgeleitet (Helfer im Access-Layer, vgl. „Offen für Phase 6“ in
       ADR 002), nutzbar für alle Rollen.
-- [ ] Umrechnung in EUR je Tag über `fx_rates` in derselben Abfrage (F3), Originalwährung bleibt daneben erhalten.
+- [ ] Umrechnung in die Anzeigewährung (F3: automatisch, EUR, USD oder eine Profilwährung) je Tag über `fx_rates` in derselben
+      Abfrage, Originalwährung bleibt daneben erhalten. Wählbare Währungen aus den sichtbaren Profilen (Access-Layer) plus EUR, USD.
 - [ ] Abfragen: Summen je Zeile einer Ebene (F6) für Zeitraum und Vergleichszeitraum, Summenzeile über alle Zeilen, Tagesreihe für
       eine Auswahl, Summen je Client/Profil/Ad-Typ fürs Dashboard, Product-Ad-Suche nach ASIN inkl. `extra.asins` (F10). Obergrenze
       der Zeilen nach F7.
@@ -226,10 +246,11 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 ### 2.5 API (`apps/api`)
 - [ ] Middleware `requireFeature(key, 'view')`: prüft Entitlement und Rolle serverseitig (`resolveFeatureAccess`), `403` mit
       Fehlerformat `{ error: { code, message } }`.
-- [ ] Endpunkte (POST, IDs im Body): Explorer-Zeilen je Ebene, Tagesreihe, Dashboard-Summen, ASIN-Suche, Clients für die
-      Filterleiste. zod an der Grenze, OpenAPI und `schema.gen.ts` neu erzeugt. Beträge als Decimal-Strings, Kennzahlen aus 2.1.
-- [ ] Antwort nennt Währung bzw. „umgerechnet“, Attribution je Summe (gemischt ja/nein, fehlende Werte), „Daten bis“, den Beginn
-      der vorläufigen Tage und ob die Zeilen gekürzt sind.
+- [ ] Endpunkte (POST, IDs im Body): Explorer-Zeilen je Ebene, Tagesreihe, Dashboard-Summen, ASIN-Suche, Clients und wählbare
+      Währungen für die Filterleiste; Anzeigewährung als Parameter (F3). zod an der Grenze, OpenAPI und `schema.gen.ts` neu erzeugt.
+      Beträge als Decimal-Strings, Kennzahlen aus 2.1.
+- [ ] Antwort nennt die Währung und ob umgerechnet wurde, Attribution je Summe (gemischt ja/nein, fehlende Werte), „Daten bis“,
+      den Beginn der vorläufigen Tage und ob die Zeilen gekürzt sind.
 - [ ] Komprimierung der Antworten (F7).
 
 ### 2.6 Web-Grundlagen
@@ -238,7 +259,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
       (F5; z. B. Bereich über `crossLines`).
 - [ ] AG Grid: deutsche `localeText` mit `LocaleModule` (offen seit Phase 0), benötigte Module registrieren (Sortierung, Filter, CSV
       nach F6). Nur registrierte Module nutzen, Konsole prüfen. Vergleich für Decimal-Strings (F7) in `packages/shared`.
-- [ ] Filterleiste (F2, F4, F5) als eigene Komponente, kurzer Zustand in der URL, letzte Auswahl in `ui_state`.
+- [ ] Filterleiste (F2, F3, F4, F5) als eigene Komponente (Clients/Profile, Anzeigewährung, Attribution, Zeitraum, Vergleich), kurzer
+      Zustand in der URL, letzte Auswahl in `ui_state`.
 - [ ] Bausteine: KPI-Kachel mit Veränderung, Hinweise „≈“, „gemischte Attribution“ und „Wert fehlt“, Kennzeichnung vorläufiger Tage.
 
 ### 2.7 Dashboard (`/dashboard`)
@@ -247,6 +269,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 
 ### 2.8 Explorer (`/ads/explorer/*`)
 - [ ] Reiter, Drill-Down, Brotkrumen, Chart und Grid nach F6/F7; Spaltenauswahl, Sortierung, Filter; Zustand in der URL.
+- [ ] CSV-Export der geladenen Zeilen in aktueller Filterung und Sortierung (F6); Beträge als Decimal-Strings mit Währungsspalte,
+      Hinweis im Export, wenn die Zeilen gekürzt sind (F7).
 - [ ] Spalten je Ad-Typ lesbar: Attribution (F4), Klick-/View-Anteil bei SB/SD, sichtbare Impressionen und vCPM bei SD, Kostenart
       (`extra.costType`; Gebote bei vCPM als „je 1000 sichtbare Impressionen“ beschriftet), Platzhalter („unbekannt“) und entfernte
       Entities (Filter, Standard ausgeblendet; `phase-1.md` F10).
@@ -268,6 +292,11 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 - [ ] Popover in den Quick-Tools nach F10 (Feature `sp-explorer`, Recht `view`), Zeitraum aus der Filterleiste bzw. Standard,
       Sprung in den Explorer.
 
+### 2.12 Alte Tabellen ohne waagerechtes Scrollen (F14)
+- [ ] Sync-Status (`/ops/sync`) und Profiltabelle (`/admin/connections`) passen bei 1440 px (Sidebar ein- und ausgeklappt) auch mit
+      klassischer Scrollbar ohne waagerechtes Scrollen; gekürzte Texte auch auf Touch lesbar (nicht nur per Tooltip).
+- [ ] Im Browser-Pane mit klassischer Scrollbar prüfen (Scrollbar-Breite per CSS nachgestellt, da das Pane Overlay-Scrollbars hat).
+
 ## `.env.example`
 
 Neu in Phase 2 (Vorschlag): `HEALTHCHECKS_FX_RATES_SYNC_URL` (2.2), optional `AMAZON_ADS_MOCK_SCALE` (2.3, nur Entwicklung).
@@ -284,7 +313,7 @@ Neu in Phase 2 (Vorschlag): `HEALTHCHECKS_FX_RATES_SYNC_URL` (2.2), optional `AM
 
 ## Reihenfolge für Claude Code
 
-2.1 → 2.2 → 2.3 → 2.4 → 2.5 → 2.6 → 2.7 → 2.8 → 2.9 → 2.10 → 2.11.
+2.1 → 2.2 → 2.3 → 2.4 → 2.5 → 2.6 → 2.7 → 2.8 → 2.9 → 2.10 → 2.11 → 2.12.
 
 Eine frische Session je Aufgabe (2.4 und 2.8 ggf. geteilt). Nach jedem Schritt: Tests grün, kleiner Commit, Häkchen in dieser
 Datei, Umsetzungsnotizen unter der Aufgabe („Umsetzung (Stand für …)“ wie in Phase 1).
