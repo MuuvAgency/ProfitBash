@@ -73,6 +73,8 @@ export interface DailyMetricValues {
   salesClicks14d: string | null;
   purchasesClicks14d: number | null;
   unitsClicks14d: number | null;
+  /** Sichtbare Impressionen nach MRC (nur SD, Basis für vCPM). SP/SB: `null`. */
+  viewableImpressions: number | null;
   /** Weitere Report-Spalten ohne eigene Spalte. */
   extra: Record<string, unknown>;
 }
@@ -408,6 +410,7 @@ const METRIC_VALUE_KEYS = [
   'salesClicks14d',
   'purchasesClicks14d',
   'unitsClicks14d',
+  'viewableImpressions',
   'extra',
   'importedAt',
 ] as const;
@@ -447,6 +450,7 @@ function metricValues(row: DailyMetricValues): DailyMetricValues {
     salesClicks14d: row.salesClicks14d,
     purchasesClicks14d: row.purchasesClicks14d,
     unitsClicks14d: row.unitsClicks14d,
+    viewableImpressions: row.viewableImpressions,
     extra: row.extra,
   };
 }

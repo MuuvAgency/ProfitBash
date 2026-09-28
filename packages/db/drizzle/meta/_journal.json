@@ -99,6 +99,13 @@
       "when": 1790576146264,
       "tag": "0013_amazon_ads_metrics_clicks_14d",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790583846332,
+      "tag": "0014_amazon_ads_metrics_viewable_impressions",
+      "breakpoints": true
     }
   ]
 }

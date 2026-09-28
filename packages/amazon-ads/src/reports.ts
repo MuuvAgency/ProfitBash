@@ -300,6 +300,8 @@ export interface AmazonAdsDailyMetricValues {
   salesClicks14d: string | null;
   purchasesClicks14d: number | null;
   unitsClicks14d: number | null;
+  /** Sichtbare Impressionen nach MRC (nur SD, Basis für vCPM). SP/SB: `null`. */
+  viewableImpressions: number | null;
   extra: Record<string, unknown>;
 }
 
@@ -554,6 +556,7 @@ function metricBase(row: MetricColumns): MetricRowBase {
     salesClicks14d: null,
     purchasesClicks14d: null,
     unitsClicks14d: null,
+    viewableImpressions: null,
     extra: {},
   };
 }
@@ -603,6 +606,7 @@ function sbMetricBase(row: SbMetricColumns): MetricRowBase {
     salesClicks14d: row.salesClicks,
     purchasesClicks14d: row.purchasesClicks,
     unitsClicks14d: row.unitsSoldClicks,
+    viewableImpressions: null,
     extra: {},
   };
 }

@@ -379,6 +379,7 @@ describe('Import eines Reports', () => {
       salesClicks14d: null,
       purchasesClicks14d: null,
       unitsClicks14d: null,
+      viewableImpressions: null,
       extra: {},
     };
     const importer = setup();
@@ -429,6 +430,7 @@ describe('„Daten bis“ je Profil und Ad-Typ', () => {
     salesClicks14d: null,
     purchasesClicks14d: null,
     unitsClicks14d: null,
+    viewableImpressions: null,
     extra: {},
   });
 
