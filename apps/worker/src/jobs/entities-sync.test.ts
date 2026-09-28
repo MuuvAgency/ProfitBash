@@ -227,12 +227,17 @@ describe('syncConnectionEntities', () => {
   });
 
   it('legt Batches ohne freien Export-Platz nur an; der Poll fordert sie später an', async () => {
+    // Alle Export-Plätze belegt: offene SB- und SD-Batches bei Profilen außer DE.
     const others = profiles.filter((p) => p.amazonProfileId !== DE);
+    const open = new Set<string>();
     for (let i = 0; i < MAX_RUNNING_EXPORTS_PER_TYPE; i++) {
+      const profileId = others[i % others.length]!.id;
+      const adProduct = i % 2 === 0 ? SB : SD;
+      open.add(`${profileId}|${adProduct}`);
       const { requests } = await createAmazonExportBatch(testDb.db, {
         organizationId,
-        profileId: others[i % others.length]!.id,
-        adProduct: ['SPONSORED_BRANDS', 'SPONSORED_DISPLAY'][Math.floor(i / 3)]!,
+        profileId,
+        adProduct,
         exportTypes: ['campaigns', 'adGroups', 'targets', 'ads'],
         now: new Date(clock),
       });
@@ -243,11 +248,10 @@ describe('syncConnectionEntities', () => {
 
     const outcome = await sync();
 
-    // SP für alle Profile, SB nur für DE (die übrigen haben schon einen offenen SB-Batch), SD für DE und
-    // das dritte übrige Profil (die ersten beiden haben einen offenen SD-Batch).
+    // Je Profil und Ad-Typ ein neuer Batch, außer wo schon einer offen ist; keiner bekommt einen Platz.
     expect(outcome.counters).toMatchObject({
       requested: 0,
-      exportsWaiting: profiles.length + 1 + 2,
+      exportsWaiting: profiles.length * ENTITY_AD_PRODUCTS.length - open.size,
     });
     const waiting = await exportsOf(deProfileId());
     expect(waiting.filter((e) => e.adProduct === SP).map((e) => e.status)).toEqual([
