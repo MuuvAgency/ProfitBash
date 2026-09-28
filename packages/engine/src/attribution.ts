@@ -55,7 +55,8 @@ export type AttributedField = (typeof ATTRIBUTED_FIELDS)[number];
 
 /** Gewählte Spalte je Feld; `null` = Amazon liefert den Wert hier nicht (Anzeige „–“, nie 0). */
 export type AttributionSelection = Record<AttributedField, MetricColumn | null> & {
-  basis: AttributionBasis;
+  /** Grundlage von Umsatz, Käufen und Einheiten, `null`, wenn keiner dieser Werte geliefert wird. */
+  basis: AttributionBasis | null;
   /** Grundlage der Same-SKU-Werte (bei SD nur Klick), `null`, wenn es keine gibt. */
   sameSkuBasis: AttributionBasis | null;
 };
@@ -199,7 +200,13 @@ export function selectAttribution({
       return [field, column !== null && available.includes(column) ? column : null];
     }),
   ) as Candidates;
-  return { ...selection, basis, sameSkuBasis };
+  const anyOf = (fields: readonly AttributedField[]) =>
+    fields.some((field) => selection[field] !== null);
+  return {
+    ...selection,
+    basis: anyOf(['sales', 'purchases', 'units']) ? basis : null,
+    sameSkuBasis: anyOf(['salesSameSku', 'purchasesSameSku', 'unitsSameSku']) ? sameSkuBasis : null,
+  };
 }
 
 export interface AttributionSummary {
@@ -217,7 +224,11 @@ const sameBasis = (a: AttributionBasis, b: AttributionBasis) =>
 const isMixed = (bases: readonly AttributionBasis[]) =>
   bases.some((basis) => !sameBasis(basis, bases[0]!));
 
-/** Fasst die Auswahlen der Zeilen einer Summe zusammen (z. B. je Ad-Typ und Kontotyp einer Auswahl). */
+/**
+ * Fasst die Auswahlen der Zeilen einer Summe zusammen: je Kombination aus Ad-Typ und Kontotyp, die in den Zeilen
+ * **vorkommt** (nicht je gewähltem Filter). SQL-`sum()` überspringt `null` still; ob Werte fehlen, steht deshalb
+ * hier in `coverage`, nicht in der Summe. Ohne Auswahl: vollständig und nicht gemischt.
+ */
 export function summarizeAttribution(
   selections: readonly AttributionSelection[],
 ): AttributionSummary {
@@ -230,11 +241,7 @@ export function summarizeAttribution(
     }),
   ) as Record<AttributedField, Coverage>;
 
-  return {
-    mixed: isMixed(selections.map((selection) => selection.basis)),
-    sameSkuMixed: isMixed(
-      selections.flatMap((selection) => (selection.sameSkuBasis ? [selection.sameSkuBasis] : [])),
-    ),
-    coverage,
-  };
+  const bases = (key: 'basis' | 'sameSkuBasis') =>
+    selections.flatMap((selection) => (selection[key] ? [selection[key]] : []));
+  return { mixed: isMixed(bases('basis')), sameSkuMixed: isMixed(bases('sameSkuBasis')), coverage };
 }

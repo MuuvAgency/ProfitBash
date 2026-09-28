@@ -8,6 +8,7 @@ const totals = (overrides: Partial<MetricTotals> = {}): MetricTotals => ({
   sales: '120.00',
   purchases: '4',
   viewableImpressions: null,
+  viewableCost: null,
   ...overrides,
 });
 
@@ -53,7 +54,20 @@ describe('deriveMetrics', () => {
   });
 
   it('berechnet vCPM aus Kosten und sichtbaren Impressionen (nur SD)', () => {
-    expect(deriveMetrics(totals({ viewableImpressions: '1500' })).vcpm).toBe('20');
+    expect(deriveMetrics(totals({ viewableImpressions: '1500', viewableCost: '30.00' })).vcpm).toBe(
+      '20',
+    );
+  });
+
+  it('rechnet vCPM einer gemischten Summe nur mit den Kosten der Zeilen mit sichtbaren Impressionen', () => {
+    // SP 20 € + SD 10 € Kosten, sichtbare Impressionen nur bei SD.
+    expect(
+      deriveMetrics(totals({ cost: '30', viewableImpressions: '1000', viewableCost: '10' })).vcpm,
+    ).toBe('10');
+  });
+
+  it('rechnet mit negativen Korrekturen weiter (Anzeige entscheidet 2.8)', () => {
+    expect(deriveMetrics(totals({ sales: '-5' })).acos).toBe('-6');
   });
 
   it('ergibt null statt Infinity oder 0 bei Division durch 0', () => {
@@ -66,6 +80,7 @@ describe('deriveMetrics', () => {
           sales: '0',
           purchases: '0',
           viewableImpressions: '0',
+          viewableCost: '0',
         }),
       ),
     ).toEqual({ ctr: null, cpc: null, cvr: null, acos: null, roas: null, cpm: null, vcpm: null });

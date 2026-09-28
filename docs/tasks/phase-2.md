@@ -198,14 +198,44 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 ## Aufgaben
 
 ### 2.1 Kennzahlen-Rechenkern (`packages/engine`)
-- [ ] `decimal.js` als **eine** konfigurierte Kopie (`Decimal.clone`, ADR 003), nie die globale Konfiguration.
-- [ ] Summen und abgeleitete Kennzahlen aus Decimal-Strings: CTR, CPC, CVR, ACoS, ROAS, CPM, vCPM (nur SD), Veränderung zum Vergleich
+- [x] `decimal.js` als **eine** konfigurierte Kopie (`Decimal.clone`, ADR 003), nie die globale Konfiguration.
+- [x] Summen und abgeleitete Kennzahlen aus Decimal-Strings: CTR, CPC, CVR, ACoS, ROAS, CPM, vCPM (nur SD), Veränderung zum Vergleich
       (absolut und relativ). Division durch 0 → `null`. Ergebnis als Decimal-String mit fester Rechengenauigkeit; gerundet wird erst
       bei der Anzeige.
-- [ ] Attribution nach F4: Funktion, die je Ad-Typ, Ebene, Kontotyp (Seller/Agency/Vendor) und Einstellung die Spalten für Umsatz,
+- [x] Attribution nach F4: Funktion, die je Ad-Typ, Ebene, Kontotyp (Seller/Agency/Vendor) und Einstellung die Spalten für Umsatz,
       Käufe und Einheiten wählt; meldet, ob eine Summe gemischte Attribution enthält und ob Werte fehlen (Tabelle unter F4).
-- [ ] Tests für jede Zeile der Tabelle unter F4 und die Regeln aus `plan.md` §5: SB/SD `*_14d` inkl. Views; SD-Same-SKU gegen den
+- [x] Tests für jede Zeile der Tabelle unter F4 und die Regeln aus `plan.md` §5: SB/SD `*_14d` inkl. Views; SD-Same-SKU gegen den
       Klick-Anteil; vCPM-Kosten aus `cost` und `viewable_impressions`; SP-Klick-Spalten leer; fehlende Werte nie als 0.
+- [x] Umsetzung (Stand für 2.2 und später):
+  - **Decimal** (`decimal.ts`): `Dec` = `Decimal.clone` mit 34 signifikanten Stellen (wie decimal128), `ROUND_HALF_EVEN`; ein
+    Test belegt, dass die globale Konfiguration unverändert bleibt. `parseDecimal` nimmt nur Decimal-Strings ohne Exponent
+    (`-?\d+(\.\d+)?`, sonst `TypeError`), `formatDecimal` schreibt ohne Exponent, `-0` als `0`. Alle Werte (auch Zähler) sind
+    Decimal-Strings, weil SQL-Summen über `bigint`/`numeric` als String kommen.
+  - **Kennzahlen** (`metrics.ts`): `deriveMetrics` liefert Anteile als Bruch (0.25 = 25 %, passend zu `formatPercent`): CTR =
+    Klicks/Impressionen, CPC = Kosten/Klicks, CVR = Käufe/Klicks, ACoS = Kosten/Umsatz, ROAS = Umsatz/Kosten, CPM und vCPM je
+    1000. vCPM nutzt `viewableCost` (Kosten nur der Zeilen mit sichtbaren Impressionen, in SQL `sum(cost) filter (where
+    viewable_impressions is not null)`), sonst wäre vCPM einer Summe mit SP/SB falsch. `sales`/`purchases` müssen aus denselben
+    Zeilen stammen wie `cost`; bei teilweiser Abdeckung übergibt der Aufrufer `null`. Negative Korrekturen werden weiter
+    gerechnet (z. B. negativer ACoS), die Anzeige entscheidet 2.8. `change` bezieht die relative Veränderung auf |Vergleichswert|.
+    `sumWithGaps` zählt fehlende Werte nicht als 0 und meldet `coverage` (`full`/`partial`/`none`).
+  - **Attribution** (`attribution.ts`): `selectAttribution({ adProduct, level, accountType, setting })` liefert je Feld (Umsatz,
+    Käufe, Einheiten, jeweils auch Same-SKU) den Spaltennamen wie in `DailyMetricValues` (`sales7d`, `salesClicks14d` …) oder
+    `null`, dazu `basis`/`sameSkuBasis` (Fenster, Views ja/nein; `null`, wenn kein Wert geliefert wird). Nur `accountType`
+    `vendor` hat „wie Konsole“ 14 Tage, alle anderen (auch unbekannte) 7 Tage. SB „wie Konsole“ nutzt bei Targets `units14d`
+    (1.10 prüft, was die Konsole zeigt). `METRIC_AVAILABILITY` hält fest, welche Spalten der Report je Ad-Typ und Ebene füllt
+    (SD-Suchbegriffe: kein Report); der Abgleich mit `REPORT_DEFINITIONS` und `createReportRowSchema` steht in
+    `packages/amazon-ads/src/metric-availability.test.ts` (dort, damit `packages/engine` ohne Node-Typen und ohne Abhängigkeit
+    auf `@profitbash/amazon-ads` bleibt; amazon-ads hat dafür `@profitbash/engine` als devDependency).
+  - **Für 2.4/2.5:** `summarizeAttribution` bekommt je Kombination aus Ad-Typ und Kontotyp, die in den Zeilen einer Summe
+    **vorkommt**, eine Auswahl (höchstens 3 × 3) und meldet `mixed`, `sameSkuMixed` und `coverage` je Feld; SQL-`sum()` überspringt
+    `null` still, die Lücke steht nur dort. Die Spaltenwahl je Zeile lässt sich als `CASE` über Ad-Typ und Kontotyp bauen.
+    Die Einstellung `'console' | 'clicks14d'` braucht das Web (Filterleiste, `ui_state`, gespeicherte Ansichten) als zod-Enum in
+    `@profitbash/shared` (das Web darf `@profitbash/engine` wegen `decimal.js` nicht importieren, ADR 003); dann in der Engine von
+    dort übernehmen.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: keine Grundlage, wo Amazon keinen Wert liefert (sonst falscher
+    Hinweis „gemischt“ bei SP- und SB-Suchbegriffen), vCPM über `viewableCost`, Test für negative Korrekturen, Doku zu leeren
+    Eingaben. Bewusst nicht: Vergleichsspalte für SD-Same-SKU (`sameSkuBasis` sagt „nur Klick“; eine Kennzahl, die Same-SKU mit
+    dem Umsatz verrechnet, gibt es in Phase 2 nicht), Groß-/Kleinschreibung von `accountType` (Amazon liefert klein, 1.10 prüft).
 
 ### 2.2 Wechselkurse (EZB)
 - [ ] Eigenes Paket für die externe Quelle (Leitplanke 3), z. B. `packages/ecb`: Referenzkurse der EZB (EUR-Basis) laden und mit zod
