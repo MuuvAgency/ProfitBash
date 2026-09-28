@@ -357,6 +357,25 @@ export const CONNECTION_JOB_NAMES = [
 ] as const;
 export type ConnectionJobName = (typeof CONNECTION_JOB_NAMES)[number];
 
+/**
+ * Plattformweite Jobs (`organization_id` null). `fx-rates-sync` erscheint trotzdem im Sync-Status jeder
+ * Organisation (öffentliche Referenzdaten, Dominik 2026-09-28), `job-runs-cleanup` nicht.
+ */
+export const PLATFORM_JOB_NAMES = ['fx-rates-sync', 'job-runs-cleanup'] as const;
+export type PlatformJobName = (typeof PLATFORM_JOB_NAMES)[number];
+
+/** Plattformweite Jobs, deren Läufe jede Organisation im Sync-Status sieht. */
+export const SHARED_PLATFORM_JOB_NAMES = [
+  'fx-rates-sync',
+] as const satisfies readonly PlatformJobName[];
+
+/** Jobs im Sync-Status (und im Filter): die der Connections und die geteilten plattformweiten. */
+export const SYNC_STATUS_JOB_NAMES = [
+  ...CONNECTION_JOB_NAMES,
+  ...SHARED_PLATFORM_JOB_NAMES,
+] as const;
+export type SyncStatusJobName = (typeof SYNC_STATUS_JOB_NAMES)[number];
+
 export const JOB_RUN_STATUSES = ['running', 'success', 'failed'] as const;
 export type JobRunStatus = (typeof JOB_RUN_STATUSES)[number];
 
@@ -365,7 +384,7 @@ export const JOB_RUN_LIST_LIMIT = 100;
 
 /** Filter als Query-Parameter (je ein Enum-Wert). */
 export const jobRunListQuerySchema = z.object({
-  job: z.enum(CONNECTION_JOB_NAMES).optional(),
+  job: z.enum(SYNC_STATUS_JOB_NAMES).optional(),
   status: z.enum(JOB_RUN_STATUSES).optional(),
 });
 export type JobRunListQuery = z.infer<typeof jobRunListQuerySchema>;

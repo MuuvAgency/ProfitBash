@@ -62,12 +62,14 @@ describe('healthcheckUrls', () => {
         HEALTHCHECKS_PROFILES_SYNC_URL: undefined,
         HEALTHCHECKS_ENTITIES_SYNC_URL: 'https://hc-ping.com/e',
         HEALTHCHECKS_REPORTS_SYNC_URL: 'https://hc-ping.com/r',
+        HEALTHCHECKS_FX_RATES_SYNC_URL: 'https://hc-ping.com/fx',
       }),
     ).toEqual({
       'token-refresh': 'https://hc-ping.com/a',
       'profiles-sync': undefined,
       'entities-sync': 'https://hc-ping.com/e',
       'reports-sync': 'https://hc-ping.com/r',
+      'fx-rates-sync': 'https://hc-ping.com/fx',
     });
   });
 });

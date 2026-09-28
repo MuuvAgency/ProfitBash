@@ -5,9 +5,10 @@ import {
   JOB_RUN_LIST_LIMIT,
   jobRunListQuerySchema,
   jobRunListSchema,
+  SHARED_PLATFORM_JOB_NAMES,
   type JobRun,
 } from '@profitbash/shared';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { AppDeps, AppEnv } from '../context';
 import { orgAdminOnly } from '../middleware';
 import { toIso } from './serialize';
@@ -39,7 +40,8 @@ export function registerJobRunRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
     const { job, status } = c.req.valid('query');
 
     // Jobläufe sind keine Profildaten: Die Organisation ist hier die Zugriffsregel. Plattformweite
-    // Läufe (`organization_id` null) fallen dadurch heraus. Die Connection nur aus derselben Org.
+    // Läufe (`organization_id` null) fallen dadurch heraus, außer den geteilten (Kursabruf: öffentliche
+    // Referenzdaten für alle, ohne Scope und Organisationsbezug). Die Connection nur aus derselben Org.
     const rows = await db
       .select({
         id: jobRuns.id,
@@ -64,7 +66,13 @@ export function registerJobRunRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
       )
       .where(
         and(
-          eq(jobRuns.organizationId, organizationId),
+          or(
+            eq(jobRuns.organizationId, organizationId),
+            and(
+              isNull(jobRuns.organizationId),
+              inArray(jobRuns.job, [...SHARED_PLATFORM_JOB_NAMES]),
+            ),
+          ),
           job && eq(jobRuns.job, job),
           status && eq(jobRuns.status, status),
         ),

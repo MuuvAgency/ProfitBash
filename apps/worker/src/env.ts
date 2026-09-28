@@ -50,6 +50,7 @@ export function healthcheckUrls(
     'profiles-sync': env.HEALTHCHECKS_PROFILES_SYNC_URL,
     'entities-sync': env.HEALTHCHECKS_ENTITIES_SYNC_URL,
     'reports-sync': env.HEALTHCHECKS_REPORTS_SYNC_URL,
+    'fx-rates-sync': env.HEALTHCHECKS_FX_RATES_SYNC_URL,
     // `amazon-requests-poll` pingt nicht (läuft oft und kurz); Fehler zeigt `reports-sync`.
   };
 }

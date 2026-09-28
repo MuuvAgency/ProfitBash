@@ -239,7 +239,10 @@ export const de = {
       'entities-sync': 'Entity-Sync',
       'reports-sync': 'Report-Anforderung',
       'amazon-requests-poll': 'Aufträge abholen',
+      'fx-rates-sync': 'Wechselkurse (EZB)',
     },
+    /** Statt des Amazon-Kontos beim plattformweiten Kursabruf. */
+    ecbSource: 'EZB, für alle Organisationen',
     status: {
       running: 'Läuft',
       success: 'Erfolgreich',
@@ -267,6 +270,10 @@ export const de = {
       superseded: 'überholt | überholt',
       rows: 'Zeile | Zeilen',
       updated: 'geändert | geändert',
+      fetched: 'Kurs geladen | Kurse geladen',
+      currencies: 'Währung | Währungen',
+      inserted: 'neu | neu',
+      unchanged: 'unverändert | unverändert',
       placeholdersFilled: 'Platzhalter gefüllt | Platzhalter gefüllt',
       placeholdersCreated: 'Platzhalter angelegt | Platzhalter angelegt',
       backfillsCompleted: 'Historie vollständig | Historien vollständig',

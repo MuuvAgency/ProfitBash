@@ -124,6 +124,8 @@ export const healthchecksEnvSchema = z.object({
   HEALTHCHECKS_PROFILES_SYNC_URL: optionalHttpsUrl,
   HEALTHCHECKS_ENTITIES_SYNC_URL: optionalHttpsUrl,
   HEALTHCHECKS_REPORTS_SYNC_URL: optionalHttpsUrl,
+  /** Plattformweiter Kursabruf (2.2); optional, der Stand steht auch im Sync-Status. */
+  HEALTHCHECKS_FX_RATES_SYNC_URL: optionalHttpsUrl,
 });
 
 export class EnvValidationError extends Error {

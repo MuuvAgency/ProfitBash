@@ -1,7 +1,8 @@
 # ADR 002 – Mandanten-Modell
 
 - **Status:** angenommen
-- **Datum:** 2026-09-25, Geltungsbereich von Punkt 5 am 2026-09-26 dokumentiert (Stand Code Phase 0, vor dem ersten Deploy)
+- **Datum:** 2026-09-25, Geltungsbereich von Punkt 5 am 2026-09-26 dokumentiert (Stand Code Phase 0, vor dem ersten Deploy),
+  am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -51,6 +52,10 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   `runJob` in `apps/worker`). Zugriffe auf einzelne Connections bzw. Profile sind an Organisation und Connection bzw. Profil gebunden.
   Keiner dieser Zugriffe entscheidet über die Sichtbarkeit für Nutzer. Plattformweit arbeiten die Planung der Jobs (`listActiveConnections`), die Wartung
   (alte und abgebrochene Jobläufe, abgelaufene OAuth-Nonces) und die Schlüsselrotation.
+- **Öffentliche Referenzdaten ohne Organisation** (ab Phase 2, 2.2): `fx_rates` (EZB-Kurse) hat keine `organization_id`,
+  gilt für alle Organisationen und wird nur vom plattformweiten Job `fx-rates-sync` geschrieben (`packages/db/src/fx-rates.ts`).
+  Lesen darf jede Abfrage; Profildaten werden dadurch nicht sichtbar. Die Läufe von `fx-rates-sync` (`job_runs.organization_id`
+  leer) zeigt der Sync-Status jeder Organisation (`SHARED_PLATFORM_JOB_NAMES`), andere plattformweite Läufe nicht.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

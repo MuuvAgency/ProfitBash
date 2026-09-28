@@ -81,6 +81,15 @@ beforeAll(async () => {
     // Plattformweit (Cron-Auslöser, Cleanup): gehören nicht zur Org-Sicht.
     { organizationId: null, job: 'profiles-sync', status: 'success', startedAt: at(6) },
     { organizationId: null, job: 'job-runs-cleanup', status: 'success', startedAt: at(7) },
+    // Ausnahme: Der Kursabruf (öffentliche Referenzdaten für alle) erscheint in jeder Organisation.
+    {
+      organizationId: null,
+      job: 'fx-rates-sync',
+      status: 'success',
+      startedAt: at(9),
+      finishedAt: at(10),
+      counters: { fetched: 29, inserted: 29 },
+    },
     // Fremde Organisation.
     {
       organizationId: otherOrgId,
@@ -116,15 +125,16 @@ describe('GET /api/job-runs', () => {
     expect((await request(ctx, '/api/job-runs', { cookie: editor })).status).toBe(403);
   });
 
-  it('listet die Läufe der aktiven Organisation, neueste zuerst, ohne plattformweite und fremde', async () => {
+  it('listet die Läufe der aktiven Organisation, neueste zuerst, ohne plattformweite (außer Kursabruf) und fremde', async () => {
     const runs = await list();
     expect(runs.map((run) => [run.job, run.status])).toEqual([
+      ['fx-rates-sync', 'success'],
       ['profiles-sync', 'running'],
       ['token-refresh', 'failed'],
       ['profiles-sync', 'success'],
       ['token-refresh', 'success'],
     ]);
-    expect(runs[2]).toEqual({
+    expect(runs[3]).toEqual({
       id: expect.any(String),
       job: 'profiles-sync',
       scope: connectionId,
@@ -139,13 +149,14 @@ describe('GET /api/job-runs', () => {
       error: null,
       counters: { profiles: 4, created: 1 },
     });
-    expect(runs[1]).toMatchObject({ error: 'Amazon hat nicht geantwortet.' });
-    expect(runs[0]).toMatchObject({ finishedAt: null, counters: {} });
+    expect(runs[2]).toMatchObject({ error: 'Amazon hat nicht geantwortet.' });
+    expect(runs[1]).toMatchObject({ finishedAt: null, counters: {} });
+    expect(runs[0]).toMatchObject({ scope: null, connection: null, counters: { fetched: 29 } });
   });
 
   it('zeigt Connections fremder Organisationen nie an, auch wenn der Scope darauf zeigt', async () => {
     const runs = await list();
-    expect(runs[3]).toMatchObject({ scope: otherOrgConnectionId, connection: null });
+    expect(runs[4]).toMatchObject({ scope: otherOrgConnectionId, connection: null });
     expect(JSON.stringify(runs)).not.toContain('FREMD');
   });
 
@@ -155,6 +166,9 @@ describe('GET /api/job-runs', () => {
       'success',
     ]);
     expect((await list('?status=running')).map((run) => run.job)).toEqual(['profiles-sync']);
+    expect((await list('?job=fx-rates-sync')).map((run) => run.startedAt)).toEqual([
+      '2026-09-26T08:09:00.000Z',
+    ]);
     expect((await list('?job=profiles-sync&status=success')).map((run) => run.startedAt)).toEqual([
       '2026-09-26T08:01:00.000Z',
     ]);

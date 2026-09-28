@@ -9,7 +9,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createConnection, createOrganization, testKeyring } from './testing';
 import { startJobQueue, startWorker, type Worker } from './worker';
 
-const { amazonAdsProfiles, amazonAdsReportRequests, connectionJobLeases, jobRuns } = schema;
+const { amazonAdsProfiles, amazonAdsReportRequests, connectionJobLeases, fxRates, jobRuns } =
+  schema;
 
 let testDb: TestDatabase;
 let organizationId = '';
@@ -62,6 +63,8 @@ describe('startWorker', () => {
       }),
       logger: (entry) => logs.push(entry),
       pollingIntervalSeconds: 0.5,
+      // Kein Aufruf der echten EZB: ein Kurs, damit der Lauf beim Start etwas schreibt.
+      fetchFxRates: async () => [{ date: '2026-09-28', currency: 'USD', rate: '1.1378' }],
     });
   });
 
@@ -69,18 +72,35 @@ describe('startWorker', () => {
     await worker.stop();
   });
 
-  it('richtet die Zeitpläne ein (Refresh stündlich, Profile 05:00, Entities und Reports 06:00 Berlin, Poll alle 10 Min.)', async () => {
+  it('richtet die Zeitpläne ein (Refresh stündlich, Profile 05:00, Entities, Reports und Kurse 06:00 Berlin, Poll alle 10 Min.)', async () => {
     const rows = await testDb.db.execute<{ name: string; cron: string; timezone: string }>(
       sql`select name, cron, timezone from pgboss.schedule order by name`,
     );
     expect([...rows]).toEqual([
       { name: 'amazon-requests-poll-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'entities-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
+      { name: 'fx-rates-sync', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'job-runs-cleanup', cron: '30 3 * * *', timezone: 'Europe/Berlin' },
       { name: 'profiles-sync-all', cron: '0 5 * * *', timezone: 'Europe/Berlin' },
       { name: 'reports-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'token-refresh-all', cron: '0 * * * *', timezone: 'UTC' },
     ]);
+  });
+
+  it('lädt beim Start die Wechselkurse, solange noch keine gespeichert sind (plattformweit)', async () => {
+    const run = await waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(jobRuns)
+        .where(and(eq(jobRuns.job, 'fx-rates-sync'), isNull(jobRuns.organizationId)));
+      return row?.status === 'running' ? undefined : row;
+    });
+    expect(run).toMatchObject({
+      status: 'success',
+      scope: null,
+      counters: expect.objectContaining({ fetched: 1, inserted: 1 }) as unknown,
+    });
+    expect(await testDb.db.select().from(fxRates)).toHaveLength(1);
   });
 
   it('plant nichts ein, wenn die Transaktion des Aufrufers zurückrollt', async () => {
