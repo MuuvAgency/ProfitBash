@@ -198,20 +198,47 @@ function attributedColumn(
   setting: AttributionSetting,
   field: AttributedSumField,
 ): SQL {
-  const branches: SQL[] = [];
-  for (const adProduct of AD_PRODUCTS) {
-    for (const accountType of ['vendor', 'seller'] as const) {
-      const column = selectAttribution({ adProduct, level, accountType, setting })[field];
-      const vendor =
-        accountType === 'vendor'
-          ? sql.raw(`p.account_type = 'vendor'`)
-          : sql.raw(`p.account_type <> 'vendor'`);
-      branches.push(
-        sql`when m.ad_product = ${adProduct} and ${vendor} then ${column ? sql.raw(`m.${COLUMN_SQL[column]}`) : sql.raw('null')}`,
-      );
-    }
-  }
-  return sql`(case ${sql.join(branches, sql` `)} else null end)`;
+  // Gleiche Spalten zusammenfassen: meist bleiben ein bis zwei Zweige (z. B. SP-Seller 7 Tage, sonst 14 Tage).
+  const byColumn = new Map<string, number[]>();
+  COMBOS.forEach((combo, index) => {
+    const column = selectAttribution({
+      adProduct: combo.adProduct,
+      level,
+      accountType: combo.vendor ? 'vendor' : 'seller',
+      setting,
+    })[field];
+    if (column)
+      byColumn.set(COLUMN_SQL[column], [...(byColumn.get(COLUMN_SQL[column]) ?? []), index]);
+  });
+  if (byColumn.size === 0) return sql.raw('null');
+  const branches = [...byColumn].map(
+    ([column, indexes]) => `when y.k in (${indexes.join(', ')}) then y.${column}`,
+  );
+  return sql.raw(`(case ${branches.join(' ')} end)`);
+}
+
+/** Index der Kombination aus Ad-Typ und Kontotyp wie in `COMBOS` (unbekannter Ad-Typ: negativ). */
+const COMBO_INDEX_SQL = sql.raw(
+  `((case m.ad_product ${AD_PRODUCTS.map(
+    (adProduct, index) => `when '${adProduct}' then ${index * 2}`,
+  ).join(' ')} else -100 end) + (case when p.account_type = 'vendor' then 0 else 1 end))`,
+);
+
+/** Spalten der Kennzahl-Tabellen, die die Attribution liest. */
+const ATTRIBUTION_SOURCE_COLUMNS = Object.values(COLUMN_SQL)
+  .filter((column) => column !== 'viewable_impressions')
+  .map((column) => `m.${column}`)
+  .join(', ');
+
+/**
+ * Abfrage über viele Kennzahl-Zeilen mit mehr Arbeitsspeicher für Hash-Aggregation und Sortierung (`set local`
+ * gilt nur in dieser Transaktion). Mit dem Standard (4 MB) lagert Postgres bei 10 000 Zeilen auf die Platte aus.
+ */
+async function executeLarge<T extends Record<string, unknown>>(db: Db, query: SQL): Promise<T[]> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`set local work_mem = '64MB'`);
+    return [...(await tx.execute<T>(query))] as T[];
+  });
 }
 
 const uuidArray = (values: readonly string[]) => sql`${sql.param([...values])}::uuid[]`;
@@ -241,14 +268,20 @@ async function resolveCurrency(
   db: Db,
   selectionQuery: SQL,
   requested: string,
-): Promise<CurrencyInfo> {
-  const rows = await db.execute<{ currency_code: string }>(
-    sql`select distinct s.currency_code from (${selectionQuery}) s order by 1`,
+): Promise<CurrencyInfo & { currencies: string[]; profileIds: string[] }> {
+  const rows = await db.execute<{ id: string; currency_code: string }>(
+    sql`select s.id, s.currency_code from (${selectionQuery}) s order by s.currency_code, s.id`,
   );
-  const currencies = rows.map((row) => row.currency_code);
+  const currencies = [...new Set(rows.map((row) => row.currency_code))];
+  const profileIds = rows.map((row) => row.id);
   const currency =
     requested === 'auto' ? (currencies.length === 1 ? currencies[0]! : 'EUR') : requested;
-  return { currency, converted: currencies.some((code) => code !== currency) };
+  return {
+    currency,
+    converted: currencies.some((code) => code !== currency),
+    currencies,
+    profileIds,
+  };
 }
 
 interface Periods {
@@ -262,9 +295,15 @@ function periodsOf(query: AnalyticsQuery): Periods {
 
 const inRange = (range: DateRange) => sql`m.date between ${range.from}::date and ${range.to}::date`;
 
-/** Tage beider Zeiträume (für die Einschränkung der Kennzahl-Tabelle). */
+/**
+ * Tage beider Zeiträume. Die umschließende Spanne steht vorn, damit der Index (`profile_id`, `date`) einen
+ * Bereich liest statt aller Tage des Profils.
+ */
 function anyRange({ period, comparison }: Periods): SQL {
-  return comparison ? sql`(${inRange(period)} or ${inRange(comparison)})` : inRange(period);
+  if (!comparison) return inRange(period);
+  return sql`m.date between least(${period.from}::date, ${comparison.from}::date)
+      and greatest(${period.to}::date, ${comparison.to}::date)
+    and (${inRange(period)} or ${inRange(comparison)})`;
 }
 
 /**
@@ -291,36 +330,131 @@ function fxSql(selectionQuery: SQL, target: string, { period, comparison }: Peri
 }
 
 /**
- * Summen-Ausdrücke eines Zeitraums über die Kennzahl-Zeilen `m` (Profil `p`, Faktor `fx.factor`). `converted`:
- * Beträge in der Anzeigewährung (sonst Originalwährung).
+ * Kennzahl-Zeilen als abgeleitete Tabelle `x`: Attribution (`a_*`), Faktor und Zeitraum-Merker werden je Zeile
+ * **einmal** berechnet (`offset 0` verhindert, dass Postgres die Ausdrücke in jedes Aggregat zurückkopiert).
+ * `body` enthält die Joins ab `m` (Kennzahlen) und `p` (Auswahl), `select` weitere Spalten (Gruppierung).
+ */
+function metricRowsSql(input: {
+  /** Ausgewählte, sichtbare Profile (aus `selectionSql`): als Liste, damit Postgres die Menge richtig schätzt. */
+  profileIds: readonly string[];
+  level: MetricsLevel;
+  setting: AttributionSetting;
+  periods: Periods;
+  table: string;
+  select: SQL;
+  joins: SQL;
+  where: SQL[];
+}): SQL {
+  const { level, setting, periods } = input;
+  const attributed = (field: AttributedSumField) => attributedColumn(level, setting, field);
+  const flag = (range: DateRange) => sql`y.date between ${range.from}::date and ${range.to}::date`;
+  return sql`(select y.*,
+      ${attributed('sales')} as a_sales, ${attributed('purchases')} as a_purchases, ${attributed('units')} as a_units,
+      ${attributed('salesSameSku')} as a_sales_same_sku, ${attributed('purchasesSameSku')} as a_purchases_same_sku,
+      ${attributed('unitsSameSku')} as a_units_same_sku,
+      ${flag(periods.period)} as in_cur,
+      ${periods.comparison ? flag(periods.comparison) : sql`false`} as in_cmp
+    from (
+      select ${input.select}, m.date, m.currency_code, m.ad_product, p.account_type = 'vendor' as vendor,
+        ${COMBO_INDEX_SQL} as k, m.impressions, m.clicks, m.cost, m.viewable_impressions,
+        ${sql.raw(ATTRIBUTION_SOURCE_COLUMNS)},
+        fxa.factors[(m.date - fxa.first_day) + 1][array_position(fxa.currencies, m.currency_code)] as factor
+      from ${sql.raw(input.table)} m
+      join amazon_ads_profiles p on p.id = m.profile_id
+      ${input.joins}
+      cross join fxa
+      where m.profile_id = any(${uuidArray(input.profileIds)}) and ${sql.join(input.where, sql` and `)}
+      offset 0
+    ) y
+    offset 0) x`;
+}
+
+/**
+ * Umrechnung als CTEs `fx` (Tag × Währung → Faktor) und `fxa` (dieselben Faktoren als Matrix mit `first_day` und
+ * `currencies`): Die Kennzahl-Zeilen lesen ihren Faktor per Index statt über einen Join, den Postgres bei
+ * Hunderttausenden Zeilen schlecht schätzt (Sortierung auf die Platte).
+ */
+function fxCtes(target: string, periods: Periods): SQL {
+  return sql`fx as (${fxSql(sql`select * from sel`, target, periods)}),
+    fxa as (
+      select min(d.day) as first_day, array_agg(d.factors order by d.day) as factors,
+        (select array_agg(c.currency order by c.currency) from (select distinct fx.currency from fx) c) as currencies
+      from (select fx.day, array_agg(fx.factor order by fx.currency) as factors from fx group by fx.day) d
+    )`;
+}
+
+/**
+ * Summen eines Zeitraums (`flag`: `in_cur`/`in_cmp`) über `x`. `converted`: Beträge × Faktor (Anzeigewährung);
+ * `combos`: Merker je Kombination aus Ad-Typ und Kontotyp (für `summarizeAttribution`).
  */
 function sumColumns(
-  level: MetricsLevel,
-  setting: AttributionSetting,
-  range: DateRange,
   prefix: string,
-  converted: boolean,
+  flag: 'in_cur' | 'in_cmp' | 'all',
+  options: { converted: boolean; combos: boolean; moneyOnly?: boolean },
 ): SQL[] {
-  const when = inRange(range);
-  const money = (expr: SQL) => (converted ? sql`(${expr}) * fx.factor` : expr);
-  const col = (name: string, expr: SQL) =>
-    sql`sum(${expr}) filter (where ${when}) as ${sql.raw(`${prefix}_${name}`)}`;
-  return [
-    col('impressions', sql`m.impressions`),
-    col('clicks', sql`m.clicks`),
-    col('cost', money(sql`m.cost`)),
-    col('sales', money(attributedColumn(level, setting, 'sales'))),
-    col('purchases', attributedColumn(level, setting, 'purchases')),
-    col('units', attributedColumn(level, setting, 'units')),
-    col('sales_same_sku', money(attributedColumn(level, setting, 'salesSameSku'))),
-    col('purchases_same_sku', attributedColumn(level, setting, 'purchasesSameSku')),
-    col('units_same_sku', attributedColumn(level, setting, 'unitsSameSku')),
-    col('viewable_impressions', sql`m.viewable_impressions`),
-    col('viewable_cost', money(sql`case when m.viewable_impressions is not null then m.cost end`)),
-    sql`count(*) filter (where ${when}) as ${sql.raw(`${prefix}_rows`)}`,
-    sql`array_agg(distinct m.ad_product || ':' || (case when p.account_type = 'vendor' then 'vendor' else 'other' end))
-      filter (where ${when}) as ${sql.raw(`${prefix}_combos`)}`,
+  const money = (column: string) => (options.converted ? `x.${column} * x.factor` : `x.${column}`);
+  const when = flag === 'all' ? '' : ` filter (where x.${flag})`;
+  const col = (name: string, expr: string) => `sum(${expr})${when} as ${prefix}_${name}`;
+  const viewableCost = options.converted
+    ? '(case when x.viewable_impressions is not null then x.cost end) * x.factor'
+    : 'case when x.viewable_impressions is not null then x.cost end';
+  const moneyColumns = [
+    col('cost', money('cost')),
+    col('sales', money('a_sales')),
+    col('sales_same_sku', money('a_sales_same_sku')),
+    col('viewable_cost', viewableCost),
   ];
+  if (options.moneyOnly) return moneyColumns.map((column) => sql.raw(column));
+  const columns = [
+    ...moneyColumns,
+    col('impressions', 'x.impressions'),
+    col('clicks', 'x.clicks'),
+    col('purchases', 'x.a_purchases'),
+    col('units', 'x.a_units'),
+    col('purchases_same_sku', 'x.a_purchases_same_sku'),
+    col('units_same_sku', 'x.a_units_same_sku'),
+    col('viewable_impressions', 'x.viewable_impressions'),
+    `count(*)${when} as ${prefix}_rows`,
+    // Merker statt `array_agg(distinct …)`: hashbar, `distinct` erzwänge eine Sortierung.
+    ...(options.combos
+      ? COMBOS.map(
+          (combo, index) =>
+            `coalesce(bool_or(x.ad_product = '${combo.adProduct}' and ${combo.vendor ? '' : 'not '}x.vendor)${when},
+              false) as ${prefix}_c${index}`,
+        )
+      : []),
+  ];
+  return columns.map((column) => sql.raw(column));
+}
+
+/** Merker je Währung, ob an einem Tag der Kurs fehlte (`missing_<i>`, Reihenfolge wie `currencies`). */
+function missingFxColumns(currencies: readonly string[]): SQL[] {
+  return currencies.map(
+    (code, index) =>
+      sql`coalesce(bool_or(x.factor is null and x.currency_code = ${code}), false) as ${sql.raw(`missing_${index}`)}`,
+  );
+}
+
+function missingFxOf(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  currencies: readonly string[],
+): string[] {
+  return currencies.filter((_, index) => rows.some((row) => row[`missing_${index}`] === true));
+}
+
+/** Kombinationen aus Ad-Typ und Kontotyp, die die Attribution unterscheidet (F4: nur Vendoren weichen ab). */
+const COMBOS = AD_PRODUCTS.flatMap((adProduct) =>
+  [true, false].map((vendor) => ({
+    adProduct,
+    vendor,
+    key: `${adProduct}:${vendor ? 'vendor' : 'other'}`,
+  })),
+);
+
+/** Vorkommende Kombinationen aus den Merkern `<prefix>c0` … einer Ergebniszeile. */
+function combosOf(row: Record<string, unknown> | undefined, prefix: string): string[] {
+  if (!row) return [];
+  return COMBOS.flatMap((combo, index) => (row[`${prefix}c${index}`] === true ? [combo.key] : []));
 }
 
 const SUM_SQL_NAMES: Record<(typeof SUM_KEYS)[number], string> = {
@@ -396,6 +530,8 @@ interface LevelSpec {
   /** Kennzahl-Tabelle und Gruppierung. */
   metricsTable: string;
   groupKey: SQL;
+  /** Spalten der Gruppierung in `x` (`group_key` bzw. `target_id` und `search_term`). */
+  groupSelect: SQL;
   /** Spalte der Kennzahl-Zeile (bzw. der Kampagne `c` bei Portfolios), die auf `e.id` zeigt. */
   entityKey: SQL;
   /** Entity-Abfrage mit `e` (Entity) und `p` (Profil der Auswahl), liefert `row_id`, `row_ad_product` und Attribute. */
@@ -424,6 +560,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'campaign',
     metricsTable: 'amazon_ads_campaign_daily_metrics',
     groupKey: sql`c.portfolio_id`,
+    groupSelect: sql`c.portfolio_id as group_key`,
     entityKey: sql`c.portfolio_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_portfolios e`,
@@ -443,6 +580,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'campaign',
     metricsTable: 'amazon_ads_campaign_daily_metrics',
     groupKey: sql`m.campaign_id`,
+    groupSelect: sql`m.campaign_id as group_key`,
     entityKey: sql`m.campaign_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_campaigns e left join amazon_ads_portfolios pf on pf.id = e.portfolio_id`,
@@ -464,6 +602,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'adGroup',
     metricsTable: 'amazon_ads_ad_group_daily_metrics',
     groupKey: sql`m.ad_group_id`,
+    groupSelect: sql`m.ad_group_id as group_key`,
     entityKey: sql`m.ad_group_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_ad_groups e join amazon_ads_campaigns c on c.id = e.campaign_id`,
@@ -486,6 +625,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'target',
     metricsTable: 'amazon_ads_target_daily_metrics',
     groupKey: sql`m.target_id`,
+    groupSelect: sql`m.target_id as group_key`,
     entityKey: sql`m.target_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_targets e join amazon_ads_campaigns c on c.id = e.campaign_id
@@ -511,6 +651,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'productAd',
     metricsTable: 'amazon_ads_product_ad_daily_metrics',
     groupKey: sql`m.product_ad_id`,
+    groupSelect: sql`m.product_ad_id as group_key`,
     entityKey: sql`m.product_ad_id`,
     entitySql: (filter) => {
       const where: SQL[] = [
@@ -543,6 +684,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'searchTerm',
     metricsTable: 'amazon_ads_search_term_daily_metrics',
     groupKey: sql`m.target_id || ':' || m.search_term`,
+    groupSelect: sql`m.target_id, m.search_term`,
     entityKey: sql`m.target_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_targets e join amazon_ads_campaigns c on c.id = e.campaign_id
@@ -555,7 +697,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
           ? [sql`c.portfolio_id = any(${uuidArray(filter.portfolioIds)})`]
           : []),
       ],
-      columns: sql`a.group_key as row_id, e.ad_product as row_ad_product, a.search_term as name, e.state,
+      columns: sql`a.target_id::text || ':' || a.search_term as row_id, e.ad_product as row_ad_product, a.search_term as name, e.state,
         e.amazon_target_id as amazon_id, e.removed_at is not null as removed, e.synced_at is null as placeholder,
         json_build_object('searchTerm', a.search_term, 'targetId', e.id, 'campaignId', e.campaign_id,
           'campaignName', c.name, 'adGroupId', e.ad_group_id, 'adGroupName', g.name, 'targetType', e.target_type,
@@ -564,23 +706,35 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
   },
 };
 
-function sumsJson(prefix: string): SQL {
+function sumsJson(prefix: string, combos: boolean): SQL {
   const pairs = [
     ...SUM_KEYS.map((key) => `'${key}', ${prefix}_${SUM_SQL_NAMES[key]}::text`),
     `'rows', ${prefix}_rows`,
-    `'combos', ${prefix}_combos`,
+    ...(combos ? COMBOS.map((_, index) => `'c${index}', ${prefix}_c${index}`) : []),
   ];
   return sql.raw(`json_build_object(${pairs.join(', ')})`);
 }
 
-/** Summen über die gefilterten Zeilen (`f`), Spalten `<prefix>_…` summiert, Kombinationen vereinigt. */
-function totalsOver(prefix: string): SQL {
+/**
+ * Summen über die gefilterten Zeilen (`f`, Spalten `<prefix>_…`). Kombinationen aus Ad-Typ und Kontotyp: bei
+ * Portfolios aus den Merkern der Zeilen, sonst aus Ad-Typ und Kontotyp der Zeilen mit Kennzahlen (`rowsPrefix`).
+ */
+function totalsOver(prefix: string, rowsPrefix: string, level: AnalyticsLevel): SQL {
   const sums = SUM_KEYS.map((key) => {
-    const name = `${prefix}_${SUM_SQL_NAMES[key]}`;
-    return `sum(f.${name}) as ${name}`;
+    const name = SUM_SQL_NAMES[key];
+    // Beträge aus den umgerechneten Summen (`prefix`), Zähler aus denen der Zeilen (`rowsPrefix`).
+    return `sum(f.${MONEY_KEYS.has(key) ? prefix : rowsPrefix}_${name}) as ${prefix}_${name}`;
   });
-  return sql.raw(`${sums.join(', ')}, coalesce(sum(f.${prefix}_rows), 0) as ${prefix}_rows,
-    (select array_agg(distinct c) from filtered f2, unnest(f2.${prefix}_combos) c) as ${prefix}_combos`);
+  const combos = COMBOS.map((combo, index) =>
+    level === 'portfolio'
+      ? `coalesce(bool_or(f.${rowsPrefix}_c${index}), false) as ${prefix}_c${index}`
+      : `coalesce(bool_or(f.row_ad_product = '${combo.adProduct}'
+          and f.account_type ${combo.vendor ? '=' : '<>'} 'vendor') filter (where f.${rowsPrefix}_rows > 0), false)
+          as ${prefix}_c${index}`,
+  );
+  return sql.raw(
+    `${[...sums, ...combos].join(', ')}, coalesce(sum(f.${rowsPrefix}_rows), 0) as ${prefix}_rows`,
+  );
 }
 
 /** Portfolios: Kennzahlen der Kampagnen (entfernte Kampagnen wie im Kampagnen-Reiter nur mit `includeRemoved`). */
@@ -588,6 +742,11 @@ function portfolioJoinSql(level: AnalyticsLevel, filter: ExplorerFilter): SQL {
   if (level !== 'portfolio') return sql``;
   return sql`join amazon_ads_campaigns c on c.id = m.campaign_id and c.portfolio_id is not null
     ${filter.includeRemoved ? sql`` : sql`and c.removed_at is null`}`;
+}
+
+/** Join der Kennzahl-Zeilen auf ihre Entity `e` (mit Profil, damit der Schlüssel-Index greift). */
+function entityJoinSql(spec: LevelSpec, entity: { from: SQL }): SQL {
+  return sql`join (${entity.from}) on e.id = ${spec.entityKey} and e.profile_id = m.profile_id`;
 }
 
 /**
@@ -647,7 +806,11 @@ export async function queryExplorerRows(
 ): Promise<ExplorerResult> {
   const selectionQuery = await selectionSql(db, input);
   if (selectionQuery === null) return emptyResult(input.currency);
-  const { currency, converted } = await resolveCurrency(db, selectionQuery, input.currency);
+  const { currency, converted, profileIds } = await resolveCurrency(
+    db,
+    selectionQuery,
+    input.currency,
+  );
   const periods = periodsOf(input);
   const spec = LEVELS[input.level];
   const filter = input.filter ?? {};
@@ -655,45 +818,47 @@ export async function queryExplorerRows(
   const entity = spec.entitySql(filter);
   const { entityWhere, metricsWhere } = filtersOf(input, entity, periods);
 
-  // Portfolios: Kennzahlen der Kampagnen (entfernte Kampagnen wie im Kampagnen-Reiter nur mit includeRemoved).
-  const portfolioJoin = portfolioJoinSql(input.level, filter);
-  const searchTermColumns =
-    input.level === 'searchTerm'
-      ? sql`, min(m.target_id::text)::uuid as target_id, min(m.search_term) as search_term`
-      : sql``;
-
-  const sumSets = (convertedMoney: boolean, suffix: string) => [
-    ...sumColumns(
-      spec.metricsLevel,
-      input.attribution,
-      periods.period,
-      `cur${suffix}`,
-      convertedMoney,
-    ),
-    ...(periods.comparison
-      ? sumColumns(
-          spec.metricsLevel,
-          input.attribution,
-          periods.comparison,
-          `cmp${suffix}`,
-          convertedMoney,
-        )
-      : []),
+  const portfolio = input.level === 'portfolio';
+  const sumSets = (prefix: 'cur' | 'cmp') => [
+    ...sumColumns(prefix, prefix === 'cur' ? 'in_cur' : 'in_cmp', {
+      converted: false,
+      combos: portfolio,
+    }),
+    // Umgerechnet nur die Beträge (für Summenzeile und Sortierung); Zähler sind in beiden Währungen gleich.
+    ...sumColumns(`${prefix}x`, prefix === 'cur' ? 'in_cur' : 'in_cmp', {
+      converted: true,
+      combos: false,
+      moneyOnly: true,
+    }),
   ];
+  const searchTerms = input.level === 'searchTerm';
+  const narrowed = Boolean(
+    filter.portfolioIds || filter.campaignIds || filter.adGroupIds || filter.productSearch,
+  );
+  const metricRows = metricRowsSql({
+    profileIds,
+    level: spec.metricsLevel,
+    setting: input.attribution,
+    periods,
+    table: spec.metricsTable,
+    select: spec.groupSelect,
+    // Drill-Down und Suche: Entities schon beim Lesen der Kennzahlen filtern (Index über Profil und Entity), statt
+    // alle Kennzahlen der Ebene zu summieren und danach zu verwerfen.
+    joins: narrowed
+      ? sql`${portfolioJoinSql(input.level, filter)} ${entityJoinSql(spec, entity)}`
+      : portfolioJoinSql(input.level, filter),
+    where: narrowed ? [...metricsWhere, ...entityWhere] : metricsWhere,
+  });
 
   const query = sql`
     with sel as (${selectionQuery}),
-    fx as (${fxSql(sql`select * from sel`, currency, periods)}),
+    ${fxCtes(currency, periods)},
     agg as (
-      select ${spec.groupKey} as group_key ${searchTermColumns},
-        ${sql.join([...sumSets(false, ''), ...sumSets(true, 'x')], sql`, `)},
-        array_agg(distinct m.currency_code) filter (where fx.factor is null) as missing_fx
-      from ${sql.raw(spec.metricsTable)} m
-      join sel p on p.id = m.profile_id
-      ${portfolioJoin}
-      left join fx on fx.day = m.date and fx.currency = m.currency_code
-      where ${sql.join(metricsWhere, sql` and `)}
-      group by 1
+      select ${searchTerms ? sql`x.target_id, x.search_term` : sql`x.group_key`},
+        ${sql.join([...sumSets('cur'), ...(periods.comparison ? sumSets('cmp') : [])], sql`, `)},
+        coalesce(bool_or(x.factor is null), false) as missing_fx
+      from ${metricRows}
+      group by ${searchTerms ? sql`x.target_id, x.search_term` : sql`x.group_key`}
     ),
     filtered as (
       select ${entity.columns}, p.id as profile_id, p.account_name, p.country_code, p.currency_code, p.account_type,
@@ -704,24 +869,26 @@ export async function queryExplorerRows(
       ${entityWhere.length > 0 ? sql`where ${sql.join(entityWhere, sql` and `)}` : sql``}
     ),
     tot as (
-      select ${totalsOver('curx')}${periods.comparison ? sql`, ${totalsOver('cmpx')}` : sql``},
-        (select array_agg(distinct c) from filtered f3, unnest(f3.missing_fx) c) as missing_fx
+      select ${totalsOver('curx', 'cur', input.level)}${
+        periods.comparison ? sql`, ${totalsOver('cmpx', 'cmp', input.level)}` : sql``
+      },
+        (select array_agg(distinct f3.currency_code) from filtered f3 where f3.missing_fx) as missing_fx
       from filtered f
     )
     select
       (select count(*) from filtered)::int as total_rows,
-      (select json_build_object('cur', ${sumsJson('curx')}${periods.comparison ? sql`, 'cmp', ${sumsJson('cmpx')}` : sql``},
+      (select json_build_object('cur', ${sumsJson('curx', true)}${periods.comparison ? sql`, 'cmp', ${sumsJson('cmpx', true)}` : sql``},
         'missing_fx', missing_fx) from tot) as totals,
       (select coalesce(json_agg(r), '[]'::json) from (
         select f.row_id, f.row_ad_product, f.name, f.state, f.amazon_id, f.removed, f.placeholder, f.attributes,
           f.profile_id, f.account_name, f.country_code, f.currency_code, f.account_type,
-          ${sumsJson('cur')} as cur${periods.comparison ? sql`, ${sumsJson('cmp')} as cmp` : sql``}
+          ${sumsJson('cur', portfolio)} as cur${periods.comparison ? sql`, ${sumsJson('cmp', portfolio)} as cmp` : sql``}
         from filtered f
         order by f.curx_cost desc nulls last, f.name asc nulls last, f.row_id asc
         limit ${limit}
       ) r) as rows`;
 
-  const [result] = await db.execute<{
+  const [result] = await executeLarge<{
     total_rows: number;
     totals: {
       cur: Record<string, unknown>;
@@ -731,7 +898,7 @@ export async function queryExplorerRows(
     rows: Array<
       Record<string, unknown> & { cur: Record<string, unknown>; cmp?: Record<string, unknown> }
     >;
-  }>(query);
+  }>(db, query);
   if (!result) return emptyResult(input.currency);
 
   const level = spec.metricsLevel;
@@ -769,7 +936,11 @@ export async function queryExplorerRows(
       current: sums(row.cur)!,
       comparison: sums(row.cmp),
       attribution: summarizeAttribution(
-        hasMetrics ? selectionsOf(level, input.attribution, row.cur.combos) : own ? [own] : [],
+        hasMetrics
+          ? selectionsOf(level, input.attribution, combosOf(row.cur, ''))
+          : own
+            ? [own]
+            : [],
       ),
     };
   });
@@ -789,9 +960,11 @@ export async function queryExplorerRows(
     totals: {
       current: totalSums(totals.cur)!,
       comparison: totalSums(totals.cmp),
-      attribution: summarizeAttribution(selectionsOf(level, input.attribution, totals.cur.combos)),
+      attribution: summarizeAttribution(
+        selectionsOf(level, input.attribution, combosOf(totals.cur, '')),
+      ),
       comparisonAttribution: totals.cmp
-        ? summarizeAttribution(selectionsOf(level, input.attribution, totals.cmp.combos))
+        ? summarizeAttribution(selectionsOf(level, input.attribution, combosOf(totals.cmp, '')))
         : null,
       missingFxCurrencies: [...(totals.missing_fx ?? [])].sort(),
     },
@@ -844,7 +1017,11 @@ export async function queryTimeSeries(
     missingFxCurrencies: [],
   });
   if (selectionQuery === null) return empty(input.currency);
-  const { currency, converted } = await resolveCurrency(db, selectionQuery, input.currency);
+  const { currency, converted, currencies, profileIds } = await resolveCurrency(
+    db,
+    selectionQuery,
+    input.currency,
+  );
   const periods = periodsOf(input);
   const spec = LEVELS[input.level];
   const filter = input.filter ?? {};
@@ -854,23 +1031,27 @@ export async function queryTimeSeries(
   if (input.entityIds) {
     where.push(sql`(${spec.groupKey})::text = any(${textArray(input.entityIds)})`);
   }
-  const range = periods.comparison
-    ? { from: periods.comparison.from, to: periods.period.to }
-    : periods.period;
-  const rows = await db.execute<Record<string, unknown> & { date: string }>(sql`
+  const metricRows = metricRowsSql({
+    profileIds,
+    level: spec.metricsLevel,
+    setting: input.attribution,
+    periods,
+    table: spec.metricsTable,
+    select: sql`1 as one`,
+    joins: sql`${portfolioJoinSql(input.level, filter)} ${entityJoinSql(spec, entity)}`,
+    where,
+  });
+  const rows = await executeLarge<Record<string, unknown> & { date: string }>(
+    db,
+    sql`
     with sel as (${selectionQuery}),
-    fx as (${fxSql(sql`select * from sel`, currency, periods)})
-    select to_char(m.date, 'YYYY-MM-DD') as date,
-      ${sql.join(sumColumns(spec.metricsLevel, input.attribution, range, 'd', true), sql`, `)},
-      array_agg(distinct m.currency_code) filter (where fx.factor is null) as missing_fx
-    from ${sql.raw(spec.metricsTable)} m
-    join sel p on p.id = m.profile_id
-    ${portfolioJoinSql(input.level, filter)}
-    join (${entity.from}) on e.id = ${spec.entityKey}
-    left join fx on fx.day = m.date and fx.currency = m.currency_code
-    where ${sql.join(where, sql` and `)}
-    group by m.date
-    order by m.date`);
+    ${fxCtes(currency, periods)}
+    select to_char(x.date, 'YYYY-MM-DD') as date,
+      ${sql.join([...sumColumns('d', 'all', { converted: true, combos: true }), ...missingFxColumns(currencies)], sql`, `)}
+    from ${metricRows}
+    group by x.date
+    order by x.date`,
+  );
 
   const inPeriod = (date: string, r: DateRange) => date >= r.from && date <= r.to;
   const toDay = (row: Record<string, unknown> & { date: string }): DayTotals => ({
@@ -878,7 +1059,7 @@ export async function queryTimeSeries(
     current: readSums(row, 'd', converted),
   });
   const periodRows = rows.filter((row) => inPeriod(row.date, periods.period));
-  const combos = [...new Set(periodRows.flatMap((row) => (row.d_combos as string[] | null) ?? []))];
+  const combos = [...new Set(periodRows.flatMap((row) => combosOf(row, 'd_')))];
   return {
     currency,
     converted,
@@ -887,9 +1068,7 @@ export async function queryTimeSeries(
       ? rows.filter((row) => inPeriod(row.date, periods.comparison!)).map(toDay)
       : [],
     attribution: summarizeAttribution(selectionsOf(spec.metricsLevel, input.attribution, combos)),
-    missingFxCurrencies: [
-      ...new Set(rows.flatMap((row) => (row.missing_fx as string[] | null) ?? [])),
-    ].sort(),
+    missingFxCurrencies: missingFxOf(rows, currencies),
   };
 }
 
@@ -935,38 +1114,52 @@ export async function queryDashboard(db: Db, input: AnalyticsQuery): Promise<Das
       byAdProduct: [],
     };
   }
-  const { currency, converted } = await resolveCurrency(db, selectionQuery, input.currency);
+  const { currency, converted, currencies, profileIds } = await resolveCurrency(
+    db,
+    selectionQuery,
+    input.currency,
+  );
   const periods = periodsOf(input);
   const where: SQL[] = [anyRange(periods)];
   if (input.adProducts) where.push(sql`m.ad_product = any(${textArray(input.adProducts)})`);
   const level: MetricsLevel = 'campaign';
-  const rows = await db.execute<Record<string, unknown>>(sql`
+  const metricRows = metricRowsSql({
+    profileIds,
+    level,
+    setting: input.attribution,
+    periods,
+    table: 'amazon_ads_campaign_daily_metrics',
+    select: sql`p.client_id, p.id as profile_id`,
+    joins: sql``,
+    where,
+  });
+  const rows = await executeLarge<Record<string, unknown>>(
+    db,
+    sql`
     with sel as (${selectionQuery}),
-    fx as (${fxSql(sql`select * from sel`, currency, periods)}),
+    ${fxCtes(currency, periods)},
     g as (
-      select grouping(p.client_id) as g_client, grouping(p.id) as g_profile, grouping(m.ad_product) as g_ad_product,
-        p.client_id, p.id as profile_id, m.ad_product,
+      select grouping(x.client_id) as g_client, grouping(x.profile_id) as g_profile,
+        grouping(x.ad_product) as g_ad_product, x.client_id, x.profile_id, x.ad_product,
         ${sql.join(
           [
-            ...sumColumns(level, input.attribution, periods.period, 'cur', true),
+            ...sumColumns('cur', 'in_cur', { converted: true, combos: true }),
             ...(periods.comparison
-              ? sumColumns(level, input.attribution, periods.comparison, 'cmp', true)
+              ? sumColumns('cmp', 'in_cmp', { converted: true, combos: true })
               : []),
+            ...missingFxColumns(currencies),
           ],
           sql`, `,
-        )},
-        array_agg(distinct m.currency_code) filter (where fx.factor is null) as missing_fx
-      from amazon_ads_campaign_daily_metrics m
-      join sel p on p.id = m.profile_id
-      left join fx on fx.day = m.date and fx.currency = m.currency_code
-      where ${sql.join(where, sql` and `)}
-      group by grouping sets ((p.client_id), (p.id), (m.ad_product), ())
+        )}
+      from ${metricRows}
+      group by grouping sets ((x.client_id), (x.profile_id), (x.ad_product), ())
     )
     select g.*, cl.name as client_name, pr.account_name, pr.country_code, pr.currency_code
     from g
     left join clients cl on cl.id = g.client_id
     left join sel pr on pr.id = g.profile_id
-    order by cl.name asc nulls last, pr.account_name asc nulls last, g.ad_product asc nulls last`);
+    order by cl.name asc nulls last, pr.account_name asc nulls last, g.ad_product asc nulls last`,
+  );
 
   const sumsOf = (row: Record<string, unknown>, prefix: 'cur' | 'cmp') => {
     const read = readSums(row, prefix, converted);
@@ -981,7 +1174,9 @@ export async function queryDashboard(db: Db, input: AnalyticsQuery): Promise<Das
     label,
     current: sumsOf(row, 'cur'),
     comparison: periods.comparison ? sumsOf(row, 'cmp') : null,
-    attribution: summarizeAttribution(selectionsOf(level, input.attribution, row.cur_combos)),
+    attribution: summarizeAttribution(
+      selectionsOf(level, input.attribution, combosOf(row, 'cur_')),
+    ),
   });
   const flag = (row: Record<string, unknown>, name: string) => Number(row[name]) === 1;
   const totalRow =
@@ -995,12 +1190,12 @@ export async function queryDashboard(db: Db, input: AnalyticsQuery): Promise<Das
       current: sumsOf(totalRow, 'cur'),
       comparison: periods.comparison ? sumsOf(totalRow, 'cmp') : null,
       attribution: summarizeAttribution(
-        selectionsOf(level, input.attribution, totalRow.cur_combos),
+        selectionsOf(level, input.attribution, combosOf(totalRow, 'cur_')),
       ),
       comparisonAttribution: periods.comparison
-        ? summarizeAttribution(selectionsOf(level, input.attribution, totalRow.cmp_combos))
+        ? summarizeAttribution(selectionsOf(level, input.attribution, combosOf(totalRow, 'cmp_')))
         : null,
-      missingFxCurrencies: [...((totalRow.missing_fx as string[] | null) ?? [])].sort(),
+      missingFxCurrencies: missingFxOf([totalRow], currencies),
     },
     byClient: rows
       .filter((row) => !flag(row, 'g_client'))
