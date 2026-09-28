@@ -107,6 +107,15 @@ describe('Demo-Daten mit Volumen (Generator)', () => {
     expect(assigned.length).toBe(LARGE_MOCK_PROFILES.length - 1);
   });
 
+  it('ohne feste Prüfwerte am ersten Tag (der tägliche Import beginnt jeden Tag einen neuen Zeitraum)', () => {
+    const account = largeMockAccount(LARGE_MOCK_PROFILES[0]!);
+    const rows = JSON.parse(
+      toAmazonJson(mockReportRows(account, 'spCampaigns', '2026-08-29', '2026-08-30')),
+    ) as Record<string, unknown>[];
+    const sales = rows.map((row) => Number(row.sales7d ?? 0));
+    expect(Math.max(...sales)).toBeLessThan(100_000);
+  });
+
   it('hat SB-Kampagnen ohne Kennzahlen (Preview-Lücke)', () => {
     const account = accounts.find((a) => a.campaigns.some((c) => c.adProduct === SB))!;
     const sb = account.campaigns.filter((c) => c.adProduct === SB);
