@@ -1,5 +1,5 @@
 import { createMockAmazonAdsClient, createRequestMeter } from '@profitbash/amazon-ads';
-import { createConnectionTokenStore, schema } from '@profitbash/db';
+import { createConnectionTokenStore, ensureCampaigns, schema } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -9,9 +9,16 @@ import type { ConnectionJobData, ConnectionJobDeps, ConnectionQueue } from './co
 import { syncConnectionProfiles } from './profiles-sync';
 import { syncConnectionReports } from './reports-sync';
 
-const { amazonAdsBackfills, amazonAdsProfiles, amazonAdsReportRequests, jobRuns } = schema;
+const {
+  amazonAdsBackfills,
+  amazonAdsCampaigns,
+  amazonAdsProfiles,
+  amazonAdsReportRequests,
+  jobRuns,
+} = schema;
 
 const SP = 'SPONSORED_PRODUCTS';
+const SB = 'SPONSORED_BRANDS';
 const DE = '9007199254740993';
 /** 08:00 in Berlin: heute 27.09., gestern 26.09., Fenster 28.08.–26.09. */
 const START = Date.parse('2026-09-27T06:00:00Z');
@@ -116,9 +123,28 @@ beforeEach(async () => {
   await testDb.db.delete(amazonAdsReportRequests);
   await testDb.db.delete(amazonAdsBackfills);
   await testDb.db.delete(jobRuns);
+  await testDb.db.delete(amazonAdsCampaigns);
 });
 
 describe('syncConnectionReports', () => {
+  it('fordert SB nur für Profile an, die eine SB-Kampagne haben (1.9)', async () => {
+    expect((await sync()).counters).toMatchObject({ requested: 19 });
+    expect(await reportsOf('sbCampaigns')).toEqual([]);
+
+    await testDb.db.delete(amazonAdsReportRequests);
+    await testDb.db.delete(amazonAdsBackfills);
+    await ensureCampaigns(testDb.db, { organizationId, profileId }, [
+      { amazonCampaignId: '9007199254740993501', adProduct: SB },
+    ]);
+    // SB hält 60 Tage vor: je Typ das Fenster und ein Stück Historie.
+    expect((await sync()).counters).toMatchObject({ requested: 19 + 10 });
+    expect(ranges(await reportsOf('sbCampaigns'))).toEqual([
+      '2026-07-31..2026-08-27',
+      '2026-08-28..2026-09-26',
+    ]);
+    expect((await reportsOf('sbSearchTerm')).every((r) => r.adProduct === SB)).toBe(true);
+  });
+
   it('fordert je Report-Typ das rollierende Fenster und die Historie in 31-Tage-Stücken an', async () => {
     const outcome = await sync();
 

@@ -9,6 +9,8 @@ import { parseJsonLossless } from './json';
 import type { LogEntry } from './logger';
 import {
   createReportRowSchema,
+  REPORT_AD_PRODUCT_SELECTION,
+  REPORT_AD_PRODUCTS,
   REPORT_DEFINITIONS,
   REPORT_TYPES_BY_AD_PRODUCT,
   reportTypesFor,
@@ -77,6 +79,12 @@ describe('Report-Katalog', () => {
       REPORT_TYPES_BY_AD_PRODUCT.SPONSORED_PRODUCTS,
     );
     expect(reportTypesFor('SPONSORED_DISPLAY')).toEqual([]);
+    expect(REPORT_AD_PRODUCTS).toEqual(['SPONSORED_PRODUCTS', 'SPONSORED_BRANDS']);
+    // SB nur für Profile mit SB-Kampagnen (1.9).
+    expect(REPORT_AD_PRODUCT_SELECTION).toEqual({
+      always: ['SPONSORED_PRODUCTS'],
+      withCampaigns: ['SPONSORED_BRANDS'],
+    });
     expect(reportTypesFor('toString')).toEqual([]);
   });
 
@@ -106,6 +114,85 @@ describe('Report-Katalog', () => {
       );
       expect(columns.some((c) => /(1|30)d$/.test(c))).toBe(false);
     }
+  });
+});
+
+describe('Report-Katalog: Sponsored Brands', () => {
+  // Nur Spalten, die auf der Seite des Report-Typs **und** in der Spalten-Referenz stehen (Stand
+  // 2026-09-28): Eine falsche Spalte ließe jeden Report mit 400 scheitern.
+  const SB_METRICS = [
+    'impressions',
+    'clicks',
+    'cost',
+    'sales',
+    'salesClicks',
+    'purchases',
+    'purchasesClicks',
+    'unitsSold',
+  ];
+  const PROMOTED = ['salesPromoted', 'purchasesPromoted'];
+  const AD_GROUP = ['date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName'];
+
+  it('kennt fünf Ebenen in Hierarchie-Reihenfolge, alle mit 60 Tagen Aufbewahrung', () => {
+    expect(REPORT_TYPES_BY_AD_PRODUCT.SPONSORED_BRANDS).toEqual([
+      'sbCampaigns',
+      'sbAdGroup',
+      'sbTargeting',
+      'sbAds',
+      'sbSearchTerm',
+    ]);
+    expect(
+      REPORT_TYPES_BY_AD_PRODUCT.SPONSORED_BRANDS.map((type) => {
+        const { adProduct, reportTypeId, groupBy, level, retentionDays } = REPORT_DEFINITIONS[type];
+        return { adProduct, reportTypeId, groupBy, level, retentionDays };
+      }),
+    ).toEqual(
+      [
+        { reportTypeId: 'sbCampaigns', groupBy: ['campaign'], level: 'campaign' },
+        { reportTypeId: 'sbAdGroup', groupBy: ['adGroup'], level: 'adGroup' },
+        { reportTypeId: 'sbTargeting', groupBy: ['targeting'], level: 'target' },
+        { reportTypeId: 'sbAds', groupBy: ['ads'], level: 'productAd' },
+        { reportTypeId: 'sbSearchTerm', groupBy: ['searchTerm'], level: 'searchTerm' },
+      ].map((expected) => ({ adProduct: 'SPONSORED_BRANDS', retentionDays: 60, ...expected })),
+    );
+  });
+
+  it('fordert genau die dokumentierten Spalten je Report-Typ an', () => {
+    expect(REPORT_DEFINITIONS.sbCampaigns.columns).toEqual([
+      'date',
+      'campaignId',
+      'campaignName',
+      ...SB_METRICS,
+      'unitsSoldClicks',
+      ...PROMOTED,
+    ]);
+    expect(REPORT_DEFINITIONS.sbAdGroup.columns).toEqual([
+      ...AD_GROUP,
+      ...SB_METRICS,
+      'unitsSoldClicks',
+      ...PROMOTED,
+    ]);
+    // `unitsSoldClicks` fehlt auf der Seite von sbTargeting (Widerspruch zur Spalten-Referenz).
+    expect(REPORT_DEFINITIONS.sbTargeting.columns).toEqual([
+      ...AD_GROUP,
+      'keywordId',
+      'targetingId',
+      ...SB_METRICS,
+      ...PROMOTED,
+    ]);
+    expect(REPORT_DEFINITIONS.sbAds.columns).toEqual([
+      ...AD_GROUP,
+      'adId',
+      ...SB_METRICS,
+      'unitsSoldClicks',
+      ...PROMOTED,
+    ]);
+    expect(REPORT_DEFINITIONS.sbSearchTerm.columns).toEqual([
+      ...AD_GROUP,
+      'keywordId',
+      'searchTerm',
+      ...SB_METRICS,
+    ]);
   });
 });
 
@@ -309,7 +396,7 @@ describe('getReport', () => {
   });
 });
 
-function parseRows(reportType: AmazonAdsReportType, text: string) {
+function parseRows<T extends AmazonAdsReportType>(reportType: T, text: string) {
   const schema = createReportRowSchema(reportType);
   return (parseJsonLossless(text, { decimals: 'string' }) as unknown[]).map((row) =>
     schema.safeParse(row),
@@ -451,5 +538,114 @@ describe('Zeilen-Schemas der Reports', () => {
       unitsSoldClicks7d: -2,
     });
     expect(result.data).toMatchObject({ purchases7d: -1, units7d: -2, cost: '1.5' });
+  });
+});
+
+const SB_METRICS = `"impressions": 900, "clicks": 7, "cost": 0.005,
+  "sales": 1234567.89, "salesClicks": 0.1, "purchases": 5, "purchasesClicks": 2,
+  "unitsSold": 6, "unitsSoldClicks": 3, "salesPromoted": 99.99, "purchasesPromoted": 4`;
+
+/** SB: ein Fenster (14 Tage) ohne Suffix; `*14d` = Klick + View, `*Clicks14d` = nur Klick. */
+const SB_VALUES = {
+  impressions: 900,
+  clicks: 7,
+  cost: '0.005',
+  sales7d: null,
+  sales14d: '1234567.89',
+  salesSameSku7d: null,
+  salesSameSku14d: '99.99',
+  purchases7d: null,
+  purchases14d: 5,
+  purchasesSameSku7d: null,
+  purchasesSameSku14d: 4,
+  units7d: null,
+  units14d: 6,
+  unitsSameSku7d: null,
+  unitsSameSku14d: null,
+  salesClicks14d: '0.1',
+  purchasesClicks14d: 2,
+  unitsClicks14d: 3,
+  extra: {},
+};
+
+describe('Zeilen-Schemas der Reports: Sponsored Brands', () => {
+  it('sbCampaigns → Klick + View in *14d, Klick-Anteil eigen, Promoted als Same-SKU', () => {
+    const [result] = parseRows(
+      'sbCampaigns',
+      `[{"date": "2026-09-25", "campaignId": 9007199254740993501, "campaignName": "SB", ${SB_METRICS}}]`,
+    );
+    expect(result?.data).toEqual({
+      date: '2026-09-25',
+      amazonCampaignId: '9007199254740993501',
+      campaignName: 'SB',
+      ...SB_VALUES,
+    });
+  });
+
+  it('sbAdGroup → Ad-Group-Kennzahl', () => {
+    const [result] = parseRows(
+      'sbAdGroup',
+      `[{"date": "2026-09-25", "campaignId": 1, "campaignName": "K", "adGroupId": 2, "adGroupName": "AG", ${SB_METRICS}}]`,
+    );
+    expect(result?.data).toEqual({
+      date: '2026-09-25',
+      amazonCampaignId: '1',
+      campaignName: 'K',
+      amazonAdGroupId: '2',
+      adGroupName: 'AG',
+      ...SB_VALUES,
+    });
+  });
+
+  it('sbTargeting → Target-ID aus keywordId, sonst targetingId; eine abweichende targetingId in extra', () => {
+    const results = parseRows(
+      'sbTargeting',
+      `[{"date": "2026-09-25", "campaignId": 1, "adGroupId": 2, "keywordId": 11, ${SB_METRICS}},
+        {"date": "2026-09-25", "campaignId": 1, "adGroupId": 2, "targetingId": 12, ${SB_METRICS}},
+        {"date": "2026-09-25", "campaignId": 1, "adGroupId": 2, "keywordId": 13, "targetingId": 13, ${SB_METRICS}},
+        {"date": "2026-09-25", "campaignId": 1, "adGroupId": 2, "keywordId": 14, "targetingId": 15, ${SB_METRICS}},
+        {"date": "2026-09-25", "campaignId": 1, "adGroupId": 2, ${SB_METRICS}}]`,
+    );
+    expect(results.map((r) => r.data && [r.data.amazonTargetId, r.data.extra])).toEqual([
+      ['11', {}],
+      ['12', {}],
+      ['13', {}],
+      ['14', { targetingId: '15' }],
+      undefined,
+    ]);
+    expect(results[0]?.data).toMatchObject({ amazonAdGroupId: '2', sales14d: '1234567.89' });
+  });
+
+  it('sbAds → Ad-Kennzahl ohne ASIN und SKU (der Report nennt keine)', () => {
+    const [result] = parseRows(
+      'sbAds',
+      `[{"date": "2026-09-25", "campaignId": 1, "adGroupId": 2, "adId": 9007199254740993801, ${SB_METRICS}}]`,
+    );
+    expect(result?.data).toMatchObject({
+      amazonAdId: '9007199254740993801',
+      amazonAdGroupId: '2',
+      asin: null,
+      sku: null,
+      unitsClicks14d: 3,
+    });
+  });
+
+  it('sbSearchTerm → Suchbegriff-Kennzahl, ohne Same-SKU und Klick-Einheiten', () => {
+    const [result] = parseRows(
+      'sbSearchTerm',
+      `[{"date": "2026-09-25", "campaignId": 1, "adGroupId": 2, "keywordId": 11, "searchTerm": "laufschuhe",
+         "impressions": 5, "clicks": 1, "cost": 0.5, "sales": 10, "salesClicks": 10, "purchases": 1,
+         "purchasesClicks": 1, "unitsSold": 1}]`,
+    );
+    expect(result?.data).toMatchObject({
+      amazonTargetId: '11',
+      searchTerm: 'laufschuhe',
+      sales14d: '10',
+      salesClicks14d: '10',
+      units14d: 1,
+      unitsClicks14d: null,
+      salesSameSku14d: null,
+      purchasesSameSku14d: null,
+    });
   });
 });
