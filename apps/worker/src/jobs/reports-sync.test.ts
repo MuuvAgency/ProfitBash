@@ -19,6 +19,7 @@ const {
 
 const SP = 'SPONSORED_PRODUCTS';
 const SB = 'SPONSORED_BRANDS';
+const SD = 'SPONSORED_DISPLAY';
 const DE = '9007199254740993';
 /** 08:00 in Berlin: heute 27.09., gestern 26.09., Fenster 28.08.–26.09. */
 const START = Date.parse('2026-09-27T06:00:00Z');
@@ -143,6 +144,21 @@ describe('syncConnectionReports', () => {
       '2026-08-28..2026-09-26',
     ]);
     expect((await reportsOf('sbSearchTerm')).every((r) => r.adProduct === SB)).toBe(true);
+  });
+
+  it('fordert SD nur für Profile an, die eine SD-Kampagne haben (1.9)', async () => {
+    await ensureCampaigns(testDb.db, { organizationId, profileId }, [
+      { amazonCampaignId: '9007199254740993901', adProduct: SD },
+    ]);
+    // SD hält 65 Tage vor: je Typ (vier) das Fenster und zwei Stücke Historie; SB bleibt ohne Kampagne aus.
+    expect((await sync()).counters).toMatchObject({ requested: 19 + 12 });
+    expect(ranges(await reportsOf('sdCampaigns'))).toEqual([
+      '2026-07-26..2026-08-25',
+      '2026-08-26..2026-08-27',
+      '2026-08-28..2026-09-26',
+    ]);
+    expect((await reportsOf('sdAdvertisedProduct')).every((r) => r.adProduct === SD)).toBe(true);
+    expect(await reportsOf('sbCampaigns')).toEqual([]);
   });
 
   it('fordert je Report-Typ das rollierende Fenster und die Historie in 31-Tage-Stücken an', async () => {
