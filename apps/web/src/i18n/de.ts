@@ -568,6 +568,11 @@ export const de = {
       campaign: 'Kampagne',
       adGroup: 'Ad Group',
     },
+    decimalFilter: {
+      min: 'mindestens',
+      max: 'höchstens',
+      invalid: 'Bitte eine Zahl eingeben, z. B. 12,50.',
+    },
     state: {
       ENABLED: 'Aktiv',
       PAUSED: 'Pausiert',
