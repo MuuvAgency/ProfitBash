@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import type { GridApi, GridReadyEvent } from 'ag-grid-community';
+import { compareDecimalNullsLast } from '@profitbash/shared';
 import { AgGridVue } from 'ag-grid-vue3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
@@ -29,7 +30,7 @@ async function mountGrid(rowData: Row[]) {
           rowData,
           columnDefs: [
             { field: 'name', sortable: true, filter: 'agTextColumnFilter' },
-            { field: 'cost', sortable: true },
+            { field: 'cost', sortable: true, comparator: compareDecimalNullsLast },
           ],
           pinnedBottomRowData: [{ id: 'total', name: 'Summe', cost: '3' }],
           domLayout: 'autoHeight',
@@ -57,13 +58,31 @@ describe('AG Grid (Community, nur registrierte Module)', () => {
     const { api } = await mountGrid([
       { id: 'a', name: 'Kampagne B', cost: '2' },
       { id: 'b', name: 'Kampagne A', cost: '1' },
+      { id: 'c', name: 'Kampagne C', cost: null },
     ]);
     api.applyColumnState({ state: [{ colId: 'name', sort: 'asc' }] });
     await api.setColumnFilterModel('name', { type: 'contains', filter: 'Kampagne' });
     api.onFilterChanged();
-    const csv = api.getDataAsCsv();
-    expect(csv).toContain('"Kampagne A"');
+    const names = () => {
+      const result: string[] = [];
+      for (let i = 0; i < api.getDisplayedRowCount(); i++) {
+        result.push(api.getDisplayedRowAtIndex(i)!.data!.name);
+      }
+      return result;
+    };
+    expect(names()).toEqual(['Kampagne A', 'Kampagne B', 'Kampagne C']);
+    const csv = api.getDataAsCsv() ?? '';
+    expect(csv.indexOf('"Kampagne A"')).toBeLessThan(csv.indexOf('"Kampagne B"'));
     expect(api.getPinnedBottomRowCount()).toBe(1);
+
+    // Beträge als Decimal-Strings: fehlende Werte in beide Richtungen am Ende.
+    api.applyColumnState({ state: [{ colId: 'cost', sort: 'asc' }], defaultState: { sort: null } });
+    expect(names()).toEqual(['Kampagne A', 'Kampagne B', 'Kampagne C']);
+    api.applyColumnState({
+      state: [{ colId: 'cost', sort: 'desc' }],
+      defaultState: { sort: null },
+    });
+    expect(names()).toEqual(['Kampagne B', 'Kampagne A', 'Kampagne C']);
     const messages = [...warn.mock.calls, ...error.mock.calls].flat().join('\n');
     expect(messages).not.toMatch(/AG Grid/);
   });

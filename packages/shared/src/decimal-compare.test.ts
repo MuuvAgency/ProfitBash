@@ -38,8 +38,12 @@ describe('compareDecimal', () => {
 describe('compareDecimalNullsLast', () => {
   it('sortiert fehlende Werte in beide Richtungen ans Ende', () => {
     const values = ['3', null, '-1', '10', null];
-    const ascending = [...values].sort((a, b) => compareDecimalNullsLast(a, b, false));
-    const descending = [...values].sort((a, b) => compareDecimalNullsLast(a, b, true));
+    const ascending = [...values].sort((a, b) =>
+      compareDecimalNullsLast(a, b, undefined, undefined, false),
+    );
+    const descending = [...values].sort((a, b) =>
+      compareDecimalNullsLast(a, b, undefined, undefined, true),
+    );
     expect(ascending).toEqual(['-1', '3', '10', null, null]);
     // AG Grid kehrt das Ergebnis bei absteigender Sortierung um: dort muss null „kleiner“ sein.
     expect(descending.reverse()).toEqual(['10', '3', '-1', null, null]);
