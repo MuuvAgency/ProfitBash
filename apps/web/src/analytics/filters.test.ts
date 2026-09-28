@@ -213,9 +213,7 @@ describe('Baumauswahl (Clients › Profile)', () => {
       withoutClient: true,
       profileIds: null,
     });
-    expect(toTreeSelection(state({ clientIds: [C2], withoutClient: true }), options)).toEqual(
-      keys,
-    );
+    expect(toTreeSelection(state({ clientIds: [C2], withoutClient: true }), options)).toEqual(keys);
   });
 
   it('teilweise gewählter Client: Profil-Liste über alle gewählten Profile', () => {

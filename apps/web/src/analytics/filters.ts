@@ -133,7 +133,10 @@ export function parseStoredFilters(value: unknown): FilterState | null {
  * gelten nur diese; gespeicherte Profile nur mit dem Merker `pf=1` (ein geteilter Link ohne Merker zeigt die Clients
  * ganz).
  */
-export function filterStateFromQuery(query: LocationQuery, stored: FilterState | null): FilterState {
+export function filterStateFromQuery(
+  query: LocationQuery,
+  stored: FilterState | null,
+): FilterState {
   const hasFilter = FILTER_QUERY_KEYS.some((key) => query[key] !== undefined);
   if (!hasFilter) return stored ?? DEFAULT_FILTER_STATE;
 
