@@ -436,14 +436,39 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     Sortierung auf dem Server (F7). Kampagnen, Dashboard, Drill-Down und ein Client bleiben unter 1 s.
 
 ### 2.5 API (`apps/api`)
-- [ ] Middleware `requireFeature(key, 'view')`: prüft Entitlement und Rolle serverseitig (`resolveFeatureAccess`), `403` mit
+- [x] Middleware `requireFeature(key, 'view')`: prüft Entitlement und Rolle serverseitig (`resolveFeatureAccess`), `403` mit
       Fehlerformat `{ error: { code, message } }`.
-- [ ] Endpunkte (POST, IDs im Body): Explorer-Zeilen je Ebene, Tagesreihe, Dashboard-Summen, ASIN-Suche, Clients und wählbare
+- [x] Endpunkte (POST, IDs im Body): Explorer-Zeilen je Ebene, Tagesreihe, Dashboard-Summen, ASIN-Suche, Clients und wählbare
       Währungen für die Filterleiste; Anzeigewährung als Parameter (F3). zod an der Grenze, OpenAPI und `schema.gen.ts` neu erzeugt.
       Beträge als Decimal-Strings, Kennzahlen aus 2.1.
-- [ ] Antwort nennt die Währung und ob umgerechnet wurde, Attribution je Summe (gemischt ja/nein, fehlende Werte), „Daten bis“,
+- [x] Antwort nennt die Währung und ob umgerechnet wurde, Attribution je Summe (gemischt ja/nein, fehlende Werte), „Daten bis“,
       den Beginn der vorläufigen Tage und ob die Zeilen gekürzt sind.
-- [ ] Komprimierung der Antworten (F7).
+- [x] Komprimierung der Antworten (F7).
+- [x] Umsetzung (Stand für 2.6 und später):
+  - **`requireFeature(deps, key | keys, 'view' | 'write')`** (`middleware.ts`, nach `requireSession`): Entitlements der aktiven
+    Organisation (`listEnabledFeatures`) und Rolle über `resolveFeatureAccess`; mehrere Keys = eines genügt. Fehler `403`
+    `FEATURE_FORBIDDEN` bzw. `NO_ACTIVE_ORGANIZATION`.
+  - **Endpunkte** (`routes/analytics.ts`, Tag „Auswertungen“, alle POST unter `/api/ads/*`, gzip über `hono/compress`, wenn der
+    Browser es anbietet):
+    - `filter-options` (Feature `dashboard` **oder** `sp-explorer`): sichtbare Clients und Profile
+      (`listVisibleClientsAndProfiles`), wählbare Währungen, `fxRatesThrough` (= `latestFxRateDate`), `fxRatesStale`.
+    - `explorer/rows` (`sp-explorer`): `level` inkl. `negative` (dann `current`/`total` `null`), `filter` (Drill-Down,
+      `includeRemoved`); Antwort `meta`, `rows`, `totalRows`, `truncated`, `maxRows` (10 000), `total`.
+    - `timeseries` (`dashboard` oder `sp-explorer`): `level` (Standard `campaign`), `filter`, `entityIds` (höchstens 500 wegen der
+      Body-Grenze von 64 KB); `days`, `comparisonDays`. Die Hero-Kachel des Dashboards (2.7) schickt `filter.includeRemoved: true`,
+      damit der Verlauf zur Dashboard-Summe passt.
+    - `dashboard` (`dashboard`): `total`, `byClient`, `byProfile`, `byAdProduct`, `fxRatesThrough`, `fxRatesStale`.
+    - `asin-search` (`sp-explorer`): `terms` (1–100 ASINs oder SKUs), sonst wie `explorer/rows` auf Ebene `productAd`.
+  - **Schemas** in `@profitbash/shared` (`analytics-api.ts`): Anfrage `analyticsQuerySchema` (Auswahl wie 2.4, `period`,
+    `comparison`, `currency` `auto` oder Code, `attribution`), Zeitraum höchstens 400 Tage (`from` ≤ `to`). Eine andere
+    Anzeigewährung als `auto` muss in `listSelectableCurrencies` stehen, sonst `400 CURRENCY_NOT_SELECTABLE`.
+    Antwort: `meta` (`currency`, `converted`, `missingFxCurrencies`, `dataThrough`, `provisionalFrom`, `earliestDate`,
+    `profilesWithoutData`), Summen als `{ sums, derived }` (`deriveMetrics`; Umsatz und Käufe gehen nur bei vollständiger
+    Abdeckung in ACoS, ROAS und CVR ein), `change` je Kennzahl (`absolute`, `relative`) für Summen und Dashboard-Gruppen, je
+    Explorer-Zeile nur `relative` (Nutzlast), `attribution` (`summarizeAttribution`).
+  - **„Kurse veraltet“:** `isFxRateStale(latest, now)` (`@profitbash/shared/analytics`): mehr als 5 Kalendertage (Entscheidung
+    siehe 2.2); der Tag beginnt erst mit dem Abruf um 06:00 Berlin, sonst gäbe es in der Nacht auf Mittwoch nach Ostern einen
+    Fehlalarm. Getestet mit Ostern 2027 und Weihnachten 2025/2026.
 
 ### 2.6 Web-Grundlagen
 - [ ] **AG Charts Community** einführen (ADR 001; Version exakt pinnen, Lizenz und Mindestalter prüfen), Theme aus den Tokens
