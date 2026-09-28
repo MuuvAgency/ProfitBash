@@ -407,13 +407,31 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - **EXPLAIN ANALYZE / Messung** (lokal, Demo-Daten aus 2.3, rund 2 Mio. Kennzahl-Zeilen, 6 Profile in 4 Währungen, Anzeige EUR,
     zweiter Lauf; `shared_buffers` 128 MB): Portfolios 40 ms, Kampagnen 50 ms, Ad Groups 105 ms, Product Ads 220 ms, Dashboard
     60 ms, Tagesreihe Kampagnen 60 ms (jeweils alle Profile, 30 Tage + Vergleich). Targets: alle Profile 30 Tage ohne Vergleich
-    740 ms, mit Vergleich 1,6 s, ein Client (2 Profile) mit Vergleich 560 ms, 7 Tage mit Vergleich 620 ms, Drill-Down auf eine
-    Kampagne 9 ms. Suchbegriffe: 980 ms / 2,5 s / 770 ms / 770 ms / 12 ms. Engpass laut Plan: das Lesen der Kennzahl-Zeilen
+    740–820 ms, mit Vergleich 1,6–1,8 s, ein Client (2 Profile) mit Vergleich 560–650 ms, 7 Tage mit Vergleich 620–650 ms,
+    Drill-Down auf eine Kampagne 9 ms. Suchbegriffe: 1,0 s / 2,5–2,9 s / 770–880 ms / 770–810 ms / 12 ms (Streuung zwischen
+    Messläufen). Engpass laut Plan: das Lesen der Kennzahl-Zeilen
     (rund 620 000 Target-Zeilen à 330 Byte für 60 Tage, etwa 0,7 s) und die Aggregation, nicht Indizes (alle Zugriffe über
     `…_profile_date_idx` bzw. den Schlüssel-Index; kein neuer Index nötig). Fester Anteil bei 10 000 Zeilen rund 300 ms (JSON mit
     10 MB bauen, übertragen, parsen); die API komprimiert (2.5).
+  - **Fehlende Kurse:** In umgerechneten Summen (Summenzeile, Tagesreihe, Dashboard) zählen Kennzahl-Zeilen ohne Kurs gar nicht,
+    auch nicht mit Klicks und Impressionen, damit CPC, CPM und ACoS aus denselben Zeilen stammen; die Währung steht in
+    `missingFxCurrencies`. Zeilen des Explorers (Originalwährung) sind vollständig. Eine Zeile, deren Währung an allen Tagen keinen
+    Kurs hat, sortiert ans Ende (umgerechneter Spend `null`; nur bei Währungen ohne EZB-Kurs denkbar).
+  - **Vertrag für 2.5–2.8:** Die API prüft Eingaben mit zod (Ebene, Tage, `limit`, Währung nur aus `listSelectableCurrencies`,
+    Suchbegriffe nicht leer). Die Hero-Kachel des Dashboards ruft `queryTimeSeries` mit `includeRemoved: true` (wie
+    `queryDashboard`), sonst passt ihr Verlauf nach entfernten Kampagnen nicht zur Summe. Vergleichswerte einer Zeile ohne Daten im
+    Vergleichszeitraum sind 0; ob der Vergleich vor dem ersten Datentag beginnt, zeigt `earliestDate` (F5). Der Portfolio-Reiter
+    summiert nur Kampagnen mit Portfolio (Kampagnen ohne Portfolio fehlen dort, F6).
+  - **Offen für Phase 6:** `listVisibleClientsAndProfiles` liest Clients zusätzlich nur aus der Organisation (`clients` gehört
+    der Eigentümer-Org). Für Kunden-Orgs reicht dann die Einschränkung auf die Clients sichtbarer Profile.
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung, `sql.raw` nur mit Konstanten, Beträge nie über `number`,
+    Umrechnung wie `convertAmount` bestätigt. Übernommen: Attribution je Zeile aus Ad-Typ und Kontotyp der Zeile (vorher
+    fälschlich „vollständig“ außer bei Portfolios), Zeilen ohne Kurs ganz aus umgerechneten Summen, Tests für fremde und
+    ausgeblendete IDs im Drill-Down, `withoutClient`. Nur festgehalten: Sortierung bei komplett fehlendem Kurs, Hero-Kachel,
+    Nullen im Vergleich, Eingabeprüfung in der API, Phase 6 (siehe oben). Bewusst nicht jetzt: Aufteilen des Moduls in mehrere
+    Dateien (nach dem Merge möglich, keine Verhaltensänderung).
   - **Offen (für Dominik, vor 2.8):** Targets und Suchbegriffe über **alle** Profile mit 30 Tagen **und** Vergleich liegen über der
-    1-s-Grenze der DoD (1,6 s bzw. 2,5 s mit ~12 000 Targets). Vorschläge: (a) der Explorer lädt den Vergleich erst auf Wunsch
+    1-s-Grenze der DoD (1,6–1,8 s bzw. 2,5–2,9 s mit ~12 000 Targets). Vorschläge: (a) der Explorer lädt den Vergleich erst auf Wunsch
     oder nach den Zeilen, (b) Voraggregation (z. B. je Entity und Woche) für lange Zeiträume, (c) Infinite Row Model mit
     Sortierung auf dem Server (F7). Kampagnen, Dashboard, Drill-Down und ein Client bleiben unter 1 s.
 
