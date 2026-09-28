@@ -11,6 +11,7 @@ import {
 import { AD_PRODUCTS, type AdProduct, type AttributionSetting } from '@profitbash/shared/analytics';
 import { sql, type SQL } from 'drizzle-orm';
 import { visibleProfilesScope, type ProfileVisibilityInput } from './access';
+import { metricsImportedThroughSql, type ReportAdProductSelection } from './amazon-ads-metrics';
 import type { Db } from './client';
 
 /**
@@ -395,6 +396,8 @@ interface LevelSpec {
   /** Kennzahl-Tabelle und Gruppierung. */
   metricsTable: string;
   groupKey: SQL;
+  /** Spalte der Kennzahl-Zeile (bzw. der Kampagne `c` bei Portfolios), die auf `e.id` zeigt. */
+  entityKey: SQL;
   /** Entity-Abfrage mit `e` (Entity) und `p` (Profil der Auswahl), liefert `row_id`, `row_ad_product` und Attribute. */
   entitySql: (filter: ExplorerFilter) => { from: SQL; where: SQL[]; columns: SQL; join: SQL };
 }
@@ -421,6 +424,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'campaign',
     metricsTable: 'amazon_ads_campaign_daily_metrics',
     groupKey: sql`c.portfolio_id`,
+    entityKey: sql`c.portfolio_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_portfolios e`,
       join: sql`a.group_key = e.id`,
@@ -439,6 +443,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'campaign',
     metricsTable: 'amazon_ads_campaign_daily_metrics',
     groupKey: sql`m.campaign_id`,
+    entityKey: sql`m.campaign_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_campaigns e left join amazon_ads_portfolios pf on pf.id = e.portfolio_id`,
       join: sql`a.group_key = e.id`,
@@ -459,6 +464,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'adGroup',
     metricsTable: 'amazon_ads_ad_group_daily_metrics',
     groupKey: sql`m.ad_group_id`,
+    entityKey: sql`m.ad_group_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_ad_groups e join amazon_ads_campaigns c on c.id = e.campaign_id`,
       join: sql`a.group_key = e.id`,
@@ -480,6 +486,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'target',
     metricsTable: 'amazon_ads_target_daily_metrics',
     groupKey: sql`m.target_id`,
+    entityKey: sql`m.target_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_targets e join amazon_ads_campaigns c on c.id = e.campaign_id
         left join amazon_ads_ad_groups g on g.id = e.ad_group_id`,
@@ -504,6 +511,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'productAd',
     metricsTable: 'amazon_ads_product_ad_daily_metrics',
     groupKey: sql`m.product_ad_id`,
+    entityKey: sql`m.product_ad_id`,
     entitySql: (filter) => {
       const where: SQL[] = [
         ...removedFilter(filter),
@@ -535,6 +543,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     metricsLevel: 'searchTerm',
     metricsTable: 'amazon_ads_search_term_daily_metrics',
     groupKey: sql`m.target_id || ':' || m.search_term`,
+    entityKey: sql`m.target_id`,
     entitySql: (filter) => ({
       from: sql`amazon_ads_targets e join amazon_ads_campaigns c on c.id = e.campaign_id
         left join amazon_ads_ad_groups g on g.id = e.ad_group_id`,
@@ -572,6 +581,35 @@ function totalsOver(prefix: string): SQL {
   });
   return sql.raw(`${sums.join(', ')}, coalesce(sum(f.${prefix}_rows), 0) as ${prefix}_rows,
     (select array_agg(distinct c) from filtered f2, unnest(f2.${prefix}_combos) c) as ${prefix}_combos`);
+}
+
+/** Portfolios: Kennzahlen der Kampagnen (entfernte Kampagnen wie im Kampagnen-Reiter nur mit `includeRemoved`). */
+function portfolioJoinSql(level: AnalyticsLevel, filter: ExplorerFilter): SQL {
+  if (level !== 'portfolio') return sql``;
+  return sql`join amazon_ads_campaigns c on c.id = m.campaign_id and c.portfolio_id is not null
+    ${filter.includeRemoved ? sql`` : sql`and c.removed_at is null`}`;
+}
+
+/**
+ * Filter für Kennzahlen (`m`: Tage, Ad-Typ) und Entities (`e`); der Ad-Typ gilt für beide (Portfolios gelten für
+ * alle Ad-Typen, dort nur für die Kennzahlen).
+ */
+function filtersOf(
+  input: AnalyticsQuery & { level: AnalyticsLevel },
+  entity: { where: SQL[] },
+  periods: Periods,
+): { entityWhere: SQL[]; metricsWhere: SQL[] } {
+  const metricsWhere: SQL[] = [anyRange(periods)];
+  if (!input.adProducts) return { entityWhere: entity.where, metricsWhere };
+  const adProducts = textArray(input.adProducts);
+  metricsWhere.push(sql`m.ad_product = any(${adProducts})`);
+  return {
+    entityWhere:
+      input.level === 'portfolio'
+        ? entity.where
+        : [...entity.where, sql`e.ad_product = any(${adProducts})`],
+    metricsWhere,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -615,20 +653,10 @@ export async function queryExplorerRows(
   const filter = input.filter ?? {};
   const limit = Math.min(input.limit ?? MAX_ANALYTICS_ROWS, MAX_ANALYTICS_ROWS);
   const entity = spec.entitySql(filter);
-  // Ad-Typ-Filter: Kennzahlen und Zeilen (Portfolios gelten für alle Ad-Typen, dort nur die Kennzahlen).
-  const entityWhere =
-    input.adProducts && input.level !== 'portfolio'
-      ? [...entity.where, sql`e.ad_product = any(${textArray(input.adProducts)})`]
-      : entity.where;
-  const metricsWhere: SQL[] = [anyRange(periods)];
-  if (input.adProducts) metricsWhere.push(sql`m.ad_product = any(${textArray(input.adProducts)})`);
+  const { entityWhere, metricsWhere } = filtersOf(input, entity, periods);
 
   // Portfolios: Kennzahlen der Kampagnen (entfernte Kampagnen wie im Kampagnen-Reiter nur mit includeRemoved).
-  const portfolioJoin =
-    input.level === 'portfolio'
-      ? sql`join amazon_ads_campaigns c on c.id = m.campaign_id and c.portfolio_id is not null
-          ${filter.includeRemoved ? sql`` : sql`and c.removed_at is null`}`
-      : sql``;
+  const portfolioJoin = portfolioJoinSql(input.level, filter);
   const searchTermColumns =
     input.level === 'searchTerm'
       ? sql`, min(m.target_id::text)::uuid as target_id, min(m.search_term) as search_term`
@@ -775,4 +803,301 @@ function renamePrefix(json: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of SUM_KEYS) out[`x_${SUM_SQL_NAMES[key]}`] = json[key];
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Tagesreihe
+// ---------------------------------------------------------------------------
+
+export interface DayTotals {
+  date: string;
+  current: MetricSums;
+}
+
+export interface TimeSeriesResult extends CurrencyInfo {
+  /** Nur Tage mit Kennzahl-Zeilen; Lücken füllt die Anzeige (Historie beginnt mit dem ersten Sync, F5). */
+  days: DayTotals[];
+  comparisonDays: DayTotals[];
+  attribution: AttributionSummary;
+  missingFxCurrencies: string[];
+}
+
+/**
+ * Tagesverlauf der Auswahl in der Anzeigewährung (Chart über dem Grid, Hero-Kachel des Dashboards), mit denselben
+ * Filtern wie `queryExplorerRows`; `entityIds` beschränkt auf markierte Zeilen (IDs wie in `ExplorerRow.id`).
+ */
+export async function queryTimeSeries(
+  db: Db,
+  input: AnalyticsQuery & {
+    level: AnalyticsLevel;
+    filter?: ExplorerFilter;
+    entityIds?: readonly string[];
+  },
+): Promise<TimeSeriesResult> {
+  const selectionQuery = await selectionSql(db, input);
+  const empty = (currency: string): TimeSeriesResult => ({
+    currency: currency === 'auto' ? 'EUR' : currency,
+    converted: false,
+    days: [],
+    comparisonDays: [],
+    attribution: EMPTY_SUMMARY,
+    missingFxCurrencies: [],
+  });
+  if (selectionQuery === null) return empty(input.currency);
+  const { currency, converted } = await resolveCurrency(db, selectionQuery, input.currency);
+  const periods = periodsOf(input);
+  const spec = LEVELS[input.level];
+  const filter = input.filter ?? {};
+  const entity = spec.entitySql(filter);
+  const { entityWhere, metricsWhere } = filtersOf(input, entity, periods);
+  const where = [...metricsWhere, ...entityWhere];
+  if (input.entityIds) {
+    where.push(sql`(${spec.groupKey})::text = any(${textArray(input.entityIds)})`);
+  }
+  const range = periods.comparison
+    ? { from: periods.comparison.from, to: periods.period.to }
+    : periods.period;
+  const rows = await db.execute<Record<string, unknown> & { date: string }>(sql`
+    with sel as (${selectionQuery}),
+    fx as (${fxSql(sql`select * from sel`, currency, periods)})
+    select to_char(m.date, 'YYYY-MM-DD') as date,
+      ${sql.join(sumColumns(spec.metricsLevel, input.attribution, range, 'd', true), sql`, `)},
+      array_agg(distinct m.currency_code) filter (where fx.factor is null) as missing_fx
+    from ${sql.raw(spec.metricsTable)} m
+    join sel p on p.id = m.profile_id
+    ${portfolioJoinSql(input.level, filter)}
+    join (${entity.from}) on e.id = ${spec.entityKey}
+    left join fx on fx.day = m.date and fx.currency = m.currency_code
+    where ${sql.join(where, sql` and `)}
+    group by m.date
+    order by m.date`);
+
+  const inPeriod = (date: string, r: DateRange) => date >= r.from && date <= r.to;
+  const toDay = (row: Record<string, unknown> & { date: string }): DayTotals => ({
+    date: row.date,
+    current: readSums(row, 'd', converted),
+  });
+  const periodRows = rows.filter((row) => inPeriod(row.date, periods.period));
+  const combos = [...new Set(periodRows.flatMap((row) => (row.d_combos as string[] | null) ?? []))];
+  return {
+    currency,
+    converted,
+    days: periodRows.map(toDay),
+    comparisonDays: periods.comparison
+      ? rows.filter((row) => inPeriod(row.date, periods.comparison!)).map(toDay)
+      : [],
+    attribution: summarizeAttribution(selectionsOf(spec.metricsLevel, input.attribution, combos)),
+    missingFxCurrencies: [
+      ...new Set(rows.flatMap((row) => (row.missing_fx as string[] | null) ?? [])),
+    ].sort(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+export interface DashboardGroup {
+  /** Client-ID (`null` = ohne Client), Profil-ID oder Ad-Typ. */
+  key: string | null;
+  /** Name des Clients bzw. Profils; `null` bei „Ohne Client“ und Ad-Typen. */
+  label: string | null;
+  /** Nur Profile: Land und Originalwährung. */
+  countryCode?: string;
+  currencyCode?: string;
+  current: MetricSums;
+  comparison: MetricSums | null;
+  attribution: AttributionSummary;
+}
+
+export interface DashboardResult extends CurrencyInfo {
+  totals: AnalyticsTotals;
+  byClient: DashboardGroup[];
+  byProfile: DashboardGroup[];
+  byAdProduct: DashboardGroup[];
+}
+
+/**
+ * Summen fürs Dashboard (F11) aus den Kampagnen-Kennzahlen, in der Anzeigewährung: gesamt und je Client, Profil und
+ * Ad-Typ (eine Abfrage mit `grouping sets`). Zählt alle Kampagnen (auch entfernte: ihr Spend war echt); der
+ * Kampagnen-Reiter des Explorers blendet entfernte standardmäßig aus.
+ */
+export async function queryDashboard(db: Db, input: AnalyticsQuery): Promise<DashboardResult> {
+  const selectionQuery = await selectionSql(db, input);
+  if (selectionQuery === null) {
+    const empty = emptyResult(input.currency);
+    return {
+      currency: empty.currency,
+      converted: false,
+      totals: empty.totals,
+      byClient: [],
+      byProfile: [],
+      byAdProduct: [],
+    };
+  }
+  const { currency, converted } = await resolveCurrency(db, selectionQuery, input.currency);
+  const periods = periodsOf(input);
+  const where: SQL[] = [anyRange(periods)];
+  if (input.adProducts) where.push(sql`m.ad_product = any(${textArray(input.adProducts)})`);
+  const level: MetricsLevel = 'campaign';
+  const rows = await db.execute<Record<string, unknown>>(sql`
+    with sel as (${selectionQuery}),
+    fx as (${fxSql(sql`select * from sel`, currency, periods)}),
+    g as (
+      select grouping(p.client_id) as g_client, grouping(p.id) as g_profile, grouping(m.ad_product) as g_ad_product,
+        p.client_id, p.id as profile_id, m.ad_product,
+        ${sql.join(
+          [
+            ...sumColumns(level, input.attribution, periods.period, 'cur', true),
+            ...(periods.comparison
+              ? sumColumns(level, input.attribution, periods.comparison, 'cmp', true)
+              : []),
+          ],
+          sql`, `,
+        )},
+        array_agg(distinct m.currency_code) filter (where fx.factor is null) as missing_fx
+      from amazon_ads_campaign_daily_metrics m
+      join sel p on p.id = m.profile_id
+      left join fx on fx.day = m.date and fx.currency = m.currency_code
+      where ${sql.join(where, sql` and `)}
+      group by grouping sets ((p.client_id), (p.id), (m.ad_product), ())
+    )
+    select g.*, cl.name as client_name, pr.account_name, pr.country_code, pr.currency_code
+    from g
+    left join clients cl on cl.id = g.client_id
+    left join sel pr on pr.id = g.profile_id
+    order by cl.name asc nulls last, pr.account_name asc nulls last, g.ad_product asc nulls last`);
+
+  const sumsOf = (row: Record<string, unknown>, prefix: 'cur' | 'cmp') => {
+    const read = readSums(row, prefix, converted);
+    return Number(row[`${prefix}_rows`] ?? 0) > 0 ? read : fillEmpty(read, null);
+  };
+  const group = (
+    row: Record<string, unknown>,
+    key: string | null,
+    label: string | null,
+  ): DashboardGroup => ({
+    key,
+    label,
+    current: sumsOf(row, 'cur'),
+    comparison: periods.comparison ? sumsOf(row, 'cmp') : null,
+    attribution: summarizeAttribution(selectionsOf(level, input.attribution, row.cur_combos)),
+  });
+  const flag = (row: Record<string, unknown>, name: string) => Number(row[name]) === 1;
+  const totalRow =
+    rows.find(
+      (row) => flag(row, 'g_client') && flag(row, 'g_profile') && flag(row, 'g_ad_product'),
+    ) ?? {};
+  return {
+    currency,
+    converted,
+    totals: {
+      current: sumsOf(totalRow, 'cur'),
+      comparison: periods.comparison ? sumsOf(totalRow, 'cmp') : null,
+      attribution: summarizeAttribution(
+        selectionsOf(level, input.attribution, totalRow.cur_combos),
+      ),
+      comparisonAttribution: periods.comparison
+        ? summarizeAttribution(selectionsOf(level, input.attribution, totalRow.cmp_combos))
+        : null,
+      missingFxCurrencies: [...((totalRow.missing_fx as string[] | null) ?? [])].sort(),
+    },
+    byClient: rows
+      .filter((row) => !flag(row, 'g_client'))
+      .map((row) =>
+        group(
+          row,
+          (row.client_id as string | null) ?? null,
+          (row.client_name as string | null) ?? null,
+        ),
+      ),
+    byProfile: rows
+      .filter((row) => !flag(row, 'g_profile'))
+      .map((row) => ({
+        ...group(row, String(row.profile_id), String(row.account_name)),
+        countryCode: String(row.country_code),
+        currencyCode: String(row.currency_code),
+      })),
+    byAdProduct: rows
+      .filter((row) => !flag(row, 'g_ad_product'))
+      .map((row) => group(row, String(row.ad_product), null)),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Filterleiste und Datenstand
+// ---------------------------------------------------------------------------
+
+/**
+ * Wählbare Anzeigewährungen (F3): EUR, USD und die Währungen der sichtbaren Profile, soweit die EZB sie
+ * veröffentlicht (Kurs in `fx_rates`). Kein Mitglied: leer.
+ */
+export async function listSelectableCurrencies(
+  db: Db,
+  input: ProfileVisibilityInput,
+): Promise<string[]> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return [];
+  const rows = await db.execute<{ currency: string }>(sql`
+    select c.currency from (
+      select 'EUR'::text as currency
+      union select 'USD'
+      union select p.currency_code from amazon_ads_profiles p where p.id in (${scope.ids})
+    ) c
+    where c.currency in ('EUR', 'USD') or exists (select 1 from fx_rates r where r.quote = c.currency)
+    order by c.currency`);
+  return rows.map((row) => row.currency);
+}
+
+export interface DataStatus {
+  /** Ältester „Daten bis“ der ausgewählten Profile mit Daten (Minimum über deren synchronisierte Ad-Typen). */
+  dataThrough: string | null;
+  /** Ab hier sind die Tage vorläufig (die letzten 14 Tage bis „Daten bis“, Amazon korrigiert noch, F5). */
+  provisionalFrom: string | null;
+  /** Erster Tag mit Kennzahlen in der Auswahl (davor zeigt die App „keine Daten“ statt 0). */
+  earliestDate: string | null;
+  /** Ausgewählte Profile ohne „Daten bis“ (neu verbunden oder ein Ad-Typ hängt). */
+  profilesWithoutData: number;
+}
+
+/** Tage, die vor „Daten bis“ als vorläufig gelten (inklusive „Daten bis“). */
+export const PROVISIONAL_DAYS = 14;
+
+export async function queryDataStatus(
+  db: Db,
+  selection: AnalyticsSelection,
+  adProductSelection: ReportAdProductSelection,
+): Promise<DataStatus> {
+  const selectionQuery = await selectionSql(db, selection);
+  if (selectionQuery === null) {
+    return { dataThrough: null, provisionalFrom: null, earliestDate: null, profilesWithoutData: 0 };
+  }
+  const [row] = await db.execute<{
+    data_through: string | null;
+    without_data: number;
+    earliest: string | null;
+  }>(sql`
+    select to_char(min(x.through::date), 'YYYY-MM-DD') as data_through,
+      (count(*) filter (where x.through is null))::int as without_data,
+      (select to_char(min(m.date), 'YYYY-MM-DD') from amazon_ads_campaign_daily_metrics m
+        where m.profile_id in (select s.id from (${selectionQuery}) s)
+          ${selection.adProducts ? sql`and m.ad_product = any(${textArray(selection.adProducts)})` : sql``}) as earliest
+    from (
+      select ${metricsImportedThroughSql(adProductSelection)} as through
+      from amazon_ads_profiles
+      where amazon_ads_profiles.id in (select s.id from (${selectionQuery}) s)
+    ) x`);
+  const dataThrough = row?.data_through ?? null;
+  return {
+    dataThrough,
+    provisionalFrom: dataThrough ? addDays(dataThrough, -(PROVISIONAL_DAYS - 1)) : null,
+    earliestDate: row?.earliest ?? null,
+    profilesWithoutData: row?.without_data ?? 0,
+  };
+}
+
+function addDays(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }

@@ -1,6 +1,14 @@
 import { convertAmount, formatDecimal, parseDecimal, sumDecimals } from '@profitbash/engine';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { queryExplorerRows, type AnalyticsQuery } from './ads-analytics';
+import {
+  listSelectableCurrencies,
+  queryDashboard,
+  queryDataStatus,
+  queryExplorerRows,
+  queryTimeSeries,
+  type AnalyticsQuery,
+} from './ads-analytics';
+import { markMetricsImportedThrough } from './amazon-ads-metrics';
 import { fxRatesOnOrBefore } from './fx-rates';
 import {
   amazonAdsAdGroupDailyMetrics,
@@ -873,5 +881,121 @@ describe('queryExplorerRows: Ebenen und Filter', () => {
     });
     expect(result.rows.map((row) => row.id)).toEqual([ids.sdDe]);
     expect(result.totals.current.cost).toBe('8.25');
+  });
+});
+
+describe('queryTimeSeries', () => {
+  it('liefert je Tag die umgerechneten Summen der Auswahl, getrennt nach Zeitraum und Vergleich', async () => {
+    const result = await queryTimeSeries(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      comparison: COMPARISON,
+    });
+    expect(result.currency).toBe('EUR');
+    expect(result.days.map((day) => day.date)).toEqual(['2026-09-01', '2026-09-02']);
+    const first = await expectedCost(
+      [ids.de, ids.uk, ids.se],
+      { from: '2026-09-01', to: '2026-09-01' },
+      'EUR',
+    );
+    expect(round(result.days[0]!.current.cost)).toBe(round(first.cost));
+    expect(result.comparisonDays.map((day) => day.date)).toEqual(['2026-08-30', '2026-08-31']);
+    expect(result.missingFxCurrencies).toEqual(['SEK']);
+  });
+
+  it('beschränkt auf markierte Zeilen und Drill-Down', async () => {
+    const result = await queryTimeSeries(testDb.db, {
+      ...base(),
+      level: 'target',
+      entityIds: [ids.tKeyword, ids.tUk],
+      currency: 'GBP',
+    });
+    expect(result.days.map((day) => [day.date, day.current.clicks])).toEqual([
+      ['2026-09-01', '2'],
+      ['2026-09-02', '1'],
+    ]);
+    const drill = await queryTimeSeries(testDb.db, {
+      ...base(),
+      level: 'searchTerm',
+      entityIds: [`${ids.tKeyword}:sportschuhe`],
+    });
+    expect(drill.days.map((day) => day.current.impressions)).toEqual(['30']);
+  });
+});
+
+describe('queryDashboard', () => {
+  it('summiert je Client, Profil und Ad-Typ in der Anzeigewährung, Summe wie die Kampagnen', async () => {
+    const result = await queryDashboard(testDb.db, { ...base(), comparison: COMPARISON });
+    const explorer = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      comparison: COMPARISON,
+    });
+    expect(result.totals.current).toEqual(explorer.totals.current);
+    expect(result.byClient.map((group) => [group.key, group.label])).toEqual([
+      [ids.clientA, 'Alpha'],
+      [ids.clientB, 'Beta'],
+      [null, null],
+    ]);
+    expect(result.byAdProduct.map((group) => group.key)).toEqual([SD, SP]);
+    const sd = result.byAdProduct.find((group) => group.key === SD)!;
+    expect(sd.current.cost).toBe('8.25');
+    expect(sd.attribution.mixed).toBe(false);
+    const uk = result.byProfile.find((group) => group.key === ids.uk)!;
+    expect(uk).toMatchObject({ label: 'Konto 2', currencyCode: 'GBP' });
+    expect(round(uk.current.cost)).toBe(round(formatDecimal(parseDecimal('3.40').div('0.86'))));
+    expect(result.totals.attribution.mixed).toBe(true);
+  });
+});
+
+describe('listSelectableCurrencies', () => {
+  it('bietet EUR, USD und die Währungen sichtbarer Profile an, soweit die EZB sie führt', async () => {
+    expect(
+      await listSelectableCurrencies(testDb.db, { userId: ids.viewer, orgId: ids.org }),
+    ).toEqual(['EUR', 'GBP', 'SEK', 'USD']);
+    expect(
+      await listSelectableCurrencies(testDb.db, { userId: ids.outsider, orgId: ids.org }),
+    ).toEqual([]);
+  });
+});
+
+describe('queryDataStatus', () => {
+  it('nennt „Daten bis“ (Minimum der Profile), den Beginn der vorläufigen Tage und den ersten Tag mit Daten', async () => {
+    const selection = { always: [SP], withCampaigns: [] as string[] };
+    const empty = await queryDataStatus(
+      testDb.db,
+      { userId: ids.viewer, orgId: ids.org },
+      selection,
+    );
+    expect(empty).toEqual({
+      dataThrough: null,
+      provisionalFrom: null,
+      earliestDate: '2026-08-30',
+      profilesWithoutData: 3,
+    });
+
+    await markMetricsImportedThrough(testDb.db, {
+      organizationId: ids.org,
+      profileId: ids.de,
+      adProduct: SP,
+      date: '2026-09-02',
+    });
+    await markMetricsImportedThrough(testDb.db, {
+      organizationId: ids.org,
+      profileId: ids.uk,
+      adProduct: SP,
+      date: '2026-09-01',
+    });
+    const status = await queryDataStatus(
+      testDb.db,
+      { userId: ids.viewer, orgId: ids.org },
+      selection,
+    );
+    expect(status).toEqual({
+      dataThrough: '2026-09-01',
+      provisionalFrom: '2026-08-19',
+      earliestDate: '2026-08-30',
+      profilesWithoutData: 1,
+    });
   });
 });
