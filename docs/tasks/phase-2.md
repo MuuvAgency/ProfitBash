@@ -643,6 +643,16 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     Kachel (erste Spalte fest, F13).
   - Browser-Pane geprüft: 1440 px, Handy, Hell/Dunkel, Drill-Down mit Brotkrumen, Targets mit Kürzung, ASIN-Popover, Konsole
     ohne Fehler und ohne AG-Warnungen.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: Budget und Gebote als Beträge (roher Decimal-String, Sortierung,
+    `DecimalFilter`, CSV roh; „je 1000 sichtbare Impr.“ nur in der Anzeige), sichtbare Impressionen formatiert, Anteile im
+    Filter in Prozent (`filterParams.scale`, Verschiebung als String), Text „CPM“, Markierungen bei jeder Änderung der Anfrage
+    zurückgesetzt, Drill-Down verwirft tiefere IDs, CSV mit BOM (Excel), Formeln in Texten entschärft (`csvSafe`), fehlende
+    Werte leer, Ad-Typen in fester Reihenfolge in der URL, Brotkrumen speichern nur echte Namen, Zeilenzahl formatiert,
+    Chart-Anfrage ohne Vergleich im Schlüssel, `aria-expanded` am ASIN-Knopf, konstante Grid-Optionen, Download robuster.
+  - **Offen (klein, später):** Amazon-Enums unübersetzt (Match-Typ, Targeting, Gebotsstrategie) und Ausdrücke von Targets als
+    JSON; nach einer Änderung in der Filterleiste gelten Brotkrumen-Namen aus den Zeilen statt aus dem Verlauf;
+    `suppressCellFocus` (Tastatur-Navigation im Grid aus, Links per Tab erreichbar); Zeilen der Abfrage als `shallow`
+    (weniger Proxys bei 10 000 Zeilen); weitere Tests (CSV nach Sortierung, Spaltenauswahl speichern, Vergleichsfehler).
 
 
 ### 2.9 Gespeicherte Ansichten (F8)
