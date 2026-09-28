@@ -92,6 +92,13 @@
       "when": 1790538783562,
       "tag": "0012_amazon_ads_profile_metrics_imported_through",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790576146264,
+      "tag": "0013_amazon_ads_metrics_clicks_14d",
+      "breakpoints": true
     }
   ]
 }

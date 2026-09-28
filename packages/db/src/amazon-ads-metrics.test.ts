@@ -54,6 +54,9 @@ const values = (overrides: Partial<DailyMetricValues> = {}): DailyMetricValues =
   units14d: 3,
   unitsSameSku7d: 1,
   unitsSameSku14d: 2,
+  salesClicks14d: null,
+  purchasesClicks14d: null,
+  unitsClicks14d: null,
   extra: {},
   ...overrides,
 });
@@ -202,6 +205,33 @@ describe('replaceDailyMetrics: Kampagnen', () => {
         units7d: null,
         extra: { topOfSearchImpressionShare: '0.25' },
       },
+    ]);
+  });
+
+  it('speichert den Klick-Anteil (SB/SD) in eigenen Spalten und aktualisiert ihn', async () => {
+    const row = { date: '2026-09-01', amazonCampaignId: 'c-klick' };
+    await replaceDailyMetrics(
+      testDb.db,
+      campaignImport([
+        { ...row, salesClicks14d: '0.005', purchasesClicks14d: 1, unitsClicks14d: 2 },
+      ]),
+    );
+    await replaceDailyMetrics(
+      testDb.db,
+      campaignImport([
+        { ...row, salesClicks14d: '1234567.89', purchasesClicks14d: 3, unitsClicks14d: null },
+      ]),
+    );
+    const rows = await testDb.db
+      .select({
+        salesClicks14d: amazonAdsCampaignDailyMetrics.salesClicks14d,
+        purchasesClicks14d: amazonAdsCampaignDailyMetrics.purchasesClicks14d,
+        unitsClicks14d: amazonAdsCampaignDailyMetrics.unitsClicks14d,
+      })
+      .from(amazonAdsCampaignDailyMetrics)
+      .where(eq(amazonAdsCampaignDailyMetrics.profileId, profileId));
+    expect(rows).toEqual([
+      { salesClicks14d: '1234567.89', purchasesClicks14d: 3, unitsClicks14d: null },
     ]);
   });
 

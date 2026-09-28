@@ -376,6 +376,9 @@ describe('Import eines Reports', () => {
       units14d: null,
       unitsSameSku7d: null,
       unitsSameSku14d: null,
+      salesClicks14d: null,
+      purchasesClicks14d: null,
+      unitsClicks14d: null,
       extra: {},
     };
     const importer = setup();
@@ -423,6 +426,9 @@ describe('„Daten bis“ je Profil und Ad-Typ', () => {
     units14d: null,
     unitsSameSku7d: null,
     unitsSameSku14d: null,
+    salesClicks14d: null,
+    purchasesClicks14d: null,
+    unitsClicks14d: null,
     extra: {},
   });
 
