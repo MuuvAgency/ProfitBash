@@ -1666,7 +1666,8 @@
                 "profiles-sync",
                 "entities-sync",
                 "reports-sync",
-                "amazon-requests-poll"
+                "amazon-requests-poll",
+                "fx-rates-sync"
               ]
             },
             "required": false,

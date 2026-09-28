@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import {
-  CONNECTION_JOB_NAMES,
+  SYNC_STATUS_JOB_NAMES,
   JOB_RUN_LIST_LIMIT,
   JOB_RUN_STATUSES,
-  type ConnectionJobName,
+  type SyncStatusJobName,
   type JobRunListQuery,
   type JobRunStatus,
 } from '@profitbash/shared';
@@ -36,7 +36,7 @@ function queryValue<T extends string>(
 }
 
 const filters = computed<JobRunListQuery>(() => {
-  const job = queryValue<ConnectionJobName>(route.query.job, CONNECTION_JOB_NAMES);
+  const job = queryValue<SyncStatusJobName>(route.query.job, SYNC_STATUS_JOB_NAMES);
   const status = queryValue<JobRunStatus>(route.query.status, JOB_RUN_STATUSES);
   return { ...(job && { job }), ...(status && { status }) };
 });
@@ -58,7 +58,7 @@ function resetFilters() {
 
 const jobOptions = computed(() => [
   { value: null, label: t('sync.filter.all') },
-  ...CONNECTION_JOB_NAMES.map((job) => ({ value: job, label: t(`sync.job.${job}`) })),
+  ...SYNC_STATUS_JOB_NAMES.map((job) => ({ value: job, label: t(`sync.job.${job}`) })),
 ]);
 const statusOptions = computed(() => [
   { value: null, label: t('sync.filter.all') },

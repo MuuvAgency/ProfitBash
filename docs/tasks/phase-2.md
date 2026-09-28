@@ -37,7 +37,7 @@ Die Agentur sieht ihre Amazon-Werbung, ohne die Konsole zu öffnen:
 - [ ] Dashboard und Explorer im Browser-Pane geprüft: 1440 px (Sidebar ein- und ausgeklappt), Tablet, Handy (F13), Hell/Dunkel,
       Konsole ohne Fehler und ohne Warnungen zu nicht registrierten AG-Grid-Modulen.
 - [ ] Jede schreibende Aktion (Mitglieder, gespeicherte Ansichten) erzeugt ein `audit_event` mit handelndem Nutzer; der neue Job (2.2)
-      läuft über `runJob` und pingt Healthchecks.
+      läuft über `runJob` und erscheint im Sync-Status (Healthchecks optional, siehe 2.2).
 - [ ] Abfragen bleiben bei den Demo-Daten mit Volumen (2.3) unter 1 s (Messung im Test oder per `EXPLAIN ANALYZE` festgehalten).
 - [ ] `pnpm test`, `typecheck`, `lint`, `build` und beide Smoke-Tests grün, CI grün.
 
@@ -238,20 +238,58 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     dem Umsatz verrechnet, gibt es in Phase 2 nicht), Groß-/Kleinschreibung von `accountType` (Amazon liefert klein, 1.10 prüft).
 
 ### 2.2 Wechselkurse (EZB)
-- [ ] Eigenes Paket für die externe Quelle (Leitplanke 3), z. B. `packages/ecb`: Referenzkurse der EZB (EUR-Basis) laden und mit zod
+- [x] Eigenes Paket für die externe Quelle (Leitplanke 3), z. B. `packages/ecb`: Referenzkurse der EZB (EUR-Basis) laden und mit zod
       prüfen; Kurse als Decimal-String (nie `number`). Quelle, Format und Veröffentlichungszeit beim Umsetzen gegen die EZB-Doku prüfen.
-- [ ] Tabelle `fx_rates` (`date`, `base` = `EUR`, `quote`, `rate` `numeric`; unique (`date`, `quote`)). **Ohne `organization_id`:**
+- [x] Tabelle `fx_rates` (`date`, `base` = `EUR`, `quote`, `rate` `numeric`; unique (`date`, `quote`)). **Ohne `organization_id`:**
       öffentliche Referenzdaten für alle Organisationen; in ADR 002 unter „Geltungsbereich“ ergänzen.
-- [ ] Job `fx-rates-sync` über `runJob`, plattformweit: täglich nach Veröffentlichung der EZB; beim ersten Lauf Historie ab einem
+- [x] Job `fx-rates-sync` über `runJob`, plattformweit: täglich nach Veröffentlichung der EZB; beim ersten Lauf Historie ab einem
       festen Startdatum (Konstante, z. B. 01.01.2026; liest nicht über Organisationen hinweg, welche Tage gebraucht werden).
-- [ ] **Überwachung:** Plattformweite Läufe (`job_runs.organization_id` leer) erscheinen nicht im Sync-Status der Organisation.
+- [x] **Überwachung:** Plattformweite Läufe (`job_runs.organization_id` leer) erscheinen nicht im Sync-Status der Organisation.
       Deshalb Healthcheck **Pflicht** (`HEALTHCHECKS_FX_RATES_SYNC_URL`) und „Kurse bis“ im Datenstand des Dashboards (F11), damit ein
       hängender Kursabruf auffällt, bevor Summen nur noch mit Hinweis erscheinen.
-- [ ] Alle von der EZB veröffentlichten Währungen speichern (die Anzeigewährung ist wählbar, F3; USD gehört immer zur Auswahl).
-- [ ] Kurs für Tag *d* = letzter veröffentlichter Kurs an oder vor *d*. Fehlt er (neue Währung, von der EZB nicht veröffentlicht),
+      **Geändert (Dominik, 2026-09-28): ohne externes Konto.** Der Kursabruf erscheint im Sync-Status jeder Organisation; das
+      Dashboard warnt, wenn die Kurse älter als 4 Tage sind (2.7); einen Absturz der App meldet Railway. `HEALTHCHECKS_FX_RATES_SYNC_URL`
+      bleibt optional wie die anderen Ping-URLs (leer = kein Ping). E-Mail-Warnungen kommen mit Phase 5.
+- [x] Alle von der EZB veröffentlichten Währungen speichern (die Anzeigewährung ist wählbar, F3; USD gehört immer zur Auswahl).
+- [x] Kurs für Tag *d* = letzter veröffentlichter Kurs an oder vor *d*. Fehlt er (neue Währung, von der EZB nicht veröffentlicht),
       bleibt der Betrag unumgerechnet und die Summe zeigt einen Hinweis statt einer falschen Zahl. Umrechnung zwischen zwei
       Nicht-EUR-Währungen über EUR mit den Kursen desselben Tages (F3).
-- [ ] Tests mit msw (kein Aufruf der echten EZB), inkl. Wochenende, Feiertag, fehlender Währung, Wiederholung ohne Duplikate.
+- [x] Tests mit msw (kein Aufruf der echten EZB), inkl. Wochenende, Feiertag, fehlender Währung, Wiederholung ohne Duplikate.
+- [x] Umsetzung (Stand für 2.4 und später):
+  - **Quelle** (geprüft am 2026-09-28 gegen die EZB-Seite „Euro foreign exchange reference rates“ und echte Antworten): SDMX Data API
+    `https://data-api.ecb.europa.eu/service/data/EXR/D..EUR.SP00.A?startPeriod=…&format=csvdata&detail=dataonly`. Ein Abruf liefert
+    alle Währungen für einen beliebigen Zeitraum (die XML-Dateien `eurofxref-*` können nur „heute“, 90 Tage oder alles seit 1999).
+    Veröffentlichung an TARGET-Arbeitstagen gegen 16:00 MEZ (Konzertation 14:10); keine Werte an Wochenenden und TARGET-Feiertagen
+    (Neujahr, Karfreitag, Ostermontag, 1. Mai, 25./26.12.). Antwort: CSV mit CRLF, Werte ohne Tausendertrennzeichen, Nullen am Ende
+    gekürzt (`178.5`); leerer Zeitraum = HTTP 200 mit leerem Body. Stand 2026-09-28: 29 Währungen (u. a. USD, GBP, SEK, PLN, TRY;
+    BGN fehlt seit dem Euro-Beitritt 2026, RUB seit 03/2022).
+  - **Paket `@profitbash/ecb`** (`rates.ts`): `fetchEcbRates({ startDate, endDate? })` → `{ date, currency, rate }[]`, Kurs als
+    Decimal-String wie geliefert. Spalten über den Kopf gefunden; Zeile mit anderer Spaltenzahl, Kurs ≤ 0, Exponent, Basis ≠ EUR
+    oder doppelter Tag je Währung → `EcbError` (ohne Rohdaten); Beobachtungen ohne Wert (leer/`NaN`) fehlen. 404 = keine Kurse,
+    5xx/Netzwerk 3 Versuche mit Backoff, 4xx sofort Fehler.
+  - **Tabelle `fx_rates`** (Migration `0015_fx_rates`): Primärschlüssel (`quote`, `date`) statt nur unique, damit „letzter Kurs an
+    oder vor *d*“ je Währung ein Index-Zugriff ist; Checks: `base = 'EUR'`, `quote` drei Großbuchstaben und nicht EUR, `rate > 0`.
+    `packages/db/src/fx-rates.ts`: `upsertFxRates` (Upsert, zählt `inserted`/`updated`/`unchanged`; gleicher Wert in anderer
+    Schreibweise ist unverändert), `latestFxRateDate`, `fxRatesOnOrBefore(db, date, currencies)` (Map; EUR immer `1`; Währung ohne
+    Kurs bis *d* fehlt).
+  - **Umrechnung** (`packages/engine/src/fx.ts`): `convertAmount(amount, from, to, rates)` = Betrag ÷ Kurs(from) × Kurs(to) mit `Dec`,
+    `null`, wenn ein Kurs fehlt. **Für 2.4:** dieselbe Regel in SQL je Tag (lateral bzw. `distinct on` über `fx_rates` mit
+    `date <= Tag`), Ergebnis gegen `convertAmount` testen; fehlt ein Kurs, den Betrag nicht in die umgerechnete Summe zählen und
+    melden (wie `coverage` in `sumWithGaps`).
+  - **Job `fx-rates-sync`** (`apps/worker/src/jobs/fx-rates-sync.ts`): plattformweit über `runJob` (`organization_id` und `scope`
+    leer), täglich **06:00 Europe/Berlin** (Dominik, 2026-09-28: holt die Kurse des Vortags zusammen mit dem Amazon-Sync). Lädt ab
+    dem letzten gespeicherten Tag minus 7 Tage (Korrekturen der EZB; nie vor `FX_RATES_START_DATE` = 2026-01-01), beim ersten Lauf
+    ab dem Startdatum, und schreibt in einer Transaktion. Zähler `fetched`, `inserted`, `updated`, `unchanged`, `currencies`. Ist
+    `fx_rates` beim Start des Workers leer, plant er sofort einen Lauf ein (sonst gäbe es bis zum nächsten Morgen keine Kurse).
+    Tests ersetzen den Abruf über `startWorker({ fetchFxRates })`.
+  - **Sync-Status:** `SHARED_PLATFORM_JOB_NAMES` (`fx-rates-sync`) in `@profitbash/shared`; `GET /api/job-runs` zeigt deren
+    plattformweite Läufe in jeder Organisation, andere plattformweite (Auslöser, Cleanup) weiter nicht. Filter „Job“ enthält
+    „Wechselkurse (EZB)“, die Spalte „Amazon-Konto“ zeigt „EZB, für alle Organisationen“.
+  - **Für 2.5/2.7:** „Kurse bis“ = `latestFxRateDate`. Vorsicht bei der vereinbarten Warnung „älter als 4 Tage“: Am Dienstag nach
+    Ostern um 06:00 ist der letzte Kurs vom Gründonnerstag (5 Kalendertage), ohne dass etwas hängt. Die Grenze deshalb in
+    TARGET-Arbeitstagen zählen oder großzügiger wählen (z. B. mehr als 5 Kalendertage) und mit Ostern und Weihnachten testen.
+  - **Offen für 0.9 (Deploy):** Ohne Healthchecks.io fehlt auch die externe Überwachung des Backups (`HEALTHCHECKS_DB_BACKUP_URL`,
+    `docs/deploy.md`); vor dem Deploy mit Dominik klären, ob das Backup anders überwacht wird.
 
 ### 2.3 Demo-Daten mit Volumen (F12)
 - [ ] Generator im Mock-Anbieter nach F12, deterministisch (fester Seed), nur erfundene Namen; Seed-Schritt für Clients und
@@ -329,7 +367,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 
 ## `.env.example`
 
-Neu in Phase 2 (Vorschlag): `HEALTHCHECKS_FX_RATES_SYNC_URL` (2.2), optional `AMAZON_ADS_MOCK_SCALE` (2.3, nur Entwicklung).
+Neu in Phase 2: `HEALTHCHECKS_FX_RATES_SYNC_URL` (2.2, optional), optional `AMAZON_ADS_MOCK_SCALE` (2.3, nur Entwicklung).
 
 ## Bewusst nicht in Phase 2
 

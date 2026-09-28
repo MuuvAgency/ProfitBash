@@ -1,4 +1,4 @@
-import { CONNECTION_JOB_NAMES } from '@profitbash/shared';
+import { CONNECTION_JOB_NAMES, SYNC_STATUS_JOB_NAMES } from '@profitbash/shared';
 import { describe, expect, it } from 'vitest';
 import { NAVIGATION } from '../navigation/navigation';
 import { errorMessageKey, i18n } from './index';
@@ -18,8 +18,9 @@ describe('i18n', () => {
     expect(keys.filter((key) => !te(key))).toEqual([]);
   });
 
-  it('hat Texte für alle Jobs je Connection im Sync-Status', () => {
-    expect(CONNECTION_JOB_NAMES.filter((job) => !te(`sync.job.${job}`))).toEqual([]);
+  it('hat Texte für alle Jobs im Sync-Status (je Connection und plattformweit geteilt)', () => {
+    expect(SYNC_STATUS_JOB_NAMES.filter((job) => !te(`sync.job.${job}`))).toEqual([]);
+    expect(SYNC_STATUS_JOB_NAMES).toEqual(expect.arrayContaining(['fx-rates-sync']));
     expect(CONNECTION_JOB_NAMES).toEqual(
       expect.arrayContaining(['entities-sync', 'reports-sync', 'amazon-requests-poll']),
     );

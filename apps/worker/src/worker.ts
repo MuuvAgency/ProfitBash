@@ -1,5 +1,6 @@
 import type { AmazonAdsClient } from '@profitbash/amazon-ads';
-import type { Db } from '@profitbash/db';
+import { latestFxRateDate, type Db } from '@profitbash/db';
+import type { EcbRate, FetchEcbRatesOptions } from '@profitbash/ecb';
 import type { Logger } from '@profitbash/shared';
 import { PgBoss, type Job } from 'pg-boss';
 import {
@@ -11,6 +12,7 @@ import {
 import { pollAmazonRequests } from './jobs/amazon-requests-poll';
 import { dispatchConnectionJobs } from './jobs/dispatch';
 import { syncConnectionEntities } from './jobs/entities-sync';
+import { syncFxRates } from './jobs/fx-rates-sync';
 import { cleanupJobRuns } from './jobs/job-runs-cleanup';
 import { syncConnectionProfiles } from './jobs/profiles-sync';
 import { syncConnectionReports } from './jobs/reports-sync';
@@ -21,6 +23,7 @@ import {
   createJobQueue,
   createQueues,
   DISPATCH_QUEUES,
+  FX_RATES_QUEUE,
   logBossErrors,
   SCHEDULES,
   type JobQueue,
@@ -52,6 +55,8 @@ export interface StartWorkerOptions {
   fetch?: typeof fetch;
   /** Nur für Tests kürzer als der pg-boss-Standard (2 s). */
   pollingIntervalSeconds?: number;
+  /** Abruf der EZB-Kurse; Standard `fetchEcbRates`. Tests ersetzen ihn (kein Aufruf der echten EZB). */
+  fetchFxRates?: (options: FetchEcbRatesOptions) => Promise<EcbRate[]>;
 }
 
 export interface Worker {
@@ -134,11 +139,20 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
     );
   });
 
+  await boss.work(FX_RATES_QUEUE, workOptions, async () => {
+    await runJob(FX_RATES_QUEUE, { organizationId: null, scope: null }, () =>
+      syncFxRates({ db, ...(options.fetchFxRates && { fetchRates: options.fetchFxRates }) }),
+    );
+  });
+
   for (const schedule of SCHEDULES) {
     await boss.schedule(schedule.queue, schedule.cron, null, {
       ...('tz' in schedule && { tz: schedule.tz }),
     });
   }
+
+  // Ohne Kurse (neue Datenbank) nicht bis zum nächsten Morgen warten; `stately` verhindert Doppel.
+  if ((await latestFxRateDate(db)) === null) await boss.send(FX_RATES_QUEUE, null);
 
   logger({ level: 'info', msg: 'worker.started', queues: SCHEDULES.map((s) => s.queue) });
   return {

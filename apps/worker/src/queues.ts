@@ -24,10 +24,12 @@ export const DISPATCH_QUEUES = {
 } as const satisfies Record<string, ConnectionQueue>;
 
 export const CLEANUP_QUEUE = 'job-runs-cleanup';
+/** EZB-Kurse, plattformweit (2.2). Die EZB veröffentlicht gegen 16:00; der Lauf holt den Vortag. */
+export const FX_RATES_QUEUE = 'fx-rates-sync';
 
 /**
  * Zeitpläne (F9): Profile um 05:00, Entities und Reports um 06:00 Berlin (die Lease der Connection
- * reiht sie nacheinander). Der Poll plant sich selbst neu ein; der Auslöser alle 10 Min. holt nach
+ * reiht sie nacheinander), die EZB-Kurse des Vortags ebenfalls um 06:00 (Dominik, 2026-09-28). Der Poll plant sich selbst neu ein; der Auslöser alle 10 Min. holt nach
  * Absturz oder Deploy auf.
  */
 export const SCHEDULES = [
@@ -37,6 +39,7 @@ export const SCHEDULES = [
   { queue: 'reports-sync-all', cron: '0 6 * * *', tz: 'Europe/Berlin' },
   { queue: 'amazon-requests-poll-all', cron: '*/10 * * * *' },
   { queue: CLEANUP_QUEUE, cron: '30 3 * * *', tz: 'Europe/Berlin' },
+  { queue: FX_RATES_QUEUE, cron: '0 6 * * *', tz: 'Europe/Berlin' },
 ] as const;
 
 /** So lange darf ein Job laufen, bevor pg-boss ihn als abgelaufen führt. */
@@ -49,7 +52,12 @@ const QUEUE_OPTIONS: Omit<Queue, 'name'> = {
   expireInSeconds: JOB_EXPIRE_SECONDS,
 };
 
-const ALL_QUEUES = [...CONNECTION_QUEUES, ...Object.keys(DISPATCH_QUEUES), CLEANUP_QUEUE];
+const ALL_QUEUES = [
+  ...CONNECTION_QUEUES,
+  ...Object.keys(DISPATCH_QUEUES),
+  CLEANUP_QUEUE,
+  FX_RATES_QUEUE,
+];
 
 /**
  * Legt die Queues an bzw. gleicht bestehende an `QUEUE_OPTIONS` an (idempotent). API und Worker rufen

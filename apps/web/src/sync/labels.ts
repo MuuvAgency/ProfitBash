@@ -22,8 +22,13 @@ const COUNTER_ORDER = [
   'imported',
   'superseded',
   'rows',
+  // Wechselkurse (2.2): geladen, davon neu, geändert, unverändert.
+  'fetched',
+  'currencies',
+  'inserted',
   'created',
   'updated',
+  'unchanged',
   'placeholdersFilled',
   'placeholdersCreated',
   'reassigned',
@@ -76,6 +81,7 @@ export function useJobRunLabels() {
   }
 
   function connection(run: JobRun) {
+    if (run.job === 'fx-rates-sync') return t('sync.ecbSource');
     return (
       run.connection?.externalAccountEmail ?? run.connection?.externalAccountId ?? MISSING_VALUE
     );

@@ -229,6 +229,25 @@ describe('SyncStatusPage', () => {
     );
   });
 
+  it('zeigt den Kursabruf der EZB (plattformweit) mit Quelle statt Amazon-Konto', async () => {
+    const fx = jobRunFixture({
+      id: '77777777-7777-4777-8777-777777777777',
+      job: 'fx-rates-sync',
+      scope: null,
+      connection: null,
+      counters: { fetched: 29, inserted: 29, updated: 0, unchanged: 145, currencies: 29 },
+    });
+    stubFetch(routes([fx]));
+    const { wrapper } = await mountPage();
+    const fxRow = await waitForRow(wrapper, fx);
+
+    expect(fxRow.get('[col-id="job"]').text()).toBe('Wechselkurse (EZB)');
+    expect(fxRow.get('[col-id="connection"]').text()).toBe('EZB, für alle Organisationen');
+    expect(fxRow.get('[col-id="result"]').text()).toBe(
+      '29 Kurse geladen · 29 Währungen · 29 neu · 145 unverändert',
+    );
+  });
+
   it('nennt gekürzte Texte (Amazon-Konto, Zähler) vollständig im Tooltip', async () => {
     const longEmail = jobRunFixture({
       connection: {
@@ -320,6 +339,9 @@ describe('SyncStatusPage', () => {
     await choose(wrapper, 'Status', 'Alle');
     await vi.waitFor(() => expect(jobRunRequests(requests)).toContain('?job=token-refresh'));
     expect(router.currentRoute.value.query).toEqual({ job: 'token-refresh' });
+
+    await choose(wrapper, 'Job', 'Wechselkurse (EZB)');
+    await vi.waitFor(() => expect(jobRunRequests(requests)).toContain('?job=fx-rates-sync'));
   });
 
   it('zeigt nach einem Org-Wechsel nie die Läufe der vorherigen Org', async () => {

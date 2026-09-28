@@ -863,7 +863,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll";
+                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll" | "fx-rates-sync";
                     status?: "running" | "success" | "failed";
                 };
                 header?: never;
