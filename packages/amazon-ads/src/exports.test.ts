@@ -227,7 +227,11 @@ function rows(text: string): unknown[] {
   return parseJsonLossless(text, { decimals: 'string' }) as unknown[];
 }
 
-function parseRows(exportType: AmazonAdsExportType, text: string, logs: LogEntry[] = []) {
+function parseRows<T extends AmazonAdsExportType>(
+  exportType: T,
+  text: string,
+  logs: LogEntry[] = [],
+) {
   const schema = createExportRowSchema(exportType, {
     adProduct: 'SPONSORED_PRODUCTS',
     logger: (entry) => logs.push(entry),
@@ -454,6 +458,47 @@ describe('Zeilen-Schemas der Exports', () => {
         extra: { adType: 'PRODUCT_AD', headline: 'Hallo' },
       },
     ]);
+  });
+
+  it('normalisiert SB-Ads: ASIN nur bei genau einem Produkt, sonst alle ASINs in extra (1.9)', () => {
+    const results = parseRows(
+      'ads',
+      `[{"adId": 801, "adGroupId": 2, "adProduct": "SPONSORED_BRANDS", "state": "ENABLED",
+         "adType": "VIDEO", "name": "Video",
+         "creative": {"products": [{"productIdType": "ASIN", "productId": "B000TEST01"}],
+                      "videos": [{"assetId": "amzn1.assetlibrary.asset1.x", "assetVersion": "version_v1"}]}},
+        {"adId": 802, "adGroupId": 2, "adProduct": "SPONSORED_BRANDS", "state": "PAUSED",
+         "adType": "PRODUCT_COLLECTION", "name": "Kollektion",
+         "creative": {"headline": "Drei Schuhe", "brandName": "Mock",
+                      "products": [{"productIdType": "ASIN", "productId": "B000TEST01"},
+                                   {"productIdType": "ASIN", "productId": "B000TEST02"},
+                                   {"productIdType": "ASIN", "productId": "B000TEST03"}]}},
+        {"adId": 803, "adGroupId": 2, "adProduct": "SPONSORED_BRANDS", "state": "ENABLED",
+         "adType": "STORE_SPOTLIGHT", "creative": {"brandName": "Mock"}}]`,
+    );
+    expect(results.map((r) => r.data)).toMatchObject([
+      {
+        amazonAdId: '801',
+        adProduct: 'SPONSORED_BRANDS',
+        asin: 'B000TEST01',
+        sku: null,
+        extra: { adType: 'VIDEO', name: 'Video' },
+      },
+      {
+        amazonAdId: '802',
+        asin: null,
+        sku: null,
+        extra: {
+          adType: 'PRODUCT_COLLECTION',
+          name: 'Kollektion',
+          headline: 'Drei Schuhe',
+          asins: ['B000TEST01', 'B000TEST02', 'B000TEST03'],
+        },
+      },
+      { amazonAdId: '803', asin: null, sku: null, extra: { adType: 'STORE_SPOTLIGHT' } },
+    ]);
+    expect(results[0]?.data?.extra).not.toHaveProperty('asins');
+    expect(results[2]?.data?.extra).not.toHaveProperty('asins');
   });
 
   it('verwirft keine Entity, nur weil Felder für extra eine unerwartete Form haben', () => {
