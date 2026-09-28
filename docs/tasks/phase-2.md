@@ -295,6 +295,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - **Für 2.5/2.7:** „Kurse bis“ = `latestFxRateDate`. Vorsicht bei der vereinbarten Warnung „älter als 4 Tage“: Am Dienstag nach
     Ostern um 06:00 ist der letzte Kurs vom Gründonnerstag (5 Kalendertage), ohne dass etwas hängt. Die Grenze deshalb in
     TARGET-Arbeitstagen zählen oder großzügiger wählen (z. B. mehr als 5 Kalendertage) und mit Ostern und Weihnachten testen.
+    **Entschieden (Dominik, 2026-09-28): Warnung, wenn der letzte Kurs mehr als 5 Kalendertage alt ist** (einfacher als
+    EZB-Arbeitstage; Ostern: Dienstag nach Ostern 5 Tage, also keine Warnung). Mit Ostern und Weihnachten testen.
   - **Offen für 0.9 (Deploy):** Ohne Healthchecks.io fehlt auch die externe Überwachung des Backups (`HEALTHCHECKS_DB_BACKUP_URL`,
     `docs/deploy.md`); vor dem Deploy mit Dominik klären, ob das Backup anders überwacht wird.
 
