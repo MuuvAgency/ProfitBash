@@ -69,12 +69,6 @@ function localDate(day: string): Date {
   return new Date(year, month - 1, date);
 }
 
-function shiftHours(date: Date, hours: number): Date {
-  const shifted = new Date(date);
-  shifted.setHours(shifted.getHours() + hours);
-  return shifted;
-}
-
 const rawKey = (key: string) => `raw:${key}`;
 
 export function buildTimeSeriesOptions(input: TimeSeriesChartInput): AgCartesianChartOptions {
@@ -126,16 +120,12 @@ export function buildTimeSeriesOptions(input: TimeSeriesChartInput): AgCartesian
       ? [
           {
             type: 'range',
-            // Je ein halber Tag davor und danach: Die Balken der Randtage liegen ganz im Bereich, ein einzelner Tag
-            // ist nicht null breit.
+            // Auf der Tagesachse mit Bändern deckt der Bereich die Bänder der Randtage ganz ab.
             range: [
-              shiftHours(
-                localDate(
-                  input.provisionalFrom > points[0]!.day ? input.provisionalFrom : points[0]!.day,
-                ),
-                -12,
+              localDate(
+                input.provisionalFrom > points[0]!.day ? input.provisionalFrom : points[0]!.day,
               ),
-              shiftHours(localDate(last), 12),
+              localDate(last),
             ],
             fill: theme.colors.provisional,
             fillOpacity: 0.12,
@@ -157,8 +147,10 @@ export function buildTimeSeriesOptions(input: TimeSeriesChartInput): AgCartesian
     data,
     series: chartSeries as AgCartesianChartOptions['series'],
     axes: {
+      // Ein Band je Tag: Balken füllen den Tag, die Achse endet am ersten und letzten Tag (ohne Polster).
       x: {
-        type: 'time',
+        type: 'unit-time',
+        unit: 'day',
         position: 'bottom',
         label: { ...axisLabel, format: '%d.%m.' },
         crossLines,
