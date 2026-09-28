@@ -5,7 +5,7 @@ import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { useSessionStore } from '../stores/session';
 import HintBadge from './HintBadge.vue';
 import type { MetricHint } from './hints';
-import { changeTone, formatChange, type MetricKey } from './metrics';
+import { changeTone, formatChange, isShownAsNoChange, type MetricKey } from './metrics';
 
 /**
  * KPI-Kachel (DESIGN.md §4 „KPI / Metric block“): Überzeile, großer Wert in Mono, Veränderung als Pille mit Farbe
@@ -50,7 +50,7 @@ const pillClass = computed(
     })[tone.value ?? 'neutral'],
 );
 const arrow = computed(() =>
-  props.change === null || /^-?0(\.0+)?$/.test(props.change)
+  props.change === null || isShownAsNoChange(props.change)
     ? 'pi-minus'
     : props.change.startsWith('-')
       ? 'pi-arrow-down-right'

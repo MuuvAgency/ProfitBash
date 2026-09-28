@@ -91,8 +91,10 @@ describe('buildTimeSeriesOptions', () => {
       type: 'range',
       label: { text: 'Vorläufig' },
     });
+    // Ein halber Tag zu beiden Seiten, damit auch der Balken des Randtages ganz im Bereich liegt.
     const [start, end] = (crossLines[0] as { range: [Date, Date] }).range;
-    expect([start.getDate(), end.getDate()]).toEqual([2, 2]);
+    expect(start).toEqual(new Date(2026, 8, 1, 12));
+    expect(end).toEqual(new Date(2026, 8, 2, 12));
   });
 
   it('ohne vorläufige Tage im Zeitraum kein Bereich', () => {

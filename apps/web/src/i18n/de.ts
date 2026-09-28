@@ -338,6 +338,7 @@ export const de = {
       comparison: 'Vergleich',
       currency: 'Währung',
       attribution: 'Attribution',
+      rangeTooLong: 'Der Zeitraum darf höchstens {days} Tage umfassen.',
       previousYearUnavailable: 'Für das Vorjahr liegen noch keine Daten vor.',
       loadFailed: 'Die Filter konnten nicht geladen werden.',
       range: '{from} – {to}',
@@ -366,7 +367,6 @@ export const de = {
     },
     currency: {
       auto: 'Automatisch',
-      autoHint: 'Eine Währung in der Auswahl: diese, sonst EUR.',
     },
     attribution: {
       console: 'Wie Konsole',

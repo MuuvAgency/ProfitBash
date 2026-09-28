@@ -48,6 +48,14 @@ describe('formatChange', () => {
 
   it('winzige Veränderungen, die auf 0 gerundet werden, ohne Vorzeichen', () => {
     expect(formatChange('0.00001', 'de-DE')).toBe(`0,0${nbsp}%`);
+    expect(formatChange('-0.0001', 'de-DE')).toBe(`0,0${nbsp}%`);
+    expect(formatChange('-0.0004999', 'de-DE')).toBe(`0,0${nbsp}%`);
+    expect(formatChange('-0.0005', 'de-DE')).toBe(`-0,1${nbsp}%`);
+  });
+
+  it('auf 0 gerundet ist neutral (keine Farbe)', () => {
+    expect(changeTone('sales', '0.0004')).toBe('neutral');
+    expect(changeTone('acos', '-0.0001')).toBe('neutral');
   });
 });
 

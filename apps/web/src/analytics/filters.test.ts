@@ -133,7 +133,26 @@ describe('parseStoredFilters', () => {
   });
 });
 
+describe('parseStoredFilters (Grenzen)', () => {
+  it('zu viele Profile: nur die Profilauswahl entfällt, der Rest bleibt', () => {
+    const many = Array.from(
+      { length: 2000 },
+      (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+    );
+    expect(
+      parseStoredFilters(state({ clientIds: [C1], profileIds: many, comparison: 'off' })),
+    ).toEqual(state({ clientIds: [C1], comparison: 'off' }));
+  });
+});
+
 describe('sanitizeFilterState', () => {
+  it('„Ohne Client“ entfällt, wenn es keine Profile ohne Client gibt', () => {
+    const withClients = { ...options, profiles: options.profiles.filter((p) => p.clientId) };
+    expect(sanitizeFilterState(state({ withoutClient: true }), withClients).withoutClient).toBe(
+      false,
+    );
+  });
+
   it('entfernt Clients und Profile, die der Nutzer nicht (mehr) sieht', () => {
     const unknown = '00000000-0000-4000-8000-0000000000ff';
     expect(

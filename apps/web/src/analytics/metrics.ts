@@ -1,4 +1,5 @@
 import {
+  compareDecimal,
   decimalSign,
   formatCurrency,
   formatNumber,
@@ -34,8 +35,19 @@ export const METRIC_POLARITY: Record<MetricKey, Polarity> = {
 
 export type ChangeTone = 'positive' | 'negative' | 'neutral';
 
-/** Farbe der Veränderung; `null` ohne Vergleichswert. */
+/** Veränderungen werden mit einer Nachkommastelle in Prozent gezeigt: unter 0,05 % erscheint „0,0 %“. */
+const SHOWN_AS_ZERO_BELOW = '0.0005';
+
+/** Die angezeigte Veränderung ist 0 (auch winzige Werte, die auf 0 gerundet werden). */
+export function isShownAsNoChange(relative: string): boolean {
+  const magnitude = relative.startsWith('-') ? relative.slice(1) : relative;
+  return compareDecimal(magnitude, SHOWN_AS_ZERO_BELOW) < 0;
+}
+
+/** Farbe der Veränderung; `null` ohne Vergleichswert. Was als 0 erscheint, ist neutral. */
 export function changeTone(key: MetricKey, relative: string | null): ChangeTone | null {
+  if (relative === null) return null;
+  if (isShownAsNoChange(relative)) return 'neutral';
   const sign = decimalSign(relative);
   if (sign === null) return null;
   const polarity = METRIC_POLARITY[key];
@@ -46,10 +58,10 @@ export function changeTone(key: MetricKey, relative: string | null): ChangeTone 
 /** Relative Veränderung (Bruch) als Prozent mit Vorzeichen: `+12,3 %`. */
 export function formatChange(relative: string | null, locale: Locale): string {
   if (relative === null) return MISSING_VALUE;
+  // Auf 0 gerundete Werte ohne Vorzeichen („+0,0 %“ bzw. „-0,0 %“ wäre irreführend).
+  if (isShownAsNoChange(relative)) return formatPercent('0', locale);
   const formatted = formatPercent(relative, locale);
-  // Auf 0 gerundete Werte ohne Vorzeichen („+0,0 %“ wäre irreführend).
-  const roundsToZero = formatted === formatPercent('0', locale);
-  return decimalSign(relative) === 1 && !roundsToZero ? `+${formatted}` : formatted;
+  return decimalSign(relative) === 1 ? `+${formatted}` : formatted;
 }
 
 const MONEY = new Set<MetricKey>(['cost', 'sales', 'cpc', 'cpm', 'vcpm']);

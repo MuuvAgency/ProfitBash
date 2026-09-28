@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Popover from 'primevue/popover';
-import { computed, ref, useId } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { MetricHint } from './hints';
 
@@ -13,7 +13,6 @@ const props = defineProps<{ hint: MetricHint }>();
 const { t } = useI18n();
 const popover = ref<InstanceType<typeof Popover>>();
 const open = ref(false);
-const id = useId();
 
 const content = computed(() => {
   const hint = props.hint;
@@ -62,7 +61,6 @@ const content = computed(() => {
     type="button"
     :aria-label="t('analytics.hint.showHint', { label: content.label })"
     :aria-expanded="open"
-    :aria-controls="id"
     :class="[
       'inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-violet-wash focus-visible:outline-2 focus-visible:outline-violet',
       content.tone === 'warn' ? 'text-warn' : 'text-ink-tertiary',
@@ -72,7 +70,7 @@ const content = computed(() => {
     <i :class="['pi', content.icon, 'text-body-sm']" aria-hidden="true" />
   </button>
   <Popover ref="popover" @show="open = true" @hide="open = false">
-    <div :id="id" class="flex max-w-xs flex-col gap-space-xs">
+    <div class="flex max-w-xs flex-col gap-space-xs">
       <p class="text-body-sm font-semibold text-ink">{{ content.label }}</p>
       <p class="text-body-sm text-ink-secondary">{{ content.text }}</p>
     </div>

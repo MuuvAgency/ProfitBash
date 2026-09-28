@@ -115,6 +115,19 @@ describe('FilterBar', () => {
     expect(router.currentRoute.value.query).toMatchObject({ from: '2026-05-01', to: '2026-05-31' });
   });
 
+  it('Zeitraum über 400 Tage: Fehler statt still „Letzte 30 Tage“', async () => {
+    stubFetch(routes());
+    const { wrapper, router } = await mountBar(
+      '/dashboard?period=custom&from=2026-05-01&to=2026-05-31',
+    );
+    wrapper
+      .findComponent(DatePicker)
+      .vm.$emit('update:modelValue', [new Date(2025, 0, 1), new Date(2026, 5, 1)]);
+    await flushPromises();
+    expect(router.currentRoute.value.query).toMatchObject({ from: '2026-05-01', to: '2026-05-31' });
+    expect(wrapper.find('[role="alert"]').text()).toContain('höchstens 400 Tage');
+  });
+
   it('Vorjahr ist gesperrt, solange Daten dafür fehlen', async () => {
     stubFetch(routes());
     const { wrapper } = await mountBar('/dashboard', '2026-06-01');
