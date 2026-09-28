@@ -5,6 +5,7 @@ import { i18n } from '../i18n';
 import {
   attributionLabel,
   buildColumnDefs,
+  csvSafe,
   defaultVisibleColumns,
   OPTIONAL_COLUMNS,
   totalRow,
@@ -66,6 +67,7 @@ function row(patch: Partial<Row> = {}): Row {
 
 const ctx = {
   t,
+  te: (key: string) => i18n.global.te(key),
   locale: 'de-DE' as const,
   attribution: 'console' as const,
   accountTypeOf: () => 'seller',
@@ -159,5 +161,50 @@ describe('Explorer-Spalten', () => {
     expect(defs[0]).toMatchObject({ colId: 'name', pinned: 'left' });
     expect(defs.map((d) => d.colId)).toContain('changeCost');
     expect(defs.map((d) => d.colId)).not.toContain('viewableImpressions');
+  });
+
+  it('Budget und Gebote als Beträge: roher Decimal-String, Decimal-Sortierung, CSV ohne Formatierung', () => {
+    const defs = all('target');
+    const bid = column(defs, 'bid');
+    const data = row({ attributes: { bid: '0.8', bidCurrencyCode: 'GBP' } });
+    const value = (bid.valueGetter as (p: unknown) => unknown)({ data });
+    expect(value).toBe('0.8');
+    expect(bid.useValueFormatterForExport).toBe(false);
+    const comparator = bid.comparator as (...args: unknown[]) => number;
+    expect(comparator('10', '9', {}, {}, false)).toBeGreaterThan(0);
+    expect(column(all('campaign'), 'budget').useValueFormatterForExport).toBe(false);
+  });
+
+  it('sichtbare Impressionen als Zahl formatiert', () => {
+    const def = column(all('campaign'), 'viewableImpressions');
+    const data = row({
+      current: {
+        ...row().current!,
+        sums: { ...row().current!.sums, viewableImpressions: '123456' },
+      },
+    });
+    expect(display(def, data)).toBe('123.456');
+  });
+
+  it('Anteile filtern in Prozent (Eingabe 30 = 30 %)', () => {
+    expect(column(all('campaign'), 'acos').filterParams).toEqual({ scale: 2 });
+    expect(column(all('campaign'), 'cost').filterParams).toBeUndefined();
+  });
+
+  it('jede Kennzahl des Charts hat einen Text', () => {
+    for (const key of ['cpm', 'vcpm', 'ctr', 'units'] as const) {
+      expect(i18n.global.te(`explorer.column.${key}`)).toBe(true);
+    }
+  });
+});
+
+describe('csvSafe', () => {
+  it('entschärft Formeln in Texten, lässt Decimal-Strings und normale Texte', () => {
+    expect(csvSafe('=HYPERLINK("x")')).toBe('\'=HYPERLINK("x")');
+    expect(csvSafe('+49 Lampe')).toBe("'+49 Lampe");
+    expect(csvSafe('@home')).toBe("'@home");
+    expect(csvSafe('-0.1')).toBe('-0.1');
+    expect(csvSafe('-rabatt')).toBe("'-rabatt");
+    expect(csvSafe('Lampe')).toBe('Lampe');
   });
 });

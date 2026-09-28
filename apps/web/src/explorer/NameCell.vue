@@ -22,6 +22,7 @@ const props = defineProps<{
 
 const { t } = useI18n();
 const popover = ref<InstanceType<typeof Popover>>();
+const open = ref(false);
 
 const row = computed(() => props.params.data);
 const link = computed(() =>
@@ -51,6 +52,7 @@ const withoutMetrics = computed(
       type="button"
       class="shrink-0 rounded-full bg-violet-wash px-2 text-data-sm text-violet hover:underline"
       aria-haspopup="dialog"
+      :aria-expanded="open"
       @click="popover?.toggle($event)"
     >
       {{ t('explorer.sharesAsins', { count: asins.length }) }}
@@ -63,7 +65,7 @@ const withoutMetrics = computed(
       <i class="pi pi-info-circle text-[0.625rem]" aria-hidden="true" />
       <span class="sr-only">{{ t('explorer.noMetrics') }}</span>
     </span>
-    <Popover v-if="asins.length" ref="popover">
+    <Popover v-if="asins.length" ref="popover" @show="open = true" @hide="open = false">
       <div class="flex flex-col gap-space-xs">
         <p class="text-body-sm font-semibold text-ink">{{ t('explorer.asinList') }}</p>
         <ul class="font-data text-data-sm text-ink-secondary">

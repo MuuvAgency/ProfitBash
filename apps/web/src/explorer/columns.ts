@@ -27,6 +27,8 @@ type Translate = (key: string, values?: Record<string, unknown>) => string;
 
 export interface ColumnContext {
   t: Translate;
+  /** Gibt es den i18n-Key? */
+  te: (key: string) => boolean;
   locale: Locale;
   attribution: AttributionSetting;
   /** Kontotyp je Profil (`filter-options`), für die Attribution „wie Konsole“. */
@@ -38,7 +40,10 @@ export interface ColumnContext {
 }
 
 type MetricKind = 'money' | 'count' | 'ratio' | 'factor';
-const METRIC_KIND: Record<MetricKey, MetricKind> = {
+/** Kennzahl-Spalten: Veränderungs-Kennzahlen und die sichtbaren Impressionen (nur SD). */
+type ColumnMetric = MetricKey | 'viewableImpressions';
+const METRIC_KIND: Record<ColumnMetric, MetricKind> = {
+  viewableImpressions: 'count',
   impressions: 'count',
   clicks: 'count',
   cost: 'money',
@@ -186,7 +191,7 @@ const attr = (row: GridRow | undefined, key: string): string | null => {
   return typeof value === 'string' && value !== '' ? value : null;
 };
 
-function metricValue(row: GridRow | undefined, key: MetricKey): string | null {
+function metricValue(row: GridRow | undefined, key: ColumnMetric): string | null {
   const period = row?.current;
   if (!period) return null;
   if (key in period.derived) return period.derived[key as keyof typeof period.derived];
@@ -195,6 +200,17 @@ function metricValue(row: GridRow | undefined, key: MetricKey): string | null {
 
 const DATA_CELL = 'font-data text-right justify-end';
 
+const DECIMAL_STRING = /^-?\d+(\.\d+)?$/;
+/**
+ * Text für den CSV-Export ohne Formel-Wirkung in Tabellenkalkulationen: Werte, die mit `=`, `+`, `-`, `@`, Tab oder
+ * Zeilenumbruch beginnen, bekommen ein `'` vorangestellt (Suchbegriffe stammen von beliebigen Käufern). Decimal-Strings
+ * wie `-0.1` bleiben.
+ */
+export function csvSafe(value: string): string {
+  if (DECIMAL_STRING.test(value)) return value;
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
 export function buildColumnDefs(
   input: ColumnContext & { level: ExplorerLevel; visible: Set<string> },
 ): ColDef<GridRow>[] {
@@ -202,7 +218,7 @@ export function buildColumnDefs(
   const currencyOf = (row: GridRow) => (row.isTotal ? input.displayCurrency : row.currencyCode);
   const approx = (row: GridRow | undefined) => (row?.isTotal && input.converted ? '≈ ' : '');
 
-  const formatMetric = (key: MetricKey, row: GridRow | undefined, value: string | null) => {
+  const formatMetric = (key: ColumnMetric, row: GridRow | undefined, value: string | null) => {
     if (value === null || !row) return MISSING_VALUE;
     switch (METRIC_KIND[key]) {
       case 'money':
@@ -234,7 +250,7 @@ export function buildColumnDefs(
     ...extra,
   });
 
-  const metric = (key: MetricKey): ColDef<GridRow> => ({
+  const metric = (key: ColumnMetric): ColDef<GridRow> => ({
     colId: key,
     headerName: t(`explorer.column.${key}`),
     valueGetter: ({ data }) => metricValue(data, key),
@@ -244,6 +260,8 @@ export function buildColumnDefs(
     type: 'rightAligned',
     cellClass: DATA_CELL,
     filter: markRaw(DecimalFilter),
+    // Anteile erscheinen in Prozent: Filtereingabe „30“ meint 30 %.
+    ...(METRIC_KIND[key] === 'ratio' && { filterParams: { scale: 2 } }),
   });
 
   const changeColumn = (id: string, key: MetricKey): ColDef<GridRow> => ({
@@ -267,24 +285,40 @@ export function buildColumnDefs(
     },
   });
 
-  const bid = (amountKey: string, currencyKey: string) => (row: GridRow) => {
-    const amount = attr(row, amountKey);
-    if (amount === null) return null;
-    const formatted = money(amount, attr(row, currencyKey));
-    // Gebote bei vCPM-Kampagnen gelten je 1000 sichtbare Impressionen (plan.md §5).
-    return attr(row, 'costType') === 'VCPM'
-      ? t('explorer.perThousandViewable', { value: formatted })
-      : formatted;
-  };
+  /**
+   * Beträge aus den Attributen (Budget, Gebote): roher Decimal-String für Sortierung, Filter und CSV, formatiert mit ihrer
+   * Währung; Gebote bei vCPM-Kampagnen gelten je 1000 sichtbare Impressionen (plan.md §5).
+   */
+  const amount = (
+    id: string,
+    amountKey: string,
+    currencyKey: string,
+    perViewable = false,
+  ): ColDef<GridRow> => ({
+    colId: id,
+    headerName: t(`explorer.column.${id}`),
+    valueGetter: ({ data }) => (data && !data.isTotal ? attr(data, amountKey) : null),
+    valueFormatter: ({ data, value }) => {
+      if (value === null || value === undefined || !data) return MISSING_VALUE;
+      const formatted = money(value as string, attr(data, currencyKey));
+      return perViewable && attr(data, 'costType') === 'VCPM'
+        ? t('explorer.perThousandViewable', { value: formatted })
+        : formatted;
+    },
+    comparator: compareDecimalNullsLast,
+    useValueFormatterForExport: false,
+    type: 'rightAligned',
+    cellClass: DATA_CELL,
+    filter: markRaw(DecimalFilter),
+  });
 
   const builders: Record<string, () => ColDef<GridRow>> = {
     state: () =>
       text('state', (row) => {
         if (!row.state) return null;
         const key = `explorer.state.${row.state}`;
-        const label = t(key);
         // Unbekannte Zustände (Amazon ergänzt gelegentlich) wie geliefert.
-        return label === key ? row.state : label;
+        return input.te(key) ? t(key) : row.state;
       }),
     adProduct: () =>
       text('adProduct', (row) =>
@@ -312,23 +346,14 @@ export function buildColumnDefs(
     asin: () => text('asin', (row) => attr(row, 'asin')),
     sku: () => text('sku', (row) => attr(row, 'sku')),
     targetingType: () => text('targetingType', (row) => attr(row, 'targetingType')),
-    budget: () =>
-      text(
-        'budget',
-        (row) => {
-          const amount = attr(row, 'budgetAmount');
-          return amount === null ? null : money(amount, attr(row, 'budgetCurrencyCode'));
-        },
-        { cellClass: DATA_CELL },
-      ),
+    budget: () => amount('budget', 'budgetAmount', 'budgetCurrencyCode'),
     biddingStrategy: () => text('biddingStrategy', (row) => attr(row, 'biddingStrategy')),
     costType: () =>
       text('costType', (row) =>
         attr(row, 'costType') === 'VCPM' ? 'vCPM' : row.adProduct ? 'CPC' : null,
       ),
-    defaultBid: () =>
-      text('defaultBid', bid('defaultBid', 'defaultBidCurrencyCode'), { cellClass: DATA_CELL }),
-    bid: () => text('bid', bid('bid', 'bidCurrencyCode'), { cellClass: DATA_CELL }),
+    defaultBid: () => amount('defaultBid', 'defaultBid', 'defaultBidCurrencyCode', true),
+    bid: () => amount('bid', 'bid', 'bidCurrencyCode', true),
     attribution: () =>
       text('attribution', (row) =>
         attributionLabel(row.adProduct, input.accountTypeOf(row.profileId), input.attribution, t),
@@ -358,7 +383,7 @@ export function buildColumnDefs(
   const optional = OPTIONAL_COLUMNS.filter(
     (spec) => availableAt(spec, level) && (input.visible.has(spec.id) || spec.id === 'currency'),
   ).map((spec) => {
-    const def = (builders[spec.id] ?? (() => metric(spec.id as MetricKey)))();
+    const def = (builders[spec.id] ?? (() => metric(spec.id as ColumnMetric)))();
     return spec.id === 'currency' ? { ...def, hide: !input.visible.has('currency') } : def;
   });
 

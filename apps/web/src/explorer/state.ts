@@ -122,11 +122,17 @@ export function drillQuery(
   parents: Partial<DrillDown>,
 ): { path: string; query: LocationQueryRaw } {
   const child = childLevel(level)!;
-  const query: LocationQueryRaw = { ...base };
-  for (const [key, value] of Object.entries(parents) as [keyof DrillDown, string | null][]) {
+  // Nur die Ebenen oberhalb der geklickten bleiben; tiefere Drill-IDs (z. B. aus einem anderen Reiter) fallen weg.
+  const order: (keyof DrillDown)[] = ['portfolioId', 'campaignId', 'adGroupId'];
+  const own = DRILL_PARAM[level]!;
+  const query: LocationQueryRaw = Object.fromEntries(
+    Object.entries(base).filter(([key]) => !Object.values(PARAM_OF).includes(key)),
+  );
+  for (const key of order.slice(0, order.indexOf(own))) {
+    const value = parents[key];
     if (value) query[PARAM_OF[key]] = value;
   }
-  query[PARAM_OF[DRILL_PARAM[level]!]] = id;
+  query[PARAM_OF[own]] = id;
   return { path: pathForLevel(child), query };
 }
 

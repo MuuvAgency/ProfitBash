@@ -100,6 +100,25 @@ describe('Drill-Down-Links', () => {
   });
 });
 
+describe('Drill-Down von einer oberen Ebene', () => {
+  it('verwirft Drill-IDs unterhalb der geklickten Ebene', () => {
+    expect(
+      drillQuery({}, 'campaign', CAMPAIGN, {
+        portfolioId: PORTFOLIO,
+        campaignId: 'alt',
+        adGroupId: AD_GROUP,
+      }),
+    ).toEqual({
+      path: '/ads/explorer/ad-groups',
+      query: { portfolio: PORTFOLIO, campaign: CAMPAIGN },
+    });
+    expect(drillQuery({ adGroup: AD_GROUP, campaign: 'alt' }, 'portfolio', PORTFOLIO, {})).toEqual({
+      path: '/ads/explorer/campaigns',
+      query: { portfolio: PORTFOLIO },
+    });
+  });
+});
+
 describe('explorerQuery (Filter für die API)', () => {
   it('Drill-Down und entfernte Entities', () => {
     expect(

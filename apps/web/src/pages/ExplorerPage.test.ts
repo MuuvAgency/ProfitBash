@@ -109,8 +109,8 @@ function rowsResponse(rows: Row[], patch: Partial<ExplorerRowsData> = {}): Explo
 }
 
 const campaigns = () => [
-  row(CAMPAIGN, 'SP Waldkauz Nistkasten', '20'),
-  row(CAMPAIGN2, 'SP Waldkauz Futterhaus', '10'),
+  row(CAMPAIGN, 'SP Waldkauz Nistkasten', '20.125'),
+  row(CAMPAIGN2, '=SUMME(1)', '10'),
 ];
 
 function withComparison(rows: Row[]): Row[] {
@@ -355,10 +355,16 @@ describe('ExplorerPage', () => {
     await wrapper.find('button[data-explorer-export]').trigger('click');
     await vi.waitFor(() => expect(blob).toBeDefined());
     const csv = await blob!.text();
+    // BOM, damit Excel UTF-8 erkennt; der Hinweis steht vor der Kopfzeile.
+    expect(csv.startsWith('\uFEFF')).toBe(true);
+    expect(csv.indexOf('nur die 10.000')).toBeLessThan(csv.indexOf('"Name"'));
+    // Formeln in Texten entschärft
+    expect(csv).toContain(`"'=SUMME(1)"`);
+    // Betrag als Decimal-String (nicht „20,13 €“)
+    expect(csv).toContain('"20.125"');
     expect(csv).toContain('nur die 10.000 Zeilen mit dem höchsten Spend von 12.187');
     expect(csv).toContain('"Währung"');
     expect(csv).toContain('"SP Waldkauz Nistkasten"');
-    expect(csv).toContain('"20"');
     expect(csv).toContain('"EUR"');
   });
 

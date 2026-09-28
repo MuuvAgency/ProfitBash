@@ -37,6 +37,12 @@ async function mountGrid(rowData: Row[]) {
               comparator: compareDecimalNullsLast,
               filter: markRaw(DecimalFilter),
             },
+            {
+              colId: 'acos',
+              valueGetter: ({ data }: { data?: Row }) => data?.cost ?? null,
+              filter: markRaw(DecimalFilter),
+              filterParams: { scale: 2 },
+            },
           ],
           domLayout: 'autoHeight',
           getRowId: ({ data }: { data: unknown }) => (data as Row).id,
@@ -79,5 +85,16 @@ describe('DecimalFilter (Beträge ohne number, F7)', () => {
     api.onFilterChanged();
     await vi.waitFor(() => expect(ids(api)).toEqual(['a', 'b', 'c', 'd']));
     expect(warn.mock.calls.flat().join('\n')).not.toMatch(/AG Grid/);
+  });
+
+  it('Anteile: Eingabe in Prozent (scale 2), verglichen ohne number', async () => {
+    const api = await mountGrid([
+      { id: 'a', cost: '0.25' },
+      { id: 'b', cost: '0.31' },
+      { id: 'c', cost: '0.3' },
+    ]);
+    await api.setColumnFilterModel('acos', { min: '30' });
+    api.onFilterChanged();
+    await vi.waitFor(() => expect(ids(api)).toEqual(['b', 'c']));
   });
 });

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type {
   ColDef,
+  ProcessCellForExportParams,
+  RowSelectionOptions,
+  SelectionColumnDef,
   GetRowIdParams,
   GridApi,
   GridReadyEvent,
@@ -10,7 +13,8 @@ import type {
 import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, shallowRef } from 'vue';
 import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
-import type { GridRow } from './columns';
+import { csvSafe, type GridRow } from './columns';
+import { MISSING_VALUE } from '@profitbash/shared';
 import NameCell, { type NameCellContext } from './NameCell.vue';
 
 /**
@@ -39,6 +43,27 @@ const defaultColDef: ColDef<GridRow> = {
   minWidth: 96,
   cellClass: 'flex items-center',
 };
+
+/** Konstant: Neue Objekte je Render ließen AG Grid die Optionen jedes Mal neu anwenden. */
+const rowSelection: RowSelectionOptions = {
+  mode: 'multiRow',
+  checkboxes: true,
+  headerCheckbox: true,
+  enableClickSelection: false,
+};
+const selectionColumnDef: SelectionColumnDef = { pinned: 'left', lockPinned: true };
+
+/**
+ * Zellen im CSV: Beträge und Zähler roh (Decimal-String), Texte formatiert und gegen Formeln entschärft; fehlende Werte
+ * leer (nicht „–“).
+ */
+function processCell(params: ProcessCellForExportParams<GridRow>): string {
+  const colDef = params.column.getColDef();
+  if (colDef.useValueFormatterForExport === false) return params.value ?? '';
+  const formatted = params.formatValue(params.value) as unknown;
+  const text = formatted === null || formatted === undefined ? '' : String(formatted);
+  return text === MISSING_VALUE ? '' : csvSafe(text);
+}
 
 const getRowId = ({ data }: GetRowIdParams<GridRow>) => data.id;
 const getRowClass = ({ data }: RowClassParams<GridRow>) =>
@@ -71,6 +96,7 @@ function csv(prependContent?: string): string {
     gridApi.getDataAsCsv({
       columnKeys,
       skipPinnedBottom: true,
+      processCellCallback: processCell,
       ...(prependContent && { prependContent }),
     }) ?? ''
   );
@@ -97,13 +123,8 @@ const components = { nameCell: markRaw(NameCell) };
     :components="components"
     :get-row-id="getRowId"
     :get-row-class="getRowClass"
-    :row-selection="{
-      mode: 'multiRow',
-      checkboxes: true,
-      headerCheckbox: true,
-      enableClickSelection: false,
-    }"
-    :selection-column-def="{ pinned: 'left', lockPinned: true }"
+    :row-selection="rowSelection"
+    :selection-column-def="selectionColumnDef"
     :row-height="44"
     :suppress-cell-focus="true"
     @grid-ready="onGridReady"
