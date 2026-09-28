@@ -140,6 +140,7 @@ describe('Mock-Anbieter: Entities und Reports', () => {
   const UK_VENDOR = '2345678901234567';
   const FR = '1234567890123456';
   const SB = 'SPONSORED_BRANDS';
+  const SD = 'SPONSORED_DISPLAY';
   const START = Date.parse('2026-09-27T06:00:00Z');
 
   function simulated(simulation: MockAmazonAdsSimulation = {}) {
@@ -331,6 +332,71 @@ describe('Mock-Anbieter: Entities und Reports', () => {
     expect(terms.every((row) => row.searchTerm.length > 0 && row.unitsClicks14d === null)).toBe(
       true,
     );
+  });
+
+  it('exportiert SD-Entities nur für das DE-Profil: Taktik, Kostenart, Zielgruppen, Ads mit ASIN oder SKU (1.9)', async () => {
+    const campaigns = await exportRows(DE, 'campaigns', SD);
+    expect(campaigns.map((c) => [c.adProduct, c.targetingType, c.extra.costType])).toEqual([
+      [SD, 'T00030', 'VCPM'],
+      [SD, 'T00020', 'CPC'],
+    ]);
+    expect(await exportRows(FR, 'campaigns', SD)).toEqual([]);
+
+    const adGroups = await exportRows(DE, 'adGroups', SD);
+    expect(adGroups.every((g) => g.defaultBid !== null)).toBe(true);
+
+    // SD-Targets tragen wie SB keine Kampagne; Zielgruppe, Produkt, Kategorie und ein Negative.
+    const targets = await exportRows(DE, 'targets', SD);
+    expect(targets.every((t) => t.target.amazonCampaignId === null)).toBe(true);
+    expect(new Set(targets.map((t) => t.target.targetType))).toEqual(
+      new Set(['audience', 'product', 'category']),
+    );
+    expect(targets.some((t) => t.kind === 'negative')).toBe(true);
+
+    // Seller bewerben SD-Product-Ads per SKU (ohne ASIN); das Bild-Ad zeigt zwei ASINs.
+    const ads = await exportRows(DE, 'ads', SD);
+    expect(ads.map((ad) => [ad.extra.adType, ad.asin, ad.sku])).toEqual([
+      ['PRODUCT_AD', null, 'MOCK-SKU-0001'],
+      ['IMAGE', null, null],
+    ]);
+    expect(ads[1]?.extra.asins).toHaveLength(2);
+  });
+
+  it('liefert SD-Reports: Klick + View, Same-SKU nach Klick, sichtbare Impressionen (1.9)', async () => {
+    const sim = simulated();
+    const campaigns = await reportRows(sim, 'sdCampaigns');
+    const adGroups = await reportRows(sim, 'sdAdGroup');
+    expect(campaigns.length).toBeGreaterThan(0);
+    for (const row of [...campaigns, ...adGroups]) {
+      expect(row.sales7d).toBeNull();
+      expect(Number(row.sales14d)).toBeGreaterThanOrEqual(Number(row.salesClicks14d));
+      expect(Number(row.salesClicks14d)).toBeGreaterThanOrEqual(Number(row.salesSameSku14d));
+      expect(row.viewableImpressions).not.toBeNull();
+      expect(row.viewableImpressions!).toBeLessThanOrEqual(row.impressions);
+    }
+    for (const row of campaigns) {
+      const parts = adGroups.filter(
+        (g) => g.date === row.date && g.amazonCampaignId === row.amazonCampaignId,
+      );
+      expect(parts.reduce((sum, g) => sum + g.clicks, 0)).toBe(row.clicks);
+      expect(parts.reduce((sum, g) => sum + g.viewableImpressions!, 0)).toBe(
+        row.viewableImpressions,
+      );
+    }
+    expect(campaigns.some((r) => r.purchases14d! > r.purchasesClicks14d!)).toBe(true);
+
+    // Target-IDs wie im Export (`targetingId` = `targetId`), Negatives ohne Kennzahlen.
+    const exported = await exportRows(DE, 'targets', SD);
+    const positive = exported.flatMap((t) =>
+      t.kind === 'target' ? [t.target.amazonTargetId] : [],
+    );
+    const targets = await reportRows(sim, 'sdTargeting');
+    expect(new Set(targets.map((t) => t.amazonTargetId))).toEqual(new Set(positive));
+
+    // Der Report nennt ASIN und SKU, auch wenn der Export nur die SKU trägt.
+    const ads = await reportRows(sim, 'sdAdvertisedProduct');
+    expect(ads.length).toBeGreaterThan(0);
+    expect(ads.every((ad) => ad.asin !== null && ad.sku !== null)).toBe(true);
   });
 
   it('antwortet auf eine identische Anfrage während der Verarbeitung mit 425 und der ID', async () => {
