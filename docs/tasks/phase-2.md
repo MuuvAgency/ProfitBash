@@ -553,8 +553,46 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 
 
 ### 2.7 Dashboard (`/dashboard`)
-- [ ] Inhalt nach F11 im Kinetic-Bento-Look (Referenzen als Stil, nicht als Inhalt), Zustände je Widget.
-- [ ] SB-Preview-Lücke erklären, sobald SB in der Auswahl ist (`plan.md` §5).
+- [x] Inhalt nach F11 im Kinetic-Bento-Look (Referenzen als Stil, nicht als Inhalt), Zustände je Widget.
+- [x] SB-Preview-Lücke erklären, sobald SB in der Auswahl ist (`plan.md` §5).
+- [x] Umsetzung (Stand für 2.8 und später):
+  - **Seite** `pages/DashboardPage.vue` (Route `dashboard`), Widgets in `src/dashboard/`: Filterleiste (2.6), **Hero-Kachel**
+    (`DashboardHero.vue`, dunkel: Spend und Umsatz mit Veränderung, Vergleichswert und Hinweisen, darunter der Tagesverlauf
+    Spend als Balken, Umsatz als Linie auf eigener Achse, vorläufige Tage markiert), **KPI-Kacheln** ACoS, ROAS, Käufe, Klicks
+    mit CPC, **Anteil je Ad-Typ** (`AdProductShareTile.vue`: Spend mit ACoS, Balken für den Anteil an Spend und Umsatz),
+    **Datenstand** (`DataStatusTile.vue`), **Tabelle je Client bzw. Profil** (`BreakdownTable.vue`, Umschalter, sortierbar über
+    die Spaltenköpfe mit `compareDecimalNullsLast`, Name als Link in den Explorer). Raster: 12 Spalten ab `lg` (Hero 8, KPIs 4
+    als 2 × 2, Anteil 7, Datenstand 5, Tabelle 12), darunter eine bzw. zwei Spalten (F13).
+  - **Abfragen** (`dashboard/queries.ts`): `/dashboard` und `/timeseries` getrennt (ein Fehler trifft nur sein Widget), erst wenn
+    `useAnalyticsFilters().ready` und sichtbare Profile da sind; beim Filterwechsel bleiben die alten Werte stehen
+    (`keepPreviousData`, blass und `aria-busy`, bis die neuen da sind). Die Hero-Kachel schickt `level: 'campaign'`, `filter.includeRemoved: true` (passt zur Summe).
+  - **Zustände:** je Widget Skeleton, Fehler mit „Erneut versuchen“ (nur solange keine Daten da sind), leer („Keine Kennzahlen
+    im gewählten Zeitraum“). Ohne sichtbare Profile ersetzt ein Hinweis die Widgets (Admin: Link „Clients & Connections“); dann
+    fragt die Seite keine Kennzahlen an. Scheitern die Filteroptionen, steht der Fehler nur in der Filterleiste (keine
+    endlosen Skeletons).
+  - **API (Erweiterung von 2.5):** `DashboardResponse.status` aus `queryDashboardStatus` (`packages/db`, eigene Testdatei
+    `ads-analytics-status.test.ts`): `lastSyncAt` = letzter erfolgreicher `reports-sync` der Connections der Auswahl (`job_runs`
+    der Organisation, `scope` = Connection-ID aus den sichtbaren Profilen), `adProducts` = „Daten bis“ je genutztem Ad-Typ wie
+    der Sync (SP immer, SB/SD mit Kampagnen; `null`, solange einem Profil der Stand fehlt), `sbCampaignsWithoutMetrics` =
+    nicht entfernte SB-Kampagnen ohne jede Kennzahl-Zeile. Je Ad-Typ `share` (`cost`, `sales`) = Anteil an der Gesamtsumme
+    über `share()` aus `@profitbash/engine` (Decimal; die Balkenbreite im Web ist nur CSS).
+  - **Datenstand:** Daten bis, vorläufig ab, letzter Sync, Kurse bis, Daten ab; Warnungen bei veralteten Kursen
+    (`fxRatesStale`), Profilen ohne Datenstand, einem Ad-Typ hinter den anderen (`profilesBehind`) oder ohne Stand, und wenn der Zeitraum vor dem
+    ersten Datentag beginnt (F5). **SB-Preview-Lücke:** Hinweis mit Anzahl, sobald SB in der Auswahl vorkommt.
+  - **Links in den Explorer:** `useAnalyticsFilters().linkTo(path, patch)` (kurzer Zustand in der URL, der ganze im
+    Verlaufseintrag): Client → `clients=…`, „Ohne Client“ → `nc=1`, Profil → Client plus `pf=1`, die Profil-ID nur in
+    `history.state`.
+  - **Chart:** Tagesachse `unit-time` (`UnitTimeAxisModule` statt `TimeAxisModule`; ein Band je Tag, Balken füllen den Tag,
+    kein Polster an den Rändern); auf der Hero-Kachel immer das dunkle Chart-Theme (`scheme="dark"`).
+  - **Demo-Daten:** Der Mock setzte am ersten Tag jedes angefragten Report-Zeitraums feste Prüfwerte (1 234 567,89 Umsatz);
+    durch den täglichen Import über ein rollierendes Fenster stand das an fast jedem Tag. `largeMockAccount` schaltet das ab
+    (`exactValueProbe: false`); der kleine Mock behält es. Lokale DB danach neu geladen (`docs/development.md`).
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: hängender Ad-Typ je Profil statt über die Minima verschiedener
+    Profilmengen, „Letzter Sync“ = ältester Erfolg, doppelter API-Test entfernt und Anteile genau geprüft, CPC mit
+    Veränderung und „≈“, Umsatz je Ad-Typ als Betrag, weitere Hinweise am Spend je Ad-Typ, Zustand beim Nachladen, keine
+    Skeletons ohne Filteroptionen, CPC-Spalte über i18n, vorsichtigerer Text zur SB-Lücke, keine doppelte Warnung „ohne
+    Datenstand“. Bewusst so: Ein Profil-Link in einem neuen Tab (nur `href`) nimmt die eigene letzte Profilauswahl (bekannte
+    Grenze aus 2.6).
 
 ### 2.8 Explorer (`/ads/explorer/*`)
 - [ ] Reiter, Drill-Down, Brotkrumen, Chart und Grid nach F6/F7; Spaltenauswahl, Sortierung, Filter; Zustand in der URL.
