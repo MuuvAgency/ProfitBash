@@ -735,7 +735,7 @@ Nach F11.
     (`GET /api/connections/:id/profiles`, `PATCH /api/profiles/:id`) rechnet über `REPORT_AD_PRODUCTS`, das jetzt in
     `@profitbash/amazon-ads` liegt (Schlüssel von `REPORT_TYPES_BY_AD_PRODUCT`) und das `reports-sync` ebenso nutzt: Ein Ad-Typ,
     den der Sync anfordert, zählt automatisch für „Daten bis“. API-Form unverändert (`metricsImportedThrough`).
-- [ ] **Offen für SB und SD (aus dem Review des ersten Punkts):** `REPORT_AD_PRODUCTS` gilt für alle Profile. Lehnt Amazon SB- oder
+- [x] **Offen für SB und SD (aus dem Review des ersten Punkts):** `REPORT_AD_PRODUCTS` gilt für alle Profile. Lehnt Amazon SB- oder
       SD-Reports für ein Profil dauerhaft ab (z. B. ohne Brand Registry, SD im Marktplatz nicht verfügbar, Kontotyp), zeigt es „Daten
       bis“ für immer „–“, obwohl SP aktuell ist. Beim Umsetzen entscheiden: Ad-Typen, die ein Profil nicht nutzen kann, im Sync
       überspringen und „Daten bis“ über die für dieses Profil synchronisierten Ad-Typen rechnen (mit Dominik abstimmen).
@@ -743,7 +743,7 @@ Nach F11.
       einer Kampagne dieses Ad-Typs in der DB (aus dem Entity-Sync, auch archivierte, entfernte und Platzhalter). „Daten bis“ ist das
       Minimum über genau diese Ad-Typen. Neue SB-Kampagnen bekommen Reports ab dem nächsten `reports-sync`, die Historie holt der
       Merker aus 1.7 nach. Verworfen: Ad-Typ nach Amazon-Fehler abschalten (Fehlercodes vor 1.10 unbekannt).
-- [ ] SB: Entities (Exports decken SB ab) und Reports (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`); Hinweis auf die v3-Preview-Lücke
+- [x] SB: Entities (Exports decken SB ab) und Reports (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`); Hinweis auf die v3-Preview-Lücke
       (SB-Kampagnen ohne Multi-Ad-Group fehlen) in der UI-Doku von Phase 2 vermerken.
   - **Doku-Abgleich 2026-09-28** (Report-Typ-Seiten Campaign, Ad group, Targeting, Ad, Search term, Spalten-Seite, Exports-Guide;
     die OpenAPI-Spec nennt keine Spalten je Typ): `sbCampaigns` (groupBy `campaign`), `sbAdGroup` (`adGroup`), `sbTargeting`
@@ -765,6 +765,36 @@ Nach F11.
     das gegen echte Daten.
   - **Hinweis für die UI-Doku von Phase 2:** SB-Reports in v3 sind „Preview“: Kampagnen mit `isMultiAdGroupsEnabled=false` (ältere
     SB-Kampagnen) fehlen in den Reports. Ihre Entities kommen über den Export, Kennzahlen nicht; die UI muss das bei SB-Summen erklären.
+  - Umsetzung (Stand für SD und 1.10):
+    - **Klick-Spalten:** `sales_clicks_14d` (`numeric`), `purchases_clicks_14d`, `units_clicks_14d` (`bigint`) in allen fünf
+      Kennzahl-Tabellen (Migration `0013_amazon_ads_metrics_clicks_14d`), in `DailyMetricValues` (`packages/db`) und
+      `AmazonAdsDailyMetricValues` (`packages/amazon-ads`) als `salesClicks14d` usw.; SP setzt sie `null`. SD kann sie übernehmen.
+    - **Reports** (`reports.ts`): Katalog-Schlüssel = Amazons `reportTypeId` (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`,
+      `sbSearchTerm`), Ebenen `campaign`, `adGroup`, `target`, `productAd`, `searchTerm`, `retentionDays` 60. Spalten siehe
+      Doku-Abgleich oben; ein Test prüft die Listen genau. Zeilen-Schemas: `sales`/`purchases`/`unitsSold` → `*14d`, `…Clicks` →
+      `*Clicks14d`, `salesPromoted`/`purchasesPromoted` → `*SameSku14d`, alles andere `null`. `sbAds` liefert keine ASIN (Platzhalter
+      ohne ASIN; der Export füllt sie). `sbTargeting` ohne `keywordId` und `targetingId` ist ungültig.
+    - **Ad-Typen je Profil:** `REPORT_AD_PRODUCT_SELECTION` (`@profitbash/amazon-ads`: `always` SP, `withCampaigns` SB) steuert beides:
+      `selectReportAdProducts` (`amazon-ads-metrics.ts`, prüft die Organisation) liefert die Ad-Typen, für die `reports-sync` ein Profil
+      anfordert; `metricsImportedThroughSql(selection)` rechnet „Daten bis“ über dieselben (SQL mit ausdrücklich qualifizierten
+      Spalten: In `select`-Feldern rendert Drizzle Spalten ohne Tabelle, ein `"id"` in einer Unterabfrage träfe sonst die falsche).
+      `REPORT_AD_PRODUCTS` bleibt die Liste aller Ad-Typen im Katalog.
+    - **Entities:** `ENTITY_AD_PRODUCTS` = SP und SB, für **jedes** Profil (erst der Export zeigt, ob es SB nutzt). Folgen: je Profil
+      täglich ein zweiter Export-Batch; das Limit `MAX_RUNNING_EXPORTS_PER_TYPE` (5 je Connection) greift ab dem dritten Profil, die
+      übrigen Batches warten (`exportsWaiting`) und laufen über den Poll. Weil `entities-sync` vor dem Import endet, fordert erst der
+      **nächste** `reports-sync` SB an (bei „Jetzt synchronisieren“ also erst am Folgetag oder beim nächsten manuellen Lauf); bis dahin
+      zeigt „Daten bis“ „–“, danach holt der Merker die Historie (60 Tage) nach.
+    - **SB-Ads** (`exports.ts`): `asin`/`sku` nur bei genau einem Produkt dieses Typs, mehrere ASINs in `extra.asins`; `adType`, `name`,
+      `headline` wie bisher in `extra`. Gilt unverändert für SP (ein Produkt).
+    - **Mock** (`mock-data.ts`): SB nur für das DE-Profil (zwei Kampagnen, Ad Groups ohne Standardgebot, Keyword-, Themen- und
+      Produkt-Target, ein Negative, ein Video- und ein Kollektions-Ad); SB-Targets im Export ohne `campaignId`; SB-Reports mit
+      View-Anteil (`sales` > `salesClicks` an manchen Tagen); `sbTargeting` nennt Keywords per `keywordId`, Themen/Produkte per
+      `targetingId`. Report-Zeilen enthalten nur die angeforderten Spalten (gilt auch für SP; der Mock-Test prüft das).
+    - **DoD-Test** (`data-sync.test.ts`): SB-Entities kommen mit dem ersten Lauf, SB-Kennzahlen in allen fünf Tabellen mit dem nächsten
+      `reports-sync`, „Daten bis“ wartet bis dahin (`null`).
+    - Test-Stabilität: `entities-sync.test.ts` prüft das erste Profil in Job-Reihenfolge, nicht DE (Profile aus einer Transaktion
+      sortieren nach zufälliger UUID). `data-sync.test.ts` ist im vollen Lauf einmal auf Dateiebene gescheitert (einzeln und im
+      zweiten Lauf grün, vermutlich Last wie bei `worker.test.ts`); weiter beobachten.
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
       view-basiert, Spalten entsprechend (`extra` oder eigene Spalten, beim Umsetzen entscheiden).
 
@@ -779,7 +809,12 @@ Nach F11.
       ob `spSearchTerm` für Auto- und Produkt-Targets immer `keywordId` liefert, ob Vendor-Profile `advertisedSku` und die Same-SKU-Spalten
       in `spAdvertisedProduct` annehmen (ein 400 dort ließe Vendor-Reports dauerhaft scheitern). Aus 1.7: ob die Aufbewahrungsgrenze
       (`retentionDays`, ein Tag Abstand) hält (sonst scheitert das älteste Stück der Historie täglich), für wen das Export-Limit gilt
-      (`MAX_RUNNING_EXPORTS_PER_TYPE` je Connection), Laufzeiten von `entities-sync`/`reports-sync` mit echtem Budget.
+      (`MAX_RUNNING_EXPORTS_PER_TYPE` je Connection), Laufzeiten von `entities-sync`/`reports-sync` mit echtem Budget. Aus 1.9 (SB): ob
+      Amazon SB-Exports für Profile ohne SB (ohne Brand Registry, Vendor) leer liefert oder ablehnt (Ablehnung ließe den SB-Batch täglich
+      scheitern und Alarm schlagen; dann SB-Exports je Profil abschalten), wie sich der zweite Export-Batch je Profil auf das Export-Limit
+      auswirkt, ob `sbTargeting` `keywordId` und `targetingId` wie angenommen füllt und welche davon der Export-`targetId` entspricht
+      (`extra.targetingId` bei Abweichung), ob `sbTargeting` `unitsSoldClicks` doch annimmt (Doku widersprüchlich, heute nicht
+      angefordert), ob SB-Kennzahlen (`sales` inkl. Views) zur Konsole passen, ob SB-Ads im Export `creative.products` tragen.
 - [ ] Keine Kundennamen, IDs oder Werte in Commits, Tests oder Actions-Logs.
 
 ### 1.11 Datei-Import (optional, nur mit Auslöser)
