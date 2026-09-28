@@ -64,6 +64,7 @@ function row(wrapper: Wrapper, accountName: string) {
   return wrapper.findAll('[role="row"]').find((r) => r.text().includes(accountName));
 }
 
+/** AG Grid rendert Zeilen in Frames von höchstens 60 ms; auf langsamen Rechnern kommt jede Zeile evtl. erst später. */
 async function waitForRow(wrapper: Wrapper, accountName: string) {
   await vi.waitFor(() => expect(row(wrapper, accountName)).toBeDefined());
   return row(wrapper, accountName)!;
@@ -120,7 +121,7 @@ describe('ConnectionsPage', () => {
     for (const text of ['Deutschland', 'Seller', 'EUR', 'Europe/Berlin']) {
       expect(de.text()).toContain(text);
     }
-    const uk = row(wrapper, 'Nordwind UK Ltd')!;
+    const uk = await waitForRow(wrapper, 'Nordwind UK Ltd');
     expect(uk.text()).toContain('Vereinigtes Königreich');
     await vi.waitFor(() => expect(uk.find('img[src*="gb.svg"]').exists()).toBe(true));
     expect(uk.get('[role="combobox"]').text()).toBe('Nordwind');
@@ -136,7 +137,7 @@ describe('ConnectionsPage', () => {
     const dataThrough = (r: DOMWrapper<Element>) => r.get('[col-id="metricsImportedThrough"]');
     expect(dataThrough(de).text()).toBe('25.09.2026');
     expect(dataThrough(de).classes()).toContain('font-data');
-    expect(dataThrough(row(wrapper, 'Nordwind UK Ltd')!).text()).toBe('–');
+    expect(dataThrough(await waitForRow(wrapper, 'Nordwind UK Ltd')).text()).toBe('–');
   });
 
   it('gibt der Profiltabelle eine Mindestbreite aus den Spalten, darunter scrollt die Kachel', async () => {
@@ -443,7 +444,9 @@ describe('ConnectionsPage', () => {
     const dimmed = () => row(wrapper, 'Nordwind GmbH')!.classes('text-ink-secondary');
     await waitForRow(wrapper, 'Nordwind GmbH');
     expect(dimmed()).toBe(true);
-    expect(row(wrapper, 'Nordwind UK Ltd')!.classes('text-ink-secondary')).toBe(false);
+    expect((await waitForRow(wrapper, 'Nordwind UK Ltd')).classes('text-ink-secondary')).toBe(
+      false,
+    );
 
     await wrapper.get('input[aria-label="Nordwind GmbH (DE) ausblenden"]').setValue(false);
     await flushPromises();
