@@ -340,6 +340,7 @@ export function buildColumnDefs(
 
   const nameColumn: ColDef<GridRow> = {
     colId: 'name',
+    cellRenderer: 'nameCell',
     headerName: t(`explorer.column.name`),
     pinned: 'left',
     lockPinned: true,
@@ -353,9 +354,13 @@ export function buildColumnDefs(
     },
   };
 
+  // Die Währung ist immer da (für den CSV-Export), aber nur sichtbar, wenn gewählt.
   const optional = OPTIONAL_COLUMNS.filter(
-    (spec) => availableAt(spec, level) && input.visible.has(spec.id),
-  ).map((spec) => (builders[spec.id] ?? (() => metric(spec.id as MetricKey)))());
+    (spec) => availableAt(spec, level) && (input.visible.has(spec.id) || spec.id === 'currency'),
+  ).map((spec) => {
+    const def = (builders[spec.id] ?? (() => metric(spec.id as MetricKey)))();
+    return spec.id === 'currency' ? { ...def, hide: !input.visible.has('currency') } : def;
+  });
 
   return [nameColumn, ...optional];
 }

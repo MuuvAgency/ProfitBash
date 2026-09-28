@@ -10,6 +10,7 @@ import {
   ModuleRegistry,
   PinnedRowModule,
   RowAutoHeightModule,
+  RowSelectionModule,
   RowStyleModule,
   TextFilterModule,
   themeQuartz,
@@ -19,7 +20,8 @@ import {
 /**
  * AG Grid Community (ADR 001). Nur die Module, die die App nutzt, damit das Bundle klein bleibt.
  * Sortieren gehört zum Kern. Für den Explorer (`phase-2.md` F6/F7): Textfilter, eigene Filter (Beträge als
- * Decimal-Strings, ohne `number`), Summenzeile (angeheftete Zeile) und CSV-Export. Nicht registriert sind u. a.
+ * Decimal-Strings, ohne `number`), Summenzeile (angeheftete Zeile), CSV-Export und markierte Zeilen
+ * (Chart über dem Grid). Nicht registriert sind u. a.
  * `TooltipModule` und `RenderApiModule`: Tooltips kommen von PrimeVue. Braucht eine Tabelle mehr, hier ergänzen;
  * in der Entwicklung meldet das `ValidationModule` fehlende Module in der Konsole.
  */
@@ -35,6 +37,7 @@ ModuleRegistry.registerModules([
   CustomFilterModule,
   PinnedRowModule,
   CsvExportModule,
+  RowSelectionModule,
   ...(import.meta.env.DEV ? [ValidationModule] : []),
 ]);
 
