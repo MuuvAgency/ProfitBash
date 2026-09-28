@@ -31,6 +31,7 @@ const PlaceholderPage = () => import('../pages/PlaceholderPage.vue');
 
 /** Fertige Seiten je Menüeintrag (`NavItem.id`). Alle anderen öffnen bis zu ihrer Phase einen Platzhalter. */
 const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteComponent>)>> = {
+  dashboard: () => import('../pages/DashboardPage.vue'),
   connections: () => import('../pages/ConnectionsPage.vue'),
   sync: () => import('../pages/SyncStatusPage.vue'),
 };

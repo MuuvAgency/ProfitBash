@@ -19,13 +19,15 @@ const props = withDefaults(
     series: ChartSeriesDef[];
     provisionalFrom: string | null;
     height?: string;
+    /** Farbschema erzwingen (z. B. `dark` auf der dunklen Hero-Kachel), sonst wie die App. */
+    scheme?: 'light' | 'dark';
   }>(),
-  { height: '16rem' },
+  { height: '16rem', scheme: undefined },
 );
 
 const { t } = useI18n();
 const session = useSessionStore();
-const scheme = useColorScheme();
+const appScheme = useColorScheme();
 
 const options = computed(() => {
   const locale = session.preferences.locale;
@@ -37,7 +39,7 @@ const options = computed(() => {
       provisionalLabel: t('analytics.hint.provisional'),
       formatDay: (day) => formatDay(day, locale),
       formatAxisValue: (value) => formatNumber(value, locale, { maximumFractionDigits: 0 }),
-      theme: chartTheme(scheme.value),
+      theme: chartTheme(props.scheme ?? appScheme.value),
     }),
     locale: { localeText: AG_CHARTS_LOCALE_DE_DE },
   };
