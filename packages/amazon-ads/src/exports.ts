@@ -111,8 +111,9 @@ export interface AmazonAdsProductAd extends EntityBase {
   amazonAdGroupId: string;
   /** Das gemeinsame Ad-Modell hat keine Kampagne; 1.7 ergänzt sie über die Ad Group. */
   amazonCampaignId: string | null;
+  /** Nur bei genau einem beworbenen Produkt; SB-Ads mit mehreren ASINs führen sie in `extra.asins` (1.9). */
   asin: string | null;
-  /** Vendoren haben keine SKU. */
+  /** Vendoren und SB-Ads haben keine SKU. */
   sku: string | null;
 }
 
@@ -481,19 +482,26 @@ export function createExportRowSchema<T extends AmazonAdsExportType>(
     ads: adRowSchema.transform((row): AmazonAdsProductAd => {
       const { extraBase, ...base } = baseFields(row, options, unknown);
       const products = row.creative?.products ?? [];
-      const productId = (type: string) =>
-        products.find((product) => product.productIdType === type)?.productId ?? null;
+      const productIds = (type: string) =>
+        products.flatMap((product) =>
+          product.productIdType === type && product.productId ? [product.productId] : [],
+        );
+      // SP-Product-Ads zeigen genau ein Produkt. SB-Ads (Video, Kollektion, Store Spotlight, 1.9) zeigen
+      // 0–n ASINs ohne SKU: `asin` nur bei genau einem, sonst alle ASINs in `extra`.
+      const asins = productIds('ASIN');
+      const skus = productIds('SKU');
       return {
         amazonAdId: row.adId,
         amazonAdGroupId: row.adGroupId,
         amazonCampaignId: row.campaignId ?? null,
-        asin: productId('ASIN'),
-        sku: productId('SKU'),
+        asin: asins.length === 1 ? asins[0]! : null,
+        sku: skus.length === 1 ? skus[0]! : null,
         ...base,
         extra: compact({
           adType: row.adType,
           name: row.name,
           headline: row.creative?.headline,
+          asins: asins.length > 1 ? asins : undefined,
           ...extraBase,
         }),
       };
