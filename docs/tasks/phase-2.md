@@ -279,12 +279,19 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - **Job `fx-rates-sync`** (`apps/worker/src/jobs/fx-rates-sync.ts`): plattformweit über `runJob` (`organization_id` und `scope`
     leer), täglich **06:00 Europe/Berlin** (Dominik, 2026-09-28: holt die Kurse des Vortags zusammen mit dem Amazon-Sync). Lädt ab
     dem letzten gespeicherten Tag minus 7 Tage (Korrekturen der EZB; nie vor `FX_RATES_START_DATE` = 2026-01-01), beim ersten Lauf
-    ab dem Startdatum, und schreibt in einer Transaktion. Zähler `fetched`, `inserted`, `updated`, `unchanged`, `currencies`. Ist
+    ab dem Startdatum, und schreibt in einer Transaktion. Zähler `fetched`, `inserted`, `updated`, `unchanged`, `currencies`. Eine
+    leere Antwort ist ein Fehlschlag (der Zeitraum enthält immer einen EZB-Arbeitstag; leer heißt: Endpunkt oder Format geändert).
+    Nach einem Fehlschlag plant der Worker einen neuen Versuch nach 1 Std. ein, höchstens 3 (Daten `{ retry }`). Ist
     `fx_rates` beim Start des Workers leer, plant er sofort einen Lauf ein (sonst gäbe es bis zum nächsten Morgen keine Kurse).
     Tests ersetzen den Abruf über `startWorker({ fetchFxRates })`.
   - **Sync-Status:** `SHARED_PLATFORM_JOB_NAMES` (`fx-rates-sync`) in `@profitbash/shared`; `GET /api/job-runs` zeigt deren
     plattformweite Läufe in jeder Organisation, andere plattformweite (Auslöser, Cleanup) weiter nicht. Filter „Job“ enthält
     „Wechselkurse (EZB)“, die Spalte „Amazon-Konto“ zeigt „EZB, für alle Organisationen“.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: unbenutzter Import (Lint), leere Antwort als Fehlschlag statt
+    „Erfolgreich · 0 Kurse“, Wiederholung nach 1 Std., Abbruch beim Lesen des Bodys wie ein Netzwerkfehler, Prüfung über
+    `SHARED_PLATFORM_JOB_NAMES` im Web. Bewusst nicht: Test „Start mit vorhandenen Kursen plant nichts ein“ (bräuchte einen zweiten
+    Worker auf derselben Test-DB; die Bedingung ist eine Zeile in `worker.ts`), 404 bleibt „keine Kurse“ (SDMX-Standard; der Job
+    meldet die leere Antwort ohnehin als Fehler).
   - **Für 2.5/2.7:** „Kurse bis“ = `latestFxRateDate`. Vorsicht bei der vereinbarten Warnung „älter als 4 Tage“: Am Dienstag nach
     Ostern um 06:00 ist der letzte Kurs vom Gründonnerstag (5 Kalendertage), ohne dass etwas hängt. Die Grenze deshalb in
     TARGET-Arbeitstagen zählen oder großzügiger wählen (z. B. mehr als 5 Kalendertage) und mit Ostern und Weihnachten testen.

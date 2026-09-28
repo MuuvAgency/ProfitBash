@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createMockAmazonAdsClient } from '@profitbash/amazon-ads';
 import { acquireConnectionLease, createConnectionTokenStore, schema } from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
+import type { EcbRate } from '@profitbash/ecb';
 import type { LogEntry } from '@profitbash/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { PgBoss } from 'pg-boss';
@@ -14,11 +15,23 @@ const { amazonAdsProfiles, amazonAdsReportRequests, connectionJobLeases, fxRates
 
 let testDb: TestDatabase;
 let organizationId = '';
+let fetchFxRates = async (): Promise<EcbRate[]> => [
+  { date: '2026-09-28', currency: 'USD', rate: '1.1378' },
+];
 const logs: LogEntry[] = [];
 
 async function queuedJobs(name: string) {
   const rows = await testDb.db.execute<{ singleton_key: string | null; state: string }>(
     sql`select singleton_key, state from pgboss.job where name = ${name} order by created_on`,
+  );
+  return [...rows];
+}
+
+async function queuedFxRetries() {
+  const rows = await testDb.db.execute<{ data: unknown; start_after: string }>(
+    sql`select data, start_after::text as start_after from pgboss.job
+        where name = 'fx-rates-sync' and state = 'created' and data is not null
+        order by created_on`,
   );
   return [...rows];
 }
@@ -64,7 +77,7 @@ describe('startWorker', () => {
       logger: (entry) => logs.push(entry),
       pollingIntervalSeconds: 0.5,
       // Kein Aufruf der echten EZB: ein Kurs, damit der Lauf beim Start etwas schreibt.
-      fetchFxRates: async () => [{ date: '2026-09-28', currency: 'USD', rate: '1.1378' }],
+      fetchFxRates: () => fetchFxRates(),
     });
   });
 
@@ -101,6 +114,35 @@ describe('startWorker', () => {
       counters: expect.objectContaining({ fetched: 1, inserted: 1 }) as unknown,
     });
     expect(await testDb.db.select().from(fxRates)).toHaveLength(1);
+  });
+
+  it('versucht einen gescheiterten Kursabruf nach einer Stunde erneut, höchstens dreimal', async () => {
+    fetchFxRates = () => Promise.reject(new Error('EZB nicht erreichbar.'));
+    const boss = new PgBoss({ connectionString: testDb.url, supervise: false, schedule: false });
+    await boss.start();
+    try {
+      await boss.send('fx-rates-sync', { retry: 3 });
+      await waitFor(async () => {
+        const [row] = await testDb.db
+          .select()
+          .from(jobRuns)
+          .where(and(eq(jobRuns.job, 'fx-rates-sync'), eq(jobRuns.status, 'failed')));
+        return row;
+      });
+      // Dritter Wiederholungsversuch gescheitert: kein weiterer.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(await queuedFxRetries()).toEqual([]);
+
+      await boss.send('fx-rates-sync', null);
+      const retry = await waitFor(async () => (await queuedFxRetries())[0]);
+      expect(retry.data).toEqual({ retry: 1 });
+      const delayMs = Date.parse(retry.start_after) - Date.now();
+      expect(delayMs).toBeGreaterThan(55 * 60_000);
+      expect(delayMs).toBeLessThanOrEqual(60 * 60_000);
+    } finally {
+      await boss.stop({ graceful: false });
+      fetchFxRates = async () => [];
+    }
   });
 
   it('plant nichts ein, wenn die Transaktion des Aufrufers zurückrollt', async () => {

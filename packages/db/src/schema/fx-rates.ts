@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, date, numeric, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { check, date, numeric, pgTable, primaryKey, text } from 'drizzle-orm/pg-core';
 import { createdAt, updatedAt } from './columns';
 
 /**

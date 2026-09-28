@@ -1,6 +1,6 @@
 import { latestFxRateDate, upsertFxRates, type Db } from '@profitbash/db';
 import { fetchEcbRates, type EcbRate, type FetchEcbRatesOptions } from '@profitbash/ecb';
-import type { JobOutcome } from '../run-job';
+import { JobFailure, type JobOutcome } from '../run-job';
 
 /**
  * Beginn der Historie beim ersten Lauf (fest, 2.2): Der Job liest nicht über Organisationen hinweg,
@@ -34,6 +34,11 @@ export async function syncFxRates(deps: FxRatesSyncDeps): Promise<JobOutcome> {
   const startDate = overlapStart < FX_RATES_START_DATE ? FX_RATES_START_DATE : overlapStart;
 
   const rates = await (deps.fetchRates ?? fetchEcbRates)({ startDate });
+  // Der Zeitraum reicht bis heute und umfasst mindestens 8 Tage, also immer einen EZB-Arbeitstag.
+  // Leer heißt deshalb: Endpunkt oder Format hat sich geändert, nicht „nichts Neues“.
+  if (rates.length === 0) {
+    throw new JobFailure(`Die EZB lieferte keine Kurse ab ${startDate}.`, { fetched: 0 });
+  }
   const result = await deps.db.transaction((tx) =>
     upsertFxRates(
       tx,
