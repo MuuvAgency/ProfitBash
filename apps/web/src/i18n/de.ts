@@ -391,6 +391,8 @@ export const de = {
       approxText:
         'Beträge in anderen Währungen sind je Tag mit dem EZB-Kurs dieses Tages umgerechnet (Wochenenden und Feiertage: letzter Kurs davor).',
       missingFx: 'Ohne Kurs nicht gezählt: {currencies}',
+      missingFxText:
+        'Für diese Währungen fehlt an mindestens einem Tag ein EZB-Kurs. Ihre Werte sind in umgerechneten Summen nicht enthalten.',
       mixedAttribution: 'Gemischte Attribution',
       mixedAttributionText:
         'Die Summe enthält Werte mit verschiedenen Attributionsfenstern (z. B. SP 7 Tage nach Klick, SB/SD 14 Tage inkl. Views). Einheitlich vergleichbar mit „14 Tage, nur Klicks“.',
