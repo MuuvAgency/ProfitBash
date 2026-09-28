@@ -7,6 +7,7 @@ import {
   queryExplorerRows,
   queryNegatives,
   queryTimeSeries,
+  resolveDisplayCurrency,
   type AnalyticsQuery,
 } from './ads-analytics';
 import { markMetricsImportedThrough } from './amazon-ads-metrics';
@@ -1138,5 +1139,33 @@ describe('queryNegatives', () => {
     expect(await queryNegatives(testDb.db, { userId: ids.outsider, orgId: ids.org })).toMatchObject(
       { rows: [] },
     );
+  });
+});
+
+describe('Attribution des Vergleichszeitraums', () => {
+  it('fasst Dashboard-Gruppen und Tagesreihe je Zeitraum getrennt zusammen', async () => {
+    // Im Vergleichszeitraum gibt es keine SD-Kennzahlen, im Zeitraum schon (Client Alpha).
+    const dashboard = await queryDashboard(testDb.db, {
+      ...base(),
+      comparison: COMPARISON,
+      attribution: 'clicks14d',
+    });
+    const alpha = dashboard.byClient.find((group) => group.key === ids.clientA)!;
+    expect(alpha.comparisonAttribution).not.toBeNull();
+    expect(alpha.comparisonAttribution!.coverage.salesSameSku).toBe('full');
+    expect(alpha.attribution.coverage.salesSameSku).toBe('full');
+    const series = await queryTimeSeries(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      comparison: COMPARISON,
+    });
+    expect(series.comparisonAttribution).not.toBeNull();
+    expect(series.comparisonAttribution!.mixed).toBe(true);
+    expect(
+      await resolveDisplayCurrency(testDb.db, { ...base(), clientIds: [ids.clientB] }),
+    ).toEqual({
+      currency: 'GBP',
+      converted: false,
+    });
   });
 });

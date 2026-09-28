@@ -32,12 +32,13 @@ describe('isFxRateStale („Kurse bis“ älter als 5 Kalendertage)', () => {
     expect(isFxRateStale(null, berlin('2026-09-27T12:00:00'))).toBe(true);
   });
 
-  it('gibt an Ostern keinen Fehlalarm, auch nicht vor dem Abruf um 06:00', () => {
+  it('gibt an Ostern keinen Fehlalarm, auch nicht vor dem Abruf oder bei dessen Wiederholung', () => {
     // Ostern 2027: Gründonnerstag 25.03. letzter Kurs, Karfreitag und Ostermontag ohne Kurs; der Kurs vom
     // Dienstag (30.03.) kommt am Mittwoch um 06:00.
     expect(isFxRateStale('2027-03-25', berlin('2027-03-30T23:00:00'))).toBe(false);
     expect(isFxRateStale('2027-03-25', berlin('2027-03-31T05:30:00'))).toBe(false);
-    expect(isFxRateStale('2027-03-25', berlin('2027-03-31T07:00:00'))).toBe(true);
+    expect(isFxRateStale('2027-03-25', berlin('2027-03-31T07:30:00'))).toBe(false);
+    expect(isFxRateStale('2027-03-25', berlin('2027-03-31T08:30:00'))).toBe(true);
   });
 
   it('gibt an Weihnachten keinen Fehlalarm', () => {

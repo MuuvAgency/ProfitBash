@@ -13,12 +13,21 @@ import { adProductSchema, attributionSettingSchema } from './analytics';
 
 /** Längster Zeitraum je Anfrage (Letztes Jahr, Letzte 12 Monate, frei gewählt). */
 export const MAX_ANALYTICS_RANGE_DAYS = 400;
-/** Höchstzahl markierter Zeilen für die Tagesreihe (Body-Grenze der API: 64 KB). */
-export const MAX_TIME_SERIES_ENTITY_IDS = 500;
+/**
+ * Höchstzahl markierter Zeilen für die Tagesreihe. Unabhängig davon gilt die Body-Grenze der API (64 KB): Größere
+ * Anfragen scheitern vorher mit `413` im Fehlerformat.
+ */
+export const MAX_TIME_SERIES_ENTITY_IDS = 200;
 /** Höchstzahl ASINs/SKUs je Suche im ASIN-Quick-Tool. */
 export const MAX_ASIN_SEARCH_TERMS = 100;
 
 const DAY_MS = 86_400_000;
+
+/**
+ * Nullbar an der Verwendung, ohne die benannte Komponente zu ändern: `.nullable()` auf einem Schema mit
+ * `.meta({ id })` machte die Komponente selbst in OpenAPI nullbar (und damit jede Verwendung im Client).
+ */
+const orNull = <T extends z.ZodType>(schema: T) => z.union([schema, z.null()]);
 
 export const dateRangeSchema = z
   .object({ from: z.iso.date(), to: z.iso.date() })
@@ -47,9 +56,11 @@ export const analyticsSelectionSchema = z.object({
 export const analyticsQuerySchema = analyticsSelectionSchema
   .extend({
     period: dateRangeSchema,
-    comparison: dateRangeSchema.nullable().optional(),
-    currency: displayCurrencySchema.default('auto'),
-    attribution: attributionSettingSchema.default('console'),
+    comparison: orNull(dateRangeSchema).optional(),
+    /** Standard `auto` (der Server setzt ihn, damit der generierte Client das Feld weglassen darf). */
+    currency: displayCurrencySchema.optional(),
+    /** Standard `console`. */
+    attribution: attributionSettingSchema.optional(),
   })
   .meta({ id: 'AnalyticsQuery' });
 
@@ -191,9 +202,9 @@ const changesSchema = z
 export const metricsTotalSchema = z
   .object({
     current: periodMetricsSchema,
-    comparison: periodMetricsSchema.nullable(),
+    comparison: orNull(periodMetricsSchema),
     /** `null` ohne Vergleichszeitraum. */
-    change: changesSchema.nullable(),
+    change: orNull(changesSchema),
     attribution: attributionSummarySchema,
   })
   .meta({ id: 'MetricsTotal' });
@@ -234,11 +245,11 @@ export const explorerRowSchema = z
     /** Ebenenabhängige Felder (Kampagne, Ad Group, Gebot, ASIN, Kostenart …). */
     attributes: z.record(z.string(), z.unknown()),
     /** `null` bei Negatives (ohne Kennzahlen). */
-    current: periodMetricsSchema.nullable(),
-    comparison: periodMetricsSchema.nullable(),
+    current: orNull(periodMetricsSchema),
+    comparison: orNull(periodMetricsSchema),
     /** Relative Veränderung je Kennzahl (Bruch), `null` ohne Vergleich. */
     change: z.record(z.enum(CHANGE_KEYS), amount).nullable(),
-    attribution: attributionSummarySchema.nullable(),
+    attribution: orNull(attributionSummarySchema),
   })
   .meta({ id: 'ExplorerRow' });
 export type ExplorerRowResponse = z.infer<typeof explorerRowSchema>;
@@ -252,7 +263,7 @@ export const explorerRowsResponseSchema = z
     truncated: z.boolean(),
     maxRows: z.number().int(),
     /** `null` bei Negatives. */
-    total: metricsTotalSchema.nullable(),
+    total: orNull(metricsTotalSchema),
   })
   .meta({ id: 'ExplorerRowsResponse' });
 export type ExplorerRowsResponse = z.infer<typeof explorerRowsResponseSchema>;
@@ -269,6 +280,8 @@ export const timeSeriesResponseSchema = z
     days: z.array(dayMetricsSchema),
     comparisonDays: z.array(dayMetricsSchema),
     attribution: attributionSummarySchema,
+    /** `null` ohne Vergleichszeitraum. */
+    comparisonAttribution: orNull(attributionSummarySchema),
   })
   .meta({ id: 'TimeSeriesResponse' });
 export type TimeSeriesResponse = z.infer<typeof timeSeriesResponseSchema>;

@@ -21,4 +21,26 @@ describe('openapi.json', () => {
     };
     expect(doc.components.schemas.Me.properties.features.required).toEqual([...FEATURE_KEYS]);
   });
+
+  it('hält geteilte Komponenten der Auswertungen nicht-nullbar (nullbar erst an der Verwendung)', async () => {
+    const doc = JSON.parse(await renderOpenApiDocument()) as {
+      components: { schemas: Record<string, { type?: unknown }> };
+    };
+    for (const name of [
+      'PeriodMetrics',
+      'MetricsTotal',
+      'MetricChanges',
+      'AttributionSummary',
+      'DateRange',
+    ]) {
+      expect(doc.components.schemas[name]?.type, name).toBe('object');
+    }
+  });
+
+  it('führt Währung und Attribution in Anfragen als optional (Standard auf dem Server)', async () => {
+    const doc = JSON.parse(await renderOpenApiDocument()) as {
+      components: { schemas: { AnalyticsQuery: { required?: string[] } } };
+    };
+    expect(doc.components.schemas.AnalyticsQuery.required).toEqual(['period']);
+  });
 });
