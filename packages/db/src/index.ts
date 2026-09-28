@@ -13,3 +13,4 @@ export * from './key-rotation';
 export * from './maintenance';
 export * from './system-access';
 export { runMigrations } from './migrate';
+export * from './fx-rates';
