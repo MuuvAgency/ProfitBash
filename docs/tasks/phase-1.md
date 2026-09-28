@@ -4,7 +4,7 @@
 > (Umsetzungsnotizen 0.5–0.7), `docs/decisions/` (001 Stack, 002 Mandanten-Modell, 003 Decimal-Library, 004 Amazon-API).
 >
 > **Status: abgestimmt (2026-09-26), in Umsetzung.** Entscheidungen stehen als **F1–F14** unter „Fragen an Dominik“.
-> Entschieden: F1–F11, F13, F14. Offen: F12 (betrifft nur die Doku in `phase-0.md`, nicht den Code; Stand 2026-09-27 unter F12).
+> Entschieden: F1–F11, F13, F14. Offen: F12 (Ads-API-Zugang; Stand 2026-09-28 unter F12: vorerst keiner, Phase 2 läuft gegen Mocks).
 > Aufgaben, die von einer Frage abhängen, verweisen darauf.
 
 ## Ziel
@@ -124,6 +124,12 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   gehen; ein Antrag als Direct Advertiser (1P) würde abgelehnt. Dominik hat den Partner-Network-Antrag erneut gestellt und fragt beim
   Support nach, wie ein Einzelunternehmen die 3P-Registrierung abschließt (Rückfall: schriftliche Bestätigung, dass der Weg als Direct
   Advertiser für ihn zulässig ist). `phase-0.md` 0.0b/0.0c/0.0e erst nach der Antwort anpassen. Rückfallebene ohne API: 1.11.
+  **Stand (Dominik, 2026-09-28):** Antwort des Supports: Das Partner Network nimmt keine Einzelunternehmen auf (Vorgabe der
+  Rechtsabteilung zum Umgang mit personenbezogenen Daten, keine Frage fehlender Unterlagen); der Weg als Direct Advertiser gilt nur
+  für das eigene Werbekonto, Agenturarbeit ist 3P. Der erneute Antrag unter „Muuv“ wurde abgelehnt (Registrierung nicht
+  validierbar). Damit gibt es vorerst **keinen Ads-API-Zugang**; er kommt erst mit einer eingetragenen Gesellschaft (Dominiks
+  Entscheidung, ohne Termin). Folgen: 1.10 und die offenen DoD-Punkte warten weiter; Phase 2 wird gegen die Mock-Daten gebaut
+  (`docs/tasks/phase-2.md`); danach greift der Auslöser von 1.11. `phase-0.md` 0.0c bleibt bis zur Entscheidung unverändert.
 - **F13 – Decimal-Library (ADR 003).** Empfehlung `decimal.js` (Begründung und Alternativen in 1.1).
   **Entschieden (Dominik, 2026-09-26): wie empfohlen.**
 - **F14 – Ausgeblendete Profile.** Synchronisieren? Empfehlung **ja**: Ausblenden ist Darstellung, keine Datenentscheidung, und
