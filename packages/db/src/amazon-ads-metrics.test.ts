@@ -61,6 +61,7 @@ const values = (overrides: Partial<DailyMetricValues> = {}): DailyMetricValues =
   salesClicks14d: null,
   purchasesClicks14d: null,
   unitsClicks14d: null,
+  viewableImpressions: null,
   extra: {},
   ...overrides,
 });
@@ -237,6 +238,20 @@ describe('replaceDailyMetrics: Kampagnen', () => {
     expect(rows).toEqual([
       { salesClicks14d: '1234567.89', purchasesClicks14d: 3, unitsClicks14d: null },
     ]);
+  });
+
+  it('speichert sichtbare Impressionen (SD) in einer eigenen Spalte und aktualisiert sie', async () => {
+    const row = { date: '2026-09-01', amazonCampaignId: 'c-sichtbar' };
+    await replaceDailyMetrics(testDb.db, campaignImport([{ ...row, viewableImpressions: 400 }]));
+    await replaceDailyMetrics(
+      testDb.db,
+      campaignImport([{ ...row, viewableImpressions: 9_007_199_254 }]),
+    );
+    const rows = await testDb.db
+      .select({ viewableImpressions: amazonAdsCampaignDailyMetrics.viewableImpressions })
+      .from(amazonAdsCampaignDailyMetrics)
+      .where(eq(amazonAdsCampaignDailyMetrics.profileId, profileId));
+    expect(rows).toEqual([{ viewableImpressions: 9_007_199_254 }]);
   });
 
   it('aktualisiert beim erneuten Import, statt Zeilen zu verdoppeln', async () => {

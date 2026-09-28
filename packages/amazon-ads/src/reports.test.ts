@@ -428,6 +428,7 @@ const VALUES = {
   salesClicks14d: null,
   purchasesClicks14d: null,
   unitsClicks14d: null,
+  viewableImpressions: null,
   extra: {},
 };
 
@@ -565,6 +566,8 @@ const SB_VALUES = {
   salesClicks14d: '0.1',
   purchasesClicks14d: 2,
   unitsClicks14d: 3,
+  // Sichtbare Impressionen liefert nur SD.
+  viewableImpressions: null,
   extra: {},
 };
 

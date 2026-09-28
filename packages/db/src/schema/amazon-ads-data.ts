@@ -308,7 +308,7 @@ const metricKeyColumns = () => ({
  * Attribution nach F7: 7 und 14 Tage, gesamt und „same SKU“. SB/SD liefern nur ein Fenster (14 Tage)
  * ohne Suffix → `*_14d`, die `*_7d`-Spalten bleiben dort leer (nicht 0). Bei SB/SD zählen `*_14d` Klicks
  * und Views (wie die Konsole), `*_clicks_14d` nur Klicks (1.9); SP ist nur klick-basiert, dort bleiben
- * sie leer.
+ * sie leer. SD: Same-SKU nur nach Klick, `viewable_impressions` (MRC, Basis für vCPM) nur dort gefüllt.
  */
 const metricValueColumns = () => ({
   /** Währung des Profils (v3-Reports liefern je Zeile keine). */
@@ -331,6 +331,7 @@ const metricValueColumns = () => ({
   salesClicks14d: money('sales_clicks_14d'),
   purchasesClicks14d: count('purchases_clicks_14d'),
   unitsClicks14d: count('units_clicks_14d'),
+  viewableImpressions: count('viewable_impressions'),
   /** Weitere Report-Spalten ohne eigene Spalte. */
   extra: extra(),
   importedAt: timestamp('imported_at', { withTimezone: true, mode: 'date' }).notNull(),
