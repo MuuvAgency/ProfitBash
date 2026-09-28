@@ -68,7 +68,9 @@ export {
   MOCK_AMAZON_ADS_IDENTITY,
   renderMockConsentPage,
   type MockAmazonAdsClientOptions,
+  type MockAmazonAdsScale,
 } from './mock';
+export { LARGE_MOCK_CLIENTS, LARGE_MOCK_PROFILES } from './mock-large';
 export { PORTFOLIOS_CONTENT_TYPE, type AmazonAdsPortfolio } from './portfolios';
 export {
   createReportRowSchema,

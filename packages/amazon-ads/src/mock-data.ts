@@ -56,7 +56,7 @@ export function toAmazonJson(value: unknown): string {
 // Entities
 // ---------------------------------------------------------------------------
 
-interface MockCampaign {
+export interface MockCampaign {
   id: string;
   adProduct: string;
   name: string;
@@ -67,9 +67,11 @@ interface MockCampaign {
   costType?: string;
   budget: string;
   portfolioId: string | null;
+  /** SB ohne Multi-Ad-Group (v3-Preview-Lücke): Entities im Export, aber keine Report-Zeilen. */
+  withoutReports?: boolean;
 }
 
-interface MockAdGroup {
+export interface MockAdGroup {
   id: string;
   campaignId: string;
   name: string;
@@ -78,7 +80,7 @@ interface MockAdGroup {
   defaultBid: string | null;
 }
 
-interface MockTarget {
+export interface MockTarget {
   id: string;
   campaignId: string;
   adGroupId: string | null;
@@ -87,18 +89,22 @@ interface MockTarget {
   targetType: string;
   details: Record<string, unknown>;
   bid: string | null;
+  /** Suchbegriffe im Report; ohne Angabe zwei feste Mock-Begriffe. */
+  searchTerms?: readonly string[];
 }
 
-interface MockAd {
+export interface MockAd {
   id: string;
   campaignId: string;
   adGroupId: string;
   state: string;
   adType: string;
   asins: string[];
+  /** SKU bei Sellern; ohne Angabe aus der ersten ASIN abgeleitet. */
+  sku?: string;
 }
 
-interface MockAccount {
+export interface MockAccount {
   profile: MockProfile;
   portfolios: Array<{ id: string; name: string; budget: string | null; policy: string }>;
   campaigns: MockCampaign[];
@@ -583,7 +589,7 @@ export function mockExportRows(
           ? []
           : ad.asins.map((asin) => ({ productIdType: 'ASIN', productId: asin }));
         if (ad.adType === 'PRODUCT_AD' && seller) {
-          products.push({ productIdType: 'SKU', productId: mockSku(ad.asins[0]!) });
+          products.push({ productIdType: 'SKU', productId: mockSku(ad) });
         }
         rows.push({
           adId: raw(ad.id),
@@ -601,7 +607,7 @@ export function mockExportRows(
   );
 }
 
-const mockSku = (asin: string) => `MOCK-SKU-${asin.slice(-4)}`;
+const mockSku = (ad: MockAd) => ad.sku ?? `MOCK-SKU-${ad.asins[0]!.slice(-4)}`;
 
 // ---------------------------------------------------------------------------
 // Kennzahlen
@@ -773,9 +779,13 @@ export function mockReportRows(
   const days = daysBetween(startDate, endDate);
   const { adProduct, level, columns } = REPORT_DEFINITIONS[reportType];
   const adProductOfCampaign = adProductOf(account);
+  const unreported = new Set(account.campaigns.filter((c) => c.withoutReports).map((c) => c.id));
   const ofAdProduct = <T extends { campaignId: string }>(entities: readonly T[]) =>
-    entities.filter((entity) => adProductOfCampaign(entity.campaignId) === adProduct);
-  const campaigns = account.campaigns.filter((c) => c.adProduct === adProduct);
+    entities.filter(
+      (entity) =>
+        adProductOfCampaign(entity.campaignId) === adProduct && !unreported.has(entity.campaignId),
+    );
+  const campaigns = account.campaigns.filter((c) => c.adProduct === adProduct && !c.withoutReports);
   const adGroups = ofAdProduct(account.adGroups);
   const campaignName = new Map(account.campaigns.map((c) => [c.id, c.name]));
   const adGroupName = new Map(account.adGroups.map((g) => [g.id, g.name]));
@@ -837,7 +847,10 @@ export function mockReportRows(
             if (metrics) rows.push({ ...base, ...values(metrics) });
             continue;
           }
-          for (const term of ['mock suchbegriff eins', 'mock suchbegriff zwei']) {
+          for (const term of target.searchTerms ?? [
+            'mock suchbegriff eins',
+            'mock suchbegriff zwei',
+          ]) {
             const metrics = metricsFor(`${target.id}|${term}`, date);
             if (metrics) rows.push({ ...base, searchTerm: term, ...values(metrics) });
           }
@@ -857,7 +870,7 @@ export function mockReportRows(
             // SD heißt `promoted…`, SP `advertised…`; je Ad eine Zeile mit dem ersten Produkt.
             [adProduct === SD ? 'promotedAsin' : 'advertisedAsin']: ad.asins[0],
             ...(account.profile.accountType !== 'vendor' && {
-              [adProduct === SD ? 'promotedSku' : 'advertisedSku']: mockSku(ad.asins[0]!),
+              [adProduct === SD ? 'promotedSku' : 'advertisedSku']: mockSku(ad),
             }),
             ...values(metrics),
           });

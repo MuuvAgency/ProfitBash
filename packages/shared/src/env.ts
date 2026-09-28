@@ -93,13 +93,31 @@ export const amazonAdsEnvSchema = z.object({
     (value) => (value === '' ? undefined : value),
     z.coerce.number().min(0.2, 'mindestens 0,2 Anfragen/s').max(100).optional(),
   ),
+  /**
+   * Datenumfang des Mock-Anbieters: `default` (kleine Testdaten) oder `large` (Demo-Daten mit Volumen,
+   * `phase-2.md` 2.3). Nur Entwicklung: `large` verlangt den Mock und ist in Produktion verboten.
+   */
+  AMAZON_ADS_MOCK_SCALE: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.enum(['default', 'large']).default('default'),
+  ),
 });
 
 /** Ohne Mock sind Client-ID und Secret Pflicht. Für `superRefine` des App-Schemas. */
 export function refineAmazonAdsCredentials(
-  env: z.output<typeof amazonAdsEnvSchema>,
+  env: z.output<typeof amazonAdsEnvSchema> & { NODE_ENV?: string },
   ctx: z.RefinementCtx,
 ): void {
+  if (
+    env.AMAZON_ADS_MOCK_SCALE === 'large' &&
+    (!env.AMAZON_ADS_USE_MOCK || env.NODE_ENV === 'production')
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['AMAZON_ADS_MOCK_SCALE'],
+      message: 'large nur mit AMAZON_ADS_USE_MOCK=true und nicht in Produktion (Demo-Daten)',
+    });
+  }
   if (env.AMAZON_ADS_USE_MOCK) return;
   for (const name of ['AMAZON_ADS_CLIENT_ID', 'AMAZON_ADS_CLIENT_SECRET'] as const) {
     if (!env[name]) {

@@ -113,6 +113,24 @@ describe('loadApiEnv', () => {
     expect(env.AMAZON_ADS_CLIENT_ID).toBe('amzn1.application-oa2-client.x');
   });
 
+  it('AMAZON_ADS_MOCK_SCALE=large nur mit Mock und nicht in Produktion', () => {
+    expect(load({ ...base, AMAZON_ADS_MOCK_SCALE: 'large' }).AMAZON_ADS_MOCK_SCALE).toBe('large');
+    expect(
+      messageOf(() =>
+        load({
+          ...base,
+          AMAZON_ADS_USE_MOCK: 'false',
+          AMAZON_ADS_CLIENT_ID: 'amzn1.application-oa2-client.x',
+          AMAZON_ADS_CLIENT_SECRET: 'geheim',
+          AMAZON_ADS_MOCK_SCALE: 'large',
+        }),
+      ),
+    ).toContain('AMAZON_ADS_MOCK_SCALE');
+    expect(
+      messageOf(() => load({ ...base, NODE_ENV: 'production', AMAZON_ADS_MOCK_SCALE: 'large' })),
+    ).toContain('AMAZON_ADS_MOCK_SCALE');
+  });
+
   it('lehnt andere Werte als true/false für AMAZON_ADS_USE_MOCK ab', () => {
     expect(messageOf(() => load({ ...base, AMAZON_ADS_USE_MOCK: 'yes' }))).toContain(
       'AMAZON_ADS_USE_MOCK',
