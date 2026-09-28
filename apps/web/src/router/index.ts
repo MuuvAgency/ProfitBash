@@ -32,6 +32,7 @@ const PlaceholderPage = () => import('../pages/PlaceholderPage.vue');
 /** Fertige Seiten je Menüeintrag (`NavItem.id`). Alle anderen öffnen bis zu ihrer Phase einen Platzhalter. */
 const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteComponent>)>> = {
   dashboard: () => import('../pages/DashboardPage.vue'),
+  explorer: () => import('../pages/ExplorerPage.vue'),
   connections: () => import('../pages/ConnectionsPage.vue'),
   sync: () => import('../pages/SyncStatusPage.vue'),
 };
@@ -65,6 +66,11 @@ const routes: RouteRecordRaw[] = [
     children: [
       // Leitet im Guard auf den ersten sichtbaren Menüeintrag weiter.
       { path: '', name: 'home', component: PlaceholderPage, meta: { home: true } },
+      // Explorer ohne Ebene: Kampagnen (F6), mit allen Parametern.
+      {
+        path: 'ads/explorer',
+        redirect: (to) => ({ path: '/ads/explorer/campaigns', query: to.query, hash: to.hash }),
+      },
       ...NAVIGATION.flatMap((group) => group.items.map(navRoute)),
       {
         path: SETTINGS_PATH.slice(1),
