@@ -32,6 +32,7 @@ const { amazonAdsPortfolios, amazonAdsProfiles, amazonAdsReportRequests } = sche
 
 const SP = 'SPONSORED_PRODUCTS';
 const SB = 'SPONSORED_BRANDS';
+const SD = 'SPONSORED_DISPLAY';
 const DE = '9007199254740993';
 /** Exports je Batch (Kampagnen, Ad Groups, Targets, Ads). */
 const EXPORTS_PER_BATCH = 4;
@@ -138,10 +139,10 @@ describe('syncConnectionEntities', () => {
       exportsWaiting: batches - Math.min(batches, MAX_RUNNING_EXPORTS_PER_TYPE),
     });
     expect(outcome.counters?.created).toBeGreaterThan(0);
-    // Das erste Profil (Reihenfolge des Jobs) bekommt je Ad-Typ einen Batch mit vier Exports, beide
-    // angefordert. Spätere Profile können auf einen Export-Platz warten.
+    // Das erste Profil (Reihenfolge des Jobs) bekommt je Ad-Typ (SP, SB, SD) einen Batch mit vier
+    // Exports, alle angefordert. Spätere Profile können auf einen Export-Platz warten.
     const exports = await exportsOf(profiles[0]!.id);
-    for (const adProduct of [SP, SB]) {
+    for (const adProduct of [SP, SB, SD]) {
       const batch = exports.filter((e) => e.adProduct === adProduct);
       expect(batch.map((e) => e.reportType).sort()).toEqual([
         'adGroups',
@@ -242,8 +243,12 @@ describe('syncConnectionEntities', () => {
 
     const outcome = await sync();
 
-    // SP für alle Profile, SB nur für DE (die übrigen haben schon einen offenen SB-Batch).
-    expect(outcome.counters).toMatchObject({ requested: 0, exportsWaiting: profiles.length + 1 });
+    // SP für alle Profile, SB nur für DE (die übrigen haben schon einen offenen SB-Batch), SD für DE und
+    // das dritte übrige Profil (die ersten beiden haben einen offenen SD-Batch).
+    expect(outcome.counters).toMatchObject({
+      requested: 0,
+      exportsWaiting: profiles.length + 1 + 2,
+    });
     const waiting = await exportsOf(deProfileId());
     expect(waiting.filter((e) => e.adProduct === SP).map((e) => e.status)).toEqual([
       'pending_request',
