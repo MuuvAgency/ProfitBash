@@ -1,9 +1,15 @@
 import {
   createMockAmazonAdsClient,
   createRequestMeter,
+  REPORT_AD_PRODUCT_SELECTION,
   type AmazonAdsClient,
 } from '@profitbash/amazon-ads';
-import { createConnectionTokenStore, nextAmazonRequestPollAt, schema } from '@profitbash/db';
+import {
+  createConnectionTokenStore,
+  metricsImportedThroughSql,
+  nextAmazonRequestPollAt,
+  schema,
+} from '@profitbash/db';
 import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
 import { asc, eq, sql } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
@@ -38,6 +44,8 @@ const {
 } = schema;
 
 const DE = '9007199254740993';
+const SP = 'SPONSORED_PRODUCTS';
+const SB = 'SPONSORED_BRANDS';
 const START = Date.parse('2026-09-27T06:00:00Z');
 
 let testDb: TestDatabase;
@@ -192,6 +200,59 @@ describe('Sync mit dem Mock-Anbieter (DoD Phase 1)', () => {
     const values = await campaignMetrics();
     expect(values.map((v) => v.cost)).toContain('0.005');
     expect(values.map((v) => v.sales7d)).toContain('1234567.89');
+  });
+
+  it('holt SB-Kennzahlen mit dem nächsten reports-sync, sobald die SB-Kampagnen da sind (1.9)', async () => {
+    // Der erste Lauf hat SB-Entities importiert, SB-Reports aber noch nicht angefordert (keine Kampagne).
+    const campaigns = await testDb.db
+      .select({ id: amazonAdsCampaigns.id, adProduct: amazonAdsCampaigns.adProduct })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.profileId, profileId));
+    const sbCampaignIds = new Set(campaigns.filter((c) => c.adProduct === SB).map((c) => c.id));
+    expect(sbCampaignIds.size).toBeGreaterThan(0);
+    const adsOf = async (adProduct: string) =>
+      testDb.db
+        .select()
+        .from(amazonAdsProductAds)
+        .where(
+          sql`${amazonAdsProductAds.profileId} = ${profileId} and ${amazonAdsProductAds.adProduct} = ${adProduct}`,
+        );
+    expect((await adsOf(SB)).map((ad) => ad.extra.adType).sort()).toEqual([
+      'PRODUCT_COLLECTION',
+      'VIDEO',
+    ]);
+    const dataThrough = async () => {
+      const [row] = await testDb.db
+        .select({ date: metricsImportedThroughSql(REPORT_AD_PRODUCT_SELECTION) })
+        .from(amazonAdsProfiles)
+        .where(eq(amazonAdsProfiles.id, profileId));
+      return row!.date;
+    };
+    // Das Profil nutzt SB, SB hat aber noch keinen Tag: „Daten bis“ wartet darauf.
+    expect(await dataThrough()).toBeNull();
+
+    await syncConnectionReports(deps(), job(), run());
+    const counters = await drain();
+
+    expect(counters.failed ?? 0).toBe(0);
+    const metrics = await testDb.db
+      .select()
+      .from(amazonAdsCampaignDailyMetrics)
+      .where(eq(amazonAdsCampaignDailyMetrics.profileId, profileId));
+    const sb = metrics.filter((m) => m.adProduct === SB);
+    const sp = metrics.filter((m) => m.adProduct === SP);
+    expect(sb.length).toBeGreaterThan(0);
+    expect(sb.every((m) => sbCampaignIds.has(m.campaignId) && m.sales7d === null)).toBe(true);
+    expect(sb.every((m) => m.salesClicks14d !== null && m.purchasesClicks14d !== null)).toBe(true);
+    expect(sp.every((m) => m.salesClicks14d === null)).toBe(true);
+    for (const table of Object.values(METRIC_TABLES)) {
+      const [row] = await testDb.db.execute<{ n: number }>(
+        sql`select count(*)::int as n from ${table} where profile_id = ${profileId} and ad_product = ${SB}`,
+      );
+      expect(row!.n).toBeGreaterThan(0);
+    }
+    // Gestern in Paris (Zeitzone des Profils): 26.09.
+    expect(await dataThrough()).toBe('2026-09-26');
   });
 
   it('ändert bei einem zweiten Lauf nichts', async () => {
