@@ -1296,3 +1296,70 @@ function addDays(date: string, days: number): string {
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
+
+// ---------------------------------------------------------------------------
+// Negatives
+// ---------------------------------------------------------------------------
+
+export interface NegativeRow {
+  id: string;
+  profileId: string;
+  accountName: string;
+  countryCode: string;
+  currencyCode: string;
+  adProduct: string;
+  /** Keyword-Text bzw. Ausdruck als Text. */
+  name: string | null;
+  state: string;
+  removed: boolean;
+  /** Ebene, Kampagne, Ad Group, Art, Match-Typ, Ausdruck. */
+  attributes: Record<string, unknown>;
+}
+
+/** Negatives der Auswahl (F6, ohne Kennzahlen), sortiert nach Kampagne und Text, höchstens `MAX_ANALYTICS_ROWS`. */
+export async function queryNegatives(
+  db: Db,
+  input: AnalyticsSelection & { filter?: ExplorerFilter; limit?: number },
+): Promise<{ rows: NegativeRow[]; totalRows: number; truncated: boolean }> {
+  const selectionQuery = await selectionSql(db, input);
+  if (selectionQuery === null) return { rows: [], totalRows: 0, truncated: false };
+  const filter = input.filter ?? {};
+  const limit = Math.min(input.limit ?? MAX_ANALYTICS_ROWS, MAX_ANALYTICS_ROWS);
+  const where: SQL[] = [
+    ...removedFilter(filter),
+    ...parentFilters(filter, { campaign: true, adGroup: true }),
+  ];
+  if (filter.portfolioIds) where.push(sql`c.portfolio_id = any(${uuidArray(filter.portfolioIds)})`);
+  if (input.adProducts) where.push(sql`e.ad_product = any(${textArray(input.adProducts)})`);
+  const rows = await db.execute<Record<string, unknown>>(sql`
+    select e.id, e.profile_id, p.account_name, p.country_code, p.currency_code, e.ad_product,
+      coalesce(e.keyword_text, e.expression::text) as name, e.state, e.removed_at is not null as removed,
+      json_build_object('amazonId', e.amazon_target_id, 'level', e.level, 'campaignId', e.campaign_id,
+        'campaignName', c.name, 'adGroupId', e.ad_group_id, 'adGroupName', g.name, 'targetType', e.target_type,
+        'keywordText', e.keyword_text, 'matchType', e.match_type, 'expression', e.expression) as attributes,
+      count(*) over () as total_rows
+    from amazon_ads_negative_targets e
+    join (${selectionQuery}) p on p.id = e.profile_id
+    join amazon_ads_campaigns c on c.id = e.campaign_id
+    left join amazon_ads_ad_groups g on g.id = e.ad_group_id
+    ${where.length > 0 ? sql`where ${sql.join(where, sql` and `)}` : sql``}
+    order by c.name asc nulls last, name asc nulls last, e.id
+    limit ${limit}`);
+  const totalRows = rows.length > 0 ? Number(rows[0]!.total_rows) : 0;
+  return {
+    rows: rows.map((row) => ({
+      id: String(row.id),
+      profileId: String(row.profile_id),
+      accountName: String(row.account_name),
+      countryCode: String(row.country_code),
+      currencyCode: String(row.currency_code),
+      adProduct: String(row.ad_product),
+      name: (row.name as string | null) ?? null,
+      state: String(row.state),
+      removed: Boolean(row.removed),
+      attributes: row.attributes as Record<string, unknown>,
+    })),
+    totalRows,
+    truncated: totalRows > rows.length,
+  };
+}

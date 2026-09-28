@@ -372,7 +372,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     `currency` (`auto` oder Code), `attribution`. Die Auswahl beginnt immer mit `visibleProfilesScope()`; ausgeblendete und fremde
     Profile fallen auch bei ausdrücklicher Nennung heraus.
     - `queryExplorerRows({ …, level, filter?, limit? })`, Ebenen `portfolio`, `campaign`, `adGroup`, `target`, `productAd`,
-      `searchTerm` (Negatives haben keine Kennzahlen und kommen in 2.5 als einfache Liste). `filter`: `portfolioIds`,
+      `searchTerm`; Negatives ohne Kennzahlen über `queryNegatives` (gleiche Auswahl und Filter). `filter`: `portfolioIds`,
       `campaignIds`, `adGroupIds` (Drill-Down), `includeRemoved` (Standard nein), `productSearch` (ASIN/SKU, auch
       `extra.asins`, Groß-/Kleinschreibung egal). Ergebnis: `currency`, `converted`, `rows` (Beträge in der **Originalwährung** der
       Zeile, `attributes` je Ebene, `placeholder`, `removed`, `hasMetrics`, `attribution` = `summarizeAttribution`), `totalRows`,
