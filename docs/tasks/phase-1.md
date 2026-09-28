@@ -794,11 +794,14 @@ Nach F11.
     - **DoD-Test** (`data-sync.test.ts`): SB-Entities kommen mit dem ersten Lauf, SB-Kennzahlen in allen fünf Tabellen mit dem nächsten
       `reports-sync`, „Daten bis“ wartet bis dahin (`null`).
     - Test-Stabilität: `entities-sync.test.ts` prüft das erste Profil in Job-Reihenfolge, nicht DE (Profile aus einer Transaktion
-      sortieren nach zufälliger UUID). `data-sync.test.ts` ist im vollen Lauf einmal auf Dateiebene gescheitert (einzeln und im
-      zweiten Lauf grün, vermutlich Last wie bei `worker.test.ts`); weiter beobachten.
+      sortieren nach zufälliger UUID). `data-sync.test.ts` scheiterte im vollen Lauf ab und zu auf Dateiebene: `DROP DATABASE … WITH (FORCE)`
+      beim Aufräumen des Klons durfte als `profitbash` (kein Superuser) einen Autovacuum-Worker nicht beenden (`42501`, „permission
+      denied to terminate process“, im Server-Log belegt; trifft schreiblastige Testdateien). `dropDatabaseForce` in `testing.ts`
+      wiederholt das `DROP` bei `42501` (bis zu 10 Versuche, kurze Pausen), auch beim Neuaufbau der Template-DB. Vermutlich war das
+      auch die Ursache des einmal roten `worker.test.ts`.
     - Review (unabhängig): keine kritischen oder wichtigen Befunde. Übernommen: `exists` statt Lesen aller Kampagnen, Spalten der
       „Daten bis“-SQL über Drizzle statt als Text, API-Test mit SB-Kampagne (`null`, dann Minimum), 1.10-Punkte zu `sbSearchTerm` und
-      SB-Negatives, Verweis in `plan.md`. Nur festgehalten: Flake von `data-sync.test.ts` (siehe oben).
+      SB-Negatives, Verweis in `plan.md`. Flake von `data-sync.test.ts` danach behoben (siehe oben).
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
       view-basiert, Spalten entsprechend (`extra` oder eigene Spalten, beim Umsetzen entscheiden).
 
