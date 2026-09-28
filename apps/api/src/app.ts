@@ -1,11 +1,13 @@
 import { OpenAPIHono, type Hook } from '@hono/zod-openapi';
 import { bodyLimit } from 'hono/body-limit';
+import { compress } from 'hono/compress';
 import { requestId } from 'hono/request-id';
 import type { AppDeps, AppEnv } from './context';
 import { ApiError, createErrorHandler, errorResponse, notFoundHandler } from './errors';
 import { consoleLogger } from './logger';
 import { csrfProtection, requestLogger } from './middleware';
 import { registerAmazonOAuthRoutes } from './routes/amazon-oauth';
+import { registerAnalyticsRoutes } from './routes/analytics';
 import { registerClientRoutes } from './routes/clients';
 import { registerConnectionRoutes } from './routes/connections';
 import { registerHealthRoutes } from './routes/health';
@@ -63,6 +65,8 @@ export function createApp(options: CreateAppOptions) {
     }),
   );
   app.use(csrfProtection(deps.appUrl));
+  // Auswertungen liefern bis zu 10 000 Zeilen mit Vergleich (mehrere MB JSON): komprimieren (F7).
+  app.use('/ads/*', compress());
 
   // better-auth: Login, Logout, Session, Organisationen (Allowlist, siehe oben)
   app.on(['GET', 'POST'], '/auth/*', (c) => {
@@ -77,6 +81,7 @@ export function createApp(options: CreateAppOptions) {
   registerConnectionRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerJobRunRoutes(app, deps);
+  registerAnalyticsRoutes(app, deps);
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

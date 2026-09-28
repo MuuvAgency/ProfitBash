@@ -918,6 +918,341 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Auswahl der Filterleiste: sichtbare Clients und Profile, wählbare Währungen, Stand der Kurse */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FilterOptionsRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FilterOptionsResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/explorer/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explorer: Zeilen einer Ebene mit Vergleich und Summenzeile (höchstens 10 000 Zeilen) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExplorerRowsRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExplorerRowsResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/asin-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ASIN-Quick-Tool: Product Ads zu ASINs oder SKUs mit Kennzahlen */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AsinSearchRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExplorerRowsResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/timeseries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tagesverlauf der Auswahl in der Anzeigewährung (Chart, Hero-Kachel) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TimeSeriesRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TimeSeriesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dashboard: Summen gesamt und je Client, Profil und Ad-Typ */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AnalyticsQuery"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DashboardResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1136,6 +1471,274 @@ export interface components {
             counters: {
                 [key: string]: number;
             };
+        };
+        FilterOptionsResponse: {
+            clients: {
+                id: string;
+                name: string;
+                slug: string;
+            }[];
+            profiles: {
+                id: string;
+                amazonProfileId: string;
+                accountName: string;
+                countryCode: string;
+                currencyCode: string;
+                timezone: string;
+                accountType: string;
+                clientId: string | null;
+            }[];
+            currencies: string[];
+            /** Format: date */
+            fxRatesThrough: string | null;
+            fxRatesStale: boolean;
+        };
+        FilterOptionsRequest: Record<string, never>;
+        ExplorerRowsResponse: {
+            meta: components["schemas"]["AnalyticsMeta"];
+            rows: components["schemas"]["ExplorerRow"][];
+            totalRows: number;
+            truncated: boolean;
+            maxRows: number;
+            total: components["schemas"]["MetricsTotal"];
+        };
+        AnalyticsMeta: {
+            currency: string;
+            converted: boolean;
+            missingFxCurrencies: string[];
+            /** Format: date */
+            dataThrough: string | null;
+            /** Format: date */
+            provisionalFrom: string | null;
+            /** Format: date */
+            earliestDate: string | null;
+            profilesWithoutData: number;
+        };
+        ExplorerRow: {
+            id: string;
+            profileId: string;
+            accountName: string;
+            countryCode: string;
+            currencyCode: string;
+            adProduct: string | null;
+            name: string | null;
+            state: string | null;
+            removed: boolean;
+            placeholder: boolean;
+            hasMetrics: boolean;
+            attributes: {
+                [key: string]: unknown;
+            };
+            current: components["schemas"]["PeriodMetrics"];
+            comparison: components["schemas"]["PeriodMetrics"];
+            change: {
+                impressions?: string | null;
+                clicks?: string | null;
+                cost?: string | null;
+                sales?: string | null;
+                purchases?: string | null;
+                units?: string | null;
+                ctr?: string | null;
+                cpc?: string | null;
+                cvr?: string | null;
+                acos?: string | null;
+                roas?: string | null;
+                cpm?: string | null;
+                vcpm?: string | null;
+            } | null;
+            attribution: components["schemas"]["AttributionSummary"];
+        };
+        PeriodMetrics: {
+            sums: components["schemas"]["MetricSums"];
+            derived: components["schemas"]["DerivedMetrics"];
+        } | null;
+        MetricSums: {
+            impressions: string | null;
+            clicks: string | null;
+            cost: string | null;
+            sales: string | null;
+            purchases: string | null;
+            units: string | null;
+            salesSameSku: string | null;
+            purchasesSameSku: string | null;
+            unitsSameSku: string | null;
+            viewableImpressions: string | null;
+            viewableCost: string | null;
+        };
+        DerivedMetrics: {
+            ctr: string | null;
+            cpc: string | null;
+            cvr: string | null;
+            acos: string | null;
+            roas: string | null;
+            cpm: string | null;
+            vcpm: string | null;
+        };
+        AttributionSummary: {
+            mixed: boolean;
+            sameSkuMixed: boolean;
+            coverage: {
+                /** @enum {string} */
+                sales: "full" | "partial" | "none";
+                /** @enum {string} */
+                purchases: "full" | "partial" | "none";
+                /** @enum {string} */
+                units: "full" | "partial" | "none";
+                /** @enum {string} */
+                salesSameSku: "full" | "partial" | "none";
+                /** @enum {string} */
+                purchasesSameSku: "full" | "partial" | "none";
+                /** @enum {string} */
+                unitsSameSku: "full" | "partial" | "none";
+            };
+        } | null;
+        MetricsTotal: {
+            current: components["schemas"]["PeriodMetrics"];
+            comparison: components["schemas"]["PeriodMetrics"];
+            change: components["schemas"]["MetricChanges"];
+            attribution: components["schemas"]["AttributionSummary"];
+        } | null;
+        MetricChanges: {
+            impressions: components["schemas"]["MetricChange"];
+            clicks: components["schemas"]["MetricChange"];
+            cost: components["schemas"]["MetricChange"];
+            sales: components["schemas"]["MetricChange"];
+            purchases: components["schemas"]["MetricChange"];
+            units: components["schemas"]["MetricChange"];
+            ctr: components["schemas"]["MetricChange"];
+            cpc: components["schemas"]["MetricChange"];
+            cvr: components["schemas"]["MetricChange"];
+            acos: components["schemas"]["MetricChange"];
+            roas: components["schemas"]["MetricChange"];
+            cpm: components["schemas"]["MetricChange"];
+            vcpm: components["schemas"]["MetricChange"];
+        } | null;
+        MetricChange: {
+            absolute: string | null;
+            relative: string | null;
+        };
+        ExplorerRowsRequest: {
+            clientIds?: string[];
+            withoutClient?: boolean;
+            profileIds?: string[];
+            adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            period: components["schemas"]["DateRange"];
+            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
+            /** @default auto */
+            currency: "auto" | string;
+            /**
+             * @default console
+             * @enum {string}
+             */
+            attribution: "console" | "clicks14d";
+            /** @enum {string} */
+            level: "portfolio" | "campaign" | "adGroup" | "target" | "productAd" | "searchTerm" | "negative";
+            filter?: {
+                portfolioIds?: string[];
+                campaignIds?: string[];
+                adGroupIds?: string[];
+                includeRemoved?: boolean;
+            };
+        };
+        DateRange: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+        };
+        AsinSearchRequest: {
+            clientIds?: string[];
+            withoutClient?: boolean;
+            profileIds?: string[];
+            adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            period: components["schemas"]["DateRange"];
+            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
+            /** @default auto */
+            currency: "auto" | string;
+            /**
+             * @default console
+             * @enum {string}
+             */
+            attribution: "console" | "clicks14d";
+            terms: string[];
+        };
+        TimeSeriesResponse: {
+            meta: components["schemas"]["AnalyticsMeta"];
+            days: {
+                /** Format: date */
+                date: string;
+                sums: components["schemas"]["MetricSums"];
+                derived: components["schemas"]["DerivedMetrics"];
+            }[];
+            comparisonDays: {
+                /** Format: date */
+                date: string;
+                sums: components["schemas"]["MetricSums"];
+                derived: components["schemas"]["DerivedMetrics"];
+            }[];
+            attribution: components["schemas"]["AttributionSummary"];
+        };
+        TimeSeriesRequest: {
+            clientIds?: string[];
+            withoutClient?: boolean;
+            profileIds?: string[];
+            adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            period: components["schemas"]["DateRange"];
+            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
+            /** @default auto */
+            currency: "auto" | string;
+            /**
+             * @default console
+             * @enum {string}
+             */
+            attribution: "console" | "clicks14d";
+            /**
+             * @default campaign
+             * @enum {string}
+             */
+            level: "portfolio" | "campaign" | "adGroup" | "target" | "productAd" | "searchTerm";
+            filter?: {
+                portfolioIds?: string[];
+                campaignIds?: string[];
+                adGroupIds?: string[];
+                includeRemoved?: boolean;
+            };
+            entityIds?: string[];
+        };
+        DashboardResponse: {
+            meta: components["schemas"]["AnalyticsMeta"];
+            total: components["schemas"]["MetricsTotal"];
+            byClient: components["schemas"]["DashboardGroup"][];
+            byProfile: components["schemas"]["DashboardGroup"][];
+            byAdProduct: components["schemas"]["DashboardGroup"][];
+            /** Format: date */
+            fxRatesThrough: string | null;
+            fxRatesStale: boolean;
+        };
+        DashboardGroup: {
+            current: components["schemas"]["PeriodMetrics"];
+            comparison: components["schemas"]["PeriodMetrics"];
+            change: components["schemas"]["MetricChanges"];
+            attribution: components["schemas"]["AttributionSummary"];
+            key: string | null;
+            label: string | null;
+            countryCode?: string;
+            currencyCode?: string;
+        };
+        AnalyticsQuery: {
+            clientIds?: string[];
+            withoutClient?: boolean;
+            profileIds?: string[];
+            adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            period: components["schemas"]["DateRange"];
+            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
+            /** @default auto */
+            currency: "auto" | string;
+            /**
+             * @default console
+             * @enum {string}
+             */
+            attribution: "console" | "clicks14d";
         };
     };
     responses: never;

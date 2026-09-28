@@ -19,6 +19,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@profitbash/amazon-ads": "workspace:*",
     "@profitbash/db": "workspace:*",
+    "@profitbash/engine": "workspace:*",
     "@profitbash/shared": "workspace:*",
     "@profitbash/worker": "workspace:*",
     "better-auth": "1.7.5",

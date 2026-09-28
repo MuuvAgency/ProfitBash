@@ -837,6 +837,1297 @@
           "error",
           "counters"
         ]
+      },
+      "FilterOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "slug"
+              ]
+            }
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "amazonProfileId": {
+                  "type": "string"
+                },
+                "accountName": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string"
+                },
+                "currencyCode": {
+                  "type": "string"
+                },
+                "timezone": {
+                  "type": "string"
+                },
+                "accountType": {
+                  "type": "string"
+                },
+                "clientId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "amazonProfileId",
+                "accountName",
+                "countryCode",
+                "currencyCode",
+                "timezone",
+                "accountType",
+                "clientId"
+              ]
+            }
+          },
+          "currencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fxRatesThrough": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "fxRatesStale": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "clients",
+          "profiles",
+          "currencies",
+          "fxRatesThrough",
+          "fxRatesStale"
+        ]
+      },
+      "FilterOptionsRequest": {
+        "type": "object",
+        "properties": {}
+      },
+      "ExplorerRowsResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/AnalyticsMeta"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerRow"
+            }
+          },
+          "totalRows": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "maxRows": {
+            "type": "integer"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MetricsTotal"
+          }
+        },
+        "required": [
+          "meta",
+          "rows",
+          "totalRows",
+          "truncated",
+          "maxRows",
+          "total"
+        ]
+      },
+      "AnalyticsMeta": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "converted": {
+            "type": "boolean"
+          },
+          "missingFxCurrencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dataThrough": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "provisionalFrom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "earliestDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "profilesWithoutData": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "currency",
+          "converted",
+          "missingFxCurrencies",
+          "dataThrough",
+          "provisionalFrom",
+          "earliestDate",
+          "profilesWithoutData"
+        ]
+      },
+      "ExplorerRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "profileId": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "adProduct": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "removed": {
+            "type": "boolean"
+          },
+          "placeholder": {
+            "type": "boolean"
+          },
+          "hasMetrics": {
+            "type": "boolean"
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "current": {
+            "$ref": "#/components/schemas/PeriodMetrics"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodMetrics"
+          },
+          "change": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "impressions": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "clicks": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cost": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sales": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "purchases": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "units": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ctr": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cpc": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cvr": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "acos": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "roas": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cpm": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "vcpm": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/AttributionSummary"
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "accountName",
+          "countryCode",
+          "currencyCode",
+          "adProduct",
+          "name",
+          "state",
+          "removed",
+          "placeholder",
+          "hasMetrics",
+          "attributes",
+          "current",
+          "comparison",
+          "change",
+          "attribution"
+        ]
+      },
+      "PeriodMetrics": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "sums": {
+            "$ref": "#/components/schemas/MetricSums"
+          },
+          "derived": {
+            "$ref": "#/components/schemas/DerivedMetrics"
+          }
+        },
+        "required": [
+          "sums",
+          "derived"
+        ]
+      },
+      "MetricSums": {
+        "type": "object",
+        "properties": {
+          "impressions": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clicks": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cost": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sales": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purchases": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "units": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "salesSameSku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purchasesSameSku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unitsSameSku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewableImpressions": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewableCost": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "impressions",
+          "clicks",
+          "cost",
+          "sales",
+          "purchases",
+          "units",
+          "salesSameSku",
+          "purchasesSameSku",
+          "unitsSameSku",
+          "viewableImpressions",
+          "viewableCost"
+        ]
+      },
+      "DerivedMetrics": {
+        "type": "object",
+        "properties": {
+          "ctr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cpc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roas": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cpm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vcpm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ctr",
+          "cpc",
+          "cvr",
+          "acos",
+          "roas",
+          "cpm",
+          "vcpm"
+        ]
+      },
+      "AttributionSummary": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "mixed": {
+            "type": "boolean"
+          },
+          "sameSkuMixed": {
+            "type": "boolean"
+          },
+          "coverage": {
+            "type": "object",
+            "properties": {
+              "sales": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "partial",
+                  "none"
+                ]
+              },
+              "purchases": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "partial",
+                  "none"
+                ]
+              },
+              "units": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "partial",
+                  "none"
+                ]
+              },
+              "salesSameSku": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "partial",
+                  "none"
+                ]
+              },
+              "purchasesSameSku": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "partial",
+                  "none"
+                ]
+              },
+              "unitsSameSku": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "partial",
+                  "none"
+                ]
+              }
+            },
+            "required": [
+              "sales",
+              "purchases",
+              "units",
+              "salesSameSku",
+              "purchasesSameSku",
+              "unitsSameSku"
+            ]
+          }
+        },
+        "required": [
+          "mixed",
+          "sameSkuMixed",
+          "coverage"
+        ]
+      },
+      "MetricsTotal": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/PeriodMetrics"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodMetrics"
+          },
+          "change": {
+            "$ref": "#/components/schemas/MetricChanges"
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/AttributionSummary"
+          }
+        },
+        "required": [
+          "current",
+          "comparison",
+          "change",
+          "attribution"
+        ]
+      },
+      "MetricChanges": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "impressions": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "clicks": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "cost": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "sales": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "purchases": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "units": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "ctr": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "cpc": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "cvr": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "acos": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "roas": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "cpm": {
+            "$ref": "#/components/schemas/MetricChange"
+          },
+          "vcpm": {
+            "$ref": "#/components/schemas/MetricChange"
+          }
+        },
+        "required": [
+          "impressions",
+          "clicks",
+          "cost",
+          "sales",
+          "purchases",
+          "units",
+          "ctr",
+          "cpc",
+          "cvr",
+          "acos",
+          "roas",
+          "cpm",
+          "vcpm"
+        ]
+      },
+      "MetricChange": {
+        "type": "object",
+        "properties": {
+          "absolute": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relative": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "absolute",
+          "relative"
+        ]
+      },
+      "ExplorerRowsRequest": {
+        "type": "object",
+        "properties": {
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500
+          },
+          "withoutClient": {
+            "type": "boolean"
+          },
+          "profileIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SPONSORED_PRODUCTS",
+                "SPONSORED_BRANDS",
+                "SPONSORED_DISPLAY"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "period": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "comparison": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRange"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            ],
+            "default": "auto"
+          },
+          "attribution": {
+            "type": "string",
+            "enum": [
+              "console",
+              "clicks14d"
+            ],
+            "default": "console"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "portfolio",
+              "campaign",
+              "adGroup",
+              "target",
+              "productAd",
+              "searchTerm",
+              "negative"
+            ]
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "portfolioIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 1000
+              },
+              "campaignIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 1000
+              },
+              "adGroupIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 1000
+              },
+              "includeRemoved": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "period",
+          "level"
+        ]
+      },
+      "DateRange": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      },
+      "AsinSearchRequest": {
+        "type": "object",
+        "properties": {
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500
+          },
+          "withoutClient": {
+            "type": "boolean"
+          },
+          "profileIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SPONSORED_PRODUCTS",
+                "SPONSORED_BRANDS",
+                "SPONSORED_DISPLAY"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "period": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "comparison": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRange"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            ],
+            "default": "auto"
+          },
+          "attribution": {
+            "type": "string",
+            "enum": [
+              "console",
+              "clicks14d"
+            ],
+            "default": "console"
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "period",
+          "terms"
+        ]
+      },
+      "TimeSeriesResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/AnalyticsMeta"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "sums": {
+                  "$ref": "#/components/schemas/MetricSums"
+                },
+                "derived": {
+                  "$ref": "#/components/schemas/DerivedMetrics"
+                }
+              },
+              "required": [
+                "date",
+                "sums",
+                "derived"
+              ]
+            }
+          },
+          "comparisonDays": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "sums": {
+                  "$ref": "#/components/schemas/MetricSums"
+                },
+                "derived": {
+                  "$ref": "#/components/schemas/DerivedMetrics"
+                }
+              },
+              "required": [
+                "date",
+                "sums",
+                "derived"
+              ]
+            }
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/AttributionSummary"
+          }
+        },
+        "required": [
+          "meta",
+          "days",
+          "comparisonDays",
+          "attribution"
+        ]
+      },
+      "TimeSeriesRequest": {
+        "type": "object",
+        "properties": {
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500
+          },
+          "withoutClient": {
+            "type": "boolean"
+          },
+          "profileIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SPONSORED_PRODUCTS",
+                "SPONSORED_BRANDS",
+                "SPONSORED_DISPLAY"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "period": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "comparison": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRange"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            ],
+            "default": "auto"
+          },
+          "attribution": {
+            "type": "string",
+            "enum": [
+              "console",
+              "clicks14d"
+            ],
+            "default": "console"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "portfolio",
+              "campaign",
+              "adGroup",
+              "target",
+              "productAd",
+              "searchTerm"
+            ],
+            "default": "campaign"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "portfolioIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 1000
+              },
+              "campaignIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 1000
+              },
+              "adGroupIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 1000
+              },
+              "includeRemoved": {
+                "type": "boolean"
+              }
+            }
+          },
+          "entityIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "period"
+        ]
+      },
+      "DashboardResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/AnalyticsMeta"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MetricsTotal"
+          },
+          "byClient": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardGroup"
+            }
+          },
+          "byProfile": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardGroup"
+            }
+          },
+          "byAdProduct": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardGroup"
+            }
+          },
+          "fxRatesThrough": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "fxRatesStale": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "meta",
+          "total",
+          "byClient",
+          "byProfile",
+          "byAdProduct",
+          "fxRatesThrough",
+          "fxRatesStale"
+        ]
+      },
+      "DashboardGroup": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/PeriodMetrics"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/PeriodMetrics"
+          },
+          "change": {
+            "$ref": "#/components/schemas/MetricChanges"
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/AttributionSummary"
+          },
+          "key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "current",
+          "comparison",
+          "change",
+          "attribution",
+          "key",
+          "label"
+        ]
+      },
+      "AnalyticsQuery": {
+        "type": "object",
+        "properties": {
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500
+          },
+          "withoutClient": {
+            "type": "boolean"
+          },
+          "profileIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SPONSORED_PRODUCTS",
+                "SPONSORED_BRANDS",
+                "SPONSORED_DISPLAY"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "period": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "comparison": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRange"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            ],
+            "default": "auto"
+          },
+          "attribution": {
+            "type": "string",
+            "enum": [
+              "console",
+              "clicks14d"
+            ],
+            "default": "console"
+          }
+        },
+        "required": [
+          "period"
+        ]
       }
     },
     "parameters": {}
@@ -1721,6 +3012,306 @@
           },
           "403": {
             "description": "Keine Admin-Rolle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/filter-options": {
+      "post": {
+        "tags": [
+          "Auswertungen"
+        ],
+        "summary": "Auswahl der Filterleiste: sichtbare Clients und Profile, wählbare Währungen, Stand der Kurse",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilterOptionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilterOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/explorer/rows": {
+      "post": {
+        "tags": [
+          "Auswertungen"
+        ],
+        "summary": "Explorer: Zeilen einer Ebene mit Vergleich und Summenzeile (höchstens 10 000 Zeilen)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplorerRowsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplorerRowsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/asin-search": {
+      "post": {
+        "tags": [
+          "Auswertungen"
+        ],
+        "summary": "ASIN-Quick-Tool: Product Ads zu ASINs oder SKUs mit Kennzahlen",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsinSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplorerRowsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/timeseries": {
+      "post": {
+        "tags": [
+          "Auswertungen"
+        ],
+        "summary": "Tagesverlauf der Auswahl in der Anzeigewährung (Chart, Hero-Kachel)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TimeSeriesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeSeriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/dashboard": {
+      "post": {
+        "tags": [
+          "Auswertungen"
+        ],
+        "summary": "Dashboard: Summen gesamt und je Client, Profil und Ad-Typ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyticsQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
             "content": {
               "application/json": {
                 "schema": {
