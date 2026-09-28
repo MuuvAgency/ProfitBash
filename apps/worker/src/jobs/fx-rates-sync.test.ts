@@ -5,6 +5,7 @@ import { asc } from 'drizzle-orm';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { JobFailure } from '../run-job';
 import { FX_RATES_OVERLAP_DAYS, FX_RATES_START_DATE, syncFxRates } from './fx-rates-sync';
 
 const { fxRates } = schema;
@@ -112,7 +113,7 @@ describe('syncFxRates', () => {
 
   it('Startdatum liegt nie vor dem festen Beginn', async () => {
     await upsertFxRates(testDb.db, [{ date: '2026-01-05', quote: 'USD', rate: '1.04' }]);
-    const requested = ecb();
+    const requested = ecb(row('USD', '2026-01-05', '1.04'));
     await syncFxRates(deps());
     expect(requested).toEqual([{ start: '2026-01-01', end: null }]);
   });
@@ -129,6 +130,15 @@ describe('syncFxRates', () => {
       'USD 2026-09-25',
       'USD 2026-09-28',
     ]);
+  });
+
+  it('keine Kurse im Zeitraum ist ein Fehler (der Zeitraum enthält immer einen EZB-Arbeitstag)', async () => {
+    await upsertFxRates(testDb.db, [{ date: '2026-09-25', quote: 'USD', rate: '1.1403' }]);
+    ecb();
+    const error = await syncFxRates(deps()).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JobFailure);
+    expect((error as JobFailure).message).toBe('Die EZB lieferte keine Kurse ab 2026-09-18.');
+    expect((error as JobFailure).counters).toEqual({ fetched: 0 });
   });
 
   it('Fehler der EZB lassen den Lauf scheitern, ohne etwas zu schreiben', async () => {

@@ -3,6 +3,7 @@ import { latestFxRateDate, type Db } from '@profitbash/db';
 import type { EcbRate, FetchEcbRatesOptions } from '@profitbash/ecb';
 import type { Logger } from '@profitbash/shared';
 import { PgBoss, type Job } from 'pg-boss';
+import { z } from 'zod';
 import {
   connectionJobDataSchema,
   type ConnectionJobData,
@@ -23,7 +24,9 @@ import {
   createJobQueue,
   createQueues,
   DISPATCH_QUEUES,
+  FX_RATES_MAX_RETRIES,
   FX_RATES_QUEUE,
+  FX_RATES_RETRY_DELAY_SECONDS,
   logBossErrors,
   SCHEDULES,
   type JobQueue,
@@ -41,6 +44,9 @@ const CONNECTION_JOBS: Record<ConnectionQueue, ConnectionJobDefinition> = {
   'reports-sync': { run: syncConnectionReports, lease: true },
   'amazon-requests-poll': { run: pollAmazonRequests, lease: true },
 };
+
+/** Daten eines Kursabrufs: leer (Zeitplan, Start) oder Nummer des Wiederholungsversuchs. */
+const fxRatesJobDataSchema = z.object({ retry: z.number().int().min(0).optional() }).nullable();
 
 /** So lange wartet das Herunterfahren auf laufende Jobs. */
 const STOP_TIMEOUT_MS = 30_000;
@@ -139,10 +145,20 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
     );
   });
 
-  await boss.work(FX_RATES_QUEUE, workOptions, async () => {
-    await runJob(FX_RATES_QUEUE, { organizationId: null, scope: null }, () =>
-      syncFxRates({ db, ...(options.fetchFxRates && { fetchRates: options.fetchFxRates }) }),
-    );
+  await boss.work<unknown>(FX_RATES_QUEUE, workOptions, async (batch: Job<unknown>[]) => {
+    for (const job of batch) {
+      const retry = fxRatesJobDataSchema.safeParse(job.data).data?.retry ?? 0;
+      const result = await runJob(FX_RATES_QUEUE, { organizationId: null, scope: null }, () =>
+        syncFxRates({ db, ...(options.fetchFxRates && { fetchRates: options.fetchFxRates }) }),
+      );
+      if (result.status === 'failed' && retry < FX_RATES_MAX_RETRIES) {
+        await boss.send(
+          FX_RATES_QUEUE,
+          { retry: retry + 1 },
+          { startAfter: FX_RATES_RETRY_DELAY_SECONDS },
+        );
+      }
+    }
   });
 
   for (const schedule of SCHEDULES) {

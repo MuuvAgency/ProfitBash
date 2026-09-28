@@ -3,6 +3,7 @@ import {
   formatDuration,
   formatNumber,
   MISSING_VALUE,
+  SHARED_PLATFORM_JOB_NAMES,
   type JobRun,
 } from '@profitbash/shared';
 import { computed } from 'vue';
@@ -65,6 +66,11 @@ export function elapsedMs(run: JobRun, now = Date.now()): number | null {
   return run.status === 'running' ? Math.max(0, now - Date.parse(run.startedAt)) : null;
 }
 
+/** Plattformweiter Lauf, den jede Organisation sieht (bisher nur der Kursabruf der EZB). */
+function isSharedPlatformJob(job: string) {
+  return (SHARED_PLATFORM_JOB_NAMES as readonly string[]).includes(job);
+}
+
 /** Takt, in dem die Dauer laufender Jobs weiterzählt. */
 export const RUNNING_DURATION_TICK_MS = 1_000;
 
@@ -81,7 +87,7 @@ export function useJobRunLabels() {
   }
 
   function connection(run: JobRun) {
-    if (run.job === 'fx-rates-sync') return t('sync.ecbSource');
+    if (isSharedPlatformJob(run.job)) return t('sync.ecbSource');
     return (
       run.connection?.externalAccountEmail ?? run.connection?.externalAccountId ?? MISSING_VALUE
     );

@@ -134,16 +134,18 @@ export async function fetchEcbRates(options: FetchEcbRatesOptions): Promise<EcbR
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     if (attempt > 1) await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 2));
     let response: Response;
+    let text: string;
     try {
       response = await (options.fetch ?? fetch)(url, {
         headers: { accept: 'text/csv' },
         signal: AbortSignal.timeout(options.timeoutMs ?? 60_000),
       });
+      // Auch das Lesen des Bodys kann abbrechen (Timeout, Verbindung weg): wie ein Netzwerkfehler.
+      text = await response.text();
     } catch (error) {
       lastError = new EcbError('EZB nicht erreichbar.', null, { cause: error });
       continue;
     }
-    const text = await response.text();
     if (response.status === 404) return [];
     if (response.ok) return parseEcbRatesCsv(text);
     lastError = new EcbError(`EZB antwortet mit HTTP ${response.status}.`, response.status);

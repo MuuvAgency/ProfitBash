@@ -26,11 +26,14 @@ export const DISPATCH_QUEUES = {
 export const CLEANUP_QUEUE = 'job-runs-cleanup';
 /** EZB-Kurse, plattformweit (2.2). Die EZB veröffentlicht gegen 16:00; der Lauf holt den Vortag. */
 export const FX_RATES_QUEUE = 'fx-rates-sync';
+/** Nach einem Fehlschlag neuer Versuch nach einer Stunde, höchstens so oft (danach am nächsten Morgen). */
+export const FX_RATES_RETRY_DELAY_SECONDS = 60 * 60;
+export const FX_RATES_MAX_RETRIES = 3;
 
 /**
  * Zeitpläne (F9): Profile um 05:00, Entities und Reports um 06:00 Berlin (die Lease der Connection
- * reiht sie nacheinander), die EZB-Kurse des Vortags ebenfalls um 06:00 (Dominik, 2026-09-28). Der Poll plant sich selbst neu ein; der Auslöser alle 10 Min. holt nach
- * Absturz oder Deploy auf.
+ * reiht sie nacheinander), die EZB-Kurse des Vortags ebenfalls um 06:00 (Dominik, 2026-09-28). Der
+ * Poll plant sich selbst neu ein; der Auslöser alle 10 Min. holt nach Absturz oder Deploy auf.
  */
 export const SCHEDULES = [
   { queue: 'token-refresh-all', cron: '0 * * * *' },

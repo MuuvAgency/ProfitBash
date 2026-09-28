@@ -90,6 +90,23 @@ describe('fetchEcbRates', () => {
     expect(rates).toHaveLength(1);
   });
 
+  it('wiederholt, wenn das Lesen der Antwort abbricht', async () => {
+    let calls = 0;
+    const fetchStub: typeof fetch = async () => {
+      calls += 1;
+      if (calls === 1) {
+        const broken = new ReadableStream({
+          start: (controller) => controller.error(new Error('Verbindung getrennt')),
+        });
+        return new Response(broken, { status: 200 });
+      }
+      return new Response(csv(row('USD', '2026-09-28', '1.1378')));
+    };
+    const rates = await fetchEcbRates({ startDate: '2026-09-28', fetch: fetchStub, ...noSleep });
+    expect(calls).toBe(2);
+    expect(rates).toHaveLength(1);
+  });
+
   it('gibt nach der letzten Wiederholung mit Status auf', async () => {
     server.use(http.get(ECB_RATES_URL, () => new HttpResponse('busy', { status: 503 })));
     const error = await fetchEcbRates({ startDate: '2026-09-28', ...noSleep }).catch((e) => e);
