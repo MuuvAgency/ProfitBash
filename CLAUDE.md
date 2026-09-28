@@ -41,8 +41,13 @@ Regeln für generierte better-auth-Tabellen als eigene SQL-Migration (`drizzle-k
   - Neue Logik und Bugfixes mit `superpowers:test-driven-development`: Test zuerst, Fehlschlag (RED) prüfen, dann Code.
   - Nach jeder abgeschlossenen Aufgabe `superpowers:requesting-code-review` (unabhängiger Reviewer), Befunde fixen oder begründet zurückweisen.
   - Vor jeder „fertig"-Meldung `superpowers:verification-before-completion`: gesamte Suite, typecheck, lint, build.
-- **Eine frische Session je sinnvollem Aufgabenpunkt** (z. B. 0.4, 0.8 Teil 1), nicht erst je Phase.
-  Der Stand steht im Repo (`docs/`), nicht im Chat.
+- **Bis zu drei Aufgabenpunkte je Session** (z. B. 2.3–2.5) in der Reihenfolge der Phasen-Datei (Dominik, 2026-09-28).
+  Je Aufgabe ein eigener Branch von main, Review, Verifikation und PR. Fragen an Dominik möglichst zu Beginn der Session
+  sammeln, damit danach ohne Unterbrechung gearbeitet werden kann. Der Stand steht im Repo (`docs/`), nicht im Chat.
+- **Merge ohne Rückfrage:** PR per Rebase mergen, sobald die CI auf dem Head-Commit grün ist; danach die nächste Aufgabe von
+  main starten. Nachfragen nur bei echten Entscheidungen (Abweichung vom Plan, neue Abhängigkeit, ADR).
+- **Unterbrechungen einplanen:** Die Session kann jederzeit am Nutzungslimit enden. Deshalb nach jedem Schritt committen und
+  pushen, Häkchen und „Umsetzung“-Notiz aktuell halten, damit eine neue Session ohne Chatverlauf weitermachen kann.
 - **Übergabe am Ende jeder Session:** Nach Commit und Häkchen den fertigen Prompt für die nächste Session
   als Codeblock ausgeben, zum direkten Einfügen. Er nennt:
   - die nächste Aufgabe laut Reihenfolge in der Phasen-Datei
