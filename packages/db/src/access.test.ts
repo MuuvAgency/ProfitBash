@@ -6,6 +6,7 @@ import {
   getOrgRole,
   listEnabledFeatures,
   listMemberships,
+  listVisibleClientsAndProfiles,
   visibleProfileIds,
   visibleProfilesScope,
 } from './access';
@@ -352,5 +353,60 @@ describe('Schema-Regeln', () => {
       sql`select current_setting('TimeZone') as tz`,
     );
     expect(rows[0]!.tz).toBe('UTC');
+  });
+});
+
+describe('listVisibleClientsAndProfiles', () => {
+  it('liefert nur Clients mit sichtbaren Profilen (für jede Rolle), dazu die sichtbaren Profile', async () => {
+    const [withVisible, onlyHidden, empty] = await testDb.db
+      .insert(clients)
+      .values([
+        { organizationId: ids.muuv, name: 'Nordwind', slug: 'nordwind' },
+        { organizationId: ids.muuv, name: 'Nur ausgeblendet', slug: 'nur-ausgeblendet' },
+        { organizationId: ids.muuv, name: 'Ohne Profile', slug: 'ohne-profile' },
+      ])
+      .returning({ id: clients.id });
+    await testDb.db
+      .update(amazonAdsProfiles)
+      .set({ clientId: withVisible!.id })
+      .where(eq(amazonAdsProfiles.id, ids.visible));
+    await testDb.db
+      .update(amazonAdsProfiles)
+      .set({ clientId: onlyHidden!.id })
+      .where(inArray(amazonAdsProfiles.id, [ids.hidden, ids.removed]));
+    await testDb.db
+      .update(amazonAdsProfiles)
+      .set({ clientId: ids.otherClient })
+      .where(eq(amazonAdsProfiles.id, ids.otherOrgProfile));
+
+    const result = await listVisibleClientsAndProfiles(testDb.db, {
+      userId: ids.viewer,
+      orgId: ids.muuv,
+    });
+    expect(result.clients).toEqual([{ id: withVisible!.id, name: 'Nordwind', slug: 'nordwind' }]);
+    const seen = result.profiles.map((p) => p.id);
+    expect(seen).not.toContain(ids.hidden);
+    expect(seen).not.toContain(ids.removed);
+    expect(seen).not.toContain(ids.otherOrgProfile);
+    expect(result.profiles.find((p) => p.id === ids.visible)).toEqual({
+      id: ids.visible,
+      amazonProfileId: '1111111111111111',
+      accountName: 'Konto 1111111111111111',
+      countryCode: 'DE',
+      currencyCode: 'EUR',
+      timezone: 'Europe/Berlin',
+      accountType: 'seller',
+      clientId: withVisible!.id,
+    });
+    expect(empty).toBeDefined();
+
+    expect(
+      await listVisibleClientsAndProfiles(testDb.db, { userId: ids.outsider, orgId: ids.muuv }),
+    ).toEqual({ clients: [], profiles: [] });
+
+    await testDb.db
+      .update(amazonAdsProfiles)
+      .set({ clientId: null })
+      .where(inArray(amazonAdsProfiles.id, [ids.visible, ids.hidden, ids.removed]));
   });
 });

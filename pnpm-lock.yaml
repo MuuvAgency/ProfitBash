@@ -377,6 +377,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@profitbash/engine':
+        specifier: workspace:*
+        version: link:../engine
       '@profitbash/shared':
         specifier: workspace:*
         version: link:../shared
