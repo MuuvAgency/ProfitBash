@@ -12,8 +12,10 @@ import {
   mockPortfolios,
   mockReportRows,
   toAmazonJson,
+  type MockAccount,
   type MockProfile,
 } from './mock-data';
+import { LARGE_MOCK_PROFILES, largeMockAccount } from './mock-large';
 import { PORTFOLIOS_CONTENT_TYPE } from './portfolios';
 import {
   REPORT_CREATE_CONTENT_TYPE,
@@ -87,7 +89,14 @@ export interface MockAmazonAdsClientOptions {
   rateLimit?: AmazonAdsClientOptions['rateLimit'];
   /** Verhalten der simulierten Reports und Exports (Verarbeitungszeit, Fehler auf Wunsch). */
   simulation?: MockAmazonAdsSimulation;
+  /**
+   * `AMAZON_ADS_MOCK_SCALE`: `default` (kleine Testdaten) oder `large` (Demo-Daten mit Volumen, nur Entwicklung;
+   * statt der Test-Profile die 6 Demo-Profile aus `mock-large.ts`).
+   */
+  scale?: MockAmazonAdsScale;
 }
+
+export type MockAmazonAdsScale = 'default' | 'large';
 
 export interface MockAmazonAdsSimulation {
   /** Uhr des Mocks (Tests). Standard `Date.now`. */
@@ -117,7 +126,13 @@ export function createMockAmazonAdsClient(options: MockAmazonAdsClientOptions): 
     store: options.store,
     ...(options.logger && { logger: options.logger }),
     regions,
-    http: { fetch: createMockFetch(options.redirectUri, options.simulation ?? {}) },
+    http: {
+      fetch: createMockFetch(
+        options.redirectUri,
+        options.simulation ?? {},
+        options.scale ?? 'default',
+      ),
+    },
     ...(options.rateLimit && { rateLimit: options.rateLimit }),
   });
 }
@@ -126,12 +141,17 @@ export function createMockAmazonAdsClient(options: MockAmazonAdsClientOptions): 
  * Simulierte Amazon-Endpunkte für alle Regionen: LWA-Token, LWA-Profil, `/v2/profiles`, Portfolios, Exports,
  * Reporting v3 und die S3-Downloads.
  */
-function createMockFetch(redirectUri: string, simulation: MockAmazonAdsSimulation): typeof fetch {
+function createMockFetch(
+  redirectUri: string,
+  simulation: MockAmazonAdsSimulation,
+  scale: MockAmazonAdsScale,
+): typeof fetch {
   const hosts = new Map<string, AmazonAdsRegion>();
   for (const [region, endpoints] of Object.entries(AMAZON_ADS_REGIONS)) {
     hosts.set(new URL(endpoints.apiHost).host, region as AmazonAdsRegion);
   }
-  const jobs = createMockJobs(simulation);
+  const data = MOCK_DATA[scale];
+  const jobs = createMockJobs(simulation, data);
 
   return async (input, init) => {
     const request = new Request(input, init);
@@ -177,7 +197,7 @@ function createMockFetch(redirectUri: string, simulation: MockAmazonAdsSimulatio
       ) {
         return unauthorized();
       }
-      return new Response(MOCK_PROFILES_JSON[region], {
+      return new Response(data.profilesJson[region], {
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -189,7 +209,7 @@ function createMockFetch(redirectUri: string, simulation: MockAmazonAdsSimulatio
       ) {
         return unauthorized();
       }
-      const profile = MOCK_PROFILES[region].find(
+      const profile = data.profiles[region].find(
         (p) => p.amazonProfileId === request.headers.get('amazon-advertising-api-scope'),
       );
       const response = await jobs.handleApi(request, url, region, profile);
@@ -206,22 +226,54 @@ function createMockFetch(redirectUri: string, simulation: MockAmazonAdsSimulatio
   };
 }
 
-const MOCK_PROFILES: Record<AmazonAdsRegion, MockProfile[]> = Object.fromEntries(
-  Object.entries(MOCK_PROFILES_JSON).map(([region, text]) => [
-    region,
-    (
-      parseJsonLossless(text) as Array<{
-        profileId: string | number;
-        currencyCode: string;
-        accountInfo: { type: string };
-      }>
-    ).map((p) => ({
-      amazonProfileId: String(p.profileId),
-      currencyCode: p.currencyCode,
-      accountType: p.accountInfo.type,
-    })),
-  ]),
-) as Record<AmazonAdsRegion, MockProfile[]>;
+/** Demo-Profile als JSON wie von Amazon, nur in der EU. */
+const LARGE_MOCK_PROFILES_JSON: Record<AmazonAdsRegion, string> = {
+  eu: `[${LARGE_MOCK_PROFILES.map(
+    (p) =>
+      `{"profileId": ${p.amazonProfileId}, "countryCode": "${p.countryCode}", "currencyCode": "${p.currencyCode}",` +
+      ` "timezone": "${p.timezone}", "accountInfo": {"marketplaceStringId": "${p.marketplaceId}",` +
+      ` "id": "${p.accountId}", "type": "${p.accountType}", "name": "${p.accountName}", "validPaymentMethod": true}}`,
+  ).join(',')}]`,
+  na: '[]',
+  fe: '[]',
+};
+
+interface MockData {
+  profilesJson: Record<AmazonAdsRegion, string>;
+  profiles: Record<AmazonAdsRegion, MockProfile[]>;
+  account: (profile: MockProfile) => MockAccount;
+}
+
+const parseProfiles = (json: Record<AmazonAdsRegion, string>) =>
+  Object.fromEntries(
+    Object.entries(json).map(([region, text]) => [
+      region,
+      (
+        parseJsonLossless(text) as Array<{
+          profileId: string | number;
+          currencyCode: string;
+          accountInfo: { type: string };
+        }>
+      ).map((p) => ({
+        amazonProfileId: String(p.profileId),
+        currencyCode: p.currencyCode,
+        accountType: p.accountInfo.type,
+      })),
+    ]),
+  ) as Record<AmazonAdsRegion, MockProfile[]>;
+
+const MOCK_DATA: Record<MockAmazonAdsScale, MockData> = {
+  default: {
+    profilesJson: MOCK_PROFILES_JSON,
+    profiles: parseProfiles(MOCK_PROFILES_JSON),
+    account: mockAccount,
+  },
+  large: {
+    profilesJson: LARGE_MOCK_PROFILES_JSON,
+    profiles: parseProfiles(LARGE_MOCK_PROFILES_JSON),
+    account: largeMockAccount,
+  },
+};
 
 /** S3-Regionen der simulierten Download-Hosts (passen zu `AMAZON_ADS_DOWNLOAD_HOST_PATTERNS`). */
 const S3_REGIONS: Record<AmazonAdsRegion, string> = {
@@ -315,7 +367,7 @@ function decodeJob(id: string): MockJob | null {
   return null;
 }
 
-function createMockJobs(simulation: MockAmazonAdsSimulation) {
+function createMockJobs(simulation: MockAmazonAdsSimulation, data: MockData) {
   const now = simulation.now ?? Date.now;
   const processingMs = simulation.processingMs ?? 5_000;
   const failing = new Set(simulation.failingReportTypes ?? []);
@@ -324,8 +376,8 @@ function createMockJobs(simulation: MockAmazonAdsSimulation) {
 
   const elapsed = (job: MockJob) => now() - job.createdAt;
   const accountFor = (job: MockJob) => {
-    const profile = MOCK_PROFILES[job.region].find((p) => p.amazonProfileId === job.profileId);
-    return profile ? mockAccount(profile) : null;
+    const profile = data.profiles[job.region].find((p) => p.amazonProfileId === job.profileId);
+    return profile ? data.account(profile) : null;
   };
   const s3Region = (region: AmazonAdsRegion) => S3_REGIONS[region];
 
@@ -357,7 +409,7 @@ function createMockJobs(simulation: MockAmazonAdsSimulation) {
     if (request.method === 'POST' && url.pathname === '/portfolios/list') {
       if (contentType !== PORTFOLIOS_CONTENT_TYPE) return unsupportedMediaType();
       const body = (await request.json()) as { nextToken?: string };
-      const all = mockPortfolios(mockAccount(profile));
+      const all = mockPortfolios(data.account(profile));
       const offset = Number(body.nextToken ?? '0');
       const next = offset + PORTFOLIO_PAGE_SIZE;
       return amazonJson(

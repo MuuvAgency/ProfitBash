@@ -1,7 +1,7 @@
 import type { RefreshTokenStore } from './access-token';
 import { createAmazonAdsClient, type AmazonAdsClient } from './client';
 import type { Logger } from './logger';
-import { createMockAmazonAdsClient } from './mock';
+import { createMockAmazonAdsClient, type MockAmazonAdsScale } from './mock';
 
 /** Konfiguration aus der Umgebung (`AMAZON_ADS_*`), gemeinsam für API und Worker. */
 export interface AmazonAdsClientConfig {
@@ -14,6 +14,8 @@ export interface AmazonAdsClientConfig {
   mockConsentUrl: string;
   /** `AMAZON_ADS_REQUESTS_PER_SECOND`: Anfrage-Budget je Profil. Standard 2/s. */
   requestsPerSecond?: number | undefined;
+  /** `AMAZON_ADS_MOCK_SCALE`: Datenumfang des Mocks (`large` = Demo-Daten mit Volumen). */
+  mockScale?: MockAmazonAdsScale | undefined;
 }
 
 /** Wählt Mock oder echten Amazon-Client. Ohne Mock sind Client-ID und Secret Pflicht. */
@@ -34,6 +36,7 @@ export function createAmazonAdsClientFromConfig(options: {
       store,
       ...(logger && { logger }),
       ...(rateLimit && { rateLimit }),
+      ...(config.mockScale && { scale: config.mockScale }),
     });
   }
   const { clientId, clientSecret, redirectUri } = config;

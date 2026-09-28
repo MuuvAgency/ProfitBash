@@ -19,6 +19,20 @@ describe('createAmazonAdsClientFromConfig', () => {
     expect(url.searchParams.get('redirect_uri')).toBe(base.redirectUri);
   });
 
+  it('liefert mit mockScale large die Demo-Profile', async () => {
+    const client = createAmazonAdsClientFromConfig({
+      config: { ...base, useMock: true, mockScale: 'large' },
+      store: {
+        async withRefreshToken(_connectionId, refresh) {
+          return (await refresh('Atzr|mock-refresh-test')).result;
+        },
+      },
+    });
+    const profiles = await client.listProfiles({ id: 'c', organizationId: 'o', region: 'eu' });
+    expect(profiles).toHaveLength(6);
+    expect(profiles.every((p) => p.accountName.startsWith('Demo'))).toBe(true);
+  });
+
   it('nutzt ohne Mock Amazon mit den konfigurierten Zugangsdaten', () => {
     const client = createAmazonAdsClientFromConfig({
       config: {

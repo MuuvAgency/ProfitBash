@@ -163,4 +163,15 @@ describe('amazonAdsEnvSchema', () => {
       ).toThrow(/AMAZON_ADS_REQUESTS_PER_SECOND/);
     }
   });
+
+  it('liest AMAZON_ADS_MOCK_SCALE: Standard default, large erlaubt, sonst Fehler', () => {
+    const read = (value?: string) =>
+      loadEnv(amazonAdsEnvSchema, {
+        source: { ...amazon, ...(value !== undefined && { AMAZON_ADS_MOCK_SCALE: value }) },
+      }).AMAZON_ADS_MOCK_SCALE;
+    expect(read()).toBe('default');
+    expect(read('')).toBe('default');
+    expect(read('large')).toBe('large');
+    expect(() => read('huge')).toThrow(/AMAZON_ADS_MOCK_SCALE/);
+  });
 });
