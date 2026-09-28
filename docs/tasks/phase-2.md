@@ -347,19 +347,75 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     Laden (`connection.reconnect`) und mit `before`, SKU nur bei SD-Product-Ads, Schutz im CLI (Mock verlangt), Doku.
 
 ### 2.4 Abfrage-Schicht (`packages/db`)
-- [ ] Neues Modul (z. B. `ads-analytics.ts`) für Lesezugriffe von Nutzern: **nur** über `visibleProfilesScope()` (ADR 002), Filter
+- [x] Neues Modul (z. B. `ads-analytics.ts`) für Lesezugriffe von Nutzern: **nur** über `visibleProfilesScope()` (ADR 002), Filter
       nach Clients, Profilen, Ad-Typen, Zeitraum; Summen in SQL (`sum()` auf `numeric`/`bigint`, als String zurück).
-- [ ] Clients für die Filterleiste (F2) aus den sichtbaren Profilen abgeleitet (Helfer im Access-Layer, vgl. „Offen für Phase 6“ in
+- [x] Clients für die Filterleiste (F2) aus den sichtbaren Profilen abgeleitet (Helfer im Access-Layer, vgl. „Offen für Phase 6“ in
       ADR 002), nutzbar für alle Rollen.
-- [ ] Umrechnung in die Anzeigewährung (F3: automatisch, EUR, USD oder eine Profilwährung) je Tag über `fx_rates` in derselben
+- [x] Umrechnung in die Anzeigewährung (F3: automatisch, EUR, USD oder eine Profilwährung) je Tag über `fx_rates` in derselben
       Abfrage, Originalwährung bleibt daneben erhalten. Wählbare Währungen aus den sichtbaren Profilen (Access-Layer) plus EUR, USD.
-- [ ] Abfragen: Summen je Zeile einer Ebene (F6) für Zeitraum und Vergleichszeitraum, Summenzeile über alle Zeilen, Tagesreihe für
+- [x] Abfragen: Summen je Zeile einer Ebene (F6) für Zeitraum und Vergleichszeitraum, Summenzeile über alle Zeilen, Tagesreihe für
       eine Auswahl, Summen je Client/Profil/Ad-Typ fürs Dashboard, Product-Ad-Suche nach ASIN inkl. `extra.asins` (F10). Obergrenze
       der Zeilen nach F7.
-- [ ] Indizes prüfen (`EXPLAIN ANALYZE` mit den Demo-Daten aus 2.3), bei Bedarf ergänzen; Ergebnis hier notieren.
-- [ ] Tests: fremde Organisation, ausgeblendetes Profil, gemischte Währungen, Tage ohne Kurs, Platzhalter-Entities (Name leer),
+- [x] Indizes prüfen (`EXPLAIN ANALYZE` mit den Demo-Daten aus 2.3), bei Bedarf ergänzen; Ergebnis hier notieren.
+- [x] Tests: fremde Organisation, ausgeblendetes Profil, gemischte Währungen, Tage ohne Kurs, Platzhalter-Entities (Name leer),
       entfernte Entities (`removed_at`), SB-Kampagnen ohne Kennzahlen (Preview-Lücke), SB-Targets ohne Ad Group, Kürzen bei der
       Obergrenze (Summenzeile bleibt vollständig).
+- [x] Umsetzung (Stand für 2.5 und später):
+  - **`@profitbash/shared/analytics`** (eigener Einstiegspunkt ohne Node-/DOM-Typen, auch fürs Web): `AD_PRODUCTS`,
+    `adProductSchema`, `ATTRIBUTION_SETTINGS` (`console` | `clicks14d`), `attributionSettingSchema`,
+    `DEFAULT_ATTRIBUTION_SETTING`. Die Engine übernimmt `AdProduct`/`AttributionSetting` von dort (Abhängigkeit
+    `@profitbash/shared`); `packages/db` hängt jetzt von `@profitbash/engine` ab.
+  - **Access-Layer:** `listVisibleClientsAndProfiles(db, { userId, orgId })` → sichtbare Profile (ID, Amazon-ID, Name, Land,
+    Währung, Zeitzone, Kontotyp, `clientId`) und nur die Clients mit mindestens einem sichtbaren Profil; Nicht-Mitglied: leer.
+  - **`packages/db/src/ads-analytics.ts`** (aus `index.ts` exportiert). Gemeinsame Eingabe `AnalyticsQuery`: `userId`, `orgId`,
+    `clientIds?` (+ `withoutClient` für „Ohne Client“), `profileIds?`, `adProducts?` (alles UND), `period`, `comparison?`,
+    `currency` (`auto` oder Code), `attribution`. Die Auswahl beginnt immer mit `visibleProfilesScope()`; ausgeblendete und fremde
+    Profile fallen auch bei ausdrücklicher Nennung heraus.
+    - `queryExplorerRows({ …, level, filter?, limit? })`, Ebenen `portfolio`, `campaign`, `adGroup`, `target`, `productAd`,
+      `searchTerm` (Negatives haben keine Kennzahlen und kommen in 2.5 als einfache Liste). `filter`: `portfolioIds`,
+      `campaignIds`, `adGroupIds` (Drill-Down), `includeRemoved` (Standard nein), `productSearch` (ASIN/SKU, auch
+      `extra.asins`, Groß-/Kleinschreibung egal). Ergebnis: `currency`, `converted`, `rows` (Beträge in der **Originalwährung** der
+      Zeile, `attributes` je Ebene, `placeholder`, `removed`, `hasMetrics`, `attribution` = `summarizeAttribution`), `totalRows`,
+      `truncated`, `totals` (Anzeigewährung, `attribution`, `comparisonAttribution`, `missingFxCurrencies`). Entities ohne
+      Kennzahlen: Impressionen, Klicks, Kosten 0; Umsatz usw. 0, wenn Amazon den Wert für Ad-Typ und Ebene liefert, sonst `null`.
+      Suchbegriffe nur mit Kennzahlen, ID `targetId:searchTerm`. Sortiert nach umgerechnetem Spend (dann Name, ID), gekürzt auf
+      `MAX_ANALYTICS_ROWS` (10 000); die Summenzeile gilt für alle Zeilen der Auswahl. Der Ad-Typ-Filter gilt für Zeilen und
+      Kennzahlen (Portfolios: nur Kennzahlen). `includeRemoved` wirkt auf Zeilen **und** Summenzeile.
+    - `queryTimeSeries({ …, level, filter?, entityIds? })`: Summen je Tag in der Anzeigewährung (`days`, `comparisonDays`),
+      nur Tage mit Kennzahlen (Lücken füllt die Anzeige, F5).
+    - `queryDashboard(query)`: Summen gesamt und je Client (`null` = ohne Client), Profil (mit Land, Währung) und Ad-Typ aus den
+      Kampagnen-Kennzahlen, eine Abfrage mit `grouping sets`. Zählt **alle** Kampagnen (auch entfernte: ihr Spend war echt); der
+      Kampagnen-Reiter des Explorers blendet entfernte standardmäßig aus, seine Summe kann dann kleiner sein.
+    - `listSelectableCurrencies`: EUR, USD und die Währungen sichtbarer Profile, die in `fx_rates` vorkommen.
+    - `queryDataStatus(selection, REPORT_AD_PRODUCT_SELECTION)`: `dataThrough` (Minimum über die Profile **mit** Datenstand, per
+      `metricsImportedThroughSql`), `provisionalFrom` = `dataThrough` − 13 Tage (`PROVISIONAL_DAYS` 14), `earliestDate` (erster
+      Tag mit Kampagnen-Kennzahlen), `profilesWithoutData`.
+  - **Umrechnung in SQL:** CTE `fx` = Tag × Währung → Faktor = Kurs(Ziel) ÷ Kurs(Quelle) mit dem letzten Kurs an oder vor dem Tag
+    (`numeric(48,30)`, 30 Nachkommastellen; EUR = 1, gleiche Währung = 1, fehlender Kurs = `null`), dazu `fxa` als Matrix
+    (Tage × Währungen): Jede Kennzahl-Zeile liest ihren Faktor per Index statt über einen Join. Umgerechnete Summen werden in TS
+    auf 12 Nachkommastellen gerundet (`HALF_EVEN`), nicht umgerechnete bleiben exakt (z. B. `3.40`). Der Test vergleicht die
+    Summen mit `convertAmount` je Zeile (9 Nachkommastellen) für EUR, USD (zwei Nicht-EUR-Währungen) und einen Zeitraum ohne
+    SEK-Kurs (Betrag nicht gezählt, `missingFxCurrencies: ['SEK']`).
+  - **Attribution in SQL:** je Feld ein `CASE` über den Index der Kombination aus Ad-Typ und Kontotyp (`COMBOS`, nur Vendor
+    weicht ab), gleiche Spalten zusammengefasst; welche Kombinationen vorkommen, melden Merker (`bool_or`) statt
+    `array_agg(distinct …)` (das erzwang eine Sortierung).
+  - **Aufbau der Abfrage:** abgeleitete Tabelle `x` mit `offset 0` (Attribution, Faktor und Zeitraum-Merker je Zeile einmal),
+    Profil-IDs als Liste (`m.profile_id = any(…)`, aus der Auswahl über den Access-Layer), eine umschließende Tagesspanne vor dem
+    exakten Filter (Index `(profile_id, date)` liest einen Bereich), Drill-Down und Suche schon beim Lesen der Kennzahlen
+    (Join auf die Entity mit Profil: Schlüssel-Index `(profile_id, <entity>_id, date)`), Ergebnis als ein JSON (Beträge als Text,
+    nie als JSON-Zahl), `set local work_mem = '64MB'` für die großen Lesezugriffe.
+  - **EXPLAIN ANALYZE / Messung** (lokal, Demo-Daten aus 2.3, rund 2 Mio. Kennzahl-Zeilen, 6 Profile in 4 Währungen, Anzeige EUR,
+    zweiter Lauf; `shared_buffers` 128 MB): Portfolios 40 ms, Kampagnen 50 ms, Ad Groups 105 ms, Product Ads 220 ms, Dashboard
+    60 ms, Tagesreihe Kampagnen 60 ms (jeweils alle Profile, 30 Tage + Vergleich). Targets: alle Profile 30 Tage ohne Vergleich
+    740 ms, mit Vergleich 1,6 s, ein Client (2 Profile) mit Vergleich 560 ms, 7 Tage mit Vergleich 620 ms, Drill-Down auf eine
+    Kampagne 9 ms. Suchbegriffe: 980 ms / 2,5 s / 770 ms / 770 ms / 12 ms. Engpass laut Plan: das Lesen der Kennzahl-Zeilen
+    (rund 620 000 Target-Zeilen à 330 Byte für 60 Tage, etwa 0,7 s) und die Aggregation, nicht Indizes (alle Zugriffe über
+    `…_profile_date_idx` bzw. den Schlüssel-Index; kein neuer Index nötig). Fester Anteil bei 10 000 Zeilen rund 300 ms (JSON mit
+    10 MB bauen, übertragen, parsen); die API komprimiert (2.5).
+  - **Offen (für Dominik, vor 2.8):** Targets und Suchbegriffe über **alle** Profile mit 30 Tagen **und** Vergleich liegen über der
+    1-s-Grenze der DoD (1,6 s bzw. 2,5 s mit ~12 000 Targets). Vorschläge: (a) der Explorer lädt den Vergleich erst auf Wunsch
+    oder nach den Zeilen, (b) Voraggregation (z. B. je Entity und Woche) für lange Zeiträume, (c) Infinite Row Model mit
+    Sortierung auf dem Server (F7). Kampagnen, Dashboard, Drill-Down und ein Client bleiben unter 1 s.
 
 ### 2.5 API (`apps/api`)
 - [ ] Middleware `requireFeature(key, 'view')`: prüft Entitlement und Rolle serverseitig (`resolveFeatureAccess`), `403` mit
