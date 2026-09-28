@@ -23,6 +23,7 @@ import {
 } from './mock';
 import {
   createReportRowSchema,
+  REPORT_DEFINITIONS,
   type AmazonAdsReportRows,
   type AmazonAdsReportType,
 } from './reports';
@@ -137,6 +138,8 @@ describe('renderMockConsentPage', () => {
 describe('Mock-Anbieter: Entities und Reports', () => {
   const DE = '9007199254740993';
   const UK_VENDOR = '2345678901234567';
+  const FR = '1234567890123456';
+  const SB = 'SPONSORED_BRANDS';
   const START = Date.parse('2026-09-27T06:00:00Z');
 
   function simulated(simulation: MockAmazonAdsSimulation = {}) {
@@ -166,12 +169,13 @@ describe('Mock-Anbieter: Entities und Reports', () => {
   async function exportRows<T extends AmazonAdsExportType>(
     amazonProfileId: string,
     exportType: T,
+    adProduct = 'SPONSORED_PRODUCTS',
   ): Promise<AmazonAdsExportRows[T][]> {
     const { client, advance } = simulated();
     const { exportId } = await client.requestExport(connection, {
       amazonProfileId,
       exportType,
-      adProduct: 'SPONSORED_PRODUCTS',
+      adProduct,
     });
     const ref = { amazonProfileId, exportType, exportId };
     await expect(client.getExport(connection, ref)).resolves.toEqual({ status: 'PROCESSING' });
@@ -179,10 +183,7 @@ describe('Mock-Anbieter: Entities und Reports', () => {
     const state = await client.getExport(connection, ref);
     expect(state.status).toBe('COMPLETED');
     const rows = await download(client, state.status === 'COMPLETED' ? state.url : null);
-    const schema = createExportRowSchema(exportType, {
-      adProduct: 'SPONSORED_PRODUCTS',
-      logger: () => {},
-    });
+    const schema = createExportRowSchema(exportType, { adProduct, logger: () => {} });
     return rows.map((row) => schema.parse(row));
   }
 
@@ -247,6 +248,11 @@ describe('Mock-Anbieter: Entities und Reports', () => {
     const state = await client.getReport(connection, ref);
     expect(state.status).toBe('COMPLETED');
     const rows = await download(client, state.status === 'COMPLETED' ? state.url : null);
+    // Wie Amazon: nur die angeforderten Spalten.
+    const columns = new Set<string>(REPORT_DEFINITIONS[reportType].columns);
+    for (const row of rows) {
+      expect(Object.keys(row as object).filter((key) => !columns.has(key))).toEqual([]);
+    }
     const schema = createReportRowSchema(reportType);
     return rows.map((row) => schema.parse(row));
   }
@@ -275,6 +281,56 @@ describe('Mock-Anbieter: Entities und Reports', () => {
     expect((await reportRows(sim, 'spAdvertisedProduct')).length).toBeGreaterThan(0);
     const terms = await reportRows(sim, 'spSearchTerm');
     expect(terms.every((row) => row.searchTerm.length > 0)).toBe(true);
+  });
+
+  it('exportiert SB-Entities nur für das DE-Profil, getrennt von SP (1.9)', async () => {
+    const campaigns = await exportRows(DE, 'campaigns', SB);
+    expect(campaigns.length).toBeGreaterThan(0);
+    expect(campaigns.every((c) => c.adProduct === SB)).toBe(true);
+    const spCampaigns = await exportRows(DE, 'campaigns');
+    expect(spCampaigns.every((c) => c.adProduct === 'SPONSORED_PRODUCTS')).toBe(true);
+    expect(await exportRows(FR, 'campaigns', SB)).toEqual([]);
+
+    // SB-Targets tragen wie im gemeinsamen Modell keine Kampagne; dazu Themen und ein Negative.
+    const targets = await exportRows(DE, 'targets', SB);
+    expect(targets.every((t) => t.target.amazonCampaignId === null)).toBe(true);
+    expect(new Set(targets.map((t) => t.target.targetType))).toEqual(
+      new Set(['keyword', 'theme', 'product']),
+    );
+    expect(targets.some((t) => t.kind === 'negative')).toBe(true);
+
+    const ads = await exportRows(DE, 'ads', SB);
+    expect(ads.map((ad) => [ad.extra.adType, ad.asin, ad.sku])).toEqual([
+      ['VIDEO', 'B0MOCK0001', null],
+      ['PRODUCT_COLLECTION', null, null],
+    ]);
+    expect(ads[1]?.extra.asins).toHaveLength(3);
+  });
+
+  it('liefert SB-Reports: Klick + View, Klick-Anteil, Kampagnen = Summe der Ad Groups (1.9)', async () => {
+    const sim = simulated();
+    const campaigns = await reportRows(sim, 'sbCampaigns');
+    const adGroups = await reportRows(sim, 'sbAdGroup');
+    expect(campaigns.length).toBeGreaterThan(0);
+    for (const row of campaigns) {
+      const parts = adGroups.filter(
+        (g) => g.date === row.date && g.amazonCampaignId === row.amazonCampaignId,
+      );
+      expect(parts.reduce((sum, g) => sum + g.clicks, 0)).toBe(row.clicks);
+      expect(row.sales7d).toBeNull();
+      expect(Number(row.sales14d)).toBeGreaterThanOrEqual(Number(row.salesClicks14d));
+      expect(row.purchases14d!).toBeGreaterThanOrEqual(row.purchasesClicks14d!);
+    }
+    // Views machen einen Unterschied, sonst prüfte der Mock die Trennung nicht.
+    expect(campaigns.some((r) => r.purchases14d! > r.purchasesClicks14d!)).toBe(true);
+
+    const targets = await reportRows(sim, 'sbTargeting');
+    expect(targets.length).toBeGreaterThan(0);
+    expect((await reportRows(sim, 'sbAds')).length).toBeGreaterThan(0);
+    const terms = await reportRows(sim, 'sbSearchTerm');
+    expect(terms.every((row) => row.searchTerm.length > 0 && row.unitsClicks14d === null)).toBe(
+      true,
+    );
   });
 
   it('antwortet auf eine identische Anfrage während der Verarbeitung mit 425 und der ID', async () => {
