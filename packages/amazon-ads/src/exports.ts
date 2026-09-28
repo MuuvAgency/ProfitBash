@@ -111,7 +111,10 @@ export interface AmazonAdsProductAd extends EntityBase {
   amazonAdGroupId: string;
   /** Das gemeinsame Ad-Modell hat keine Kampagne; 1.7 ergänzt sie über die Ad Group. */
   amazonCampaignId: string | null;
-  /** Nur bei genau einem beworbenen Produkt; SB-Ads mit mehreren ASINs führen sie in `extra.asins` (1.9). */
+  /**
+   * Nur bei genau einem beworbenen Produkt; SB- und SD-Ads mit mehreren ASINs führen sie in `extra.asins`
+   * (1.9). SD-Product-Ads von Sellern nennen oft nur die SKU (ASIN dann aus dem Report).
+   */
   asin: string | null;
   /** Vendoren und SB-Ads haben keine SKU. */
   sku: string | null;
@@ -486,8 +489,9 @@ export function createExportRowSchema<T extends AmazonAdsExportType>(
         products.flatMap((product) =>
           product.productIdType === type && product.productId ? [product.productId] : [],
         );
-      // SP-Product-Ads zeigen genau ein Produkt. SB-Ads (Video, Kollektion, Store Spotlight, 1.9) zeigen
-      // 0–n ASINs ohne SKU: `asin` nur bei genau einem, sonst alle ASINs in `extra`.
+      // SP-Product-Ads zeigen genau ein Produkt, SD-Product-Ads eine ASIN oder SKU. SB-Ads (Video, Kollektion,
+      // Store Spotlight) und SD-Bild-/Video-Ads zeigen 0–n ASINs ohne SKU (1.9): `asin` nur bei genau einem,
+      // sonst alle ASINs in `extra`.
       const asins = productIds('ASIN');
       const skus = productIds('SKU');
       return {
