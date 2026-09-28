@@ -46,6 +46,7 @@ const {
 const DE = '9007199254740993';
 const SP = 'SPONSORED_PRODUCTS';
 const SB = 'SPONSORED_BRANDS';
+const SD = 'SPONSORED_DISPLAY';
 const START = Date.parse('2026-09-27T06:00:00Z');
 
 let testDb: TestDatabase;
@@ -202,14 +203,17 @@ describe('Sync mit dem Mock-Anbieter (DoD Phase 1)', () => {
     expect(values.map((v) => v.sales7d)).toContain('1234567.89');
   });
 
-  it('holt SB-Kennzahlen mit dem nächsten reports-sync, sobald die SB-Kampagnen da sind (1.9)', async () => {
-    // Der erste Lauf hat SB-Entities importiert, SB-Reports aber noch nicht angefordert (keine Kampagne).
+  it('holt SB- und SD-Kennzahlen mit dem nächsten reports-sync, sobald deren Kampagnen da sind (1.9)', async () => {
+    // Der erste Lauf hat SB- und SD-Entities importiert, deren Reports aber noch nicht angefordert (keine
+    // Kampagne).
     const campaigns = await testDb.db
       .select({ id: amazonAdsCampaigns.id, adProduct: amazonAdsCampaigns.adProduct })
       .from(amazonAdsCampaigns)
       .where(eq(amazonAdsCampaigns.profileId, profileId));
     const sbCampaignIds = new Set(campaigns.filter((c) => c.adProduct === SB).map((c) => c.id));
+    const sdCampaignIds = new Set(campaigns.filter((c) => c.adProduct === SD).map((c) => c.id));
     expect(sbCampaignIds.size).toBeGreaterThan(0);
+    expect(sdCampaignIds.size).toBeGreaterThan(0);
     const adsOf = async (adProduct: string) =>
       testDb.db
         .select()
@@ -221,6 +225,7 @@ describe('Sync mit dem Mock-Anbieter (DoD Phase 1)', () => {
       'PRODUCT_COLLECTION',
       'VIDEO',
     ]);
+    expect((await adsOf(SD)).map((ad) => ad.extra.adType).sort()).toEqual(['IMAGE', 'PRODUCT_AD']);
     const dataThrough = async () => {
       const [row] = await testDb.db
         .select({ date: metricsImportedThroughSql(REPORT_AD_PRODUCT_SELECTION) })
@@ -228,7 +233,7 @@ describe('Sync mit dem Mock-Anbieter (DoD Phase 1)', () => {
         .where(eq(amazonAdsProfiles.id, profileId));
       return row!.date;
     };
-    // Das Profil nutzt SB, SB hat aber noch keinen Tag: „Daten bis“ wartet darauf.
+    // Das Profil nutzt SB und SD, beide haben aber noch keinen Tag: „Daten bis“ wartet darauf.
     expect(await dataThrough()).toBeNull();
 
     await syncConnectionReports(deps(), job(), run());
@@ -245,11 +250,25 @@ describe('Sync mit dem Mock-Anbieter (DoD Phase 1)', () => {
     expect(sb.every((m) => sbCampaignIds.has(m.campaignId) && m.sales7d === null)).toBe(true);
     expect(sb.every((m) => m.salesClicks14d !== null && m.purchasesClicks14d !== null)).toBe(true);
     expect(sp.every((m) => m.salesClicks14d === null)).toBe(true);
-    for (const table of Object.values(METRIC_TABLES)) {
+    const sd = metrics.filter((m) => m.adProduct === SD);
+    expect(sd.length).toBeGreaterThan(0);
+    expect(sd.every((m) => sdCampaignIds.has(m.campaignId) && m.salesClicks14d !== null)).toBe(
+      true,
+    );
+    // Sichtbare Impressionen nur bei SD.
+    expect(sd.every((m) => m.viewableImpressions !== null)).toBe(true);
+    expect([...sp, ...sb].every((m) => m.viewableImpressions === null)).toBe(true);
+    const countOf = async (table: PgTable, adProduct: string) => {
       const [row] = await testDb.db.execute<{ n: number }>(
-        sql`select count(*)::int as n from ${table} where profile_id = ${profileId} and ad_product = ${SB}`,
+        sql`select count(*)::int as n from ${table} where profile_id = ${profileId} and ad_product = ${adProduct}`,
       );
-      expect(row!.n).toBeGreaterThan(0);
+      return row!.n;
+    };
+    for (const [level, table] of Object.entries(METRIC_TABLES)) {
+      expect(await countOf(table, SB)).toBeGreaterThan(0);
+      // SD hat keinen Suchbegriff-Report.
+      if (level === 'searchTerm') expect(await countOf(table, SD)).toBe(0);
+      else expect(await countOf(table, SD)).toBeGreaterThan(0);
     }
     // Gestern in Paris (Zeitzone des Profils): 26.09.
     expect(await dataThrough()).toBe('2026-09-26');
