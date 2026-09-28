@@ -25,8 +25,11 @@ import {
   type LoadedConnection,
 } from './connection-job';
 
-/** Ad-Typen des Entity-Syncs (F2: SP zuerst; SB und SD folgen mit 1.9). */
-export const ENTITY_AD_PRODUCTS = ['SPONSORED_PRODUCTS'] as const;
+/**
+ * Ad-Typen des Entity-Syncs (F2; SD folgt mit 1.9). Für jedes Profil, auch ohne SB: Erst die exportierten
+ * Kampagnen zeigen, ob das Profil SB nutzt und `reports-sync` SB-Reports anfordert (1.9).
+ */
+export const ENTITY_AD_PRODUCTS = ['SPONSORED_PRODUCTS', 'SPONSORED_BRANDS'] as const;
 
 /**
  * `entities-sync` je Connection (1.7): für jedes nicht entfernte Profil (auch ausgeblendete, F14) die

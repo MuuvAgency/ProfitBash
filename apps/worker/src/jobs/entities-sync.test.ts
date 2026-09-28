@@ -25,13 +25,21 @@ import {
   type ConnectionQueue,
   type ScheduledRetry,
 } from './connection-job';
-import { syncConnectionEntities } from './entities-sync';
+import { ENTITY_AD_PRODUCTS, syncConnectionEntities } from './entities-sync';
 import { syncConnectionProfiles } from './profiles-sync';
 
 const { amazonAdsPortfolios, amazonAdsProfiles, amazonAdsReportRequests } = schema;
 
 const SP = 'SPONSORED_PRODUCTS';
+const SB = 'SPONSORED_BRANDS';
 const DE = '9007199254740993';
+/** Exports je Batch (Kampagnen, Ad Groups, Targets, Ads). */
+const EXPORTS_PER_BATCH = 4;
+/** Batches je Profil: einer je Ad-Typ, auch ohne Kampagnen dieses Typs (1.9). */
+const BATCHES_PER_PROFILE = ENTITY_AD_PRODUCTS.length;
+/** Angeforderte Exports für so viele neue Batches; ab `MAX_RUNNING_EXPORTS_PER_TYPE` warten sie. */
+const requestedFor = (batches: number) =>
+  Math.min(batches, MAX_RUNNING_EXPORTS_PER_TYPE) * EXPORTS_PER_BATCH;
 const START = Date.parse('2026-09-27T06:00:00Z');
 
 let testDb: TestDatabase;
@@ -123,31 +131,38 @@ describe('syncConnectionEntities', () => {
   it('liest Portfolios direkt, fordert je Profil einen Export-Batch an und plant den Poll ein', async () => {
     const outcome = await sync();
 
+    const batches = profiles.length * BATCHES_PER_PROFILE;
     expect(outcome.counters).toMatchObject({
       profiles: profiles.length,
-      requested: profiles.length * 4,
-      exportsWaiting: 0,
+      requested: requestedFor(batches),
+      exportsWaiting: batches - Math.min(batches, MAX_RUNNING_EXPORTS_PER_TYPE),
     });
     expect(outcome.counters?.created).toBeGreaterThan(0);
-    const exports = await exportsOf(deProfileId());
-    expect(exports.map((e) => e.reportType).sort()).toEqual([
-      'adGroups',
-      'ads',
-      'campaigns',
-      'targets',
-    ]);
-    expect(new Set(exports.map((e) => e.batchId)).size).toBe(1);
-    expect(exports.every((e) => e.status === 'requested' && e.adProduct === SP)).toBe(true);
+    // Das erste Profil (Reihenfolge des Jobs) bekommt je Ad-Typ einen Batch mit vier Exports, beide
+    // angefordert. Spätere Profile können auf einen Export-Platz warten.
+    const exports = await exportsOf(profiles[0]!.id);
+    for (const adProduct of [SP, SB]) {
+      const batch = exports.filter((e) => e.adProduct === adProduct);
+      expect(batch.map((e) => e.reportType).sort()).toEqual([
+        'adGroups',
+        'ads',
+        'campaigns',
+        'targets',
+      ]);
+      expect(new Set(batch.map((e) => e.batchId)).size).toBe(1);
+    }
+    expect(exports.every((e) => e.status === 'requested')).toBe(true);
     const portfolios = await testDb.db
       .select()
       .from(amazonAdsPortfolios)
       .where(eq(amazonAdsPortfolios.profileId, deProfileId()));
     expect(portfolios.length).toBeGreaterThan(0);
+    // Wartende Batches sind sofort fällig: Der Poll prüft bald, ob ein Export-Platz frei ist.
     expect(enqueued).toEqual([
       {
         queue: 'amazon-requests-poll',
         job: { organizationId, connectionId },
-        startAfterSeconds: 60,
+        startAfterSeconds: 5,
       },
     ]);
   });
@@ -156,7 +171,7 @@ describe('syncConnectionEntities', () => {
     await sync();
     const second = await sync();
     expect(second.counters).toMatchObject({ requested: 0 });
-    expect((await exportsOf(deProfileId())).length).toBe(4);
+    expect((await exportsOf(deProfileId())).length).toBe(BATCHES_PER_PROFILE * EXPORTS_PER_BATCH);
   });
 
   it('synchronisiert ausgeblendete Profile (F14), entfernte nicht', async () => {
@@ -173,7 +188,7 @@ describe('syncConnectionEntities', () => {
     const outcome = await sync();
 
     expect(outcome.counters).toMatchObject({ profiles: profiles.length - 1 });
-    expect((await exportsOf(hidden!.id)).length).toBe(4);
+    expect((await exportsOf(hidden!.id)).length).toBe(BATCHES_PER_PROFILE * EXPORTS_PER_BATCH);
     expect(await exportsOf(removed!.id)).toEqual([]);
   });
 
@@ -227,7 +242,8 @@ describe('syncConnectionEntities', () => {
 
     const outcome = await sync();
 
-    expect(outcome.counters).toMatchObject({ requested: 0, exportsWaiting: profiles.length });
+    // SP für alle Profile, SB nur für DE (die übrigen haben schon einen offenen SB-Batch).
+    expect(outcome.counters).toMatchObject({ requested: 0, exportsWaiting: profiles.length + 1 });
     const waiting = await exportsOf(deProfileId());
     expect(waiting.filter((e) => e.adProduct === SP).map((e) => e.status)).toEqual([
       'pending_request',
@@ -267,7 +283,7 @@ describe('syncConnectionEntities', () => {
     expect((error as JobFailure).message).toMatch(/1 von \d+ Profilen/);
     expect((error as JobFailure).counters).toMatchObject({
       profileErrors: 1,
-      requested: (profiles.length - 1) * 4,
+      requested: requestedFor((profiles.length - 1) * BATCHES_PER_PROFILE),
     });
     expect(await exportsOf(deProfileId())).toEqual([]);
     // Die Kette läuft trotzdem weiter (Reports der übrigen Profile).
@@ -296,7 +312,7 @@ describe('syncConnectionEntities', () => {
     enqueued.length = 0;
     const resumed = await sync({ chain: true, resumeFromProfileId: profiles[1]!.id });
     expect(resumed.counters).toMatchObject({ profiles: profiles.length - 1 });
-    expect(await exportsOf(profiles[0]!.id)).toHaveLength(4);
+    expect(await exportsOf(profiles[0]!.id)).toHaveLength(BATCHES_PER_PROFILE * EXPORTS_PER_BATCH);
     expect(enqueued).toContainEqual(expect.objectContaining({ queue: 'reports-sync' }));
   });
 
@@ -314,7 +330,10 @@ describe('syncConnectionEntities', () => {
     const error = await sync({ chain: true }, deps(throttled)).catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(JobFailure);
-    expect((error as JobFailure).counters).toMatchObject({ profiles: 2, requested: 4 });
+    expect((error as JobFailure).counters).toMatchObject({
+      profiles: 2,
+      requested: requestedFor(BATCHES_PER_PROFILE),
+    });
     expect(retries).toEqual([
       {
         queue: 'entities-sync',
