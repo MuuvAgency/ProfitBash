@@ -1,7 +1,7 @@
 import { isOrgRole, type OrgRole } from '@profitbash/shared';
-import { and, asc, eq, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
-import { amazonAdsProfiles, members, orgEntitlements, organizations } from './schema';
+import { amazonAdsProfiles, clients, members, orgEntitlements, organizations } from './schema';
 
 /**
  * Zentraler Access-Layer. ALLE Profil-Abfragen laufen hierüber (siehe CLAUDE.md).
@@ -137,4 +137,58 @@ export async function canSeeProfile(
     .where(and(...conditions, eq(amazonAdsProfiles.id, input.profileId)))
     .limit(1);
   return row !== undefined;
+}
+
+export interface VisibleProfileSummary {
+  id: string;
+  amazonProfileId: string;
+  accountName: string;
+  countryCode: string;
+  currencyCode: string;
+  timezone: string;
+  accountType: string;
+  clientId: string | null;
+}
+
+export interface VisibleClient {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+/**
+ * Auswahl für die Filterleiste (`phase-2.md` F2): sichtbare Profile und die Clients, denen mindestens eines
+ * davon gehört. Für alle Rollen; Clients ohne sichtbares Profil erscheinen nicht. Profile ohne Client haben
+ * `clientId: null` („Ohne Client“). Kein Mitglied: leere Listen.
+ */
+export async function listVisibleClientsAndProfiles(
+  db: Db,
+  input: ProfileVisibilityInput,
+): Promise<{ clients: VisibleClient[]; profiles: VisibleProfileSummary[] }> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return { clients: [], profiles: [] };
+  const profiles = await db
+    .select({
+      id: amazonAdsProfiles.id,
+      amazonProfileId: amazonAdsProfiles.amazonProfileId,
+      accountName: amazonAdsProfiles.accountName,
+      countryCode: amazonAdsProfiles.countryCode,
+      currencyCode: amazonAdsProfiles.currencyCode,
+      timezone: amazonAdsProfiles.timezone,
+      accountType: amazonAdsProfiles.accountType,
+      clientId: amazonAdsProfiles.clientId,
+    })
+    .from(amazonAdsProfiles)
+    .where(inArray(amazonAdsProfiles.id, scope.ids))
+    .orderBy(asc(amazonAdsProfiles.accountName), asc(amazonAdsProfiles.id));
+  const clientIds = [...new Set(profiles.flatMap((p) => (p.clientId ? [p.clientId] : [])))];
+  const visibleClients =
+    clientIds.length === 0
+      ? []
+      : await db
+          .select({ id: clients.id, name: clients.name, slug: clients.slug })
+          .from(clients)
+          .where(and(eq(clients.organizationId, input.orgId), inArray(clients.id, clientIds)))
+          .orderBy(asc(clients.name), asc(clients.id));
+  return { clients: visibleClients, profiles };
 }
