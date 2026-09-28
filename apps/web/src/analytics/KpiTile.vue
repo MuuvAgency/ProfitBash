@@ -2,14 +2,15 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
-import { useSessionStore } from '../stores/session';
+import ChangePill from './ChangePill.vue';
 import HintBadge from './HintBadge.vue';
 import type { MetricHint } from './hints';
-import { changeTone, formatChange, isShownAsNoChange, type MetricKey } from './metrics';
+import type { MetricKey } from './metrics';
 
 /**
  * KPI-Kachel (DESIGN.md §4 „KPI / Metric block“): Überzeile, großer Wert in Mono, Veränderung als Pille mit Farbe
  * nach Bedeutung, Vergleichswert und Hinweise. Werte kommen fertig formatiert (Helper aus `@profitbash/shared`).
+ * Slot `detail`: Zusatzwert unter dem Wert (z. B. CPC bei den Klicks).
  */
 const props = withDefaults(
   defineProps<{
@@ -28,34 +29,8 @@ const props = withDefaults(
 );
 
 const { t } = useI18n();
-const session = useSessionStore();
 
 const approx = computed(() => props.hints.some((hint) => hint.kind === 'approx'));
-const tone = computed(() => changeTone(props.metric, props.change));
-const changeText = computed(() => formatChange(props.change, session.preferences.locale));
-const changeWords = computed(() => {
-  if (tone.value === null) return '';
-  if (props.change === null || /^-?0(\.0+)?$/.test(props.change))
-    return t('analytics.kpi.unchanged');
-  return t(props.change.startsWith('-') ? 'analytics.kpi.decrease' : 'analytics.kpi.increase', {
-    value: changeText.value,
-  });
-});
-const pillClass = computed(
-  () =>
-    ({
-      positive: 'bg-lime/25 text-lime-deep',
-      negative: 'bg-loss-wash text-on-loss-wash',
-      neutral: 'bg-well text-ink-secondary',
-    })[tone.value ?? 'neutral'],
-);
-const arrow = computed(() =>
-  props.change === null || isShownAsNoChange(props.change)
-    ? 'pi-minus'
-    : props.change.startsWith('-')
-      ? 'pi-arrow-down-right'
-      : 'pi-arrow-up-right',
-);
 </script>
 
 <template>
@@ -77,20 +52,11 @@ const arrow = computed(() =>
       <p data-kpi-value class="font-data text-data-lg text-ink">
         <span v-if="approx" aria-hidden="true">≈ </span>{{ value }}
       </p>
+      <p v-if="$slots.detail" class="font-data text-data-sm text-ink-secondary">
+        <slot name="detail" />
+      </p>
       <div class="flex flex-wrap items-center gap-x-space-sm gap-y-space-xs">
-        <span
-          v-if="tone !== null"
-          data-kpi-change
-          :data-tone="tone"
-          :class="[
-            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-data text-data-sm',
-            pillClass,
-          ]"
-        >
-          <i :class="['pi', arrow, 'text-[0.625rem]']" aria-hidden="true" />
-          <span aria-hidden="true">{{ changeText }}</span>
-          <span class="sr-only">{{ changeWords }}</span>
-        </span>
+        <ChangePill :metric="metric" :change="change" />
         <span v-if="comparisonValue" class="font-data text-data-sm text-ink-tertiary">
           {{ t('analytics.kpi.comparisonValue', { value: comparisonValue }) }}
         </span>

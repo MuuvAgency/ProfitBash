@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue';
-import { useRoute, useRouter, type HistoryState } from 'vue-router';
+import { useRoute, useRouter, type HistoryState, type RouteLocationRaw } from 'vue-router';
 import { api } from '../api';
 import {
   filterStateFromQuery,
+  filterStateToQuery,
   mergeFilterQuery,
   parseStoredFilters,
   sanitizeFilterState,
@@ -134,5 +135,18 @@ export function useAnalyticsFilters() {
 
   const query = computed(() => toAnalyticsQuery(state.value, today.value));
 
-  return { state, options, ready, update, query, today };
+  /**
+   * Link auf eine andere Auswertung (z. B. den Explorer) mit geänderter Auswahl: kurzer Zustand in der URL, der ganze
+   * (auch die Profile) im Verlaufseintrag.
+   */
+  function linkTo(path: string, patch: Partial<FilterState>): RouteLocationRaw {
+    const next: FilterState = { ...state.value, ...patch };
+    return {
+      path,
+      query: filterStateToQuery(next),
+      state: { [HISTORY_STATE_KEY]: toHistoryValue(next) },
+    };
+  }
+
+  return { state, options, ready, update, query, today, linkTo };
 }

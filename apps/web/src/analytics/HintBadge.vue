@@ -8,7 +8,10 @@ import type { MetricHint } from './hints';
  * Hinweis an einer Kennzahl als kleiner Schalter mit Erklärung im Popover. Per Klick statt Tooltip, damit der Text
  * auch auf Touch-Geräten lesbar ist (`phase-2.md` F14).
  */
-const props = defineProps<{ hint: MetricHint }>();
+const props = defineProps<{
+  hint: MetricHint;
+  /** Auf dunkler Fläche (Hero-Kachel). */ onDark?: boolean;
+}>();
 
 const { t } = useI18n();
 const popover = ref<InstanceType<typeof Popover>>();
@@ -62,8 +65,9 @@ const content = computed(() => {
     :aria-label="t('analytics.hint.showHint', { label: content.label })"
     :aria-expanded="open"
     :class="[
-      'inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-violet-wash focus-visible:outline-2 focus-visible:outline-violet',
-      content.tone === 'warn' ? 'text-warn' : 'text-ink-tertiary',
+      'inline-flex size-7 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-violet',
+      content.tone === 'warn' ? 'text-warn' : onDark ? 'text-on-panel-muted' : 'text-ink-tertiary',
+      onDark ? 'hover:bg-on-panel/10' : 'hover:bg-violet-wash',
     ]"
     @click="popover?.toggle($event)"
   >
