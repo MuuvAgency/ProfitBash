@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AppEnv } from './context';
 import { createErrorHandler } from './errors';
-import { requireRole, requireSession, requireSuperadmin } from './middleware';
+import { requireFeature, requireRole, requireSession, requireSuperadmin } from './middleware';
 import {
   createTestContext,
   createUser,
@@ -44,6 +44,11 @@ beforeAll(async () => {
   guarded.get('/admin', requireRole('admin'), (c) => c.text('ok'));
   guarded.get('/editor', requireRole('editor'), (c) => c.text('ok'));
   guarded.get('/super', requireSuperadmin(), (c) => c.text('ok'));
+  guarded.get('/explorer', requireFeature(deps, 'sp-explorer', 'view'), (c) => c.text('ok'));
+  guarded.get('/changes', requireFeature(deps, 'changes', 'write'), (c) => c.text('ok'));
+  guarded.get('/filters', requireFeature(deps, ['dashboard', 'sp-explorer'], 'view'), (c) =>
+    c.text('ok'),
+  );
 });
 
 afterAll(async () => {
@@ -229,5 +234,50 @@ describe('CSRF-Schutz eigener Endpunkte', () => {
       body: '{"theme":"dark","locale":"de-DE","density":"compact"}',
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('requireFeature', () => {
+  const setEntitlement = (feature: string, enabled: boolean) =>
+    ctx.testDb.db
+      .update(schema.orgEntitlements)
+      .set({ enabled })
+      .where(
+        and(
+          eq(schema.orgEntitlements.organizationId, ctx.seeded.organizationId),
+          eq(schema.orgEntitlements.feature, feature),
+        ),
+      );
+
+  it('lässt jede Rolle mit gebuchtem Feature lesen, schreiben nur Editor und Admin', async () => {
+    expect((await call('/explorer', cookies.viewer)).status).toBe(200);
+    expect(await call('/changes', cookies.viewer)).toEqual({
+      status: 403,
+      body: { error: { code: 'FEATURE_FORBIDDEN', message: expect.stringContaining('changes') } },
+    });
+    expect((await call('/changes', cookies.editor)).status).toBe(200);
+  });
+
+  it('antwortet 403 im Fehlerformat, wenn die Organisation das Feature nicht gebucht hat', async () => {
+    await setEntitlement('sp-explorer', false);
+    try {
+      expect(await call('/explorer', cookies.admin)).toEqual({
+        status: 403,
+        body: { error: { code: 'FEATURE_FORBIDDEN', message: expect.any(String) } },
+      });
+      // Eines von mehreren Features genügt (Filterleiste in Dashboard und Explorer).
+      expect((await call('/filters', cookies.viewer)).status).toBe(200);
+      await setEntitlement('dashboard', false);
+      expect((await call('/filters', cookies.viewer)).status).toBe(403);
+    } finally {
+      await setEntitlement('sp-explorer', true);
+      await setEntitlement('dashboard', true);
+    }
+  });
+
+  it('ohne aktive Organisation 403', async () => {
+    expect((await call('/explorer', cookies.loner)).body).toMatchObject({
+      error: { code: 'NO_ACTIVE_ORGANIZATION' },
+    });
   });
 });

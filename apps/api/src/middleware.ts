@@ -1,5 +1,12 @@
-import { listMemberships, schema } from '@profitbash/db';
-import { hasOrgRole, isPlatformRole, type OrgRole, type PlatformRole } from '@profitbash/shared';
+import { listEnabledFeatures, listMemberships, schema } from '@profitbash/db';
+import {
+  hasOrgRole,
+  isPlatformRole,
+  resolveFeatureAccess,
+  type FeatureKey,
+  type OrgRole,
+  type PlatformRole,
+} from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { csrf } from 'hono/csrf';
@@ -123,6 +130,36 @@ export function requireSuperadmin(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     if (c.get('auth').user.role !== 'superadmin') {
       throw new ApiError(403, 'FORBIDDEN', 'Nur für Plattform-Admins.');
+    }
+    await next();
+  };
+}
+
+/**
+ * Verlangt ein Feature-Recht in der aktiven Organisation (Entitlement und Rolle, `resolveFeatureAccess`). Nach
+ * `requireSession`. Mehrere Keys: eines genügt (z. B. Filterleiste für Dashboard und Explorer).
+ */
+export function requireFeature(
+  { db }: Pick<AppDeps, 'db'>,
+  features: FeatureKey | readonly FeatureKey[],
+  permission: 'view' | 'write',
+): MiddlewareHandler<AppEnv> {
+  const keys: readonly FeatureKey[] = typeof features === 'string' ? [features] : features;
+  return async (c, next) => {
+    const { activeOrganization, orgRole } = c.get('auth');
+    if (!activeOrganization) {
+      throw new ApiError(403, 'NO_ACTIVE_ORGANIZATION', 'Keine aktive Organisation.');
+    }
+    const access = resolveFeatureAccess(
+      orgRole,
+      await listEnabledFeatures(db, activeOrganization.organizationId),
+    );
+    if (!keys.some((key) => access[key][permission])) {
+      throw new ApiError(
+        403,
+        'FEATURE_FORBIDDEN',
+        `Kein Recht „${permission}“ für ${keys.map((key) => `„${key}“`).join(' oder ')}.`,
+      );
     }
     await next();
   };
