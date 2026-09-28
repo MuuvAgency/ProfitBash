@@ -11,7 +11,16 @@ import type {
 } from '@profitbash/shared';
 import createClient, { type Middleware } from 'openapi-fetch';
 import { ApiError, toApiError } from './errors';
-import type { paths } from './schema.gen';
+import type { components, paths } from './schema.gen';
+
+type Schemas = components['schemas'];
+export type AnalyticsQueryInput = Schemas['AnalyticsQuery'];
+export type FilterOptions = Schemas['FilterOptionsResponse'];
+export type DashboardData = Schemas['DashboardResponse'];
+export type TimeSeriesInput = Schemas['TimeSeriesRequest'];
+export type TimeSeriesData = Schemas['TimeSeriesResponse'];
+export type ExplorerRowsInput = Schemas['ExplorerRowsRequest'];
+export type ExplorerRowsData = Schemas['ExplorerRowsResponse'];
 
 export interface ApiOptions {
   /**
@@ -154,6 +163,18 @@ export function createApi(options: ApiOptions = {}) {
     /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */
     listJobRuns: async (query: JobRunListQuery = {}): Promise<JobRun[]> =>
       (await unwrap(client.GET('/api/job-runs', { params: { query } }))).jobRuns,
+
+    /** Auswertungen (`/api/ads/*`): alle POST, Auswahl und IDs im Body, Beträge als Decimal-Strings. */
+    analytics: {
+      filterOptions: (): Promise<FilterOptions> =>
+        unwrap(client.POST('/api/ads/filter-options', { body: {} })),
+      dashboard: (query: AnalyticsQueryInput): Promise<DashboardData> =>
+        unwrap(client.POST('/api/ads/dashboard', { body: query })),
+      timeSeries: (input: TimeSeriesInput): Promise<TimeSeriesData> =>
+        unwrap(client.POST('/api/ads/timeseries', { body: input })),
+      explorerRows: (input: ExplorerRowsInput): Promise<ExplorerRowsData> =>
+        unwrap(client.POST('/api/ads/explorer/rows', { body: input })),
+    },
 
     auth: {
       signIn: (input: SignInInput) => postAuth<unknown>('sign-in/email', input),
