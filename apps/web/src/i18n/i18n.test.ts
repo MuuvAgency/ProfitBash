@@ -1,4 +1,10 @@
-import { CONNECTION_JOB_NAMES, SYNC_STATUS_JOB_NAMES } from '@profitbash/shared';
+import {
+  AD_PRODUCTS,
+  ATTRIBUTION_SETTINGS,
+  CONNECTION_JOB_NAMES,
+  SYNC_STATUS_JOB_NAMES,
+} from '@profitbash/shared';
+import { COMPARISON_MODES, PERIOD_PRESETS } from '../analytics/periods';
 import { describe, expect, it } from 'vitest';
 import { NAVIGATION } from '../navigation/navigation';
 import { errorMessageKey, i18n } from './index';
@@ -33,6 +39,16 @@ describe('i18n', () => {
     expect(errorMessageKey('NETWORK_ERROR')).toBe('errors.NETWORK_ERROR');
     expect(errorMessageKey('IRGENDWAS_NEUES')).toBe('errors.UNKNOWN');
     expect(te(errorMessageKey('IRGENDWAS_NEUES'))).toBe(true);
+  });
+
+  it('hat Texte für alle Optionen der Filterleiste und alle Ad-Typen', () => {
+    const keys = [
+      ...PERIOD_PRESETS.map((preset) => `analytics.period.${preset}`),
+      ...COMPARISON_MODES.map((mode) => `analytics.comparison.${mode}`),
+      ...ATTRIBUTION_SETTINGS.map((setting) => `analytics.attribution.${setting}`),
+      ...AD_PRODUCTS.map((adProduct) => `analytics.adProduct.${adProduct}`),
+    ];
+    expect(keys.filter((key) => !te(key))).toEqual([]);
   });
 
   it('nennt die Phase auf Platzhalterseiten', () => {

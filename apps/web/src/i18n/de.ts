@@ -324,6 +324,87 @@ export const de = {
       },
     },
   },
+  analytics: {
+    filter: {
+      label: 'Filter',
+      selection: 'Clients und Profile',
+      allProfiles: 'Alle Profile',
+      profileCount: '{count} Profil | {count} Profile',
+      withoutClient: 'Ohne Client',
+      searchProfiles: 'Clients und Profile durchsuchen',
+      noProfiles: 'Keine sichtbaren Profile',
+      period: 'Zeitraum',
+      customRange: 'Eigener Zeitraum',
+      comparison: 'Vergleich',
+      currency: 'Währung',
+      attribution: 'Attribution',
+      previousYearUnavailable: 'Für das Vorjahr liegen noch keine Daten vor.',
+      loadFailed: 'Die Filter konnten nicht geladen werden.',
+      range: '{from} – {to}',
+      comparisonRange: 'Vergleich: {from} – {to}',
+    },
+    period: {
+      yesterday: 'Gestern',
+      last7: 'Letzte 7 Tage',
+      last14: 'Letzte 14 Tage',
+      last30: 'Letzte 30 Tage',
+      thisWeek: 'Diese Woche',
+      lastWeek: 'Letzte Woche',
+      thisMonth: 'Dieser Monat',
+      lastMonth: 'Letzter Monat',
+      monthBeforeLast: 'Vorletzter Monat',
+      thirdLastMonth: 'Vor-vorletzter Monat',
+      last12Months: 'Letzte 12 Monate',
+      yearToDate: 'Dieses Jahr bis jetzt',
+      lastYear: 'Letztes Jahr',
+      custom: 'Frei wählen',
+    },
+    comparison: {
+      previous: 'Vorperiode',
+      previousYear: 'Vorjahr',
+      off: 'Kein Vergleich',
+    },
+    currency: {
+      auto: 'Automatisch',
+      autoHint: 'Eine Währung in der Auswahl: diese, sonst EUR.',
+    },
+    attribution: {
+      console: 'Wie Konsole',
+      clicks14d: '14 Tage, nur Klicks',
+    },
+    adProduct: {
+      SPONSORED_PRODUCTS: 'Sponsored Products',
+      SPONSORED_BRANDS: 'Sponsored Brands',
+      SPONSORED_DISPLAY: 'Sponsored Display',
+    },
+    kpi: {
+      vsComparison: 'vs. Vergleich',
+      comparisonValue: 'Vergleich: {value}',
+      noComparison: 'Kein Vergleich',
+      increase: 'gestiegen um {value}',
+      decrease: 'gesunken um {value}',
+      unchanged: 'unverändert',
+    },
+    hint: {
+      showHint: 'Hinweis anzeigen: {label}',
+      approx: 'Umgerechnet',
+      approxText:
+        'Beträge in anderen Währungen sind je Tag mit dem EZB-Kurs dieses Tages umgerechnet (Wochenenden und Feiertage: letzter Kurs davor).',
+      missingFx: 'Ohne Kurs nicht gezählt: {currencies}',
+      mixedAttribution: 'Gemischte Attribution',
+      mixedAttributionText:
+        'Die Summe enthält Werte mit verschiedenen Attributionsfenstern (z. B. SP 7 Tage nach Klick, SB/SD 14 Tage inkl. Views). Einheitlich vergleichbar mit „14 Tage, nur Klicks“.',
+      missingValue: 'Wert fehlt',
+      missingValueText:
+        'Amazon liefert diesen Wert für die gewählte Ebene oder den Ad-Typ nicht. Er wird nicht als 0 gezählt.',
+      partialValue: 'Wert unvollständig',
+      partialValueText:
+        'Für einen Teil der Auswahl liefert Amazon diesen Wert nicht; die Summe enthält nur die gelieferten Werte.',
+      provisional: 'Vorläufig',
+      provisionalText:
+        'Die letzten 14 Tage vor „Daten bis“ sind vorläufig: Amazon korrigiert sie noch, bis die Attributionsfenster abgeschlossen sind.',
+    },
+  },
   forbidden: {
     title: 'Kein Zugriff',
     text: 'Für diese Seite fehlen dir die Rechte, oder deine Organisation hat das Feature nicht gebucht.',
@@ -346,6 +427,10 @@ export const de = {
     CLIENT_NOT_FOUND: 'Den Client gibt es nicht mehr. Bitte lade die Seite neu.',
     CLIENT_SLUG_TAKEN:
       'Einen Client mit diesem Namen gibt es schon. Bitte wähle ihn aus der Liste.',
+    CURRENCY_NOT_SELECTABLE:
+      'Diese Anzeigewährung ist nicht wählbar. Es gilt wieder „Automatisch“.',
+    FEATURE_FORBIDDEN:
+      'Deine Organisation hat dieses Feature nicht gebucht, oder dir fehlen die Rechte.',
     NETWORK_ERROR: 'Der Server ist nicht erreichbar. Prüfe deine Verbindung.',
     SERVER: 'Auf dem Server ist ein Fehler aufgetreten. Bitte versuche es später erneut.',
     UNKNOWN: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
