@@ -739,8 +739,32 @@ Nach F11.
       SD-Reports für ein Profil dauerhaft ab (z. B. ohne Brand Registry, SD im Marktplatz nicht verfügbar, Kontotyp), zeigt es „Daten
       bis“ für immer „–“, obwohl SP aktuell ist. Beim Umsetzen entscheiden: Ad-Typen, die ein Profil nicht nutzen kann, im Sync
       überspringen und „Daten bis“ über die für dieses Profil synchronisierten Ad-Typen rechnen (mit Dominik abstimmen).
+      **Entschieden (Dominik, 2026-09-28): nach Kampagnen.** SP wird immer angefordert. SB (später SD) nur für Profile mit mindestens
+      einer Kampagne dieses Ad-Typs in der DB (aus dem Entity-Sync, auch archivierte, entfernte und Platzhalter). „Daten bis“ ist das
+      Minimum über genau diese Ad-Typen. Neue SB-Kampagnen bekommen Reports ab dem nächsten `reports-sync`, die Historie holt der
+      Merker aus 1.7 nach. Verworfen: Ad-Typ nach Amazon-Fehler abschalten (Fehlercodes vor 1.10 unbekannt).
 - [ ] SB: Entities (Exports decken SB ab) und Reports (`sbCampaigns`, `sbAdGroup`, `sbTargeting`, `sbAds`); Hinweis auf die v3-Preview-Lücke
       (SB-Kampagnen ohne Multi-Ad-Group fehlen) in der UI-Doku von Phase 2 vermerken.
+  - **Doku-Abgleich 2026-09-28** (Report-Typ-Seiten Campaign, Ad group, Targeting, Ad, Search term, Spalten-Seite, Exports-Guide;
+    die OpenAPI-Spec nennt keine Spalten je Typ): `sbCampaigns` (groupBy `campaign`), `sbAdGroup` (`adGroup`), `sbTargeting`
+    (`targeting`), `sbAds` (`ads`), `sbSearchTerm` (`searchTerm`), alle 60 Tage Aufbewahrung, höchstens 31 Tage je Anfrage.
+    `sales`, `purchases`, `unitsSold` zählen 14 Tage nach Klick **oder View**, `salesClicks`, `purchasesClicks`, `unitsSoldClicks` nur
+    nach Klick. `salesPromoted`/`purchasesPromoted` sind laut Doku dasselbe wie `…SameSku14d` (Einheiten ohne Same-SKU). Widerspruch:
+    `unitsSoldClicks` fehlt auf der Seite von `sbTargeting`, die Spalten-Seite nennt `sbTargeting` dort aber; `sbSearchTerm` hat es
+    nirgends, dazu kein `…Promoted`. Angefordert werden nur Spalten, die auf beiden Seiten stehen (eine falsche Spalte ließe jeden
+    Report mit 400 scheitern).
+  - **Entschieden (Dominik, 2026-09-28):**
+    - Attribution: `*_14d` = Klick + View (`sales`, `purchases`, `unitsSold`, wie die Konsole). Neue Spalten `sales_clicks_14d`,
+      `purchases_clicks_14d`, `units_clicks_14d` in allen Kennzahl-Tabellen für den Klick-Anteil (SP bleibt dort `null`, SP ist nur
+      klick-basiert; SD nutzt sie später auch). Same-SKU aus `salesPromoted`/`purchasesPromoted`, `units_same_sku_14d` bleibt `null`.
+    - SB-Ads (`VIDEO`, `PRODUCT_COLLECTION`, `STORE_SPOTLIGHT`, 0–n ASINs, keine SKU) in `amazon_ads_product_ads`, `sbAds` in deren
+      Kennzahlen. `asin` nur bei genau einem Produkt, sonst `null`; alle ASINs in `extra.asins`.
+    - `sbSearchTerm` kommt mit (Begründung wie F6: nach 60 Tagen weg).
+  - **Target-IDs:** `sbTargeting` liefert `keywordId` („keyword or targeting expression“) und `targetingId` getrennt, der Export legt
+    beide in `targetId` zusammen. Abbildung: `keywordId`, sonst `targetingId`; weicht `targetingId` ab, steht sie in `extra`. 1.10 prüft
+    das gegen echte Daten.
+  - **Hinweis für die UI-Doku von Phase 2:** SB-Reports in v3 sind „Preview“: Kampagnen mit `isMultiAdGroupsEnabled=false` (ältere
+    SB-Kampagnen) fehlen in den Reports. Ihre Entities kommen über den Export, Kennzahlen nicht; die UI muss das bei SB-Summen erklären.
 - [ ] SD: Entities und Reports (`sdCampaigns`, `sdAdGroup`, `sdTargeting`, `sdAdvertisedProduct`); SD-Metriken sind klick- **und**
       view-basiert, Spalten entsprechend (`extra` oder eigene Spalten, beim Umsetzen entscheiden).
 
