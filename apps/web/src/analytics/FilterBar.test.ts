@@ -3,7 +3,7 @@ import DatePicker from 'primevue/datepicker';
 import Select from 'primevue/select';
 import TreeSelect from 'primevue/treeselect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, type PropType } from 'vue';
+import { defineComponent, h } from 'vue';
 import { json, stubFetch } from '../test/fetch-stub';
 import { meFixture } from '../test/fixtures';
 import { cleanupMounted, mountWithApp } from '../test/mount';
@@ -43,18 +43,14 @@ function routes(options: Response = json(filterOptions)) {
   };
 }
 
-const Host = defineComponent({
-  props: { earliestDate: { type: String as PropType<string | null>, default: null } },
-  setup(props) {
-    const filters = useAnalyticsFilters();
-    return () => h(FilterBar, { filters, earliestDate: props.earliestDate });
-  },
-});
-
 async function mountBar(path = '/dashboard', earliestDate: string | null = '2026-01-01') {
-  const mounted = await mountWithApp(defineComponent({ render: () => h(Host, { earliestDate }) }), {
-    path,
+  const Host = defineComponent({
+    setup() {
+      const filters = useAnalyticsFilters();
+      return () => h(FilterBar, { filters, earliestDate });
+    },
   });
+  const mounted = await mountWithApp(Host, { path });
   await flushPromises();
   return mounted;
 }
