@@ -26,10 +26,14 @@ import {
 } from './connection-job';
 
 /**
- * Ad-Typen des Entity-Syncs (F2; SD folgt mit 1.9). Für jedes Profil, auch ohne SB: Erst die exportierten
- * Kampagnen zeigen, ob das Profil SB nutzt und `reports-sync` SB-Reports anfordert (1.9).
+ * Ad-Typen des Entity-Syncs (F2, 1.9). Für jedes Profil, auch ohne SB/SD: Erst die exportierten Kampagnen
+ * zeigen, ob das Profil SB oder SD nutzt und `reports-sync` deren Reports anfordert (1.9).
  */
-export const ENTITY_AD_PRODUCTS = ['SPONSORED_PRODUCTS', 'SPONSORED_BRANDS'] as const;
+export const ENTITY_AD_PRODUCTS = [
+  'SPONSORED_PRODUCTS',
+  'SPONSORED_BRANDS',
+  'SPONSORED_DISPLAY',
+] as const;
 
 /**
  * `entities-sync` je Connection (1.7): für jedes nicht entfernte Profil (auch ausgeblendete, F14) die
