@@ -514,20 +514,28 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     2.8), `PinnedRowModule` (Summenzeile), `CsvExportModule`; Sortieren gehört zum Kern. Weiter nicht registriert: `TooltipModule`,
     `RenderApiModule`. Ein Test nutzt Sortierung, Textfilter, Summenzeile und CSV und prüft, dass AG Grid nichts meldet.
   - **Decimal-Vergleich** (`@profitbash/shared`, `decimal-compare.ts`): `compareDecimal` (ziffernweise, auch jenseits von
-    `Number.MAX_SAFE_INTEGER`, `-0` = 0, wirft bei Nicht-Decimal-Strings), `compareDecimalNullsLast(a, b, isDescending)` mit der
-    Signatur des AG-Grid-`comparator` (fehlende Werte in beide Richtungen am Ende), `decimalSign`.
+    `Number.MAX_SAFE_INTEGER`, `-0` = 0, wirft bei Nicht-Decimal-Strings), `compareDecimalNullsLast(a, b, nodeA, nodeB, isDescending)`
+    direkt als AG-Grid-`comparator` (fehlende Werte in beide Richtungen am Ende; getestet in einer echten Grid-Spalte),
+    `decimalSign`.
   - **Filterleiste** (`src/analytics/`): `periods.ts` (Voreinstellungen F5; „Letzte N Tage“ enden gestern, „Diese Woche/Dieser
     Monat/Dieses Jahr bis jetzt“ enden heute, Wochen ab Montag, „Letzte 12 Monate“ = 12 volle Monate vor dem laufenden; Vergleich
     Vorperiode gleicher Länge bzw. Vorjahr mit 29.02. → 28.02.; „heute“ in der Zeitzone des Browsers). `filters.ts`: URL-Parameter
     `clients`, `nc` (Ohne Client), `pf=1` (Profilauswahl aktiv; die IDs stehen nur in `ui_state`), `period`, `from`/`to`, `cmp`,
     `cur`, `attr`; Standardwerte fehlen in der URL. Ohne Filter-Parameter gilt die letzte Auswahl (`ui_state` `analytics/filters`,
     **geteilt** zwischen Dashboard und Explorer) und wird per `replace` in die URL übernommen; Änderungen per `push`
-    (Zurück-Taste). Ein Link ohne `pf=1` zeigt die Clients ganz. `sanitizeFilterState` entfernt Unsichtbares (Clients, Profile,
+    (Zurück-Taste). Jeder Verlaufseintrag trägt den ganzen Zustand in `history.state` (`analyticsFilters`), damit Zurück/Vor
+    auch die Profilauswahl und den Ausgangszustand wiederherstellt (Vorrang: Verlaufseintrag, dann URL-Parameter, dann letzte
+    Auswahl). Ein Link ohne `pf=1` zeigt die Clients ganz; ein geteilter Link mit `pf=1` nimmt beim Empfänger dessen eigene
+    letzte Profilauswahl innerhalb der verlinkten Clients (bekannte Grenze: die Profile des Absenders stehen nicht im Link).
+    Eine eigene Änderung gilt vor einer gespeicherten Auswahl, die erst danach ankommt; gespeichert wird nacheinander, immer
+    der neueste Stand (Fehler still, URL und Verlauf bleiben). Mehr als 1000 Profile (API-Grenze) bzw. rund 400 (16 KB
+    `ui_state`) kosten nur die gespeicherte Profilauswahl. „Heute“ wird beim Fokus des Tabs neu bestimmt. `sanitizeFilterState` entfernt Unsichtbares (Clients, Profile,
     Profile außerhalb der Clients, nicht wählbare Währung → automatisch). Auswahl als Baum (PrimeVue `TreeSelect`, Checkboxen):
     Clients › Profile, „Ohne Client“; alles oder nichts gewählt = keine Einschränkung, Teilauswahl = `clientIds` plus
     `profileIds` (Server verknüpft mit UND). `useAnalyticsFilters()` liefert `state`, `options` (`/filter-options`), `ready`
     (erst dann laden Widgets), `update`, `query` (Body für `/api/ads/*`). `FilterBar.vue`: fünf Felder mit sichtbaren Labels,
-    „Frei wählen“ mit Datumsbereich (übernimmt erst beide Enden), Anzeige der Tage von Zeitraum und Vergleich in Mono, „Vorjahr“
+    „Frei wählen“ mit Datumsbereich (übernimmt erst beide Enden; über 400 Tage
+    Fehlermeldung statt stillem Standard), Anzeige der Tage von Zeitraum und Vergleich in Mono, „Vorjahr“
     gesperrt, solange `earliestDate` nach dessen Beginn liegt (Prop der Seite aus `meta.earliestDate`).
   - **Bausteine:** `metrics.ts` (`formatMetricValue` je Art, `formatChange` mit Vorzeichen, `changeTone` nach Bedeutung),
     `hints.ts` (`metricHints`: „≈“ nur an Beträgen, „Ohne Kurs nicht gezählt“ an allen Summen, gemischte Attribution bzw. „Wert
@@ -535,6 +543,13 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     lesbar auch auf Touch), `KpiTile.vue` (Überzeile, Wert in Mono mit „≈“, Veränderung als Pille mit Pfeil und Text für
     Screenreader, Vergleichswert, Skeleton). Die API-Funktionen stehen unter `api.analytics.*` (`filterOptions`, `dashboard`,
     `timeSeries`, `explorerRows`).
+    Veränderungen, die als „0,0 %“ erscheinen (Betrag unter 0,05 %), sind neutral, ohne Vorzeichen und Pfeil.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: Signatur des Grid-Vergleichs, Zurück-Taste nach der ersten
+    Änderung und für die Profilauswahl (`history.state`), Zeitraum über 400 Tage, Wettlauf mit der gespeicherten Auswahl,
+    Speichern nacheinander, gerundete 0 neutral, zu lange Profilliste kostet nur die Profile, „Ohne Client“ ohne solche
+    Profile entfällt, Bereich „Vorläufig“ je einen halben Tag breiter (Randbalken ganz im Bereich), „Heute“ beim Fokus,
+    Sortiertest prüft die Reihenfolge, `title` an der Währung und `aria-controls` des Popovers entfernt. Offen für 2.7: Chart
+    einmal im Browser prüfen (Balken auf der Zeitachse; ggf. `unit-time`).
 
 
 ### 2.7 Dashboard (`/dashboard`)
