@@ -595,14 +595,55 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     Grenze aus 2.6).
 
 ### 2.8 Explorer (`/ads/explorer/*`)
-- [ ] Reiter, Drill-Down, Brotkrumen, Chart und Grid nach F6/F7; Spaltenauswahl, Sortierung, Filter; Zustand in der URL.
-- [ ] CSV-Export der geladenen Zeilen in aktueller Filterung und Sortierung (F6); Beträge als Decimal-Strings mit Währungsspalte,
+- [x] Reiter, Drill-Down, Brotkrumen, Chart und Grid nach F6/F7; Spaltenauswahl, Sortierung, Filter; Zustand in der URL.
+- [x] CSV-Export der geladenen Zeilen in aktueller Filterung und Sortierung (F6); Beträge als Decimal-Strings mit Währungsspalte,
       Hinweis im Export, wenn die Zeilen gekürzt sind (F7).
-- [ ] Spalten je Ad-Typ lesbar: Attribution (F4), Klick-/View-Anteil bei SB/SD, sichtbare Impressionen und vCPM bei SD, Kostenart
+- [x] Spalten je Ad-Typ lesbar: Attribution (F4), Klick-/View-Anteil bei SB/SD, sichtbare Impressionen und vCPM bei SD, Kostenart
       (`extra.costType`; Gebote bei vCPM als „je 1000 sichtbare Impressionen“ beschriftet), Platzhalter („unbekannt“) und entfernte
       Entities (Filter, Standard ausgeblendet; `phase-1.md` F10).
-- [ ] Negatives ohne Kennzahlen; Product Ads mit ASIN/SKU, bei mehreren ASINs (`extra.asins`) als Liste in einem Popover der Zelle
+- [x] Negatives ohne Kennzahlen; Product Ads mit ASIN/SKU, bei mehreren ASINs (`extra.asins`) als Liste in einem Popover der Zelle
       (Master/Detail ist AG Grid Enterprise).
+- [x] Umsetzung (Stand für 2.9 und später):
+  - **Seite** `pages/ExplorerPage.vue`, Bausteine in `src/explorer/`. **URL** (`state.ts`): Ebene als Pfad
+    (`/ads/explorer/portfolios|campaigns|ad-groups|targets|product-ads|search-terms|negatives`; `/ads/explorer` leitet im Router
+    auf Kampagnen um), Drill-Down als je eine ID (`portfolio`, `campaign`, `adGroup`), `removed=1`, `adp` (Ad-Typen, F1),
+    `m1`/`m2` (Chart); dazu die Filterleiste (geteilt mit dem Dashboard). Spaltenauswahl je Ebene in `ui_state`
+    (`explorer/columns.<ebene>`).
+  - **Drill-Down** (F6): Klick auf den Namen öffnet die nächste Ebene (Portfolio → Kampagnen → Ad Groups → Targets), obere
+    Filter bleiben; die Reiter behalten den Drill-Down (SB-Targets ohne Ad Group erscheinen so beim Reiter Targets einer
+    Kampagne). **Brotkrumen:** Auswahl der Filterleiste › Portfolio › Kampagne › Ad Group; Namen aus dem Verlaufseintrag
+    (`history.state.explorerCrumbs`, beim Klick gesetzt), sonst aus den Zeilen (`campaignName` …), sonst allgemein
+    („Kampagne“).
+  - **Vergleich nachladen** (Entscheidung zu 2.4 „Offen“): `useExplorerRows` fragt erst ohne Vergleich, danach dieselbe
+    Anfrage mit Vergleich; bis dahin zeigen die Spalten „Δ“ „–“ und ein Hinweis „Vergleich wird geladen …“ (eigener Fehler mit
+    „Erneut versuchen“). Negatives ohne Vergleich. Gemessen im Browser (Demo-Daten, alle Profile, Targets, 30 Tage, `pnpm dev`):
+    Zeilen nach 1,5 s (2,3 MB), mit Vergleich nach 3,1 s (5,6 MB); Kampagnen deutlich darunter. Die reine DB-Abfrage liegt bei
+    0,74–0,82 s (2.4); der Rest ist JSON, Übertragung und Grid. Weiter unter 1 s ginge nur mit Voraggregation oder
+    serverseitigem Row Model (2.4 „Offen“, Vorschläge b und c).
+  - **Spalten** (`columns.ts`): Name (links fest, Link, „(unbekannt)“ bei Platzhaltern, „(entfernt)“), Status, Ad-Typ, Profil,
+    Währung (immer im CSV, sichtbar nach Wahl), je Ebene Portfolio, Kampagne, Ad Group, Target, Match-Typ, Ebene (Negatives),
+    ASIN, SKU, Targeting, Budget, Gebotsstrategie, Kostenart (CPC/vCPM), Standardgebot/Gebot (bei vCPM „je 1000 sichtbare
+    Impr.“), Attribution je Zeile nach F4 („7 Tage, Klick“, „14 Tage, Klick + View“; Vendor 14 Tage), Kennzahlen (Impressionen,
+    Klicks, CTR, Spend, CPC, Umsatz, ACoS, ROAS, Käufe, Einheiten, CVR, sichtbare Impressionen, vCPM) und Veränderungen (Δ Spend,
+    Δ Umsatz, Δ ACoS, Farbe nach Bedeutung). Beträge je Zeile in der Originalwährung, die **Summenzeile** (unten angeheftet) in
+    der Anzeigewährung mit „≈“; fehlende Werte „–“. Den Klick-Anteil von SB/SD zeigt die Einstellung „14 Tage, nur Klicks“ der
+    Filterleiste (die Zeilen der API tragen nur die gewählte Attribution; eine eigene Spalte bräuchte die API).
+  - **Sortieren und Filtern** im Browser: Beträge und Zähler mit `compareDecimalNullsLast` und dem eigenen `DecimalFilter`
+    („mindestens“/„höchstens“, Komma oder Punkt, `compareDecimal`, nie `number`), Texte mit dem Textfilter. **Kürzung:**
+    Hinweis „Es werden die 10.000 Zeilen mit dem höchsten Spend gezeigt (von …)“; die Summenzeile gilt für alle.
+  - **Chart** (`ExplorerChart.vue`) über dem Grid, zwei wählbare Kennzahlen (Balken links, Linie rechts), Tagesreihe der Ebene
+    mit Drill-Down; markierte Zeilen (Checkboxen, `RowSelectionModule`) schränken ihn ein (bis 200, sonst ganze Auswahl mit
+    Hinweis). Bei Negatives kein Chart.
+  - **CSV** (`ExplorerGrid.csv`): geladene Zeilen in aktueller Filterung und Sortierung, sichtbare Spalten plus Währung,
+    Beträge als Decimal-String (`useValueFormatterForExport: false`), ohne Summenzeile, bei Kürzung ein Hinweis als erste Zeile;
+    Datei `profitbash-<ebene>-<von>_<bis>.csv`.
+  - **Product Ads:** ASIN und SKU; bei mehreren ASINs (`extra.asins`) „teilt sich n ASINs“ mit Liste im Popover der Zelle.
+    Zeilen ohne Kennzahlen (z. B. SB-Preview-Lücke) tragen ein Kennzeichen.
+  - **Grid:** feste Höhe mit Virtualisierung, bis 15 Zeilen wächst es mit; auf dem Handy scrollt es waagerecht in seiner
+    Kachel (erste Spalte fest, F13).
+  - Browser-Pane geprüft: 1440 px, Handy, Hell/Dunkel, Drill-Down mit Brotkrumen, Targets mit Kürzung, ASIN-Popover, Konsole
+    ohne Fehler und ohne AG-Warnungen.
+
 
 ### 2.9 Gespeicherte Ansichten (F8)
 - [ ] Tabelle, Access-Funktionen (Profile und Clients beim Laden über den Access-Layer gefiltert), API, Audit-Events; ADR 002
