@@ -19,6 +19,7 @@
     "@profitbash/shared": "workspace:*",
     "@tanstack/vue-query": "^5.103.2",
     "ag-charts-community": "14.2.0",
+    "ag-charts-locale": "14.2.0",
     "ag-charts-vue3": "14.2.0",
     "ag-grid-community": "36.2.0",
     "ag-grid-vue3": "36.2.0",
