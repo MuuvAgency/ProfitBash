@@ -15,6 +15,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@profitbash/engine": "workspace:*",
     "msw": "^2.15.0"
   }
 }
