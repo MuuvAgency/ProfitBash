@@ -17,6 +17,7 @@
     "db:generate": "pnpm --filter @profitbash/db run generate",
     "db:migrate": "pnpm --filter @profitbash/db run migrate",
     "db:seed": "pnpm --filter @profitbash/api run seed",
+    "demo:load": "pnpm --filter @profitbash/worker run demo:load",
     "db:rotate-keys": "pnpm --filter @profitbash/db run rotate-keys",
     "api:generate": "pnpm --filter @profitbash/api run openapi && pnpm --filter @profitbash/web run api:generate"
   },
