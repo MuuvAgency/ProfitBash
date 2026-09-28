@@ -454,21 +454,35 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
       (`listVisibleClientsAndProfiles`), wählbare Währungen, `fxRatesThrough` (= `latestFxRateDate`), `fxRatesStale`.
     - `explorer/rows` (`sp-explorer`): `level` inkl. `negative` (dann `current`/`total` `null`), `filter` (Drill-Down,
       `includeRemoved`); Antwort `meta`, `rows`, `totalRows`, `truncated`, `maxRows` (10 000), `total`.
-    - `timeseries` (`dashboard` oder `sp-explorer`): `level` (Standard `campaign`), `filter`, `entityIds` (höchstens 500 wegen der
-      Body-Grenze von 64 KB); `days`, `comparisonDays`. Die Hero-Kachel des Dashboards (2.7) schickt `filter.includeRemoved: true`,
+    - `timeseries` (`dashboard` oder `sp-explorer`): `level` (Standard `campaign`), `filter`, `entityIds` (höchstens 200; unabhängig
+      davon gilt die Body-Grenze von 64 KB, größere Anfragen scheitern mit `413`); `days`, `comparisonDays`, `attribution`,
+      `comparisonAttribution`. Die Hero-Kachel des Dashboards (2.7) schickt `filter.includeRemoved: true`,
       damit der Verlauf zur Dashboard-Summe passt.
-    - `dashboard` (`dashboard`): `total`, `byClient`, `byProfile`, `byAdProduct`, `fxRatesThrough`, `fxRatesStale`.
+    - `dashboard` (`dashboard`): `total`, `byClient`, `byProfile`, `byAdProduct` (jede Gruppe mit eigener Attribution des
+      Vergleichszeitraums), `fxRatesThrough`, `fxRatesStale`.
     - `asin-search` (`sp-explorer`): `terms` (1–100 ASINs oder SKUs), sonst wie `explorer/rows` auf Ebene `productAd`.
   - **Schemas** in `@profitbash/shared` (`analytics-api.ts`): Anfrage `analyticsQuerySchema` (Auswahl wie 2.4, `period`,
-    `comparison`, `currency` `auto` oder Code, `attribution`), Zeitraum höchstens 400 Tage (`from` ≤ `to`). Eine andere
+    `comparison` (weglassen oder `null`), `currency` (optional, Standard `auto`), `attribution` (optional, Standard `console`;
+    optional statt zod-`default`, damit der generierte Client die Felder weglassen darf), Zeitraum höchstens 400 Tage
+    (`from` ≤ `to`). Nullbare Verwendungen benannter Komponenten über `orNull` (`z.union([…, z.null()])`): `.nullable()` machte die
+    Komponente selbst nullbar (`PeriodMetrics` usw. im Client `| null`); `openapi.test.ts` prüft das. Eine andere
     Anzeigewährung als `auto` muss in `listSelectableCurrencies` stehen, sonst `400 CURRENCY_NOT_SELECTABLE`.
     Antwort: `meta` (`currency`, `converted`, `missingFxCurrencies`, `dataThrough`, `provisionalFrom`, `earliestDate`,
     `profilesWithoutData`), Summen als `{ sums, derived }` (`deriveMetrics`; Umsatz und Käufe gehen nur bei vollständiger
     Abdeckung in ACoS, ROAS und CVR ein), `change` je Kennzahl (`absolute`, `relative`) für Summen und Dashboard-Gruppen, je
     Explorer-Zeile nur `relative` (Nutzlast), `attribution` (`summarizeAttribution`).
   - **„Kurse veraltet“:** `isFxRateStale(latest, now)` (`@profitbash/shared/analytics`): mehr als 5 Kalendertage (Entscheidung
-    siehe 2.2); der Tag beginnt erst mit dem Abruf um 06:00 Berlin, sonst gäbe es in der Nacht auf Mittwoch nach Ostern einen
-    Fehlalarm. Getestet mit Ostern 2027 und Weihnachten 2025/2026.
+    siehe 2.2); ein neuer Tag zählt erst ab 08:00 Berlin (Abruf 06:00 plus Wiederholung nach 1 Std.), sonst gäbe es am
+    Mittwoch nach Ostern früh einen Fehlalarm. Getestet mit Ostern 2027 (auch 07:30) und Weihnachten 2025/2026.
+  - **Negatives:** `meta.currency` wie bei den anderen Endpunkten (`resolveDisplayCurrency`), keine Beträge.
+  - **Nutzlast:** 10 000 Target-Zeilen mit Vergleich rund 14 MB JSON aus der DB-Schicht, gzip 1,5 MB (die API ergänzt abgeleitete
+    Kennzahlen und Veränderungen, entsprechend mehr).
+  - Review (unabhängig): keine kritischen Befunde; Rechte, Mandantentrennung, Währungsprüfung, Komprimierung und
+    `isFxRateStale` bestätigt. Übernommen: nullbare OpenAPI-Komponenten (generierte Typen waren falsch), Antworten in den Tests
+    gegen die Antwort-Schemas geprüft, Attribution des Vergleichszeitraums für Dashboard-Gruppen und Tagesreihe, Schonfrist bis
+    08:00, Obergrenze `entityIds` und Hinweis auf `413`, Währung bei Negatives, optionale Standardfelder, Tests für „eines der
+    Features genügt“, `comparison: null`, `auto` mit einer Währung. Nur in 2.4 getestet (dort vollständig): fremde und
+    ausgeblendete IDs in Auswahl und Drill-Down.
 
 ### 2.6 Web-Grundlagen
 - [ ] **AG Charts Community** einführen (ADR 001; Version exakt pinnen, Lizenz und Mindestalter prüfen), Theme aus den Tokens

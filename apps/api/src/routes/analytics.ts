@@ -10,6 +10,7 @@ import {
   queryExplorerRows,
   queryNegatives,
   queryTimeSeries,
+  resolveDisplayCurrency,
   type AnalyticsQuery,
   type AnalyticsSelection,
   type AnalyticsTotals,
@@ -24,6 +25,7 @@ import {
   analyticsQuerySchema,
   asinSearchRequestSchema,
   CHANGE_KEYS,
+  DEFAULT_ATTRIBUTION_SETTING,
   dashboardResponseSchema,
   errorResponseSchema,
   explorerRowsRequestSchema,
@@ -142,13 +144,14 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
     base: { userId: string; orgId: string },
     body: Omit<QueryBody, 'level' | 'filter'>,
   ): Promise<AnalyticsQuery> {
-    if (body.currency !== 'auto') {
+    const currency = body.currency ?? 'auto';
+    if (currency !== 'auto') {
       const selectable = await listSelectableCurrencies(db, base);
-      if (!selectable.includes(body.currency)) {
+      if (!selectable.includes(currency)) {
         throw new ApiError(
           400,
           'CURRENCY_NOT_SELECTABLE',
-          `Währung ${body.currency} ist nicht wählbar (${selectable.join(', ')}).`,
+          `Währung ${currency} ist nicht wählbar (${selectable.join(', ')}).`,
         );
       }
     }
@@ -157,8 +160,8 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
       ...selection(body),
       period: body.period,
       comparison: body.comparison ?? null,
-      currency: body.currency,
-      attribution: body.attribution,
+      currency,
+      attribution: body.attribution ?? DEFAULT_ATTRIBUTION_SETTING,
     };
   }
 
@@ -187,15 +190,13 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
     const filter = explorerFilter(body.filter);
     const meta = await dataStatus(db, query);
     if (body.level === 'negative') {
-      const negatives = await queryNegatives(db, { ...query, filter });
+      const [negatives, display] = await Promise.all([
+        queryNegatives(db, { ...query, filter }),
+        resolveDisplayCurrency(db, query),
+      ]);
       return c.json(
         {
-          meta: {
-            ...meta,
-            currency: resolvedCurrency(body.currency),
-            converted: false,
-            missingFxCurrencies: [],
-          },
+          meta: { ...meta, ...display, missingFxCurrencies: [] },
           rows: negatives.rows.map((row): ExplorerRowResponse => ({
             ...row,
             placeholder: false,
@@ -243,17 +244,20 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
       }),
       dataStatus(db, query),
     ]);
-    const day = (d: { date: string; current: MetricSums }) => ({
+    const day = (coverage: Coverage) => (d: { date: string; current: MetricSums }) => ({
       date: d.date,
       sums: d.current,
-      derived: derived(d.current, result.attribution.coverage),
+      derived: derived(d.current, coverage),
     });
     return c.json(
       {
         meta: { ...meta, ...currencyMeta(result, result.missingFxCurrencies) },
-        days: result.days.map(day),
-        comparisonDays: result.comparisonDays.map(day),
+        days: result.days.map(day(result.attribution.coverage)),
+        comparisonDays: result.comparisonDays.map(
+          day((result.comparisonAttribution ?? result.attribution).coverage),
+        ),
         attribution: result.attribution,
+        comparisonAttribution: result.comparisonAttribution,
       },
       200,
     );
@@ -272,7 +276,12 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
       label: g.label,
       ...(g.countryCode !== undefined && { countryCode: g.countryCode }),
       ...(g.currencyCode !== undefined && { currencyCode: g.currencyCode }),
-      ...metricsTotal(g.current, g.comparison, g.attribution),
+      ...metricsTotal(
+        g.current,
+        g.comparison,
+        g.attribution,
+        g.comparisonAttribution ?? g.attribution,
+      ),
     });
     return c.json(
       {
@@ -312,8 +321,6 @@ function explorerFilter(filter: QueryBody['filter']): ExplorerFilter {
     ...(filter?.includeRemoved !== undefined && { includeRemoved: filter.includeRemoved }),
   };
 }
-
-const resolvedCurrency = (currency: string) => (currency === 'auto' ? 'EUR' : currency);
 
 async function dataStatus(db: Db, query: AnalyticsQuery) {
   return queryDataStatus(db, query, REPORT_AD_PRODUCT_SELECTION);

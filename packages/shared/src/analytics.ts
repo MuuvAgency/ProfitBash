@@ -21,8 +21,11 @@ export const DEFAULT_ATTRIBUTION_SETTING: AttributionSetting = 'console';
 
 /** „Kurse bis“ gilt als veraltet, wenn der letzte EZB-Kurs mehr als so viele Kalendertage zurückliegt. */
 export const FX_RATES_STALE_AFTER_DAYS = 5;
-/** Der tägliche Kursabruf läuft um 06:00 Europe/Berlin (`fx-rates-sync`); erst danach zählt ein neuer Tag. */
-const FX_RATES_FETCH_HOUR = 6;
+/**
+ * Der tägliche Kursabruf läuft um 06:00 Europe/Berlin (`fx-rates-sync`, bei Fehlschlag neuer Versuch nach 1 Std.);
+ * ein neuer Tag zählt erst ab 08:00, damit ein verspäteter oder wiederholter Abruf keinen Fehlalarm auslöst.
+ */
+const FX_RATES_DAY_STARTS_HOUR = 8;
 
 const berlinDate = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Europe/Berlin',
@@ -32,13 +35,13 @@ const berlinDate = new Intl.DateTimeFormat('en-CA', {
 });
 
 /**
- * Warnung „Kurse veraltet“ (`phase-2.md` 2.2, entschieden: mehr als 5 Kalendertage). Der Tag beginnt mit dem
- * Abruf um 06:00 Berlin, sonst gäbe es in der Nacht nach langen Feiertagen (Ostern: Gründonnerstag bis
- * Mittwoch 06:00) einen Fehlalarm. Ohne Kurs (`null`) immer veraltet.
+ * Warnung „Kurse veraltet“ (`phase-2.md` 2.2, entschieden: mehr als 5 Kalendertage). Der Tag beginnt erst um 08:00
+ * Berlin (Abruf 06:00 plus Wiederholung), sonst gäbe es nach langen Feiertagen (Ostern: Gründonnerstag bis
+ * Mittwoch früh) einen Fehlalarm. Ohne Kurs (`null`) immer veraltet.
  */
 export function isFxRateStale(latestRateDate: string | null, now: Date): boolean {
   if (latestRateDate === null) return true;
-  const today = berlinDate.format(new Date(now.getTime() - FX_RATES_FETCH_HOUR * 3_600_000));
+  const today = berlinDate.format(new Date(now.getTime() - FX_RATES_DAY_STARTS_HOUR * 3_600_000));
   const days =
     (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${latestRateDate}T00:00:00Z`)) / 86_400_000;
   return days > FX_RATES_STALE_AFTER_DAYS;

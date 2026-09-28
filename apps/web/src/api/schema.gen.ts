@@ -1500,7 +1500,7 @@ export interface components {
             totalRows: number;
             truncated: boolean;
             maxRows: number;
-            total: components["schemas"]["MetricsTotal"];
+            total: components["schemas"]["MetricsTotal"] | null;
         };
         AnalyticsMeta: {
             currency: string;
@@ -1529,8 +1529,8 @@ export interface components {
             attributes: {
                 [key: string]: unknown;
             };
-            current: components["schemas"]["PeriodMetrics"];
-            comparison: components["schemas"]["PeriodMetrics"];
+            current: components["schemas"]["PeriodMetrics"] | null;
+            comparison: components["schemas"]["PeriodMetrics"] | null;
             change: {
                 impressions?: string | null;
                 clicks?: string | null;
@@ -1546,12 +1546,12 @@ export interface components {
                 cpm?: string | null;
                 vcpm?: string | null;
             } | null;
-            attribution: components["schemas"]["AttributionSummary"];
+            attribution: components["schemas"]["AttributionSummary"] | null;
         };
         PeriodMetrics: {
             sums: components["schemas"]["MetricSums"];
             derived: components["schemas"]["DerivedMetrics"];
-        } | null;
+        };
         MetricSums: {
             impressions: string | null;
             clicks: string | null;
@@ -1591,13 +1591,13 @@ export interface components {
                 /** @enum {string} */
                 unitsSameSku: "full" | "partial" | "none";
             };
-        } | null;
+        };
         MetricsTotal: {
             current: components["schemas"]["PeriodMetrics"];
-            comparison: components["schemas"]["PeriodMetrics"];
-            change: components["schemas"]["MetricChanges"];
+            comparison: components["schemas"]["PeriodMetrics"] | null;
+            change: components["schemas"]["MetricChanges"] | null;
             attribution: components["schemas"]["AttributionSummary"];
-        } | null;
+        };
         MetricChanges: {
             impressions: components["schemas"]["MetricChange"];
             clicks: components["schemas"]["MetricChange"];
@@ -1612,7 +1612,7 @@ export interface components {
             roas: components["schemas"]["MetricChange"];
             cpm: components["schemas"]["MetricChange"];
             vcpm: components["schemas"]["MetricChange"];
-        } | null;
+        };
         MetricChange: {
             absolute: string | null;
             relative: string | null;
@@ -1623,14 +1623,10 @@ export interface components {
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
             period: components["schemas"]["DateRange"];
-            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
-            /** @default auto */
-            currency: "auto" | string;
-            /**
-             * @default console
-             * @enum {string}
-             */
-            attribution: "console" | "clicks14d";
+            comparison?: components["schemas"]["DateRange"] | null;
+            currency?: "auto" | string;
+            /** @enum {string} */
+            attribution?: "console" | "clicks14d";
             /** @enum {string} */
             level: "portfolio" | "campaign" | "adGroup" | "target" | "productAd" | "searchTerm" | "negative";
             filter?: {
@@ -1652,14 +1648,10 @@ export interface components {
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
             period: components["schemas"]["DateRange"];
-            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
-            /** @default auto */
-            currency: "auto" | string;
-            /**
-             * @default console
-             * @enum {string}
-             */
-            attribution: "console" | "clicks14d";
+            comparison?: components["schemas"]["DateRange"] | null;
+            currency?: "auto" | string;
+            /** @enum {string} */
+            attribution?: "console" | "clicks14d";
             terms: string[];
         };
         TimeSeriesResponse: {
@@ -1677,6 +1669,7 @@ export interface components {
                 derived: components["schemas"]["DerivedMetrics"];
             }[];
             attribution: components["schemas"]["AttributionSummary"];
+            comparisonAttribution: components["schemas"]["AttributionSummary"] | null;
         };
         TimeSeriesRequest: {
             clientIds?: string[];
@@ -1684,14 +1677,10 @@ export interface components {
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
             period: components["schemas"]["DateRange"];
-            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
-            /** @default auto */
-            currency: "auto" | string;
-            /**
-             * @default console
-             * @enum {string}
-             */
-            attribution: "console" | "clicks14d";
+            comparison?: components["schemas"]["DateRange"] | null;
+            currency?: "auto" | string;
+            /** @enum {string} */
+            attribution?: "console" | "clicks14d";
             /**
              * @default campaign
              * @enum {string}
@@ -1717,8 +1706,8 @@ export interface components {
         };
         DashboardGroup: {
             current: components["schemas"]["PeriodMetrics"];
-            comparison: components["schemas"]["PeriodMetrics"];
-            change: components["schemas"]["MetricChanges"];
+            comparison: components["schemas"]["PeriodMetrics"] | null;
+            change: components["schemas"]["MetricChanges"] | null;
             attribution: components["schemas"]["AttributionSummary"];
             key: string | null;
             label: string | null;
@@ -1731,14 +1720,10 @@ export interface components {
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
             period: components["schemas"]["DateRange"];
-            comparison?: components["schemas"]["DateRange"] & (Record<string, never> | null);
-            /** @default auto */
-            currency: "auto" | string;
-            /**
-             * @default console
-             * @enum {string}
-             */
-            attribution: "console" | "clicks14d";
+            comparison?: components["schemas"]["DateRange"] | null;
+            currency?: "auto" | string;
+            /** @enum {string} */
+            attribution?: "console" | "clicks14d";
         };
     };
     responses: never;

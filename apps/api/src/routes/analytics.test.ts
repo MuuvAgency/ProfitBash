@@ -1,10 +1,14 @@
 import { schema } from '@profitbash/db';
-import type {
-  DashboardResponse,
-  ErrorResponse,
-  ExplorerRowsResponse,
-  FilterOptionsResponse,
-  TimeSeriesResponse,
+import {
+  dashboardResponseSchema,
+  explorerRowsResponseSchema,
+  filterOptionsResponseSchema,
+  timeSeriesResponseSchema,
+  type DashboardResponse,
+  type ErrorResponse,
+  type ExplorerRowsResponse,
+  type FilterOptionsResponse,
+  type TimeSeriesResponse,
 } from '@profitbash/shared';
 import { and, eq } from 'drizzle-orm';
 import { gunzipSync } from 'node:zlib';
@@ -43,9 +47,26 @@ let viewer = '';
 let orgId = '';
 const ids = { client: '', de: '', uk: '', hidden: '', spDe: '', spUk: '', spHidden: '', ad: '' };
 
+/** Antwort-Schema je Pfad: Jede erfolgreiche Antwort muss dem veröffentlichten Vertrag entsprechen. */
+const RESPONSE_SCHEMAS: Record<
+  string,
+  { safeParse(value: unknown): { success: boolean; error?: unknown } }
+> = {
+  '/api/ads/filter-options': filterOptionsResponseSchema,
+  '/api/ads/explorer/rows': explorerRowsResponseSchema,
+  '/api/ads/asin-search': explorerRowsResponseSchema,
+  '/api/ads/timeseries': timeSeriesResponseSchema,
+  '/api/ads/dashboard': dashboardResponseSchema,
+};
+
 async function post<T>(path: string, body: unknown, cookie = viewer) {
   const res = await request(ctx, path, { method: 'POST', cookie, json: body });
-  return { status: res.status, body: await readJson<T>(res), headers: res.headers };
+  const json = await readJson<T>(res);
+  if (res.status === 200) {
+    const parsed = RESPONSE_SCHEMAS[path]!.safeParse(json);
+    expect(parsed.error, `${path} entspricht nicht dem Antwort-Schema`).toBeUndefined();
+  }
+  return { status: res.status, body: json, headers: res.headers };
 }
 
 const query = (extra: Record<string, unknown> = {}) => ({ period: PERIOD, ...extra });
@@ -234,6 +255,34 @@ describe('Rechte', () => {
     }
   });
 
+  it('lässt mit nur einem der Features Filterleiste und Tagesreihe zu, den Explorer nicht', async () => {
+    await ctx.testDb.db
+      .update(orgEntitlements)
+      .set({ enabled: false })
+      .where(
+        and(eq(orgEntitlements.organizationId, orgId), eq(orgEntitlements.feature, 'sp-explorer')),
+      );
+    try {
+      expect((await post('/api/ads/filter-options', {})).status).toBe(200);
+      expect((await post('/api/ads/timeseries', query())).status).toBe(200);
+      expect((await post('/api/ads/dashboard', query())).status).toBe(200);
+      expect((await post('/api/ads/explorer/rows', { ...query(), level: 'campaign' })).status).toBe(
+        403,
+      );
+      expect((await post('/api/ads/asin-search', query({ terms: ['B0X'] }))).status).toBe(403);
+    } finally {
+      await ctx.testDb.db
+        .update(orgEntitlements)
+        .set({ enabled: true })
+        .where(
+          and(
+            eq(orgEntitlements.organizationId, orgId),
+            eq(orgEntitlements.feature, 'sp-explorer'),
+          ),
+        );
+    }
+  });
+
   it('prüft Eingaben mit zod (Zeitraum, Ebene, Währung)', async () => {
     const reversed = await post<ErrorResponse>('/api/ads/explorer/rows', {
       period: { from: '2026-09-02', to: '2026-09-01' },
@@ -296,6 +345,23 @@ describe('POST /api/ads/explorer/rows', () => {
     expect(res.body).toMatchObject({ truncated: false, totalRows: 2, maxRows: 10000 });
   });
 
+  it('bleibt bei einer Währung in der Auswahl ohne Umrechnung; Vergleich null wie weggelassen', async () => {
+    const res = await post<ExplorerRowsResponse>('/api/ads/explorer/rows', {
+      ...query({ comparison: null, clientIds: [ids.client] }),
+      level: 'campaign',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.meta).toMatchObject({ currency: 'EUR', converted: false });
+    expect(res.body.total!.comparison).toBeNull();
+    expect(res.body.total!.change).toBeNull();
+    const gbp = await post<ExplorerRowsResponse>('/api/ads/explorer/rows', {
+      ...query({ profileIds: [ids.uk, ids.hidden] }),
+      level: 'campaign',
+    });
+    expect(gbp.body.meta).toMatchObject({ currency: 'GBP', converted: false });
+    expect(gbp.body.rows.map((row) => row.id)).toEqual([ids.spUk]);
+  });
+
   it('liefert Negatives ohne Kennzahlen', async () => {
     const res = await post<ExplorerRowsResponse>('/api/ads/explorer/rows', {
       ...query(),
@@ -306,6 +372,11 @@ describe('POST /api/ads/explorer/rows', () => {
       expect.objectContaining({ name: 'gratis', current: null, attribution: null }),
     ]);
     expect(res.body.total).toBeNull();
+    const single = await post<ExplorerRowsResponse>('/api/ads/explorer/rows', {
+      ...query({ profileIds: [ids.uk] }),
+      level: 'negative',
+    });
+    expect(single.body.meta.currency).toBe('GBP');
   });
 
   it('komprimiert die Antwort, wenn der Browser es anbietet', async () => {

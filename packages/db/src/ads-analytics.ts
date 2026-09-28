@@ -264,6 +264,18 @@ async function selectionSql(db: Db, selection: AnalyticsSelection): Promise<SQL 
 }
 
 /** Anzeigewährung und ob umgerechnet wird, aus den Währungen der ausgewählten Profile. */
+/** Anzeigewährung und ob umgerechnet würde, für Antworten ohne Beträge (Negatives). */
+export async function resolveDisplayCurrency(
+  db: Db,
+  input: AnalyticsSelection & { currency: string },
+): Promise<CurrencyInfo> {
+  const selectionQuery = await selectionSql(db, input);
+  if (selectionQuery === null)
+    return { currency: input.currency === 'auto' ? 'EUR' : input.currency, converted: false };
+  const { currency, converted } = await resolveCurrency(db, selectionQuery, input.currency);
+  return { currency, converted };
+}
+
 async function resolveCurrency(
   db: Db,
   selectionQuery: SQL,
@@ -996,6 +1008,8 @@ export interface TimeSeriesResult extends CurrencyInfo {
   days: DayTotals[];
   comparisonDays: DayTotals[];
   attribution: AttributionSummary;
+  /** Attribution über die Tage des Vergleichszeitraums; `null` ohne Vergleich. */
+  comparisonAttribution: AttributionSummary | null;
   missingFxCurrencies: string[];
 }
 
@@ -1018,6 +1032,7 @@ export async function queryTimeSeries(
     days: [],
     comparisonDays: [],
     attribution: EMPTY_SUMMARY,
+    comparisonAttribution: null,
     missingFxCurrencies: [],
   });
   if (selectionQuery === null) return empty(input.currency);
@@ -1063,15 +1078,22 @@ export async function queryTimeSeries(
     current: readSums(row, 'd', converted),
   });
   const periodRows = rows.filter((row) => inPeriod(row.date, periods.period));
-  const combos = [...new Set(periodRows.flatMap((row) => combosOf(row, 'd_')))];
+  const summaryOf = (days: typeof rows) =>
+    summarizeAttribution(
+      selectionsOf(spec.metricsLevel, input.attribution, [
+        ...new Set(days.flatMap((row) => combosOf(row, 'd_'))),
+      ]),
+    );
+  const comparisonRows = periods.comparison
+    ? rows.filter((row) => inPeriod(row.date, periods.comparison!))
+    : [];
   return {
     currency,
     converted,
     days: periodRows.map(toDay),
-    comparisonDays: periods.comparison
-      ? rows.filter((row) => inPeriod(row.date, periods.comparison!)).map(toDay)
-      : [],
-    attribution: summarizeAttribution(selectionsOf(spec.metricsLevel, input.attribution, combos)),
+    comparisonDays: comparisonRows.map(toDay),
+    attribution: summaryOf(periodRows),
+    comparisonAttribution: periods.comparison ? summaryOf(comparisonRows) : null,
     missingFxCurrencies: missingFxOf(rows, currencies),
   };
 }
@@ -1091,6 +1113,8 @@ export interface DashboardGroup {
   current: MetricSums;
   comparison: MetricSums | null;
   attribution: AttributionSummary;
+  /** Attribution des Vergleichszeitraums (andere Ad-Typen möglich); `null` ohne Vergleich. */
+  comparisonAttribution: AttributionSummary | null;
 }
 
 export interface DashboardResult extends CurrencyInfo {
@@ -1181,6 +1205,9 @@ export async function queryDashboard(db: Db, input: AnalyticsQuery): Promise<Das
     attribution: summarizeAttribution(
       selectionsOf(level, input.attribution, combosOf(row, 'cur_')),
     ),
+    comparisonAttribution: periods.comparison
+      ? summarizeAttribution(selectionsOf(level, input.attribution, combosOf(row, 'cmp_')))
+      : null,
   });
   const flag = (row: Record<string, unknown>, name: string) => Number(row[name]) === 1;
   const totalRow =

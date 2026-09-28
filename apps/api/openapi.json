@@ -959,7 +959,14 @@
             "type": "integer"
           },
           "total": {
-            "$ref": "#/components/schemas/MetricsTotal"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricsTotal"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1071,10 +1078,24 @@
             "additionalProperties": {}
           },
           "current": {
-            "$ref": "#/components/schemas/PeriodMetrics"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "comparison": {
-            "$ref": "#/components/schemas/PeriodMetrics"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "change": {
             "type": [
@@ -1163,7 +1184,14 @@
             }
           },
           "attribution": {
-            "$ref": "#/components/schemas/AttributionSummary"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttributionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1186,10 +1214,7 @@
         ]
       },
       "PeriodMetrics": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": "object",
         "properties": {
           "sums": {
             "$ref": "#/components/schemas/MetricSums"
@@ -1344,10 +1369,7 @@
         ]
       },
       "AttributionSummary": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": "object",
         "properties": {
           "mixed": {
             "type": "boolean"
@@ -1424,19 +1446,30 @@
         ]
       },
       "MetricsTotal": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": "object",
         "properties": {
           "current": {
             "$ref": "#/components/schemas/PeriodMetrics"
           },
           "comparison": {
-            "$ref": "#/components/schemas/PeriodMetrics"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "change": {
-            "$ref": "#/components/schemas/MetricChanges"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "attribution": {
             "$ref": "#/components/schemas/AttributionSummary"
@@ -1450,10 +1483,7 @@
         ]
       },
       "MetricChanges": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": "object",
         "properties": {
           "impressions": {
             "$ref": "#/components/schemas/MetricChange"
@@ -1571,15 +1601,12 @@
             "$ref": "#/components/schemas/DateRange"
           },
           "comparison": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/DateRange"
               },
               {
-                "type": [
-                  "object",
-                  "null"
-                ]
+                "type": "null"
               }
             ]
           },
@@ -1595,16 +1622,14 @@
                 "type": "string",
                 "pattern": "^[A-Z]{3}$"
               }
-            ],
-            "default": "auto"
+            ]
           },
           "attribution": {
             "type": "string",
             "enum": [
               "console",
               "clicks14d"
-            ],
-            "default": "console"
+            ]
           },
           "level": {
             "type": "string",
@@ -1712,15 +1737,12 @@
             "$ref": "#/components/schemas/DateRange"
           },
           "comparison": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/DateRange"
               },
               {
-                "type": [
-                  "object",
-                  "null"
-                ]
+                "type": "null"
               }
             ]
           },
@@ -1736,16 +1758,14 @@
                 "type": "string",
                 "pattern": "^[A-Z]{3}$"
               }
-            ],
-            "default": "auto"
+            ]
           },
           "attribution": {
             "type": "string",
             "enum": [
               "console",
               "clicks14d"
-            ],
-            "default": "console"
+            ]
           },
           "terms": {
             "type": "array",
@@ -1817,13 +1837,24 @@
           },
           "attribution": {
             "$ref": "#/components/schemas/AttributionSummary"
+          },
+          "comparisonAttribution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttributionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "meta",
           "days",
           "comparisonDays",
-          "attribution"
+          "attribution",
+          "comparisonAttribution"
         ]
       },
       "TimeSeriesRequest": {
@@ -1865,15 +1896,12 @@
             "$ref": "#/components/schemas/DateRange"
           },
           "comparison": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/DateRange"
               },
               {
-                "type": [
-                  "object",
-                  "null"
-                ]
+                "type": "null"
               }
             ]
           },
@@ -1889,16 +1917,14 @@
                 "type": "string",
                 "pattern": "^[A-Z]{3}$"
               }
-            ],
-            "default": "auto"
+            ]
           },
           "attribution": {
             "type": "string",
             "enum": [
               "console",
               "clicks14d"
-            ],
-            "default": "console"
+            ]
           },
           "level": {
             "type": "string",
@@ -1952,7 +1978,7 @@
               "maxLength": 200
             },
             "minItems": 1,
-            "maxItems": 500
+            "maxItems": 200
           }
         },
         "required": [
@@ -2014,10 +2040,24 @@
             "$ref": "#/components/schemas/PeriodMetrics"
           },
           "comparison": {
-            "$ref": "#/components/schemas/PeriodMetrics"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "change": {
-            "$ref": "#/components/schemas/MetricChanges"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "attribution": {
             "$ref": "#/components/schemas/AttributionSummary"
@@ -2089,15 +2129,12 @@
             "$ref": "#/components/schemas/DateRange"
           },
           "comparison": {
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/DateRange"
               },
               {
-                "type": [
-                  "object",
-                  "null"
-                ]
+                "type": "null"
               }
             ]
           },
@@ -2113,16 +2150,14 @@
                 "type": "string",
                 "pattern": "^[A-Z]{3}$"
               }
-            ],
-            "default": "auto"
+            ]
           },
           "attribution": {
             "type": "string",
             "enum": [
               "console",
               "clicks14d"
-            ],
-            "default": "console"
+            ]
           }
         },
         "required": [
