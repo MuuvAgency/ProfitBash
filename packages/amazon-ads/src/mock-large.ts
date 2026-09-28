@@ -328,7 +328,9 @@ export function largeMockAccount(profile: MockProfile): MockAccount {
             ...(kw !== null && {
               searchTerms: chance(0.5) ? [kw] : [kw, `${kw} ${pick(ADJECTIVES)}`],
             }),
-            ...(auto && { searchTerms: [keyword(word), keyword(word)] }),
+            ...(auto && {
+              searchTerms: [keyword(word), `${word.toLowerCase()} ${pick(ADJECTIVES)} kaufen`],
+            }),
             ...(productTargeting && { searchTerms: [pick(range).asin.toLowerCase()] }),
           });
         }
@@ -509,7 +511,7 @@ export function largeMockAccount(profile: MockProfile): MockAccount {
         asins: image
           ? [first.asin, range.find((p) => p !== first)?.asin ?? first.asin]
           : [first.asin],
-        ...(seller && { sku: first.sku }),
+        ...(seller && !image && { sku: first.sku }),
       });
     }
   }

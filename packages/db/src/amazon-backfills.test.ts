@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { completeBackfill, ensureBackfill } from './amazon-backfills';
+import { completeBackfill, countOpenBackfills, ensureBackfill } from './amazon-backfills';
 import { amazonAdsBackfills } from './schema';
 import { createTestConnection, createTestOrganization, createTestProfile } from './test-fixtures';
 import { createTestDatabase, type TestDatabase } from './testing';
@@ -8,6 +8,7 @@ let testDb: TestDatabase;
 let organizationId = '';
 let otherOrganizationId = '';
 let profileId = '';
+let connectionId = '';
 
 const SP = 'SPONSORED_PRODUCTS';
 const now = new Date('2026-09-27T06:00:00Z');
@@ -18,7 +19,7 @@ beforeAll(async () => {
   testDb = await createTestDatabase();
   organizationId = await createTestOrganization(testDb.db, 'muuv');
   otherOrganizationId = await createTestOrganization(testDb.db, 'andere');
-  const connectionId = await createTestConnection(testDb.db, organizationId, 'amzn1.account.A');
+  connectionId = await createTestConnection(testDb.db, organizationId, 'amzn1.account.A');
   profileId = await createTestProfile(testDb.db, {
     organizationId,
     connectionId,
@@ -86,5 +87,24 @@ describe('completeBackfill', () => {
     expect(
       (await ensureBackfill(testDb.db, { ...key(), fromDate: '2026-06-25' })).completedAt,
     ).toEqual(now);
+  });
+});
+
+describe('countOpenBackfills', () => {
+  it('zählt offene Merker der Profile einer Connection, nur in der eigenen Organisation', async () => {
+    const connection = () => ({ organizationId, connectionId });
+    expect(await countOpenBackfills(testDb.db, connection())).toBe(0);
+    const open = await ensureBackfill(testDb.db, { ...key(), fromDate: '2026-06-25' });
+    await ensureBackfill(testDb.db, {
+      ...key(),
+      reportType: 'spTargeting',
+      fromDate: '2026-06-25',
+    });
+    expect(await countOpenBackfills(testDb.db, connection())).toBe(2);
+    await completeBackfill(testDb.db, { organizationId, id: open.id, now });
+    expect(await countOpenBackfills(testDb.db, connection())).toBe(1);
+    expect(
+      await countOpenBackfills(testDb.db, { organizationId: otherOrganizationId, connectionId }),
+    ).toBe(0);
   });
 });

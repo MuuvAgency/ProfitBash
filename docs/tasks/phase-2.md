@@ -301,9 +301,47 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     `docs/deploy.md`); vor dem Deploy mit Dominik klären, ob das Backup anders überwacht wird.
 
 ### 2.3 Demo-Daten mit Volumen (F12)
-- [ ] Generator im Mock-Anbieter nach F12, deterministisch (fester Seed), nur erfundene Namen; Seed-Schritt für Clients und
+- [x] Generator im Mock-Anbieter nach F12, deterministisch (fester Seed), nur erfundene Namen; Seed-Schritt für Clients und
       Zuordnung. Standard bleibt der kleine Mock (Tests laufen schnell).
-- [ ] Hinweis in `docs/` (Entwicklung), wie man die lokale DB mit den großen Daten neu füllt.
+- [x] Hinweis in `docs/` (Entwicklung), wie man die lokale DB mit den großen Daten neu füllt.
+- [x] Umsetzung (Stand für 2.4 und später):
+  - **Entschieden (Dominik, 2026-09-28): ein Befehl** (`pnpm demo:load`) statt Verbinden und Synchronisieren über die Oberfläche.
+  - **Generator** (`packages/amazon-ads/src/mock-large.ts`): `LARGE_MOCK_PROFILES` (6 EU-Profile: DE, FR, IT in EUR, UK in GBP als
+    Vendor, SE in SEK als Agency, PL in PLN; IDs `71000000000000xx`, Namen „Demo …“), `largeMockAccount(profile)` mit Mulberry32
+    je Profil (fester Seed aus der Profil-ID). Ergebnis: 300 Kampagnen (210 SP, 42 SB, 48 SD), 669 Ad Groups, 12 187 Targets,
+    942 Negatives, 1 441 Product Ads, 16 146 Suchbegriffe je Tag (vor Tagen ohne Aktivität). Ein Test prüft je Report-Typ und
+    Profil die Zeilen gegen die Schemas des Clients und auf doppelte Schlüssel (die lehnt der Import ab). Sortiment je Profil aus erfundenen
+    Produktwörtern (Marken „Waldkauz“, „Lumen“, „Kranich“), daraus Kampagnen-, Ad-Group-, Keyword- und Portfolio-Namen.
+    Sonderfälle: rund ein Viertel der SB-Kampagnen mit `withoutReports` (v3-Preview-Lücke: Export ja, Report-Zeilen nein), SP-Negatives
+    auch auf Kampagnenebene (SB/SD nur auf Ad-Group-Ebene: deren Export trägt keine `campaignId`, eine Kampagnen-Negative ließe sich
+    nicht zuordnen), SB-Kollektionen und SD-Bild-Ads mit mehreren ASINs, SD-vCPM-Kampagnen, Vendor ohne SKU, pausierte und
+    archivierte Entities. SB-Targets ohne Ad Group erzeugt der Generator nicht (gleicher Grund wie bei den Negatives; der Fall steht
+    in den Tests von 2.4).
+  - **Mock** (`mock.ts`): Option `scale: 'default' | 'large'`; `large` ersetzt die Test-Profile aller Regionen durch die 6
+    Demo-Profile (NA und FE leer). `mock-data.ts`: `MockCampaign.withoutReports`, `MockTarget.searchTerms` (sonst die zwei festen
+    Mock-Begriffe), `MockAd.sku` (sonst aus der ASIN). Kennzahlen weiter über `metricsFor` für jeden angefragten Zeitraum.
+  - **Schalter** `AMAZON_ADS_MOCK_SCALE` (`amazonAdsEnvSchema`, `default`/`large`, leer = `default`); `large` nur mit
+    `AMAZON_ADS_USE_MOCK=true` und nicht bei `NODE_ENV=production` (`refineAmazonAdsCredentials`). Durchgereicht über
+    `createAmazonAdsClientFromConfig({ config: { mockScale } })` in API und Worker, damit der tägliche Sync von `pnpm dev` die
+    Demo-Profile nicht als entfernt markiert.
+  - **`pnpm demo:load`** (`apps/worker/src/demo.ts`, `demo-cli.ts`): legt die Mock-Connection in der Organisation `muuv` an (Upsert
+    über den natürlichen Schlüssel wie der OAuth-Callback, Audit `connection.create` ohne Handelnden), ruft dann die Jobfunktionen
+    direkt auf (`syncConnectionProfiles`, `syncConnectionEntities`, `syncConnectionReports`, `pollAmazonRequests` bis nichts mehr
+    offen ist; Fortsetzungen nach dem Zeitbudget führt es selbst aus) und wiederholt `reports-sync`, bis er nichts mehr anfordert
+    (siehe unten). Danach Clients per (Organisation, Slug) und die
+    Zuordnung der Profile (`LARGE_MOCK_CLIENTS`: Waldkauz DE+FR, Lumen UK+SE, Kranich PL, IT ohne Client) über
+    `assignProfilesToClient` (`system-access.ts`), Audit `client.create` und `profile.update` (mit `before`/`after`). Jeder Lauf
+    geht über `runJob` (`job_runs` wie im Betrieb, Basis für `failedSinceLastRun`); ein gescheiterter Lauf bricht mit seiner
+    Meldung ab. `reports-sync` läuft, bis keine Historie der Connection mehr offen ist (`countOpenBackfills`, normal 2 Runden:
+    anfordern, dann Merker setzen; höchstens 4). Ohne pg-boss und Lease: `pnpm dev` muss dabei aus sein
+    (`docs/development.md`). Der CLI verlangt `AMAZON_ADS_USE_MOCK=true` und lehnt `NODE_ENV=production` ab.
+    Der Mock läuft mit `processingMs: 0`, die Wartezeiten sind die echten Poll-Abstände (mindestens 1 Min.; Exports warten auf
+    freie Plätze, 5 je Typ).
+  - **Doku:** `docs/development.md` (lokale DB, Mock-Anbieter, Demo-Daten neu laden), Verweis im README.
+  - Review (unabhängig): Übernommen: doppelte Suchbegriffe bei Auto-Targets (jeder große `spSearchTerm`-Report wäre abgelehnt
+    worden, `demo:load` brach ab; neuer Test über alle Report-Typen), Ende der Report-Runden über offene Merker statt über
+    `requested` (war immer > 0), Läufe über `runJob`, Profil-Zuordnung als Systemzugriff in `packages/db`, Audit bei erneutem
+    Laden (`connection.reconnect`) und mit `before`, SKU nur bei SD-Product-Ads, Schutz im CLI (Mock verlangt), Doku.
 
 ### 2.4 Abfrage-Schicht (`packages/db`)
 - [ ] Neues Modul (z. B. `ads-analytics.ts`) für Lesezugriffe von Nutzern: **nur** über `visibleProfilesScope()` (ADR 002), Filter

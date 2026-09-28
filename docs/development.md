@@ -23,7 +23,7 @@ Rechner. `AMAZON_ADS_MOCK_SCALE` wählt den Datenumfang:
 | Wert | Inhalt | Wofür |
 |---|---|---|
 | `default` (Standard) | 4 EU-Profile + 1 US-Profil, 3 SP-Kampagnen je Profil, SB und SD nur beim DE-Profil | Tests, schnelle Prüfung der Logik |
-| `large` | 6 Demo-Profile (EUR, GBP, SEK, PLN), 300 Kampagnen (SP, SB, SD), rund 12 700 Targets, Kennzahlen für 95 Tage | Layout, Filter und Tempo von Dashboard und Explorer |
+| `large` | 6 Demo-Profile (EUR, GBP, SEK, PLN), 300 Kampagnen (SP, SB, SD), rund 12 200 Targets (ohne Negatives), Kennzahlen für 95 Tage | Layout, Filter und Tempo von Dashboard und Explorer |
 
 `large` ist nur für die Entwicklung (mit `AMAZON_ADS_USE_MOCK=true`, nie in Produktion). Die Daten sind
 deterministisch (fester Seed je Profil) und erfunden (`packages/amazon-ads/src/mock-large.ts`). Enthalten sind auch
@@ -52,7 +52,9 @@ Die lokale DB neu füllen:
    ```
 
    `demo:load` dauert einige Minuten (der Poll wartet wie im Betrieb mindestens 1 Minute bis zur ersten
-   Abfrage; rund 2 Mio. Kennzahl-Zeilen). Der Befehl ist wiederholbar: Connection und Clients werden wiederverwendet.
+   Abfrage; rund 2 Mio. Kennzahl-Zeilen). Der Befehl ist wiederholbar: Connection und Clients werden wiederverwendet; eine von Hand geänderte
+   Zuordnung der Demo-Profile setzt er zurück. Die Läufe stehen wie im Betrieb im Sync-Status. Scheitert ein Lauf, bricht
+   der Befehl mit dessen Meldung ab.
 4. `pnpm dev` starten. Bei leerer `fx_rates` holt der Worker die EZB-Kurse ab dem 01.01.2026.
 
 Zurück zu den kleinen Mock-Daten: `AMAZON_ADS_MOCK_SCALE` entfernen und die Schritte 1 und 3 ohne `demo:load`

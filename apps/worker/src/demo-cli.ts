@@ -18,8 +18,12 @@ const env = loadEnv(
     .extend(encryptionEnvSchema.shape)
     .superRefine((value, ctx) => refineKeyring(value, ctx)),
 );
-if (env.NODE_ENV === 'production') {
-  console.error('demo:load ist nur für die Entwicklung gedacht (NODE_ENV=production).');
+// Nur Entwicklung: nie in Produktion und nur, wenn die App ohnehin mit dem Mock läuft (schützt davor,
+// Demo-Daten mit einer echten DATABASE_URL in die Organisation „muuv“ zu schreiben).
+if (env.NODE_ENV === 'production' || process.env.AMAZON_ADS_USE_MOCK !== 'true') {
+  console.error(
+    'demo:load ist nur für die Entwicklung gedacht (verlangt AMAZON_ADS_USE_MOCK=true, nicht NODE_ENV=production).',
+  );
   process.exit(1);
 }
 if (process.env.AMAZON_ADS_MOCK_SCALE !== 'large') {

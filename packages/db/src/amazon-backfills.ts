@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
 import type { DbOrTx } from './audit';
-import { amazonAdsBackfills } from './schema';
+import { amazonAdsBackfills, amazonAdsProfiles } from './schema';
 
 /**
  * Merker der Historie (F4, Phase 1, 1.7). Systemzugriff des Workers ohne Nutzerkontext, an die
@@ -52,4 +52,24 @@ export async function completeBackfill(
         eq(amazonAdsBackfills.organizationId, input.organizationId),
       ),
     );
+}
+
+/** Offene Merker (ohne `completed_at`) der Profile einer Connection, gebunden an die Organisation. */
+export async function countOpenBackfills(
+  db: DbOrTx,
+  input: { organizationId: string; connectionId: string },
+): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(amazonAdsBackfills)
+    .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, amazonAdsBackfills.profileId))
+    .where(
+      and(
+        eq(amazonAdsBackfills.organizationId, input.organizationId),
+        eq(amazonAdsProfiles.organizationId, input.organizationId),
+        eq(amazonAdsProfiles.connectionId, input.connectionId),
+        isNull(amazonAdsBackfills.completedAt),
+      ),
+    );
+  return row?.n ?? 0;
 }

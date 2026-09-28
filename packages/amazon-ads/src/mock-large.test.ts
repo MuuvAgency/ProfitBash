@@ -7,7 +7,7 @@ import { createMockAmazonAdsClient } from './mock';
 import { parseJsonLossless } from './json';
 import { mockReportRows, toAmazonJson, type MockAccount } from './mock-data';
 import { LARGE_MOCK_CLIENTS, LARGE_MOCK_PROFILES, largeMockAccount } from './mock-large';
-import { createReportRowSchema } from './reports';
+import { createReportRowSchema, REPORT_DEFINITIONS, type AmazonAdsReportType } from './reports';
 
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -54,6 +54,34 @@ describe('Demo-Daten mit Volumen (Generator)', () => {
     for (const target of all('targets')) {
       if (target.targetType === 'KEYWORD') expect(target.details).toHaveProperty('keyword');
       if (target.targetType === 'PRODUCT') expect(target.details).toHaveProperty('asin');
+    }
+  });
+
+  it('liefert je Report-Typ gültige Zeilen ohne doppelte Schlüssel (sonst lehnt der Import ab)', () => {
+    const keyOf: Record<string, (row: Record<string, unknown>) => string> = {
+      campaign: (row) => `${String(row.campaignId)}`,
+      adGroup: (row) => `${String(row.adGroupId)}`,
+      target: (row) => `${String(row.keywordId ?? row.targetingId)}`,
+      productAd: (row) => `${String(row.adId)}`,
+      searchTerm: (row) => `${String(row.keywordId)}|${String(row.searchTerm)}`,
+    };
+    for (const account of accounts) {
+      for (const reportType of Object.keys(REPORT_DEFINITIONS) as AmazonAdsReportType[]) {
+        const { level } = REPORT_DEFINITIONS[reportType];
+        const rows = reportRows(account, reportType, '2026-09-01', '2026-09-02');
+        const schema = createReportRowSchema(reportType);
+        for (const row of rows) schema.parse(row);
+        const keys = rows.map((row) => `${String(row.date)}|${keyOf[level]!(row)}`);
+        expect(new Set(keys).size, `${account.profile.amazonProfileId} ${reportType}`).toBe(
+          keys.length,
+        );
+      }
+    }
+  });
+
+  it('gibt SKUs nur Product-Ads von Sellern', () => {
+    for (const ad of all('ads')) {
+      if (ad.sku !== undefined) expect(ad.adType).toBe('PRODUCT_AD');
     }
   });
 

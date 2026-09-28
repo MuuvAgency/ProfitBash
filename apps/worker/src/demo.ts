@@ -3,10 +3,17 @@ import {
   MOCK_AMAZON_ADS_IDENTITY,
   type AmazonAdsClient,
 } from '@profitbash/amazon-ads';
-import { nextAmazonRequestPollAt, recordAuditEvent, schema, type Db } from '@profitbash/db';
+import {
+  assignProfilesToClient,
+  countOpenBackfills,
+  nextAmazonRequestPollAt,
+  recordAuditEvent,
+  schema,
+  type Db,
+} from '@profitbash/db';
 import type { Logger } from '@profitbash/shared';
 import { connectionTokenAad, encrypt, type Keyring } from '@profitbash/shared/crypto';
-import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { pollAmazonRequests } from './jobs/amazon-requests-poll';
 import type {
   ConnectionJobData,
@@ -17,15 +24,15 @@ import type {
 import { syncConnectionEntities } from './jobs/entities-sync';
 import { syncConnectionProfiles } from './jobs/profiles-sync';
 import { syncConnectionReports } from './jobs/reports-sync';
-import type { JobOutcome } from './run-job';
+import { createJobRunner, type JobOutcome } from './run-job';
 
-const { amazonAdsProfiles, clients, connections, organizations } = schema;
+const { clients, connections, organizations } = schema;
 
 /** Organisation aus `pnpm db:seed`, in die die Demo-Daten kommen. */
 export const DEMO_ORGANIZATION_SLUG = 'muuv';
 /** Refresh-Token, den der Mock-Anbieter annimmt (wie nach der simulierten Einwilligung). */
 const DEMO_REFRESH_TOKEN = 'Atzr|mock-refresh-demo';
-/** So oft läuft `reports-sync` höchstens: SB/SD fordert er erst an, wenn ihre Kampagnen in der DB sind. */
+/** So oft läuft `reports-sync` höchstens (normal 2 Runden: anfordern, dann Historie abschließen). */
 const MAX_REPORT_ROUNDS = 4;
 
 export interface DemoClock {
@@ -94,13 +101,13 @@ export async function loadDemoData(input: {
     },
     now: () => new Date(clock.now()),
   };
-  const run = (): ConnectionJobRun => ({
-    meter: createRequestMeter(),
-    runId: null,
-    extendLease: () => Promise.resolve(),
-  });
+  const jobRunner = createJobRunner({ db, logger: input.logger });
+  const scope = { organizationId, scope: connectionId };
 
-  /** Führt einen Job und seine Fortsetzungen aus und summiert die Zähler. */
+  /**
+   * Führt einen Job samt Fortsetzungen über `runJob` aus (schreibt `job_runs` wie im Betrieb) und summiert
+   * die Zähler. Ein gescheiterter Lauf bricht das Laden mit seiner Meldung ab.
+   */
   async function runJob(
     fn: (d: ConnectionJobDeps, j: ConnectionJobData, r: ConnectionJobRun) => Promise<JobOutcome>,
     queue: ConnectionQueue,
@@ -108,9 +115,32 @@ export async function loadDemoData(input: {
     const totals: Record<string, number> = {};
     let data: ConnectionJobData | undefined = job;
     while (data) {
-      const outcome = await fn(deps, data, run());
-      for (const [key, value] of Object.entries(outcome.counters ?? {})) {
-        if (typeof value === 'number') totals[key] = (totals[key] ?? 0) + value;
+      const current: ConnectionJobData = data;
+      const meter = createRequestMeter();
+      const result = await jobRunner(
+        queue,
+        scope,
+        async ({ runId }) => {
+          const outcome = await fn(deps, current, {
+            meter,
+            runId,
+            extendLease: () => Promise.resolve(),
+          });
+          for (const [key, value] of Object.entries(outcome.counters ?? {})) {
+            if (typeof value === 'number') totals[key] = (totals[key] ?? 0) + value;
+          }
+          return outcome;
+        },
+        {
+          counters: () => ({
+            requests: meter.requests,
+            throttled: meter.throttled,
+            retries: meter.retries,
+          }),
+        },
+      );
+      if (result.status === 'failed') {
+        throw new Error(`${queue} gescheitert: ${result.error}`);
       }
       const next = followUps.findIndex((f) => f.queue === queue && f.job.resumeFromProfileId);
       data = next >= 0 ? followUps.splice(next, 1)[0]!.job : undefined;
@@ -127,10 +157,9 @@ export async function loadDemoData(input: {
       if (next === null) break;
       const wait = next.getTime() - clock.now();
       if (wait > 0) await clock.sleep(wait);
-      const outcome = await pollAmazonRequests(deps, job, run());
-      const done = outcome.counters?.imported;
-      if (typeof done === 'number' && done > 0) {
-        imported += done;
+      const counters = await runJob(pollAmazonRequests, 'amazon-requests-poll');
+      if ((counters.imported ?? 0) > 0) {
+        imported += counters.imported!;
         progress(`${label}: ${imported} Dateien importiert …`);
       }
     }
@@ -142,14 +171,18 @@ export async function loadDemoData(input: {
   await runJob(syncConnectionEntities, 'entities-sync');
   await drain('Entities');
 
+  // Runde 1 fordert das Fenster und die Historie an; den Merker der Historie setzt erst der nächste
+  // `reports-sync`, wenn alle Stücke importiert sind.
   let reportRounds = 0;
-  while (reportRounds < MAX_REPORT_ROUNDS) {
+  do {
     reportRounds += 1;
     progress(`Reports anfordern (Runde ${reportRounds}) …`);
-    const counters = await runJob(syncConnectionReports, 'reports-sync');
+    await runJob(syncConnectionReports, 'reports-sync');
     await drain('Reports');
-    if ((counters.requested ?? 0) === 0 && (counters.reused ?? 0) === 0) break;
-  }
+  } while (
+    reportRounds < MAX_REPORT_ROUNDS &&
+    (await countOpenBackfills(db, { organizationId, connectionId })) > 0
+  );
 
   await upsertDemoClients(db, organizationId, input.clients);
   progress('Clients angelegt und Profile zugeordnet.');
@@ -196,11 +229,11 @@ async function upsertDemoConnection(
       })
       .returning({ id: connections.id, inserted: sql<boolean>`(xmax = 0)` });
     if (!row) throw new Error('Upsert der Connection lieferte keine Zeile.');
-    if (row.inserted) {
+    {
       await recordAuditEvent(tx, {
         organizationId,
         actorUserId: null,
-        action: 'connection.create',
+        action: row.inserted ? 'connection.create' : 'connection.reconnect',
         target: {
           type: 'connection',
           id: row.id,
@@ -240,21 +273,12 @@ async function upsertDemoClients(
         .select({ id: clients.id })
         .from(clients)
         .where(and(eq(clients.organizationId, organizationId), eq(clients.slug, client.slug)));
-      if (!row || client.amazonProfileIds.length === 0) continue;
-      const changed = await tx
-        .update(amazonAdsProfiles)
-        .set({ clientId: row.id })
-        .where(
-          and(
-            eq(amazonAdsProfiles.organizationId, organizationId),
-            inArray(amazonAdsProfiles.amazonProfileId, [...client.amazonProfileIds]),
-            or(isNull(amazonAdsProfiles.clientId), ne(amazonAdsProfiles.clientId, row.id)),
-          ),
-        )
-        .returning({
-          id: amazonAdsProfiles.id,
-          amazonProfileId: amazonAdsProfiles.amazonProfileId,
-        });
+      if (!row) continue;
+      const changed = await assignProfilesToClient(tx, {
+        organizationId,
+        clientId: row.id,
+        amazonProfileIds: client.amazonProfileIds,
+      });
       for (const profile of changed) {
         await recordAuditEvent(tx, {
           organizationId,
@@ -264,6 +288,7 @@ async function upsertDemoClients(
             type: 'amazon_ads_profile',
             id: profile.id,
             amazonProfileId: profile.amazonProfileId,
+            before: { clientId: profile.previousClientId },
             after: { clientId: row.id },
             source: 'demo',
           },
