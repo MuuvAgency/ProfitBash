@@ -1,6 +1,6 @@
 import {
   MAX_REPORT_DAYS,
-  REPORT_AD_PRODUCTS,
+  REPORT_AD_PRODUCT_SELECTION,
   REPORT_DEFINITIONS,
   reportTypesFor,
   type AmazonAdsReportType,
@@ -12,6 +12,7 @@ import {
   findPreviousJobRun,
   listReportRanges,
   OPEN_AMAZON_REQUEST_STATUSES,
+  selectReportAdProducts,
   type JobProfile,
 } from '@profitbash/db';
 import {
@@ -142,7 +143,14 @@ async function syncProfile(
     endDate: yesterday,
   };
 
-  for (const adProduct of REPORT_AD_PRODUCTS) {
+  // SP immer, SB nur mit Kampagnen (1.9): Ad-Typen, die das Profil nicht nutzt, kosten keine Aufträge
+  // und halten „Daten bis“ nicht auf.
+  const adProducts = await selectReportAdProducts(
+    deps.db,
+    { organizationId: connection.organizationId, profileId: profile.id },
+    REPORT_AD_PRODUCT_SELECTION,
+  );
+  for (const adProduct of adProducts) {
     for (const reportType of reportTypesFor(adProduct)) {
       const key = {
         organizationId: connection.organizationId,

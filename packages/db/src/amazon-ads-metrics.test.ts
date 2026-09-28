@@ -1,11 +1,12 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ProfileNotFoundError } from './amazon-ads-entities';
+import { ensureCampaigns, ProfileNotFoundError } from './amazon-ads-entities';
 import {
   markMetricsImportedThrough,
   metricsImportedThroughSql,
   MetricsImportRejectedError,
   replaceDailyMetrics,
+  selectReportAdProducts,
   type DailyMetricValues,
   type ReplaceDailyMetricsInput,
 } from './amazon-ads-metrics';
@@ -35,6 +36,9 @@ let foreignProfileId = '';
 
 const SP = 'SPONSORED_PRODUCTS';
 const SB = 'SPONSORED_BRANDS';
+const SD = 'SPONSORED_DISPLAY';
+/** Wie `REPORT_AD_PRODUCT_SELECTION` in `@profitbash/amazon-ads` (1.9). */
+const SELECTION = { always: [SP], withCampaigns: [SB] };
 const now = new Date('2026-09-27T06:00:00Z');
 const later = new Date('2026-09-28T06:00:00Z');
 
@@ -614,14 +618,58 @@ describe('markMetricsImportedThrough', () => {
   });
 });
 
+describe('selectReportAdProducts', () => {
+  beforeEach(async () => {
+    await testDb.db
+      .delete(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.profileId, secondProfileId));
+  });
+
+  const select = (overrides: Partial<{ organizationId: string; profileId: string }> = {}) =>
+    selectReportAdProducts(
+      testDb.db,
+      { organizationId, profileId: secondProfileId, ...overrides },
+      SELECTION,
+    );
+
+  it('nimmt SP immer, SB erst mit einer Kampagne dieses Ad-Typs (auch als Platzhalter)', async () => {
+    expect(await select()).toEqual([SP]);
+    await ensureCampaigns(testDb.db, { organizationId, profileId: secondProfileId }, [
+      { amazonCampaignId: 'sd-1', adProduct: SD },
+    ]);
+    expect(await select()).toEqual([SP]);
+    await ensureCampaigns(testDb.db, { organizationId, profileId: secondProfileId }, [
+      { amazonCampaignId: 'sb-1', adProduct: SB },
+      { amazonCampaignId: 'sb-2', adProduct: SB },
+    ]);
+    expect(await select()).toEqual([SP, SB]);
+  });
+
+  it('zählt nur Kampagnen dieses Profils', async () => {
+    await ensureCampaigns(testDb.db, { organizationId, profileId }, [
+      { amazonCampaignId: 'sb-anderes-profil', adProduct: SB },
+    ]);
+    expect(await select()).toEqual([SP]);
+  });
+
+  it('lehnt ein Profil einer anderen Organisation ab', async () => {
+    await expect(select({ profileId: foreignProfileId })).rejects.toBeInstanceOf(
+      ProfileNotFoundError,
+    );
+  });
+});
+
 describe('metricsImportedThroughSql', () => {
   beforeEach(async () => {
     await testDb.db.delete(amazonAdsProfileMetricsImportedThrough);
+    await testDb.db
+      .delete(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.profileId, secondProfileId));
   });
 
-  async function dataThrough(adProducts: readonly string[]) {
+  async function dataThrough(selection: { always: string[]; withCampaigns: string[] } = SELECTION) {
     const [row] = await testDb.db
-      .select({ date: metricsImportedThroughSql(adProducts) })
+      .select({ date: metricsImportedThroughSql(selection) })
       .from(amazonAdsProfiles)
       .where(eq(amazonAdsProfiles.id, secondProfileId));
     return row!.date;
@@ -633,29 +681,43 @@ describe('metricsImportedThroughSql', () => {
       adProduct,
       date,
     });
+  const campaign = (adProduct: string) =>
+    ensureCampaigns(testDb.db, { organizationId, profileId: secondProfileId }, [
+      { amazonCampaignId: `${adProduct}-1`, adProduct },
+    ]);
 
-  it('ist das Minimum über die Ad-Typen: ein hängender Ad-Typ bremst „Daten bis“', async () => {
+  it('ist das Minimum über SP und die Ad-Typen mit Kampagnen: ein hängender Ad-Typ bremst', async () => {
     await mark(SP, '2026-09-27');
     await mark(SB, '2026-09-20');
-    expect(await dataThrough([SP, SB])).toBe('2026-09-20');
-    expect(await dataThrough([SP])).toBe('2026-09-27');
+    // Ohne SB-Kampagne zählt SB nicht (Profil nutzt SB nicht).
+    expect(await dataThrough()).toBe('2026-09-27');
+    await campaign(SB);
+    expect(await dataThrough()).toBe('2026-09-20');
   });
 
-  it('ist leer, solange einem der Ad-Typen ein Tag fehlt', async () => {
-    expect(await dataThrough([SP])).toBeNull();
+  it('ist leer, solange einem der ausgewählten Ad-Typen ein Tag fehlt', async () => {
+    expect(await dataThrough()).toBeNull();
     await mark(SP, '2026-09-27');
-    expect(await dataThrough([SP, SB])).toBeNull();
+    await campaign(SB);
+    expect(await dataThrough()).toBeNull();
   });
 
-  it('zählt einen doppelt übergebenen Ad-Typ einmal', async () => {
+  it('ignoriert Ad-Typen außerhalb der Auswahl, auch mit Kampagnen', async () => {
     await mark(SP, '2026-09-27');
-    expect(await dataThrough([SP, SP])).toBe('2026-09-27');
+    await mark(SD, '2026-09-01');
+    await campaign(SD);
+    expect(await dataThrough()).toBe('2026-09-27');
   });
 
-  it('ignoriert Ad-Typen, die der Sync nicht anfordert', async () => {
+  it('zählt einen doppelt genannten Ad-Typ einmal', async () => {
     await mark(SP, '2026-09-27');
-    await mark(SB, '2026-09-01');
-    expect(await dataThrough([SP])).toBe('2026-09-27');
+    await campaign(SP);
+    expect(await dataThrough({ always: [SP, SP], withCampaigns: [SP] })).toBe('2026-09-27');
+  });
+
+  it('ist leer ohne Ad-Typen', async () => {
+    await mark(SP, '2026-09-27');
+    expect(await dataThrough({ always: [], withCampaigns: [] })).toBeNull();
   });
 });
 

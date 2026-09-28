@@ -1,6 +1,17 @@
-import { and, between, eq, getTableColumns, inArray, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  between,
+  eq,
+  getTableColumns,
+  getTableName,
+  inArray,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import {
+  assertProfileInOrganization,
   ensureAdGroups,
   ensureCampaigns,
   ensureProductAds,
@@ -13,6 +24,7 @@ import type { DbOrTx } from './audit';
 import {
   amazonAdsAdGroupDailyMetrics,
   amazonAdsCampaignDailyMetrics,
+  amazonAdsCampaigns,
   amazonAdsProductAdDailyMetrics,
   amazonAdsProfileMetricsImportedThrough,
   amazonAdsProfiles,
@@ -180,21 +192,65 @@ export async function markMetricsImportedThrough(
 }
 
 /**
- * „Daten bis“ eines Profils für ein `select` über `amazon_ads_profiles`: das Minimum über die
- * übergebenen Ad-Typen (die der Sync anfordert), leer, solange einem davon ein Tag fehlt. So bremst ein
- * hängender Ad-Typ die Anzeige, statt hinter dem Stand der anderen zu verschwinden.
+ * Welche Ad-Typen der Sync für ein Profil anfordert (1.9): `always` für jedes Profil, `withCampaigns` nur,
+ * wenn das Profil mindestens eine Kampagne dieses Ad-Typs hat (aus dem Entity-Sync, auch archivierte,
+ * entfernte und Platzhalter). So bleiben Ad-Typen, die ein Profil nicht nutzt, aus Sync und „Daten bis“.
  */
-export function metricsImportedThroughSql(adProducts: readonly string[]): SQL<string | null> {
-  const marks = amazonAdsProfileMetricsImportedThrough;
-  const unique = [...new Set(adProducts)];
-  if (unique.length === 0) return sql<null>`null::text`;
+export interface ReportAdProductSelection {
+  always: readonly string[];
+  withCampaigns: readonly string[];
+}
+
+/** Die Ad-Typen eines Profils nach `selection`, in deren Reihenfolge (`always` zuerst). */
+export async function selectReportAdProducts(
+  db: DbOrTx,
+  scope: EntityScope,
+  selection: ReportAdProductSelection,
+): Promise<string[]> {
+  await assertProfileInOrganization(db, scope);
+  const optional = selection.withCampaigns.filter((p) => !selection.always.includes(p));
+  const used =
+    optional.length === 0
+      ? []
+      : await db
+          .selectDistinct({ adProduct: amazonAdsCampaigns.adProduct })
+          .from(amazonAdsCampaigns)
+          .where(
+            and(
+              eq(amazonAdsCampaigns.profileId, scope.profileId),
+              inArray(amazonAdsCampaigns.adProduct, optional),
+            ),
+          );
+  const usedSet = new Set(used.map((row) => row.adProduct));
+  return [...new Set([...selection.always, ...optional.filter((p) => usedSet.has(p))])];
+}
+
+/**
+ * „Daten bis“ eines Profils für ein `select` über `amazon_ads_profiles`: das Minimum über die Ad-Typen,
+ * die der Sync für das Profil anfordert (wie `selectReportAdProducts`), leer, solange einem davon ein Tag
+ * fehlt. So bremst ein hängender Ad-Typ die Anzeige, statt hinter dem Stand der anderen zu verschwinden;
+ * ein Ad-Typ, den das Profil nicht nutzt, bremst nicht.
+ */
+export function metricsImportedThroughSql(selection: ReportAdProductSelection): SQL<string | null> {
+  const always = [...new Set(selection.always)];
+  const withCampaigns = [...new Set(selection.withCampaigns)];
+  if (always.length === 0 && withCampaigns.length === 0) return sql<null>`null::text`;
+  // Ausdrücklich qualifiziert: In `select`-Feldern rendert Drizzle Spalten ohne Tabelle, `"id"` träfe in
+  // der Unterabfrage sonst die Kampagne statt des Profils.
+  const profileId = sql`${sql.identifier(getTableName(amazonAdsProfiles))}.${sql.identifier(amazonAdsProfiles.id.name)}`;
   // Als Text (`YYYY-MM-DD`, unabhängig von `DateStyle`): Ein Tag ohne Uhrzeit, keine Umrechnung durch den Treiber.
   return sql<string | null>`(
-    select case when count(*) = ${unique.length}
-      then to_char(min(${marks.importedThrough}), 'YYYY-MM-DD') end
-    from ${marks}
-    where ${marks.profileId} = ${amazonAdsProfiles.id}
-      and ${inArray(marks.adProduct, unique)}
+    select case when count(*) > 0 and count(*) = count(mark.imported_through)
+      then to_char(min(mark.imported_through), 'YYYY-MM-DD') end
+    from (
+      select unnest(${sql.param(always)}::text[]) as ad_product
+      union
+      select campaign.ad_product from ${amazonAdsCampaigns} as campaign
+      where campaign.profile_id = ${profileId}
+        and campaign.ad_product = any(${sql.param(withCampaigns)}::text[])
+    ) as selected
+    left join ${amazonAdsProfileMetricsImportedThrough} as mark
+      on mark.profile_id = ${profileId} and mark.ad_product = selected.ad_product
   )`;
 }
 
