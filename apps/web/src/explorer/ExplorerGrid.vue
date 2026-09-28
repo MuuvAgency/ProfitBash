@@ -8,7 +8,7 @@ import type {
   SelectionChangedEvent,
 } from 'ag-grid-community';
 import { AgGridVue } from 'ag-grid-vue3';
-import { markRaw, shallowRef } from 'vue';
+import { computed, markRaw, shallowRef } from 'vue';
 import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
 import type { GridRow } from './columns';
 import NameCell, { type NameCellContext } from './NameCell.vue';
@@ -27,6 +27,10 @@ const props = defineProps<{
 const emit = defineEmits<{ selection: [ids: string[]] }>();
 
 const api = shallowRef<GridApi<GridRow>>();
+
+/** Wenige Zeilen: Grid wächst mit (kein Leerraum); sonst feste Höhe mit Virtualisierung. */
+const AUTO_HEIGHT_MAX_ROWS = 15;
+const autoHeight = computed(() => props.rows.length <= AUTO_HEIGHT_MAX_ROWS);
 
 const defaultColDef: ColDef<GridRow> = {
   resizable: true,
@@ -79,7 +83,8 @@ const components = { nameCell: markRaw(NameCell) };
 
 <template>
   <AgGridVue
-    class="h-[34rem] w-full"
+    :class="['w-full', autoHeight ? '' : 'h-[34rem]']"
+    :dom-layout="autoHeight ? 'autoHeight' : 'normal'"
     :theme="gridTheme"
     :theme-css-layer="gridStyleOptions.themeCssLayer"
     :theme-style-container="gridStyleOptions.themeStyleContainer"
@@ -98,6 +103,7 @@ const components = { nameCell: markRaw(NameCell) };
       headerCheckbox: true,
       enableClickSelection: false,
     }"
+    :selection-column-def="{ pinned: 'left', lockPinned: true }"
     :row-height="44"
     :suppress-cell-focus="true"
     @grid-ready="onGridReady"
