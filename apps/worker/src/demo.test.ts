@@ -14,6 +14,7 @@ const {
   auditEvents,
   clients,
   connections,
+  jobRuns,
 } = schema;
 
 const DE = '9007199254740993';
@@ -86,6 +87,8 @@ describe('loadDemoData', () => {
   it('füllt Profile, Entities und Kennzahlen aller Ad-Typen über den Sync und ordnet Clients zu', async () => {
     const result = await load();
     expect(result.profiles).toBe(4);
+    // Runde 1 fordert Fenster und Historie an, Runde 2 schließt die Merker der Historie ab.
+    expect(result.reportRounds).toBe(2);
 
     const adProducts = await testDb.db
       .selectDistinct({ adProduct: amazonAdsCampaignDailyMetrics.adProduct })
@@ -101,7 +104,7 @@ describe('loadDemoData', () => {
       sql`select (max(date) - min(date))::int as days from ${amazonAdsCampaignDailyMetrics}
           where ad_product = 'SPONSORED_PRODUCTS'`,
     );
-    expect(span!.days).toBeGreaterThan(60);
+    expect(span!.days).toBeGreaterThanOrEqual(90);
     expect(
       await count(
         testDb.db.select({ n: sql<number>`count(*)::int` }).from(amazonAdsSearchTermDailyMetrics),
@@ -133,6 +136,24 @@ describe('loadDemoData', () => {
       { action: 'profile.update', actor: null },
       { action: 'profile.update', actor: null },
     ]);
+    const [profileAudit] = await testDb.db
+      .select({ target: auditEvents.target })
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'profile.update'))
+      .limit(1);
+    expect(profileAudit!.target).toMatchObject({ before: { clientId: null } });
+
+    // Die Läufe stehen wie im Betrieb in job_runs (Sync-Status, Basis für `failedSinceLastRun`).
+    const runs = await testDb.db
+      .select({ job: jobRuns.job, status: jobRuns.status })
+      .from(jobRuns)
+      .where(eq(jobRuns.organizationId, organizationId));
+    const byJob = new Map<string, string[]>();
+    for (const run of runs) byJob.set(run.job, [...(byJob.get(run.job) ?? []), run.status]);
+    expect(byJob.get('profiles-sync')).toEqual(['success']);
+    expect(byJob.get('entities-sync')).toEqual(['success']);
+    expect(byJob.get('reports-sync')).toEqual(['success', 'success']);
+    expect(byJob.get('amazon-requests-poll')?.every((status) => status === 'success')).toBe(true);
   }, 120_000);
 
   it('ist wiederholbar: keine doppelten Connections, Clients oder Kennzahlen', async () => {
@@ -146,6 +167,11 @@ describe('loadDemoData', () => {
     expect(await count(testDb.db.select({ n: sql<number>`count(*)::int` }).from(connections))).toBe(
       1,
     );
+    const reconnects = await testDb.db
+      .select({ action: auditEvents.action })
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'connection.reconnect'));
+    expect(reconnects).toHaveLength(1);
     expect(await count(testDb.db.select({ n: sql<number>`count(*)::int` }).from(clients))).toBe(2);
     expect(
       await count(
@@ -160,5 +186,35 @@ describe('loadDemoData', () => {
           .where(and(isNull(amazonAdsCampaigns.removedAt))),
       ),
     ).toBe(campaigns);
+  }, 120_000);
+
+  it('bricht mit Meldung ab, wenn ein Report scheitert, und hält den Lauf in job_runs fest', async () => {
+    const other = await createTestDatabase();
+    try {
+      await createOrganization(other.db, 'muuv');
+      const error = await loadDemoData({
+        db: other.db,
+        keyring: testKeyring,
+        amazonAds: createMockAmazonAdsClient({
+          redirectUri: 'http://localhost/cb',
+          consentUrl: 'http://localhost/consent',
+          store: createConnectionTokenStore({ db: other.db, keyring: testKeyring }),
+          rateLimit: { requestsPerSecond: 1_000 },
+          simulation: { now: () => clock, processingMs: 0, failingReportTypes: ['spSearchTerm'] },
+        }),
+        clients: CLIENTS,
+        clock: demoClock,
+        logger: () => {},
+      }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(/reports-sync.*gescheitert/);
+      const failed = await other.db
+        .select({ job: jobRuns.job })
+        .from(jobRuns)
+        .where(eq(jobRuns.status, 'failed'));
+      expect(failed.map((run) => run.job)).toEqual(['reports-sync']);
+    } finally {
+      await other.close();
+    }
   }, 120_000);
 });

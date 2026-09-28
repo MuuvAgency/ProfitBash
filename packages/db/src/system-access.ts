@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, ne, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { DbOrTx } from './audit';
 import { amazonAdsProfiles, connections, jobRuns } from './schema';
 
@@ -201,6 +201,47 @@ export async function reassignProfiles(
     )
     .returning({ id: amazonAdsProfiles.id });
   return rows.length;
+}
+
+/**
+ * Ordnet Profile (Amazon-IDs) einem Client derselben Organisation zu, für Seed-Schritte ohne Nutzer
+ * (`pnpm demo:load`). Liefert nur die geänderten Profile mit dem vorherigen Client (für das Audit).
+ */
+export async function assignProfilesToClient(
+  db: DbOrTx,
+  input: { organizationId: string; clientId: string; amazonProfileIds: readonly string[] },
+): Promise<Array<{ id: string; amazonProfileId: string; previousClientId: string | null }>> {
+  if (input.amazonProfileIds.length === 0) return [];
+  const before = await db
+    .select({
+      id: amazonAdsProfiles.id,
+      amazonProfileId: amazonAdsProfiles.amazonProfileId,
+      previousClientId: amazonAdsProfiles.clientId,
+    })
+    .from(amazonAdsProfiles)
+    .where(
+      and(
+        eq(amazonAdsProfiles.organizationId, input.organizationId),
+        inArray(amazonAdsProfiles.amazonProfileId, [...input.amazonProfileIds]),
+        or(isNull(amazonAdsProfiles.clientId), ne(amazonAdsProfiles.clientId, input.clientId)),
+      ),
+    )
+    .for('update');
+  if (before.length === 0) return [];
+  // Der zusammengesetzte FK (client_id, organization_id) verhindert Clients anderer Organisationen.
+  await db
+    .update(amazonAdsProfiles)
+    .set({ clientId: input.clientId })
+    .where(
+      and(
+        eq(amazonAdsProfiles.organizationId, input.organizationId),
+        inArray(
+          amazonAdsProfiles.id,
+          before.map((row) => row.id),
+        ),
+      ),
+    );
+  return before;
 }
 
 /** Setzt `removed_at` (nichts wird gelöscht). Nur Profile, die noch an der Connection hängen. */
