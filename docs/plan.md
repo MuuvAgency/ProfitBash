@@ -119,7 +119,8 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
   der Einwilligung je Connection festhalten und rechtzeitig zum Neu-Verbinden auffordern (spätestens mit den Notifications in Phase 5).
 - **Kennzahlen je Ad-Typ (für Phase 2, Details in `phase-1.md` 1.9):** SP-Attribution ist klick-basiert (`*_7d`, `*_14d`). SB (und
   SD) liefern nur 14 Tage, `*_14d` zählt dort Klicks **und** Views (wie die Konsole), der Klick-Anteil steht in `*_clicks_14d`. Summen
-  über Ad-Typen müssen das kennzeichnen. SB-Reports sind in v3 „Preview“: SB-Kampagnen mit `isMultiAdGroupsEnabled=false` haben
+  über Ad-Typen müssen das kennzeichnen. SD: Same-SKU (`*_same_sku_14d`) zählt nur Klicks (gegen `*_clicks_14d` lesen),
+  `viewable_impressions` (nur SD) ist die Basis für vCPM. SB-Reports sind in v3 „Preview“: SB-Kampagnen mit `isMultiAdGroupsEnabled=false` haben
   Entities, aber keine Kennzahlen; die UI erklärt das bei SB-Summen.
 
 ## 6. Betriebskosten-Stufen
