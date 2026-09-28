@@ -28,7 +28,7 @@ const toneClass = computed(() => {
     case 'positive':
       return onDark ? 'bg-lime/15 text-lime' : 'bg-lime/25 text-lime-deep';
     case 'negative':
-      return onDark ? 'bg-loss/20 text-on-loss-wash' : 'bg-loss-wash text-on-loss-wash';
+      return onDark ? 'bg-loss/25 text-on-panel' : 'bg-loss-wash text-on-loss-wash';
     default:
       return onDark ? 'bg-on-panel/10 text-on-panel-muted' : 'bg-well text-ink-secondary';
   }
