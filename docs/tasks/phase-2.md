@@ -4,7 +4,7 @@
 > `docs/tasks/phase-1.md` (Umsetzungsnotizen 1.5–1.9, F8, F12), `docs/decisions/` (001 Stack, 002 Mandanten-Modell,
 > 003 Decimal-Library, 004 Amazon-API), `design/DESIGN.md` und die Referenzen `dashboard_home`, `werbekosten_ppc`.
 >
-> **Status: Entwurf (2026-09-28), zur Abstimmung.** Fragen stehen als **F1–F14** unter „Fragen an Dominik“, jeweils mit
+> **Status: in Abstimmung (2026-09-28).** Entschieden: F1, F2, F10, F12, Zeiträume aus F5. Offen: Rest. Fragen stehen als **F1–F14** unter „Fragen an Dominik“, jeweils mit
 > Empfehlung (die Nummern gelten nur in dieser Datei; `phase-1.md` hat eigene F1–F14). Umgesetzt wird erst, wenn die Fragen
 > entschieden sind. Aufgaben, die von einer Frage abhängen, verweisen darauf.
 >
@@ -55,6 +55,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   Empfehlung: **ein Explorer für alle drei**, Filter und Spalte „Ad-Typ“. Der Feature-Key `sp-explorer` bleibt (gemeint:
   Sponsored Ads, im Gegensatz zu `dsp-explorer`); `plan.md` §3 bekommt dazu eine Anmerkung. Umbenennen bräuchte eine
   Datenmigration der Entitlements und bringt nichts. Das ASIN-Quick-Tool (F10) hängt am selben Key.
+  **Entschieden (Dominik, 2026-09-28): ein Explorer für alle Ad-Typen, nach Ad-Typ filterbar.**
 - **F2 – Auswahl von Clients und Profilen.** Wie wählt man aus, was Dashboard und Explorer zeigen? Empfehlung: eine
   **Filterleiste oben** (gleich in Dashboard und Explorer): Clients (mehrfach), darin Profile (mehrfach), Standard „alle
   sichtbaren“. Profile ohne Client erscheinen unter „Ohne Client“.
@@ -63,6 +64,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Die URL enthält nur Kurzes (Zeitraum, Ebene, Drill-Down, Client-IDs oder die ID einer gespeicherten Ansicht), damit man Links
     teilen und mit der Zurück-Taste arbeiten kann. Eine lange Liste einzelner Profile kommt nicht in die URL (Regel in `CLAUDE.md`),
     sondern in die zuletzt benutzte Auswahl je Nutzer (`ui_state`) bzw. in eine gespeicherte Ansicht (F8).
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen.**
 - **F3 – Währung.** Empfehlung: Stammen alle ausgewählten Profile aus einer Währung, zeigt die App diese Währung. Sonst rechnet sie
   **in EUR um, je Tag mit dem EZB-Kurs dieses Tages** (für Wochenenden und Feiertage gilt der letzte Kurs davor), und kennzeichnet
   Summen mit „≈“ (`plan.md` §5). Keine wählbare Anzeigewährung (später nachrüstbar). Der Explorer zeigt je Zeile die
@@ -92,6 +94,11 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Tage sind Kalendertage in der Zeitzone des jeweiligen Profils (so liegen sie schon in der DB), „Gestern“ bezieht sich auf die
     Zeitzone des Browsers.
   - Die letzten 14 Tage vor „Daten bis“ sind **vorläufig** (Amazon korrigiert noch) und im Chart als Bereich markiert.
+  **Entschieden (Dominik, 2026-09-28), Voreinstellungen:** Letzte 30 Tage (Standard), Letzte 14 Tage, Diese Woche, Letzte Woche,
+  Letzter Monat, Vorletzter Monat, Vor-vorletzter Monat, Letzte 12 Monate, Dieses Jahr bis jetzt, Letztes Jahr, dazu frei wählbar.
+  Wochen beginnen am Montag. Reichen die Daten nicht so weit zurück (Historie ab dem ersten Sync, höchstens 95 Tage davor),
+  zeigt die App ab wann Daten vorliegen, statt Lücken als 0 zu zeigen. **Noch offen:** Vergleich (Empfehlung oben unverändert) und
+  ob „Gestern“, „Letzte 7 Tage“ und „Dieser Monat“ bewusst fehlen.
 - **F6 – Explorer-Ebenen und Drill-Down.** Empfehlung: Reiter **Portfolios · Kampagnen · Ad Groups · Targets · Product Ads ·
   Suchbegriffe · Negatives**. Ein Klick auf eine Zeile filtert die nächste Ebene darauf (Brotkrumen oben: Client › Profil ›
   Kampagne › Ad Group), die Reiter bleiben erreichbar. SB-Targets ohne Ad Group (Kampagnenebene) erscheinen beim Drill-Down von der
@@ -99,6 +106,9 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   Ein **Chart** über dem Grid zeigt den Tagesverlauf von bis zu zwei Kennzahlen für die aktuelle Auswahl (oder die markierten
   Zeilen). Dazu **CSV-Export** der geladenen Zeilen (Community-Modul von AG Grid, wenig Aufwand). Frage: CSV-Export jetzt
   oder später?
+  **Stand (2026-09-28):** Dominik hat nachgefragt; einfach erklärt: Reiter je Ebene, Klick auf eine Kampagne zeigt nur noch deren
+  Ad Groups usw., Pfad oben zum Zurückspringen, Chart über der Tabelle. Offen: diese Erklärung bestätigen und CSV-Export
+  (Tabelle als Datei für Excel herunterladen) jetzt oder später.
 - **F7 – Datenmenge im Grid.** Empfehlung: Der Server rechnet Summen je Zeile, das Grid bekommt alle Zeilen der Auswahl
   (Sortieren und Filtern im Browser, schnell und einfach) bis zu einer Obergrenze von **10 000 Zeilen**.
   - Bei mehr Zeilen lädt es die 10 000 mit dem höchsten Spend und sagt das deutlich: Filter und Sortierung wirken dann nur auf diese
@@ -138,6 +148,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Bekannte Lücke: SD-Product-Ads, die nur eine SKU tragen (`phase-1.md` 1.9), findet die Suche nach ASIN nicht; das Popover sagt
     das. Suche nach SKU zusätzlich?
   - Gemeint so, oder etwas anderes (z. B. Keyword-Recherche zu einer ASIN)?
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen, zusätzlich Suche nach SKU** (dann findet das Tool auch SD-Ads nur mit SKU;
+  Eingaben werden als ASIN oder SKU erkannt bzw. in beiden Feldern gesucht).
 - **F11 – Inhalt des Dashboards.** Die Referenzen (`dashboard_home`, `werbekosten_ppc`) zeigen Profit, Shop-Bestellungen und
   Kanäle, die es erst ab Phase 7 bzw. gar nicht gibt. Empfehlung für Phase 2:
   - **KPI-Kacheln** Spend, Umsatz (Ads), ACoS, ROAS, Käufe (Ads, von Amazon der Werbung zugeordnet), Klicks mit CPC, jeweils mit
@@ -146,12 +158,17 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - **Anteil je Ad-Typ** (Spend, Umsatz, ACoS); **Tabelle je Client bzw. Profil** mit denselben Kennzahlen und Sprung in den
     Explorer; **Datenstand** („Daten bis“, letzter Sync, Hinweis bei hängenden Ad-Typen, Stand der Wechselkurse).
   - Kein TACoS und kein Profit (Phase 7), keine erfundenen Kacheln wie „Market Velocity“.
+  **Stand (2026-09-28):** Dominik fragt nach organischen Umsätzen. Die gibt es nicht über die Ads-API, nur über die SP-API (Phase 7;
+  laut `plan.md` §2 ginge ein schmaler „Sales-Import“ früher, sobald die SP-API freigegeben ist). Ohne SP-API-Zugang bleibt Phase 2
+  bei Ads-Kennzahlen. Offen: ob der Kachel-Inhalt oben so passt, und ob die SP-API-Registrierung (`phase-0.md` 0.0e) für ein
+  Einzelunternehmen dieselbe Hürde hat wie das Partner Network (Dominik prüft).
 - **F12 – Demo-Daten mit Volumen.** Die Mock-Daten haben 16 Kampagnen und 26 Targets; Grid-Layout, Filter und Abfragetempo lassen
   sich daran nicht prüfen. Empfehlung: ein **Generator im Mock-Anbieter** (deterministisch, eigener Schalter, z. B.
   `AMAZON_ADS_MOCK_SCALE=large`): 6 Profile in EUR/GBP/SEK/PLN (neue Mock-Profile), ~300 Kampagnen, **~12 000 Targets** (über der
   Grenze aus F7, damit das Kürzen getestet wird), 95 Tage, alle drei Ad-Typen, nur erfundene Namen. Entities und Kennzahlen kommen
   über denselben Sync wie echte Daten (kein Direkt-Insert); 3 Clients und die Zuordnung der Profile legt ein Seed-Schritt an (Clients
   kommen nicht von Amazon).
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen.**
 - **F13 – Mobil.** Empfehlung: Dashboard **voll responsive** (eine Spalte unter 768 px, `DESIGN.md` §6). Explorer ab Tablet voll
   nutzbar; auf dem Handy dieselbe Seite, das Grid scrollt waagerecht in seiner Kachel, Chart und Filterleiste stapeln sich. Keine
   eigene Handy-Ansicht des Explorers in Phase 2.
