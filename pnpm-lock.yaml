@@ -254,6 +254,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ag-grid-community/locale':
+        specifier: 36.2.0
+        version: 36.2.0
       '@fontsource-variable/jetbrains-mono':
         specifier: ^5.3.0
         version: 5.3.0
@@ -269,6 +272,12 @@ importers:
       '@tanstack/vue-query':
         specifier: ^5.103.2
         version: 5.103.2(vue@3.5.43(typescript@6.0.3))
+      ag-charts-community:
+        specifier: 14.2.0
+        version: 14.2.0
+      ag-charts-vue3:
+        specifier: 14.2.0
+        version: 14.2.0(vue@3.5.43(typescript@6.0.3))
       ag-grid-community:
         specifier: 36.2.0
         version: 36.2.0
@@ -432,6 +441,9 @@ importers:
         version: 4.6.5
 
 packages:
+
+  '@ag-grid-community/locale@36.2.0':
+    resolution: {integrity: sha512-N1sBNSa6z/TzSsN/YdXmfP4Gsdl+7JAmQosTPOfGA9C5pVeOV0y4lcK6rOLfkzaL4D84AZIDSItWXA4XmuBbdg==}
 
   '@asteasolutions/zod-to-openapi@9.1.0':
     resolution: {integrity: sha512-pLMeRgRYS7/vZIgAAkOe2P6+XGTifR1MT9pqDoxZ11EmcJJ+DPmdPqLN8ZZF4U8R9KHCCQCS9c2wtuE8wSrfkw==}
@@ -2104,8 +2116,22 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  ag-charts-community@14.2.0:
+    resolution: {integrity: sha512-AQ9u5jJGjCGWY19XMehZFhC5db6e9J5DGCurSGjm1h9MUkfTQfj9KMDHLhTQqdNhVvTXI7J4OB8ZNbWMh3TJug==}
+
+  ag-charts-core@14.2.0:
+    resolution: {integrity: sha512-te4u0sFYMNuzfZMU/uh3nVEctIFpsAfLFBJIJtlMqBKI8otYdB3y4M5Ax8KAAg888X6G1lDaBW8FoNGzX3caSg==}
+
+  ag-charts-locale@14.2.0:
+    resolution: {integrity: sha512-zoG9yxh193FKc7jvx9FFp8oWUTcYIzHJLNmq1+54KCIe0us9Ay5odkp31y7WJX5gDtty8hKq+uyOEBPXtE9GHw==}
+
   ag-charts-types@14.2.0:
     resolution: {integrity: sha512-4pDV6/4zbzPN7t607Gr1o6DO9RhmPafQGr+hIpTJBaerbaMoC+WOO3v/wkxFbvCNrHKOexEKSfNTH7PaAR4UzA==}
+
+  ag-charts-vue3@14.2.0:
+    resolution: {integrity: sha512-AD9WTtt1WWcQaua9/0gC/n9l4xMhxZqqQDvqHUFGrZGUgW140lx3kFMTFZEbq1Kc4ls919uVPfnG0l6JTWzs4w==}
+    peerDependencies:
+      vue: ^3.5.0
 
   ag-grid-community@36.2.0:
     resolution: {integrity: sha512-tK0Toj7t0fV/OMLPnDc0xlYKAqDbnCT3iJodYSn2TJ541caU8jPdYwWhMdW+AP2+pUNwFiJVgc04eJNfvBPsWw==}
@@ -3922,6 +3948,8 @@ packages:
 
 snapshots:
 
+  '@ag-grid-community/locale@36.2.0': {}
+
   '@asteasolutions/zod-to-openapi@9.1.0(zod@4.6.5)':
     dependencies:
       openapi3-ts: 4.6.1
@@ -5268,7 +5296,24 @@ snapshots:
 
   acorn@8.18.0: {}
 
+  ag-charts-community@14.2.0:
+    dependencies:
+      ag-charts-core: 14.2.0
+      ag-charts-locale: 14.2.0
+      ag-charts-types: 14.2.0
+
+  ag-charts-core@14.2.0:
+    dependencies:
+      ag-charts-types: 14.2.0
+
+  ag-charts-locale@14.2.0: {}
+
   ag-charts-types@14.2.0: {}
+
+  ag-charts-vue3@14.2.0(vue@3.5.43(typescript@6.0.3)):
+    dependencies:
+      ag-charts-community: 14.2.0
+      vue: 3.5.43(typescript@6.0.3)
 
   ag-grid-community@36.2.0:
     dependencies:
