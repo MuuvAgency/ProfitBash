@@ -214,6 +214,9 @@ importers:
       '@profitbash/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@profitbash/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@profitbash/shared':
         specifier: workspace:*
         version: link:../../packages/shared
