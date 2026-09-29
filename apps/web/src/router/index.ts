@@ -7,6 +7,7 @@ import {
   type Router,
   type RouterHistory,
 } from 'vue-router';
+import { SET_PASSWORD_PATH } from '@profitbash/shared';
 import { NAVIGATION, SETTINGS_PATH, type Access, type NavItem } from '../navigation/navigation';
 import type { useSessionStore } from '../stores/session';
 import { resolveGuard } from './guard';
@@ -34,6 +35,7 @@ const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteCompone
   dashboard: () => import('../pages/DashboardPage.vue'),
   explorer: () => import('../pages/ExplorerPage.vue'),
   connections: () => import('../pages/ConnectionsPage.vue'),
+  members: () => import('../pages/MembersPage.vue'),
   sync: () => import('../pages/SyncStatusPage.vue'),
 };
 
@@ -57,6 +59,13 @@ const routes: RouteRecordRaw[] = [
     name: 'login',
     component: () => import('../pages/LoginPage.vue'),
     meta: { guestOnly: true, titleKey: 'login.pageTitle' },
+  },
+  // Öffentlich (auch angemeldet erreichbar): Passwort über den Einmal-Link setzen, Token im Fragment (F9).
+  {
+    path: SET_PASSWORD_PATH,
+    name: 'set-password',
+    component: () => import('../pages/SetPasswordPage.vue'),
+    meta: { titleKey: 'setPassword.pageTitle' },
   },
   {
     path: '/',

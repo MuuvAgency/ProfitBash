@@ -28,6 +28,8 @@ export const de = {
     noAccount: 'Zugänge vergibt die Administration deiner Agentur.',
     required: 'Bitte E-Mail-Adresse und Passwort eingeben.',
     sessionExpired: 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.',
+    passwordSet:
+      'Passwort gesetzt. Melde dich jetzt mit deiner E-Mail-Adresse und dem neuen Passwort an.',
   },
   nav: {
     label: 'Hauptnavigation',
@@ -409,6 +411,64 @@ export const de = {
         'Die letzten 14 Tage vor „Daten bis“ sind vorläufig: Amazon korrigiert sie noch, bis die Attributionsfenster abgeschlossen sind.',
     },
   },
+  members: {
+    eyebrow: 'Admin',
+    description:
+      'Mitglieder der Organisation anlegen, Rollen vergeben und Zugänge entfernen. Neue Mitglieder setzen ihr Passwort über einen einmaligen Link.',
+    loadFailed: 'Die Mitglieder konnten nicht geladen werden.',
+    empty: 'Noch keine Mitglieder.',
+    self: '(du)',
+    roleOf: 'Rolle von {name}',
+    renewLink: 'Neuer Link',
+    renewLinkFor: 'Neuen Link zum Passwort-Setzen für {name} erzeugen',
+    removeFor: '{name} entfernen',
+    column: {
+      member: 'Mitglied',
+      role: 'Rolle',
+      status: 'Status',
+      actions: 'Aktionen',
+    },
+    status: {
+      active: 'Aktiv',
+      pending: 'Link offen bis {date}',
+      expired: 'Link abgelaufen',
+    },
+    create: {
+      button: 'Mitglied anlegen',
+      title: 'Mitglied anlegen',
+      email: 'E-Mail-Adresse',
+      name: 'Name',
+      role: 'Rolle',
+      hint: 'Es wird keine E-Mail verschickt. Nach dem Anlegen bekommst du einen Link, den du selbst weitergibst.',
+      submit: 'Anlegen',
+      required: 'Bitte E-Mail-Adresse und Name angeben.',
+    },
+    link: {
+      title: 'Link für {name}',
+      text: 'Gib diesen Link selbst weiter. Er gilt einmal und bis {date}. Er wird nur jetzt angezeigt; bei Bedarf erzeugst du einen neuen.',
+      label: 'Link zum Setzen des Passworts',
+      copy: 'Link kopieren',
+      copied: 'Link kopiert.',
+    },
+    remove: {
+      title: 'Mitglied entfernen',
+      text: '{name} verliert den Zugang zu dieser Organisation und wird abgemeldet. Persönliche gespeicherte Ansichten werden gelöscht, für das Team freigegebene bleiben.',
+      confirm: 'Entfernen',
+    },
+  },
+  setPassword: {
+    pageTitle: 'Passwort setzen',
+    heading: 'Passwort setzen',
+    for: 'Zugang für {name}',
+    password: 'Neues Passwort',
+    repeat: 'Passwort wiederholen',
+    hint: 'Mindestens {min} Zeichen.',
+    submit: 'Passwort speichern',
+    tooShort: 'Das Passwort braucht mindestens {min} Zeichen.',
+    mismatch: 'Die beiden Passwörter stimmen nicht überein.',
+    invalid:
+      'Dieser Link gilt nicht (mehr). Er ist abgelaufen, wurde schon benutzt oder durch einen neuen ersetzt. Bitte frag bei der Administration nach einem neuen Link.',
+  },
   savedViews: {
     button: 'Ansichten',
     title: 'Gespeicherte Ansichten',
@@ -648,6 +708,14 @@ export const de = {
     CONNECTION_NOT_FOUND: 'Die Connection gibt es nicht mehr. Bitte lade die Seite neu.',
     PROFILE_NOT_FOUND: 'Das Profil gibt es nicht mehr. Bitte lade die Seite neu.',
     CLIENT_NOT_FOUND: 'Den Client gibt es nicht mehr. Bitte lade die Seite neu.',
+    MEMBER_EMAIL_TAKEN: 'Diese E-Mail-Adresse gehört schon zu einem Mitglied.',
+    MEMBER_LAST_ADMIN: 'Die Organisation braucht mindestens einen Admin.',
+    MEMBER_SELF: 'Dein eigenes Konto kannst du hier nicht entfernen.',
+    MEMBER_OTHER_ORGANIZATION:
+      'Dieses Mitglied gehört auch zu einer anderen Organisation; sein Passwort lässt sich hier nicht setzen.',
+    MEMBER_NOT_FOUND: 'Das Mitglied gibt es nicht mehr.',
+    PASSWORD_LINK_INVALID:
+      'Dieser Link gilt nicht (mehr). Bitte frag bei der Administration nach einem neuen Link.',
     SAVED_VIEW_NAME_TAKEN: 'Eine Ansicht mit diesem Namen gibt es beim Besitzer schon.',
     SAVED_VIEW_LIMIT_REACHED:
       'Du hast die Höchstzahl eigener Ansichten erreicht. Lösche zuerst eine.',
