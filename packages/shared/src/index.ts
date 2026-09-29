@@ -8,6 +8,7 @@ export * from './api';
 export * from './consent';
 export * from './decimal-compare';
 export * from './features';
+export * from './file-imports';
 export * from './format';
 export * from './logger';
 export * from './marketplaces';

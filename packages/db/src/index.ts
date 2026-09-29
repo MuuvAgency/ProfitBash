@@ -10,6 +10,7 @@ export * from './audit';
 export * from './connection-leases';
 export * from './connection-tokens';
 export * from './errors';
+export * from './file-imports';
 export * from './file-profiles';
 export * from './key-rotation';
 export * from './maintenance';
