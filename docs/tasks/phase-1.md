@@ -903,6 +903,98 @@ Upload, Import-Job) und Fragen an Dominik sammeln (u. a. welche Reports er herun
   Zeitraumsummen; Tageswerte kommen aus den separaten Reports. Wegwerf-Anteil: Parser, Upload, Job.
 - Testdaten nur synthetisch (öffentliches Repo).
 
+**Doku-Abgleich 2026-09-29** (öffentliche Amazon-Doku: Bulksheets-Guides unter `advertising.amazon.com/API/docs/en-us/no-code-tools/bulksheets/…`
+samt Release Notes, Hilfe-Artikel zu den Sponsored-Ads-Berichten und zu den neuen Berichten):
+- **Bulk-Datei** (Kampagnenmanager → Bulk-Vorgänge): Excel, Blätter „Portfolios“, „Sponsored Products Campaigns“, „SB multi-ad group
+  campaigns“ (ältere SB-Kampagnen vor 11/2022 im Blatt „Sponsored Brands“), ein SD-Blatt, optional Suchbegriffe (SP, SB). Kennzahlen
+  nur als **Summe über den gewählten Zeitraum** (höchstens 60 Tage), keine Tageswerte; ein Schalter „Leistungsdaten“ kann sie
+  weglassen, „nur bestimmte Kampagnen“ liefert eine Teilmenge. Spalten: `Product`, `Entity`, `Operation`, `Campaign ID`, `Ad Group ID`,
+  `Portfolio ID`, `Ad ID`, `Keyword ID`, `Product Targeting ID` (SD: `Targeting Id`), Namen, `State`, Budget, Gebote, `Keyword Text`,
+  `Match Type`, `Bidding Strategy`, Ausdrücke u. a. Die Schreibweise wechselt („Campaign Id“ vs. „Campaign ID“, Zusätze wie
+  „(Read only)“, „(Informational only)“), und **Kopfzeilen und Enum-Werte sind in der Sprache des Werbekontos** (Deutsch übersetzt).
+  Datum `YYYYMMDD`, Dezimalpunkt, keine Tausendertrennzeichen; keine Währungsspalte (außer Portfolios). Laut Doku unterscheiden sich
+  die Bulk-IDs von den IDs in der URL der Konsole; dass sie den API-IDs entsprechen, steht nicht wörtlich da (Annahme wie bisher, mit
+  1.10 prüfen).
+- **Alte Sponsored-Ads-Berichte** enden am **31.12.2026** (ab 17.12.2026 keine neuen). Sie tragen nur Namen, keine IDs.
+- **Neue Berichte** („Berichte“/Unified Reporting, Nachfolger): Zeitdimension Tag, Detailstufen Kampagne, Ad Group, Target mit
+  **IDs** (`campaign.id` = `campaignId` usw.), Währungscode, bis 24 Monate zurück, höchstens **120 Tage je Download**, Versand als
+  E-Mail (einmalig, täglich, wöchentlich). Für Sponsored-Ads-Anzeigen keine Ad-ID. Attribution: SP 7 Tage (Seller) bzw. 14 Tage
+  (Vendor), sonst 14 Tage, Metriknamen ohne „7 Day“-Präfix. Ältere SB-Kampagnen ohne Ad Groups fehlen (wie die v3-Preview-Lücke).
+  Genaue Spaltennamen und Dateiformat (CSV/XLSX) stehen nicht in der Doku.
+
+**Befund aus einer echten Bulk-Datei** (Dominik, 2026-09-29, deutsches Konto, SP; ausgewertet wurden nur Blattnamen, Kopfzeilen,
+Zelltypen und Werte-Listen, keine Datenzeilen; die Datei liegt nicht im Repo):
+- Blätter: „Portfolios“, „Sponsored Products-Kampagnen“, „Sponsored Brands-Kampagnen“ (älteres SB), „SB Anzeigengruppe Kampagnen“,
+  „Sponsored Display-Kampagnen“, „SP Bericht „Suchbegriff““, „SB Bericht „Suchbegriff““, dazu versteckt „Config“ (Listen der
+  **englischen** API-Werte je Entity und Operation, `veryHidden`) und „Sheet8“ (`Version (1.0)`). Dateiname
+  `bulk-<konto-id>-<von>-<bis>-<zeitstempel>.xlsx` (Konto-ID klein geschrieben, Zeitraum `YYYYMMDD`).
+- Kopfzeilen deutsch, z. B. SP: `Produkt`, `Entität`, `Operation`, `Kampagnen-ID`, `Anzeigengruppen-ID`, `Portfolio-ID`,
+  `Anzeigen-ID`, `Keyword-ID`, `Produkt-Targeting-ID`, `Kampagnenname`, `Name der Anzeigengruppe`, `Startdatum`, `Enddatum`,
+  `Targeting-Typ`, `Zustand`, `Tagesbudget`, `SKU`, `ASIN (Nur zu Informationszwecken)`, `Standardgebot für die Anzeigengruppe`,
+  `Gebot`, `Keyword-Text`, `Übereinstimmungstyp`, `Gebotsstrategie`, `Platzierung`, `Prozentsatz`, `Ausdruck für Produkt-Targeting`,
+  Kennzahlen `Impressions`, `Klicks`, `Ausgaben`, `Verkäufe`, `Bestellungen`, `Einheiten` (plus abgeleitete). SD zusätzlich `Taktik`,
+  `Kostenart`, `Targeting-ID`, `Targeting-Ausdruck`, `Sichtbare Impressions`, `… (Aufrufe und Klicks)`. Portfolios `Budget-Betrag`,
+  `Budgetwährungscode`, `Budget-Linie`.
+- **Werte ebenfalls deutsch:** Entität `Kampagne`, `Anzeigengruppe`, `Produktanzeige`, `Keyword`, `Negatives Keyword`,
+  `Produkt-Targeting`, `Negatives Produkt-Targeting`, `Gebotsanpassung` (Platzierung); Zustand `Aktiviert`, `Angehalten`;
+  Targeting-Typ `Manuell`, `Automatisch`; Match-Typ `Genau Passend`, `Wortgruppe`, `Negativ Genau Passend`, `Negative Wortgruppe`;
+  Gebotsstrategie `Dynamische Gebote – nur senken` (mit geschütztem Leerzeichen), `Feste Gebote`; Platzierungen `Top-Platzierung`,
+  `Platzierung Rest der Suche`, `Platzierung Produktseite`, `Platzierung für Amazon Business`; Budget-Linie `Keine Obergrenze`.
+  Auto-Targets kommen als `Produkt-Targeting` mit Ausdrücken wie `close-match`/`substitutes`, Produkt-Targets als `asin="…"`.
+- **Zellen:** Texte als `inlineStr` (auch alle IDs, 12–15 Ziffern, und `Startdatum` `YYYYMMDD`), Zahlen als `n` in
+  Gleitkomma-Darstellung mit Rundungsresten (z. B. `…99999999999999`): Beträge beim Lesen auf 15 signifikante Stellen normalisieren,
+  nie über `number` rechnen.
+- Das Suchbegriff-Blatt trägt Kampagnen-, Ad-Group-, Keyword- und Produkt-Targeting-ID, aber nur Zeitraumsummen.
+
+**Entschieden (Dominik, 2026-09-29):**
+- Tagesdaten aus den **neuen Berichten mit IDs** (nicht aus den alten ohne IDs).
+- Rhythmus **wöchentlich** je Profil: eine Bulk-Datei (Struktur, Gebote, Budgets) und ein Tagesbericht über die letzten 30 Tage
+  (Amazon korrigiert jüngere Tage; ersetzt wird wie beim API-Sync genau der Zeitraum der Datei).
+- Datei-Profile werden **später mit der API-Connection zusammengeführt** (gleiche IDs, Historie bleibt). Deshalb dieselben Tabellen und
+  Schlüssel wie der API-Sync.
+- Der Import liest **deutsche und englische** Kopfzeilen und Werte.
+- Bibliothek für Excel: **fflate + saxes** mit eigenem schmalem Leser (auch für das Schreiben in Phase 3).
+- Dominik schickt die echten Kopfzeilen (nur Spaltennamen) je Blatt der Bulk-Datei und eines neuen Tagesberichts, Deutsch und
+  Englisch. Bis dahin gilt die Doku; die Namen werden danach abgeglichen (Offen, siehe 1.11d/1.11e).
+
+Teilaufgaben (Reihenfolge):
+
+#### 1.11a Profil ohne Connection
+- [ ] Migration: `amazon_ads_profiles.connection_id` und `amazon_profile_id` nullable (die Konsole zeigt die Profil-ID nicht); CHECK:
+      mit Connection auch Amazon-Profil-ID. Der Unique-Index (Organisation, Amazon-Profil-ID) bleibt (NULL zählt nicht doppelt).
+- [ ] Anlegen durch Org-Admins: `POST /api/profiles` (Name, Land, Währung, Zeitzone mit Vorschlag aus dem Land, Kontotyp), zod,
+      `audit_event` `profile.create`; Liste `GET /api/profiles/file` (Profile ohne Connection, über `visibleProfilesScope`).
+- [ ] Bestehende Stellen null-sicher (Profil-Sync, Jobs je Connection, „Zuletzt synchronisiert“, Connections-Seite); Dashboard und
+      Explorer zeigen Datei-Profile wie andere.
+- [ ] Connections-Seite: Abschnitt „Profile ohne Connection (Datei-Import)“ mit Anlegen-Dialog, Kunde zuordnen, Ausblenden.
+
+#### 1.11b Tabellen-Leser (`packages/sheets`)
+- [ ] XLSX gestreamt (fflate entpackt, saxes liest `sharedStrings` und die Blätter Zeile für Zeile), Blattnamen, Zellen als Text
+      (Zahlen verlustfrei als Quelltext, keine Umwandlung über `number`), Größendeckel entpackt. CSV (RFC 4180, Trennzeichen `,`/`;`,
+      BOM). Tests nur mit synthetischen Dateien, die der Test selbst erzeugt.
+
+#### 1.11c Upload und Import-Job
+- [ ] Tabelle `file_imports` (Organisation, Profil, Art `bulk` | `daily_report`, Dateiname, Größe, SHA-256, Status, Zähler, Fehler,
+      hochgeladen von/am); Inhalt nur bis zum Import (danach gelöscht, F5: keine Rohdateien).
+- [ ] `POST /api/profiles/:id/file-imports` (Multipart, Größendeckel, Org-Admin bzw. `write`), Audit, Job `file-import` über `runJob`
+      (eine Datei je Profil gleichzeitig), sichtbar im Sync-Status.
+
+#### 1.11d Bulk-Datei → Entities
+- [ ] Kopfzeilen über Aliasse (DE/EN, alte und neue Schreibweisen), Blätter SP, SB, SD, Portfolios auf die normalisierten Datensätze
+      (1.5) und dieselben Upserts. `removed_at` nur aus vollständigen Dateien (keine Teilmenge, keine ungültigen Zeilen). Zeitraumsummen
+      nicht als Tageswerte speichern.
+
+#### 1.11e Tagesbericht → Kennzahlen
+- [ ] Neue Berichte (Tag, Kampagne/Ad Group/Target mit IDs) auf `replaceDailyMetrics` (Ebenen `campaign`, `adGroup`, `target`),
+      Zeitraum der Datei ersetzen, Attribution je Ad-Typ und Kontotyp, Währung prüfen, „Daten bis“. Product Ads (keine Ad-ID) und
+      Suchbegriffe erst nach Sichtung der echten Spalten entscheiden.
+
+#### 1.11f Oberfläche
+- [ ] Hochladen je Profil (welche Datei, welcher Zeitraum), Verlauf der Importe mit Ergebnis und Fehlern, Hinweis bei veralteten Daten.
+
+#### 1.11g Zusammenführen mit der API (nach der Freigabe, mit 1.10)
+- [ ] Datei-Profil einer Connection zuordnen (Amazon-Profil-ID setzen), danach übernimmt der API-Sync dieselben Zeilen.
+
 ## `.env.example`
 
 Neu in Phase 1 (Vorschlag): `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPORTS_SYNC_URL` (1.7), optional `AMAZON_ADS_REQUESTS_PER_SECOND` (1.3).
