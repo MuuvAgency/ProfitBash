@@ -424,6 +424,10 @@ export const de = {
     copied: 'Link kopiert',
     copyFailed: 'Der Link konnte nicht kopiert werden.',
     overwrite: '„{name}“ mit dem aktuellen Stand überschreiben',
+    overwriteAction: 'Überschreiben',
+    overwriteConfirm: 'Die Ansicht „{name}“ bekommt den aktuellen Stand von Filtern und Tabelle.',
+    overwriteConfirmTeam:
+      'Die Ansicht „{name}“ von {owner} bekommt den aktuellen Stand von Filtern und Tabelle. Das betrifft alle, die sie nutzen.',
     share: '„{name}“ für das Team freigeben',
     unshare: 'Freigabe von „{name}“ aufheben',
     rename: '„{name}“ umbenennen',
@@ -436,12 +440,17 @@ export const de = {
     personalOnly: 'Die Ansicht ist persönlich. Freigeben können Editoren und Admins.',
     hiddenItems:
       'Ein Eintrag dieser Ansicht ist für dich nicht sichtbar und wurde weggelassen. | {count} Einträge dieser Ansicht sind für dich nicht sichtbar und wurden weggelassen.',
+    selectionHidden:
+      'Keiner der Clients und keins der Profile dieser Ansicht ist für dich sichtbar. Die Ansicht wurde nicht geladen.',
+    outdated:
+      'Diese Ansicht stammt aus einer älteren Version und lässt sich nicht mehr laden. Überschreibe sie mit dem aktuellen Stand oder lösche sie.',
     linkNotFound: 'Die verlinkte Ansicht gibt es nicht oder sie ist nicht freigegeben.',
     dismiss: 'Hinweis schließen',
     dialog: {
       create: 'Ansicht speichern',
       rename: 'Ansicht umbenennen',
       delete: 'Ansicht löschen',
+      overwrite: 'Ansicht überschreiben',
     },
   },
   dashboard: {
@@ -639,7 +648,7 @@ export const de = {
     CONNECTION_NOT_FOUND: 'Die Connection gibt es nicht mehr. Bitte lade die Seite neu.',
     PROFILE_NOT_FOUND: 'Das Profil gibt es nicht mehr. Bitte lade die Seite neu.',
     CLIENT_NOT_FOUND: 'Den Client gibt es nicht mehr. Bitte lade die Seite neu.',
-    SAVED_VIEW_NAME_TAKEN: 'Du hast schon eine Ansicht mit diesem Namen.',
+    SAVED_VIEW_NAME_TAKEN: 'Eine Ansicht mit diesem Namen gibt es beim Besitzer schon.',
     SAVED_VIEW_LIMIT_REACHED:
       'Du hast die Höchstzahl eigener Ansichten erreicht. Lösche zuerst eine.',
     SAVED_VIEW_SHARE_FORBIDDEN: 'Freigeben können nur Editoren und Admins.',

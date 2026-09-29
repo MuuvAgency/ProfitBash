@@ -202,6 +202,34 @@ describe('/api/saved-views', () => {
     );
   });
 
+  it('fremde Organisation: weder lesen noch ändern noch löschen; Zustand muss zum Bereich passen', async () => {
+    const view = await create(editor, { shared: true });
+    const other = await ctx.testDb.db
+      .insert(schema.organizations)
+      .values({ name: 'Andere', slug: 'andere', type: 'internal', createdAt: new Date() })
+      .returning({ id: schema.organizations.id });
+    await createUser(ctx, { email: 'fremd@andere.test', org: { id: other[0]!.id, role: 'admin' } });
+    const foreign = await signIn(ctx, 'fremd@andere.test');
+    await ctx.testDb.db
+      .insert(orgEntitlements)
+      .values(
+        ['dashboard', 'sp-explorer'].map((feature) => ({ organizationId: other[0]!.id, feature })),
+      );
+    expect((await call('GET', `/saved-views/${view.body.id}`, foreign)).status).toBe(404);
+    expect(
+      (await call('PATCH', `/saved-views/${view.body.id}`, foreign, { name: 'übernommen' })).status,
+    ).toBe(404);
+    expect((await call('DELETE', `/saved-views/${view.body.id}`, foreign)).status).toBe(404);
+    expect(
+      (await call<{ views: unknown[] }>('GET', '/saved-views?area=dashboard', foreign)).body.views,
+    ).toEqual([]);
+
+    const wrongArea = await call<ErrorResponse>('PATCH', `/saved-views/${view.body.id}`, editor, {
+      state: explorerState(),
+    });
+    expect(wrongArea.status).toBe(400);
+  });
+
   it('verlangt Session, Organisation und das Feature des Bereichs', async () => {
     expect((await call('GET', '/saved-views?area=dashboard', '')).status).toBe(401);
     expect((await call('GET', '/saved-views?area=dashboard', outsider)).status).toBe(403);

@@ -138,7 +138,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - Beim Laden einer Ansicht filtert der Access-Layer die darin genannten Profile und Clients (wichtig ab Phase 6, wenn nicht jeder
     alles sieht). `saved_views` kommt in ADR 002 unter „Geltungsbereich“.
   - Alternative: nur persönlich in `ui_state` (weniger Aufwand, aber ohne Teilen im Team).
-  **Entschieden (Dominik, 2026-09-28): wie empfohlen, persönlich und im Team teilbar.**
+  **Entschieden (Dominik, 2026-09-28): wie empfohlen, persönlich und im Team teilbar.** Dazu (2026-09-29): Sortierung
+  mitspeichern; beim Entfernen eines Mitglieds bleiben seine freigegebenen Ansichten, die persönlichen werden gelöscht (2.9).
 - **F9 – Mitglieder anlegen ohne E-Mail-Versand.** Es gibt noch keinen E-Mail-Dienst, die Registrierung ist aus. Empfehlung: Der
   Admin legt das Mitglied an (E-Mail, Name, Rolle); die App erzeugt einen **einmaligen Link zum Setzen des Passworts** (7 Tage
   gültig), den der Admin selbst weitergibt. Dazu: Rolle ändern, Mitglied entfernen, Link neu erzeugen; der letzte Admin kann weder
@@ -656,12 +657,68 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 
 
 ### 2.9 Gespeicherte Ansichten (F8)
-- [ ] Tabelle, Access-Funktionen (Profile und Clients beim Laden über den Access-Layer gefiltert), API, Audit-Events; ADR 002
+- [x] Tabelle, Access-Funktionen (Profile und Clients beim Laden über den Access-Layer gefiltert), API, Audit-Events; ADR 002
       ergänzen. Menü „Ansichten“ in Dashboard und Explorer (speichern, laden, umbenennen, löschen, freigeben).
+- [x] Umsetzung (Stand für 2.10 und später):
+  - **Entschieden (Dominik, 2026-09-29):** Die Sortierung der Explorer-Tabelle wird mitgespeichert (dazu kurz in der URL,
+    `sort=<spalte>.<asc|desc>`). Wird ein Mitglied entfernt (2.10), werden seine **persönlichen** Ansichten gelöscht, die
+    freigegebenen bleiben (Admins können sie umbenennen, überschreiben oder löschen).
+  - **Schema** (`@profitbash/shared`, `saved-views.ts`): `SAVED_VIEW_AREAS` (`dashboard`, `explorer`), `savedViewStateSchema`
+    = `filters` (Filterleiste wie `FilterState`: Clients, „Ohne Client“, Profile, Zeitraum, Vergleich, Währung, Attribution) und
+    nur im Explorer `explorer` (Ebene, Drill-Down je eine ID, entfernte, Ad-Typen, zwei Chart-Kennzahlen als Array der Länge 2
+    (OpenAPI kennt keine Tupel), Spalten oder `null` = Standard, Sortierung oder `null`). Name getrimmt, 1–80 Zeichen, eindeutig
+    je Besitzer und Bereich (ohne Groß-/Kleinschreibung), höchstens 200 eigene je Bereich. `PERIOD_PRESETS` und
+    `COMPARISON_MODES` liegen jetzt in `@profitbash/shared` (das Web übernimmt sie von dort).
+  - **Tabelle** `saved_views` (Migration `0016_saved_views`): Organisation, Besitzer (`owner_user_id`, Kaskade beim Löschen des
+    Nutzers), Name, Bereich (Check), `shared`, `state` jsonb. **Zugriffe** nur über `packages/db/src/saved-views.ts`:
+    persönliche sieht nur der Besitzer, freigegebene alle Mitglieder; ändern und löschen Besitzer und Org-Admins (auch
+    fremde freigegebene; fremde persönliche bleiben auch für Admins unsichtbar, `404`); freigeben nur mit `canShare` (Recht
+    `write` im Feature des Bereichs, prüft die API), zurücknehmen darf der Besitzer immer (auch nach Herabstufung zum
+    Viewer; Umbenennen und Überschreiben eigener freigegebener Ansichten bleiben ihm ebenfalls). Audit
+    `saved_view.create|update|delete` in derselben Transaktion (Update mit `before`/`after` für Name und Freigabe,
+    `stateChanged`; der Zustand selbst steht nicht im Audit).
+  - **Access-Layer** (ADR 002, Geltungsbereich ergänzt): `loadSavedViewVisibility` lädt sichtbare Clients und Profile
+    (`listVisibleClientsAndProfiles`) und die sichtbaren Drill-Down-IDs aller Zustände einer Anfrage (eine Abfrage je
+    Entity-Tabelle über `visibleProfilesScope`), `applySavedViewVisibility` filtert. Beim Speichern **und** beim Laden:
+    `hiddenItems` zählt Entferntes, `selectionHidden` meldet, dass von einer eingeschränkten Auswahl nichts sichtbar bleibt
+    (sonst hieße der Zustand „alle Profile“; das Web lädt die Ansicht dann nicht und sagt es). Clients ohne sichtbares Profil
+    fallen wie in der Filterleiste weg. Ein Zustand, den das Schema nicht mehr kennt, erscheint mit `outdated` und dem
+    Standard des Bereichs (überschreiben oder löschen möglich, laden nicht).
+  - **API** (`routes/saved-views.ts`, Tag „Gespeicherte Ansichten“): `GET /api/saved-views?area=`, `GET|PATCH|DELETE
+    /api/saved-views/{id}`, `POST /api/saved-views`. Recht `view` im Feature des Bereichs (`dashboard` bzw. `sp-explorer`,
+    sonst `403 FEATURE_FORBIDDEN`), bei ID-Zugriffen im Bereich der Ansicht. Fehler `SAVED_VIEW_NOT_FOUND` (404),
+    `SAVED_VIEW_FORBIDDEN`, `SAVED_VIEW_SHARE_FORBIDDEN` (403), `SAVED_VIEW_NAME_TAKEN`, `SAVED_VIEW_LIMIT_REACHED` (409),
+    Zustand im falschen Bereich `400`. Antwort mit `own`, `canEdit`, `canShare`, `hiddenItems`, `selectionHidden`, `outdated`.
+    Nimmt ein Admin die Freigabe einer fremden Ansicht zurück, bekommt er das Ergebnis (danach sieht nur der Besitzer sie).
+  - **Web:** `SavedViewsMenu.vue` (Knopf „Ansichten“ im Seitenkopf, zeigt den Namen der Ansicht, die genau dem aktuellen
+    Zustand entspricht; Popover mit „Meine Ansichten“ und „Für das Team“ mit Besitzer; je Ansicht Link kopieren, bei
+    `canEdit` überschreiben (mit Rückfrage, bei Team-Ansichten mit Hinweis), freigeben/zurücknehmen, umbenennen, löschen (mit
+    Rückfrage); „Aktuelle Ansicht speichern“ mit Name und, nur mit Schreibrecht, „Für das Team freigeben“). Laden wirkt wie
+    selbst eingestellt: `useAnalyticsFilters().update(patch, { path, query, state, replace })` setzt Filterleiste, URL, Verlauf
+    und `ui_state`; im Explorer ersetzen Ebene, Drill-Down, Ad-Typen, entfernte, Chart und Sortierung der Ansicht die
+    aktuellen Parameter, die Spalten werden als eigene Auswahl der Ebene gespeichert (`ui_state` `explorer/columns.<ebene>`;
+    „Standard“ = `null` in der Ansicht). Link `?view=<id>` (Link kopieren) lädt die Ansicht, sobald die Seite bereit ist,
+    per `replace` (Zurück führt nicht erneut auf den Link); Ansicht des anderen Bereichs, nicht sichtbar oder ohne sichtbare
+    Auswahl: Hinweis, Parameter entfernt. Hinweis bei `hiddenItems`. Vergleich „aktive Ansicht“ über JSON mit sortierten
+    Schlüsseln und Listen (`view-state.ts`, `jsonb` ordnet Schlüssel um).
+  - **Sortierung im Explorer:** `ExplorerState.sort` aus `sort=<spalte>.<richtung>`; `buildColumnDefs({ sort })` setzt die
+    Richtung an der Spalte und `null` an allen anderen, das Grid meldet nur Klicks (`source === 'uiColumnSorted'`), eine Spalte
+    (`suppressMultiSort`); die Seite schreibt sie per `replace` in die URL (kein Verlaufseintrag je Klick).
+  - Browser-Pane geprüft (Demo-Daten): speichern (mit Freigabe), laden aus einem anderen Reiter mit Sortierung, umbenennen,
+    löschen, Sortierung aus der URL (`aria-sort`), Handy und Hell, Konsole ohne Fehler.
+  - Review (unabhängig): keine kritischen Befunde; Mandanten- und Besitzertrennung bestätigt. Übernommen: `404` nach
+    Rücknahme der Freigabe durch einen Admin, `selectionHidden` statt still „alle“, Sichtbarkeit einmal je Anfrage (vorher
+    mehrere Abfragen je Ansicht), veraltete Zustände sichtbar und löschbar, `replace` beim Laden über den Link, Link auf den
+    anderen Bereich, Rückfrage beim Überschreiben, Text bei vergebenem Namen, Tests (Admin nimmt Freigabe zurück, fremde
+    Organisation bei PATCH/DELETE, Zustand im falschen Bereich). Bewusst so: Laden überschreibt die eigene Spaltenauswahl
+    der Ebene (wie selbst eingestellt), Grenze von 200 Ansichten ohne Sperre gegen gleichzeitiges Anlegen (höchstens knapp
+    darüber, unkritisch), herabgestufte Besitzer ändern ihre freigegebenen Ansichten weiter (nur neu freigeben nicht).
 
 ### 2.10 Mitglieder (`/admin/members`, F9)
 - [ ] Liste mit Name, E-Mail, Rolle, Status (Link offen/aktiv); anlegen, Rolle ändern, entfernen, Link neu erzeugen; Schutz des
-      letzten Admins. Eigene Endpunkte hinter `orgAdminOnly` nach den Sicherheitsregeln in F9; Audit mit handelndem Admin.
+      letzten Admins. Entfernen löscht die persönlichen gespeicherten Ansichten des Mitglieds, freigegebene bleiben (2.9).
+      **Entschieden (Dominik, 2026-09-29):** Nach dem Setzen des Passworts geht es zur Anmeldung (Hinweis „Passwort gesetzt“),
+      keine automatische Anmeldung. Eigene Endpunkte hinter `orgAdminOnly` nach den Sicherheitsregeln in F9; Audit mit handelndem Admin.
 - [ ] Seite zum Setzen des Passworts über den Link (öffentlich, ohne Session, Token im Fragment), Link nur einmal nutzbar.
 - [ ] Tests: fremde Organisation, abgelaufener, benutzter und neu erzeugter Link, Entfernen beendet Sessions, letzter Admin,
       Token taucht nicht im Log auf.
@@ -669,6 +726,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 ### 2.11 ASIN-Quick-Tool (F10)
 - [ ] Popover in den Quick-Tools nach F10 (Feature `sp-explorer`, Recht `view`), Zeitraum aus der Filterleiste bzw. Standard,
       Sprung in den Explorer.
+      **Entschieden (Dominik, 2026-09-29):** Der Reiter Product Ads bekommt ein Suchfeld „ASIN/SKU“; das Tool öffnet ihn mit den
+      gesuchten Werten, ein Klick auf eine Zeile öffnet zusätzlich deren Ad Group.
 
 ### 2.12 Alte Tabellen ohne waagerechtes Scrollen (F14)
 - [ ] Sync-Status (`/ops/sync`) und Profiltabelle (`/admin/connections`) passen bei 1440 px (Sidebar ein- und ausgeklappt) auch mit

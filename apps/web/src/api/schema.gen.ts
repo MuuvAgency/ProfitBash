@@ -2087,6 +2087,8 @@ export interface components {
             canShare: boolean;
             state: components["schemas"]["SavedViewState"];
             hiddenItems: number;
+            selectionHidden: boolean;
+            outdated: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

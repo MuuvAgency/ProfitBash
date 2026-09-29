@@ -127,6 +127,10 @@ export const savedViewSchema = z
     state: savedViewStateSchema,
     /** Anzahl entfernter Clients, Profile und Drill-Down-IDs, die der Nutzer nicht (mehr) sieht. */
     hiddenItems: z.number().int().min(0),
+    /** Die Ansicht schränkte auf Clients bzw. Profile ein, von denen der Nutzer keines sieht (dann nicht laden). */
+    selectionHidden: z.boolean(),
+    /** Der gespeicherte Zustand stammt aus einer älteren Version; `state` ist der Standard des Bereichs. */
+    outdated: z.boolean(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })

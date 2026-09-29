@@ -384,6 +384,8 @@ describe('Gespeicherte Ansichten im Dashboard (F8)', () => {
               canEdit: true,
               canShare: true,
               hiddenItems: 0,
+              selectionHidden: false,
+              outdated: false,
               createdAt: '2026-09-28T08:00:00.000Z',
               updatedAt: '2026-09-28T08:00:00.000Z',
               state: {

@@ -61,9 +61,9 @@ const currentView = computed(() =>
   filters.ready.value ? viewState('dashboard', filters.state.value) : null,
 );
 const route = useRoute();
-function applyView(view: SavedView) {
+function applyView(view: SavedView, { replace }: { replace: boolean }) {
   const { view: _link, ...query } = route.query;
-  filters.update(filtersFromView(view.state), { query });
+  filters.update(filtersFromView(view.state), { query, replace });
 }
 const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
 </script>
