@@ -59,6 +59,14 @@ describe('/api/members', () => {
       (await call('POST', '/members', editor, { email: 'x@muuv.test', name: 'X', role: 'viewer' }))
         .status,
     ).toBe(403);
+    // Auch Ändern, Entfernen und Link neu erzeugen nur für Admins (hier mit der eigenen ID des Admins als Ziel).
+    const list = await call<{ members: Member[] }>('GET', '/members', admin);
+    const target = list.body.members.find((m) => m.email === ctx.seeded.email)!;
+    expect((await call('PATCH', `/members/${target.id}`, editor, { role: 'viewer' })).status).toBe(
+      403,
+    );
+    expect((await call('DELETE', `/members/${target.id}`, editor)).status).toBe(403);
+    expect((await call('POST', `/members/${target.id}/password-link`, editor)).status).toBe(403);
   });
 
   it('anlegen → Link im Fragment; Passwort setzen → Anmeldung; Link nur einmal; Token nie im Log', async () => {

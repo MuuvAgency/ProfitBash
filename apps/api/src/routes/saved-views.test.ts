@@ -189,6 +189,41 @@ describe('/api/saved-views', () => {
     expect(JSON.stringify(list.body)).not.toContain(ids.hidden);
   });
 
+  it('filtert ausgeblendete Profile auch beim Ändern und nach dem Ausblenden beim Laden (DoD)', async () => {
+    const created = await create(editor, { name: 'Später ausgeblendet', shared: true });
+    const patched = await call<SavedView>('PATCH', `/saved-views/${created.body.id}`, editor, {
+      state: { filters: filters({ profileIds: [ids.visible, ids.hidden] }) },
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body.state.filters.profileIds).toEqual([ids.visible]);
+    expect(patched.body.hiddenItems).toBe(1);
+
+    // Das sichtbare Profil wird nachträglich ausgeblendet: Laden über die ID nennt es nicht mehr.
+    await ctx.testDb.db
+      .update(amazonAdsProfiles)
+      .set({ isHidden: true })
+      .where(eq(amazonAdsProfiles.id, ids.visible));
+    try {
+      const loaded = await call<SavedView>('GET', `/saved-views/${created.body.id}`, viewer);
+      expect(loaded.status).toBe(200);
+      expect(JSON.stringify(loaded.body)).not.toContain(ids.visible);
+      expect(loaded.body.selectionHidden).toBe(true);
+    } finally {
+      await ctx.testDb.db
+        .update(amazonAdsProfiles)
+        .set({ isHidden: false })
+        .where(eq(amazonAdsProfiles.id, ids.visible));
+    }
+  });
+
+  it('andere Mitglieder (nicht Admin) löschen fremde Ansichten nicht', async () => {
+    const shared = await create(editor, { name: 'Team-Ansicht zum Löschen', shared: true });
+    const denied = await call<ErrorResponse>('DELETE', `/saved-views/${shared.body.id}`, viewer);
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.code).toBe('SAVED_VIEW_FORBIDDEN');
+    expect((await call('GET', `/saved-views/${shared.body.id}`, viewer)).status).toBe(200);
+  });
+
   it('prüft Eingaben, Namen und Bereich', async () => {
     expect((await create(viewer, { area: 'explorer' })).status).toBe(400);
     expect((await create(viewer, { name: '' })).status).toBe(400);
@@ -248,6 +283,9 @@ describe('/api/saved-views', () => {
       expect(list.body.error.code).toBe('FEATURE_FORBIDDEN');
       expect((await call('GET', `/saved-views/${view.body.id}`, viewer)).status).toBe(403);
       expect((await call('DELETE', `/saved-views/${view.body.id}`, viewer)).status).toBe(403);
+      expect(
+        (await call('PATCH', `/saved-views/${view.body.id}`, viewer, { name: 'neu' })).status,
+      ).toBe(403);
       expect((await create(viewer, { area: 'explorer', state: explorerState() })).status).toBe(403);
       expect((await call('GET', '/saved-views?area=dashboard', viewer)).status).toBe(200);
     } finally {

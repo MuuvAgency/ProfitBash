@@ -498,3 +498,129 @@ describe('Suche nach ASIN/SKU im Explorer (2.11)', () => {
     }
   });
 });
+
+/**
+ * DoD Phase 2: Alle Datenabfragen laufen über den Access-Layer (ADR 002); ausgeblendete und fremde Profile erscheinen nie,
+ * Feature-Recht und Session prüft jeder Endpunkt serverseitig. Je Endpunkt dieselben Prüfungen.
+ */
+describe('Access-Layer je Endpunkt (DoD)', () => {
+  const endpoints = () =>
+    [
+      ['/api/ads/filter-options', {}],
+      ['/api/ads/explorer/rows', query({ level: 'campaign' })],
+      ['/api/ads/explorer/rows', query({ level: 'productAd' })],
+      ['/api/ads/timeseries', query({ level: 'campaign' })],
+      ['/api/ads/dashboard', query()],
+      ['/api/ads/asin-search', query({ terms: ['B0TEST0001', 'SKU-1'] })],
+    ] as const;
+
+  /** Die Antwort nennt nichts vom Ziel (IDs, Namen, Beträge). */
+  const leaks = (body: unknown, needles: string[]) =>
+    needles.filter((needle) => JSON.stringify(body).includes(needle));
+
+  it('verlangt an jedem Endpunkt eine Session', async () => {
+    for (const [path, body] of endpoints()) {
+      const res = await request(ctx, path, { method: 'POST', json: body });
+      expect(res.status, path).toBe(401);
+    }
+  });
+
+  it('antwortet an jedem Endpunkt 403, wenn keines der Features gebucht ist', async () => {
+    const set = (enabled: boolean) =>
+      ctx.testDb.db
+        .update(orgEntitlements)
+        .set({ enabled })
+        .where(eq(orgEntitlements.organizationId, orgId));
+    await set(false);
+    try {
+      for (const [path, body] of endpoints()) {
+        const res = await post<ErrorResponse>(path, body);
+        expect(res.status, path).toBe(403);
+        expect(res.body.error.code, path).toBe('FEATURE_FORBIDDEN');
+      }
+    } finally {
+      await set(true);
+    }
+  });
+
+  it('Gegenprobe: Die Suche nach Werten greift (sichtbare Daten erscheinen)', async () => {
+    const rows = await post('/api/ads/explorer/rows', query({ level: 'campaign' }));
+    expect(leaks(rows.body, ['SP DE', ids.spDe])).toEqual(['SP DE', ids.spDe]);
+    const dashboard = await post('/api/ads/dashboard', query());
+    expect(leaks(dashboard.body, [ids.de, ids.client])).toEqual([ids.de, ids.client]);
+    const asin = await post('/api/ads/asin-search', query({ terms: ['B0TEST0001'] }));
+    expect(leaks(asin.body, ['B0TEST0001'])).toEqual(['B0TEST0001']);
+    const options = await post('/api/ads/filter-options', {});
+    expect(leaks(options.body, [ids.de, 'Nordwind'])).toEqual([ids.de, 'Nordwind']);
+    // Die Tagesreihe nennt keine IDs: Summe der sichtbaren Profile ohne das ausgeblendete (999).
+    const series = await post<TimeSeriesResponse>(
+      '/api/ads/timeseries',
+      query({ level: 'campaign' }),
+    );
+    expect(series.body.days.length).toBeGreaterThan(0);
+  });
+
+  it('zeigt ausgeblendete Profile an keinem Endpunkt, auch nicht bei ausdrücklicher Auswahl (Viewer und Admin)', async () => {
+    const needles = [ids.hidden, ids.spHidden, 'SP versteckt', '999'];
+    for (const cookie of [viewer, admin]) {
+      for (const [path, body] of endpoints()) {
+        for (const selection of [
+          {},
+          { profileIds: [ids.hidden] },
+          { profileIds: [ids.hidden, ids.de] },
+        ]) {
+          const res = await post(
+            path,
+            { ...body, ...(path.endsWith('filter-options') ? {} : selection) },
+            cookie,
+          );
+          expect(res.status, path).toBe(200);
+          expect(leaks(res.body, needles), `${path} ${JSON.stringify(selection)}`).toEqual([]);
+        }
+      }
+    }
+  });
+
+  it('zeigt einer fremden Organisation nichts, auch nicht mit deren IDs in der Anfrage', async () => {
+    const [other] = await ctx.testDb.db
+      .insert(schema.organizations)
+      .values({ name: 'Fremd', slug: 'fremd-analytics', type: 'internal', createdAt: new Date() })
+      .returning({ id: schema.organizations.id });
+    await ctx.testDb.db
+      .insert(orgEntitlements)
+      .values(
+        ['dashboard', 'sp-explorer'].map((feature) => ({ organizationId: other!.id, feature })),
+      );
+    await createUser(ctx, { email: 'fremd@analytics.test', org: { id: other!.id, role: 'admin' } });
+    const foreign = await signIn(ctx, 'fremd@analytics.test');
+
+    const needles = [
+      ids.de,
+      ids.uk,
+      ids.spDe,
+      ids.spUk,
+      ids.ad,
+      ids.client,
+      'Nordwind',
+      'SP DE',
+      'B0TEST0001',
+    ];
+    for (const [path, body] of endpoints()) {
+      for (const selection of [
+        {},
+        { profileIds: [ids.de, ids.uk] },
+        { clientIds: [ids.client] },
+        { filter: { campaignIds: [ids.spDe] } },
+      ]) {
+        const extra = path.endsWith('filter-options')
+          ? {}
+          : 'filter' in selection && !path.endsWith('rows') && !path.endsWith('timeseries')
+            ? {}
+            : selection;
+        const res = await post(path, { ...body, ...extra }, foreign);
+        expect(res.status, `${path} ${JSON.stringify(extra)}`).toBe(200);
+        expect(leaks(res.body, needles), `${path} ${JSON.stringify(extra)}`).toEqual([]);
+      }
+    }
+  });
+});
