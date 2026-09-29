@@ -318,6 +318,13 @@ describe('ExplorerPage', () => {
         filter: { productSearch: ['B0DEMO0001', 'sku-9'] },
       }),
     );
+    // Andere Reiter nehmen die Suche nicht mit.
+    expect(
+      wrapper.find('nav[aria-label="Ebenen"] a[href*="campaigns"]').attributes('href'),
+    ).not.toContain('q=');
+    expect(
+      wrapper.find('nav[aria-label="Ebenen"] a[href*="product-ads"]').attributes('href'),
+    ).toContain('q=');
     await wrapper.find('[data-explorer-search-clear]').trigger('click');
     await flushPromises();
     expect(router.currentRoute.value.query.q).toBeUndefined();

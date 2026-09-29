@@ -76,11 +76,18 @@ function link(path: string, query: LocationQueryRaw, crumbs: Crumbs = knownCrumb
   return { path, query, state: { ...base.state, [CRUMBS_KEY]: known } };
 }
 
+function withoutSearch(query: LocationQueryRaw, level: ExplorerLevel): LocationQueryRaw {
+  if (level === 'productAd') return query;
+  const { q: _q, ...rest } = query;
+  return rest;
+}
+
 const tabs = computed(() =>
   EXPLORER_TABS.map((tab) => ({
     ...tab,
     label: t(`explorer.tab.${tab.level}`),
-    to: link(pathForLevel(tab.level), route.query),
+    // Die Suche nach ASIN/SKU gehört zum Reiter Product Ads; andere Reiter nehmen sie nicht mit.
+    to: link(pathForLevel(tab.level), withoutSearch(route.query, tab.level)),
   })),
 );
 

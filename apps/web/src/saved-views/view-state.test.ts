@@ -65,7 +65,12 @@ describe('Zustand einer Ansicht (F8)', () => {
       path: '/ads/explorer/product-ads',
       query: { q: 'B0AAA0001,SKU-7' },
     });
-    // Ohne Suche fehlt das Feld (ältere Ansichten haben es nicht).
+    // Nur im Reiter Product Ads; ohne Suche fehlt das Feld (ältere Ansichten haben es nicht).
+    const elsewhere = viewState('explorer', filters, {
+      explorer: explorerStateFromRoute('/ads/explorer/campaigns', { q: 'B0AAA0001' }),
+      columns: null,
+    });
+    expect(elsewhere.explorer && 'productSearch' in elsewhere.explorer).toBe(false);
     const plain = viewState('explorer', filters, {
       explorer: explorerStateFromRoute('/ads/explorer/campaigns', {}),
       columns: null,

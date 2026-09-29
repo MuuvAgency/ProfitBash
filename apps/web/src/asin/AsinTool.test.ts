@@ -4,6 +4,7 @@ import { json, stubFetch } from '../test/fetch-stub';
 import { meFixture } from '../test/fixtures';
 import { cleanupMounted, mountWithApp } from '../test/mount';
 import AsinTool from './AsinTool.vue';
+import { resetAsinTool } from './state';
 import QuickTools from '../components/shell/QuickTools.vue';
 
 const CAMPAIGN = '00000000-0000-4000-8000-0000000000ca';
@@ -109,6 +110,7 @@ function routes(rows = [row]) {
 
 afterEach(() => {
   cleanupMounted();
+  resetAsinTool();
   vi.unstubAllGlobals();
 });
 
@@ -138,7 +140,7 @@ describe('ASIN-Tool (F10)', () => {
     });
     expect(wrapper.text()).toContain('Zeitraum: Letzte 7 Tage');
     expect(wrapper.text()).toContain('teilt sich 3 ASINs');
-    expect(wrapper.text().replace(/ /g, ' ')).toContain('Spend 12,50 €');
+    expect(wrapper.text().replace(/\u00a0/g, ' ')).toContain('Spend 12,50 €');
     expect(wrapper.text()).toContain('ACoS 25,0');
   });
 
@@ -164,6 +166,48 @@ describe('ASIN-Tool (F10)', () => {
     await wrapper.find('form').trigger('submit');
     await vi.waitFor(() =>
       expect(wrapper.text()).toContain('Keine Product Ads zu diesen ASINs oder SKUs.'),
+    );
+  });
+
+  it('Filteroptionen nicht ladbar: Fehler mit „Erneut versuchen“ statt ewigem Skeleton', async () => {
+    stubFetch({
+      ...routes(),
+      'POST /api/ads/filter-options': json({ error: { code: 'SERVER', message: 'x' } }, 500),
+    });
+    const { wrapper } = await search('B0DEMO0001');
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Die Suche ist fehlgeschlagen.'));
+    expect(wrapper.text()).toContain('Erneut versuchen');
+  });
+
+  it('eigener Zeitraum mit Daten; „weitere“ zählt alle Treffer; Eingabe bleibt nach dem Schließen', async () => {
+    const many = Array.from({ length: 31 }, (_, i) => ({ ...row, id: `ad-${i}` }));
+    const r = routes(many);
+    stubFetch({
+      ...r,
+      'GET /api/settings/ui-state/analytics/filters': json({
+        value: {
+          clientIds: [],
+          withoutClient: false,
+          profileIds: null,
+          period: { preset: 'custom', range: { from: '2026-09-01', to: '2026-09-10' } },
+          comparison: 'off',
+          currency: 'auto',
+          attribution: 'console',
+        },
+      }),
+      'POST /api/ads/asin-search': async () => {
+        const res = await (r['POST /api/ads/asin-search'] as Response).clone().json();
+        return json({ ...res, totalRows: 12000, truncated: true });
+      },
+    });
+    const { wrapper } = await search('B0DEMO0001');
+    await vi.waitFor(() => expect(wrapper.text()).toContain('SB Waldkauz'));
+    expect(wrapper.text()).toContain('01.09.2026 – 10.09.2026');
+    expect(wrapper.text()).toContain('und 11.970 weitere');
+    wrapper.unmount();
+    const again = await mountWithApp(AsinTool, { path: '/dashboard' });
+    expect((again.wrapper.find('[data-asin-input]').element as HTMLTextAreaElement).value).toBe(
+      'B0DEMO0001',
     );
   });
 

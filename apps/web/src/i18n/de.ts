@@ -99,7 +99,7 @@ export const de = {
     placeholder: 'z. B. B0DEMO0001, auch mehrere aus der Zwischenablage',
     required: 'Bitte mindestens eine ASIN oder SKU eingeben.',
     submit: 'Suchen',
-    period: 'Zeitraum: {period} (wie die Filterleiste)',
+    period: 'Zeitraum: {period} (zuletzt in der Filterleiste gewählt)',
     failed: 'Die Suche ist fehlgeschlagen.',
     empty: 'Keine Product Ads zu diesen ASINs oder SKUs.',
     count: '{count} Product Ad | {count} Product Ads',
