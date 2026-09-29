@@ -76,12 +76,20 @@ export const analyticsLevelSchema = z.enum(ANALYTICS_LEVELS);
 export const EXPLORER_LEVELS = [...ANALYTICS_LEVELS, 'negative'] as const;
 export type ExplorerLevel = (typeof EXPLORER_LEVELS)[number];
 
+/** ASINs oder SKUs einer Suche (ASIN-Quick-Tool, Suchfeld im Reiter Product Ads). */
+const productSearchTerms = z
+  .array(z.string().trim().min(1).max(60))
+  .min(1)
+  .max(MAX_ASIN_SEARCH_TERMS);
+
 export const explorerFilterSchema = z.object({
   portfolioIds: ids(1000).optional(),
   campaignIds: ids(1000).optional(),
   adGroupIds: ids(1000).optional(),
   /** Entfernte Entities mitzählen (Standard nein). */
   includeRemoved: z.boolean().optional(),
+  /** Nur Ebene `productAd`: ASINs oder SKUs (auch `extra.asins`), Groß-/Kleinschreibung egal (F10, 2.11). */
+  productSearch: productSearchTerms.optional(),
 });
 
 export const explorerRowsRequestSchema = analyticsQuerySchema
@@ -104,7 +112,7 @@ export const timeSeriesRequestSchema = analyticsQuerySchema
 export const asinSearchRequestSchema = analyticsQuerySchema
   .extend({
     /** ASINs oder SKUs; die API sucht in beiden Feldern und in `extra.asins`. */
-    terms: z.array(z.string().trim().min(1).max(60)).min(1).max(MAX_ASIN_SEARCH_TERMS),
+    terms: productSearchTerms,
   })
   .meta({ id: 'AsinSearchRequest' });
 

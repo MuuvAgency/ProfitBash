@@ -37,6 +37,7 @@ export function viewState(
       chartMetrics: [...e.chartMetrics],
       columns: explorer.columns ? [...explorer.columns] : null,
       sort: e.sort ? { ...e.sort } : null,
+      ...(e.productSearch.length > 0 && { productSearch: [...e.productSearch] }),
     };
   }
   return state;
@@ -61,6 +62,7 @@ export function explorerTarget(state: SavedViewState): {
       adProducts: explorer.adProducts,
       chartMetrics: explorer.chartMetrics as [MetricKey, MetricKey],
       sort: explorer.sort,
+      productSearch: explorer.productSearch ?? [],
     }),
   };
 }

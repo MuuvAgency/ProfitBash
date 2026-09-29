@@ -188,7 +188,7 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
   app.openapi({ ...explorerRowsRoute, middleware: guard('sp-explorer') }, async (c) => {
     const body = c.req.valid('json');
     const query = await toQuery(visibility(c), body);
-    const filter = explorerFilter(body.filter);
+    const filter = explorerFilter(body.filter, body.level);
     const meta = await dataStatus(db, query);
     if (body.level === 'negative') {
       const [negatives, display] = await Promise.all([
@@ -240,7 +240,7 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
       queryTimeSeries(db, {
         ...query,
         level: body.level,
-        filter: explorerFilter(body.filter),
+        filter: explorerFilter(body.filter, body.level),
         ...(body.entityIds && { entityIds: body.entityIds }),
       }),
       dataStatus(db, query),
@@ -322,8 +322,16 @@ function selection(
   };
 }
 
-function explorerFilter(filter: QueryBody['filter']): ExplorerFilter {
+function explorerFilter(filter: QueryBody['filter'], level?: string): ExplorerFilter {
+  if (filter?.productSearch && level !== 'productAd') {
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'filter.productSearch: nur auf Ebene „productAd“ (Product Ads).',
+    );
+  }
   return {
+    ...(filter?.productSearch && { productSearch: filter.productSearch }),
     ...(filter?.portfolioIds && { portfolioIds: filter.portfolioIds }),
     ...(filter?.campaignIds && { campaignIds: filter.campaignIds }),
     ...(filter?.adGroupIds && { adGroupIds: filter.adGroupIds }),

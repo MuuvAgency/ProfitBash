@@ -2,6 +2,7 @@
 import { AD_PRODUCTS, formatNumber, type AdProduct, type ExplorerLevel } from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
 import MultiSelect from 'primevue/multiselect';
 import { computed, onScopeDispose, ref, shallowRef, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -32,6 +33,7 @@ import {
   explorerStateFromRoute,
   pathForLevel,
   type DrillDown,
+  parseProductTerms,
   type GridSort,
 } from '../explorer/state';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
@@ -225,6 +227,22 @@ function onSort(sort: GridSort | null) {
   if (value === undefined) delete query.sort;
   void router.replace({ path: route.path, query, state: link(route.path, query).state });
 }
+// Suche nach ASIN/SKU (nur Reiter Product Ads, F10): Eingabe lokal, übernommen mit Enter oder „Suchen“.
+const searchText = ref('');
+watch(
+  () => state.value.productSearch.join(' '),
+  (value) => (searchText.value = value),
+  { immediate: true },
+);
+function applySearch() {
+  const terms = parseProductTerms(searchText.value);
+  setQuery({ q: terms.length > 0 ? terms.join(',') : undefined });
+}
+function clearSearch() {
+  searchText.value = '';
+  setQuery({ q: undefined });
+}
+
 function onChartMetrics([m1, m2]: [MetricKey, MetricKey]) {
   setQuery({ m1: m1 === 'cost' ? undefined : m1, m2: m2 === 'sales' ? undefined : m2 });
 }
@@ -476,6 +494,45 @@ const truncatedText = computed(() => {
               @update:model-value="onColumns"
             />
           </div>
+          <form
+            v-if="level === 'productAd'"
+            class="flex min-w-0 flex-col gap-space-xs"
+            role="search"
+            @submit.prevent="applySearch"
+          >
+            <label :for="`${id}-search`" class="text-label-eyebrow uppercase text-ink-tertiary">
+              {{ t('explorer.productSearch.label') }}
+            </label>
+            <div class="flex items-center gap-space-xs">
+              <InputText
+                :id="`${id}-search`"
+                v-model="searchText"
+                data-explorer-search
+                size="small"
+                autocomplete="off"
+                :placeholder="t('explorer.productSearch.placeholder')"
+                class="w-64 max-w-full font-data"
+              />
+              <Button
+                type="submit"
+                icon="pi pi-search"
+                severity="secondary"
+                size="small"
+                :aria-label="t('explorer.productSearch.submit')"
+              />
+              <Button
+                v-if="state.productSearch.length > 0"
+                type="button"
+                icon="pi pi-times"
+                severity="secondary"
+                text
+                size="small"
+                data-explorer-search-clear
+                :aria-label="t('explorer.productSearch.clear')"
+                @click="clearSearch"
+              />
+            </div>
+          </form>
           <label class="flex min-h-11 items-center gap-space-sm text-body-sm text-ink">
             <input
               type="checkbox"
@@ -538,7 +595,11 @@ const truncatedText = computed(() => {
           <SkeletonBlock v-for="n in 8" :key="n" height="2.25rem" />
         </div>
         <p v-else-if="data.rows.length === 0" class="text-body-sm text-ink-secondary">
-          {{ t('explorer.empty') }}
+          {{
+            level === 'productAd' && state.productSearch.length > 0
+              ? t('explorer.productSearch.empty')
+              : t('explorer.empty')
+          }}
         </p>
         <ExplorerGrid
           v-else

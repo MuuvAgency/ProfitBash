@@ -2432,6 +2432,7 @@ export interface components {
                 campaignIds?: string[];
                 adGroupIds?: string[];
                 includeRemoved?: boolean;
+                productSearch?: string[];
             };
         };
         DateRange: {
@@ -2489,6 +2490,7 @@ export interface components {
                 campaignIds?: string[];
                 adGroupIds?: string[];
                 includeRemoved?: boolean;
+                productSearch?: string[];
             };
             entityIds?: string[];
         };
@@ -2602,6 +2604,7 @@ export interface components {
                 /** @enum {string} */
                 direction: "asc" | "desc";
             } | null;
+            productSearch?: string[];
         };
         SavedViewCreate: {
             name: string;

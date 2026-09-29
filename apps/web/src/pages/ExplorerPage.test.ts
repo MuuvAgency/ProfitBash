@@ -304,6 +304,25 @@ describe('ExplorerPage', () => {
     expect(wrapper.find('[data-explorer-chart]').exists()).toBe(false);
   });
 
+  it('Suchfeld ASIN/SKU im Reiter Product Ads: Suche in der URL und in der Anfrage', async () => {
+    const { requests } = stubFetch(routes());
+    const { wrapper, router } = await mountExplorer('/ads/explorer/product-ads');
+    await waitForRow('teilt sich 3 ASINs');
+    await wrapper.find('[data-explorer-search]').setValue('B0DEMO0001 sku-9');
+    await wrapper.find('form[role="search"]').trigger('submit');
+    await flushPromises();
+    expect(router.currentRoute.value.query.q).toBe('B0DEMO0001,sku-9');
+    await vi.waitFor(() =>
+      expect(rowRequests(requests).at(-1)).toMatchObject({
+        level: 'productAd',
+        filter: { productSearch: ['B0DEMO0001', 'sku-9'] },
+      }),
+    );
+    await wrapper.find('[data-explorer-search-clear]').trigger('click');
+    await flushPromises();
+    expect(router.currentRoute.value.query.q).toBeUndefined();
+  });
+
   it('Product Ads mit mehreren ASINs: Liste im Popover der Zelle', async () => {
     stubFetch(routes());
     await mountExplorer('/ads/explorer/product-ads');

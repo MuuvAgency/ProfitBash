@@ -91,7 +91,24 @@ export const de = {
   quickTools: {
     button: 'Quick-Tools',
     title: 'Quick-Tools',
-    empty: 'Hier erscheinen kleine Werkzeuge für den Alltag, als Erstes das ASIN-Tool (Phase 2).',
+    empty: 'Hier erscheinen kleine Werkzeuge für den Alltag.',
+  },
+  asinTool: {
+    title: 'ASIN-Tool',
+    label: 'ASINs oder SKUs',
+    placeholder: 'z. B. B0DEMO0001, auch mehrere aus der Zwischenablage',
+    required: 'Bitte mindestens eine ASIN oder SKU eingeben.',
+    submit: 'Suchen',
+    period: 'Zeitraum: {period} (wie die Filterleiste)',
+    failed: 'Die Suche ist fehlgeschlagen.',
+    empty: 'Keine Product Ads zu diesen ASINs oder SKUs.',
+    count: '{count} Product Ad | {count} Product Ads',
+    more: 'und {count} weitere, alle im Explorer',
+    openExplorer: 'Alle im Explorer öffnen',
+    spend: 'Spend',
+    sales: 'Umsatz',
+    acos: 'ACoS',
+    hint: 'Sucht in ASIN und SKU der Product Ads, auch in Ads mit mehreren Produkten. Kennzahlen gelten je Ad, nicht je ASIN.',
   },
   shortcuts: {
     title: 'Tastenkürzel',
@@ -594,6 +611,13 @@ export const de = {
     },
   },
   explorer: {
+    productSearch: {
+      empty: 'Keine Product Ads zu dieser Suche.',
+      label: 'ASIN/SKU',
+      placeholder: 'ASINs oder SKUs, getrennt durch Leerzeichen',
+      submit: 'Nach ASIN oder SKU suchen',
+      clear: 'Suche aufheben',
+    },
     eyebrow: 'Amazon Ads',
     description:
       'Portfolios, Kampagnen, Ad Groups, Targets, Product Ads, Suchbegriffe und Negatives mit Kennzahlen.',

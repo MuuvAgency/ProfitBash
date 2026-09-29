@@ -460,3 +460,34 @@ describe('POST /api/ads/asin-search', () => {
     expect((await post('/api/ads/asin-search', query({ terms: [] }))).status).toBe(400);
   });
 });
+
+describe('Suche nach ASIN/SKU im Explorer (2.11)', () => {
+  it('Reiter Product Ads filtert Zeilen und Tagesreihe nach ASIN oder SKU', async () => {
+    const found = await post<ExplorerRowsResponse>(
+      '/api/ads/explorer/rows',
+      query({ level: 'productAd', filter: { productSearch: ['sku-1'] } }),
+    );
+    expect(found.status).toBe(200);
+    expect(found.body.rows.map((row) => row.id)).toEqual([ids.ad]);
+    const none = await post<ExplorerRowsResponse>(
+      '/api/ads/explorer/rows',
+      query({ level: 'productAd', filter: { productSearch: ['B0NICHTDA'] } }),
+    );
+    expect(none.body.rows).toEqual([]);
+    const series = await post<TimeSeriesResponse>(
+      '/api/ads/timeseries',
+      query({ level: 'productAd', filter: { productSearch: ['B0NICHTDA'] } }),
+    );
+    expect(series.status).toBe(200);
+    expect(series.body.days).toEqual([]);
+  });
+
+  it('nur auf Ebene Product Ads', async () => {
+    const res = await post<ErrorResponse>(
+      '/api/ads/explorer/rows',
+      query({ level: 'campaign', filter: { productSearch: ['B0TEST0001'] } }),
+    );
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
