@@ -20,5 +20,6 @@ withDefaults(
     :shape="shape === 'circle' ? 'circle' : 'rectangle'"
     :class="shape === 'tile' ? 'rounded-tile!' : 'rounded-control!'"
     aria-hidden="true"
+    data-skeleton
   />
 </template>
