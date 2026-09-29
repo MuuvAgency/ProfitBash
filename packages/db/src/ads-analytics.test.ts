@@ -1169,3 +1169,71 @@ describe('Attribution des Vergleichszeitraums', () => {
     });
   });
 });
+
+/**
+ * DoD Phase 2: Dashboard und Explorer zeigen dieselben Summen wie eine unabhängige SQL-Prüfung. Die Prüfung liest die
+ * Kampagnen-Kennzahlen der sichtbaren Profile direkt (ohne Access-Layer, ohne die CTEs des Moduls), rechnet je Zeile mit
+ * dem letzten EZB-Kurs an oder vor dem Tag über EUR um und wählt den Umsatz „wie Konsole“ (SP: 7 Tage, bei Vendoren
+ * 14 Tage; SB/SD: 14 Tage inkl. Views). Zeilen ohne Kurs zählen in umgerechneten Summen nicht.
+ */
+describe('Unabhängige SQL-Prüfung der Summen (DoD)', () => {
+  async function independentSums(
+    profileIds: string[],
+    range: { from: string; to: string },
+    target: string | null,
+  ) {
+    const rate = (currency: string) => `case when ${currency} = 'EUR' then 1 else (
+        select r.rate from fx_rates r where r.quote = ${currency} and r.date <= m.date
+        order by r.date desc limit 1) end`;
+    const factor =
+      target === null ? '1' : `(${rate(`'${target}'`)}) / (${rate('m.currency_code')})`;
+    const result = await testDb.db.$client.unsafe<
+      { impressions: string; clicks: string; cost: string; sales: string }[]
+    >(
+      `select coalesce(sum(m.impressions), 0)::text as impressions,
+              coalesce(sum(m.clicks), 0)::text as clicks,
+              coalesce(sum(m.cost * f.factor), 0)::text as cost,
+              coalesce(sum(case when m.ad_product = 'SPONSORED_PRODUCTS' and p.account_type <> 'vendor'
+                                then m.sales_7d else m.sales_14d end * f.factor), 0)::text as sales
+         from amazon_ads_campaign_daily_metrics m
+         join amazon_ads_profiles p on p.id = m.profile_id
+         cross join lateral (select ${factor} as factor) f
+        where m.profile_id = any($1::uuid[]) and m.date between $2 and $3 and f.factor is not null`,
+      [profileIds, range.from, range.to],
+    );
+    return result[0]!;
+  }
+
+  const visible = () => [ids.de, ids.uk, ids.se];
+
+  it('Summen in EUR (gemischte Währungen, SP/SB/SD) gleich in Dashboard und Explorer', async () => {
+    for (const range of [PERIOD, COMPARISON]) {
+      const expected = await independentSums(visible(), range, 'EUR');
+      const dashboard = await queryDashboard(testDb.db, { ...base(), period: range });
+      const explorer = await queryExplorerRows(testDb.db, {
+        ...base(),
+        period: range,
+        level: 'campaign',
+        filter: { includeRemoved: true },
+      });
+      for (const totals of [dashboard.totals.current, explorer.totals.current]) {
+        expect(totals.impressions).toBe(expected.impressions);
+        expect(totals.clicks).toBe(expected.clicks);
+        expect(round(totals.cost)).toBe(round(expected.cost));
+        expect(round(totals.sales)).toBe(round(expected.sales));
+      }
+      expect(dashboard.currency).toBe('EUR');
+      expect(dashboard.converted).toBe(true);
+    }
+  });
+
+  it('eine Währung: Originalbeträge exakt, ohne Umrechnung', async () => {
+    const expected = await independentSums([ids.uk], PERIOD, null);
+    const dashboard = await queryDashboard(testDb.db, { ...base(), profileIds: [ids.uk] });
+    expect(dashboard.currency).toBe('GBP');
+    expect(dashboard.converted).toBe(false);
+    expect(dashboard.totals.current.cost).toBe(expected.cost);
+    expect(dashboard.totals.current.clicks).toBe(expected.clicks);
+    expect(parseDecimal(dashboard.totals.current.sales!).eq(expected.sales)).toBe(true);
+  });
+});
