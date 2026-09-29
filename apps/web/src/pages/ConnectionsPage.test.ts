@@ -148,7 +148,7 @@ describe('ConnectionsPage', () => {
 
     const grid = wrapper.get('div[role="region"]').element.firstElementChild as HTMLElement;
     // Feste Breiten plus Mindestbreiten der Flex-Spalten (Land, Konto, Zeitzone, Kunde), keine feste Zahl im Container.
-    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBe(1055));
     expect(grid.className).not.toMatch(/min-w-/);
     // Passt bei 1440 px mit ausgeklappter Sidebar auch mit klassischer Scrollbar (F14).
     expect(parseFloat(grid.style.minWidth)).toBeLessThanOrEqual(FIT_WIDTH_AT_1440);
@@ -161,6 +161,8 @@ describe('ConnectionsPage', () => {
 
     for (const colId of ['country', 'accountName', 'timezone']) {
       expect(profile.find(`[col-id="${colId}"] [data-wrap]`).exists(), colId).toBe(true);
+      // Vertikal zentriert, auch wenn eine andere Spalte die Zeile höher macht.
+      expect(profile.get(`[col-id="${colId}"]`).classes(), colId).toContain('items-center');
     }
     expect(profile.findAll('.truncate')).toHaveLength(0);
   });

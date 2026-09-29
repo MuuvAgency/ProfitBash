@@ -10,7 +10,7 @@ defineProps<{ params: JobRunCellParams }>();
   er ohne Tooltip lesbar, auch auf Touch (`phase-2.md` F14); die Zeile wächst mit (`autoHeight`).
 -->
 <template>
-  <div class="flex min-h-[52px] w-full min-w-0 items-center py-2">
+  <div class="flex min-h-[50px] w-full min-w-0 items-center py-2">
     <span data-wrap class="min-w-0 whitespace-normal wrap-anywhere"
       ><WrapText :text="String(params.valueFormatted ?? params.value ?? '')"
     /></span>

@@ -7,7 +7,7 @@ defineProps<{ params: ProfileCellParams }>();
 
 <!-- Zeitzone in Mono, bricht bevorzugt nach „/“ um statt gekürzt zu werden (F14); die Zeile wächst mit. -->
 <template>
-  <div class="flex min-h-[52px] w-full min-w-0 items-center py-2">
+  <div class="flex min-h-[50px] w-full min-w-0 items-center py-2">
     <span data-wrap class="min-w-0 whitespace-normal font-data wrap-anywhere"
       ><WrapText :text="params.data?.timezone ?? ''"
     /></span>

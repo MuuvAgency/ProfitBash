@@ -10,7 +10,7 @@ import type {
 import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, onBeforeUnmount, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
+import { AUTO_HEIGHT_CELL, gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
 import { useGridMinWidth } from '../grid/min-width';
 import DurationCell from './cells/DurationCell.vue';
 import ResultCell from './cells/ResultCell.vue';
@@ -100,8 +100,8 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     headerName: t('sync.column.connection'),
     valueGetter: ({ data }) => (data ? labels.connection(data) : ''),
     cellRenderer: markRaw(WrappedCell),
-    // Wie „Ergebnis“: Die Zelle zentriert selbst, die Zeile wächst mit dem umbrochenen Text.
-    cellClass: 'leading-normal',
+    // Die Zeile wächst mit dem umbrochenen Text.
+    cellClass: AUTO_HEIGHT_CELL,
     autoHeight: true,
     // Platz für „amazon-ads-mock@“ in einer Zeile.
     minWidth: 180,
@@ -131,9 +131,7 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     // Zähler und (aufklappbarer) Fehlertext in einer Spalte: Der Fehler bleibt ohne Scrollen sichtbar.
     valueGetter: ({ data }) => (data ? labels.counters(data) : ''),
     cellRenderer: markRaw(ResultCell),
-    // Kein Flex: Der Wrapper der autoHeight-Zelle schrumpfte sonst nicht unter seine Inhaltsbreite und
-    // ragte über die Zelle hinaus. Vertikal zentriert die Zelle selbst.
-    cellClass: 'leading-normal',
+    cellClass: AUTO_HEIGHT_CELL,
     // Die Zeile wächst mit umbrochenen Zählern und dem aufgeklappten Fehlertext.
     autoHeight: true,
     sortable: false,
