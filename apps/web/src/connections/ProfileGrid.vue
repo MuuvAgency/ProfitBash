@@ -17,6 +17,7 @@ import AccountCell from './cells/AccountCell.vue';
 import ClientCell from './cells/ClientCell.vue';
 import CountryCell from './cells/CountryCell.vue';
 import HiddenCell from './cells/HiddenCell.vue';
+import TimezoneCell from './cells/TimezoneCell.vue';
 import type { ProfileGridContext } from './cells/types';
 
 const props = defineProps<{ profiles: Profile[]; clients: Client[]; clientsReady: boolean }>();
@@ -62,6 +63,12 @@ function accountTypeLabel(type: string | undefined) {
 /** Zellen zentrieren ihren Inhalt vertikal; Steuerelemente erben sonst die Zeilenhöhe des Grids. */
 const CELL = 'flex items-center leading-normal';
 const DATA_CELL = `${CELL} font-data`;
+/**
+ * Spalten mit umbrechendem Text (F14: passt bei 1440 px auch mit klassischer Scrollbar, lesbar ohne Tooltip): Die Zeile
+ * wächst mit, die Zelle zentriert selbst. Kein Flex an der Zelle, der Wrapper der autoHeight-Zelle schrumpfte sonst nicht
+ * unter seine Inhaltsbreite (wie im Sync-Status).
+ */
+const WRAPPED = { cellClass: 'leading-normal', autoHeight: true } as const;
 
 const columnDefs = computed<ColDef<Profile>[]>(() => {
   const { locale } = session.preferences;
@@ -72,7 +79,8 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       // Sortiert nach dem angezeigten Namen („Vereinigtes Königreich“, nicht „UK“).
       valueGetter: ({ data }) => (data ? countryName(data.countryCode) : ''),
       cellRenderer: markRaw(CountryCell),
-      minWidth: 235,
+      ...WRAPPED,
+      minWidth: 170,
       flex: 1,
     },
     {
@@ -80,6 +88,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       headerName: t('connections.profiles.column.accountName'),
       field: 'accountName',
       cellRenderer: markRaw(AccountCell),
+      ...WRAPPED,
       minWidth: 140,
       flex: 2,
     },
@@ -100,7 +109,9 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       colId: 'timezone',
       headerName: t('connections.profiles.column.timezone'),
       field: 'timezone',
-      cellClass: DATA_CELL,
+      cellRenderer: markRaw(TimezoneCell),
+      ...WRAPPED,
+      // „Europe/Stockholm“ passt; längere („America/Los_Angeles“) brechen nach „/“ um.
       minWidth: 165,
       flex: 1,
     },

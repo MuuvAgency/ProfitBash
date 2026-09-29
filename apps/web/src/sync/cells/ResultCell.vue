@@ -11,8 +11,6 @@ const labels = useJobRunLabels();
 
 const run = computed(() => props.params.data);
 const counters = computed(() => (run.value ? labels.counterParts(run.value) : []));
-/** Vollständig im Tooltip, wenn die Zeile gekürzt ist. */
-const countersText = computed(() => (run.value ? labels.counters(run.value) : ''));
 const expanded = computed(() =>
   run.value ? props.params.context.expanded.has(run.value.id) : false,
 );
@@ -35,7 +33,8 @@ const accessibleLabel = computed(() =>
 <!-- Zähler des Laufs; bei Fehlern darunter der Schalter mit der ersten Zeile, aufgeklappt der ganze Text. -->
 <template>
   <div v-if="run" class="flex min-h-[52px] w-full min-w-0 flex-col justify-center gap-1 py-2">
-    <span v-if="counters.length > 0" class="truncate" :title="countersText">
+    <!-- Umbrechen statt kürzen: ohne Tooltip lesbar, auch auf Touch (F14). -->
+    <span v-if="counters.length > 0" data-wrap class="min-w-0 whitespace-normal wrap-break-word">
       <template v-for="(part, index) in counters" :key="part.key">
         <template v-if="index > 0"> · </template>
         <span class="font-data">{{ part.value }}</span> {{ part.label }}

@@ -10,6 +10,7 @@ import {
   meFixture,
   profileFixture,
 } from '../test/fixtures';
+import { FIT_WIDTH_AT_1440 } from '../grid/min-width';
 import { cleanupMounted, mountWithApp } from '../test/mount';
 import ConnectionsPage from './ConnectionsPage.vue';
 
@@ -147,8 +148,39 @@ describe('ConnectionsPage', () => {
 
     const grid = wrapper.get('div[role="region"]').element.firstElementChild as HTMLElement;
     // Feste Breiten plus Mindestbreiten der Flex-Spalten (Land, Konto, Zeitzone, Kunde), keine feste Zahl im Container.
-    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBe(1120));
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThan(0));
     expect(grid.className).not.toMatch(/min-w-/);
+    // Passt bei 1440 px mit ausgeklappter Sidebar auch mit klassischer Scrollbar (F14).
+    expect(parseFloat(grid.style.minWidth)).toBeLessThanOrEqual(FIT_WIDTH_AT_1440);
+  });
+
+  it('bricht lange Texte (Land, Konto, Zeitzone) um statt zu kürzen: lesbar auch ohne Tooltip (F14)', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountPage();
+    const profile = await waitForRow(wrapper, 'Nordwind GmbH');
+
+    for (const colId of ['country', 'accountName', 'timezone']) {
+      expect(profile.find(`[col-id="${colId}"] [data-wrap]`).exists(), colId).toBe(true);
+    }
+    expect(profile.findAll('.truncate')).toHaveLength(0);
+  });
+
+  it('erklärt „Entfernt“ per Klick (Popover, auch auf Touch lesbar)', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await wrapper.get('input[role="switch"]#connections-show-removed').setValue(true);
+    const removed = await waitForRow(wrapper, 'Lindenhof Nordic AB');
+
+    const badge = removed.get('button[aria-haspopup="dialog"]');
+    expect(badge.text()).toBe('Entfernt');
+    expect(badge.attributes('aria-expanded')).toBe('false');
+    await badge.trigger('click');
+    await flushPromises();
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Amazon liefert dieses Profil nicht mehr.'),
+    );
+    // `aria-expanded` folgt dem `show` des Popovers (Transition-Hook, in test-utils gestubbt): im Browser geprüft (2.12).
   });
 
   it('blendet entfernte Profile nur mit dem Filter „Entfernte anzeigen“ ein', async () => {
