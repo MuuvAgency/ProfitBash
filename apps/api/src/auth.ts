@@ -12,6 +12,7 @@ import {
   platformAccessControl,
   platformRoles,
 } from '@profitbash/shared/access-control';
+import { MIN_PASSWORD_LENGTH } from '@profitbash/shared';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { createAuthMiddleware } from 'better-auth/api';
@@ -211,7 +212,7 @@ export function createAuth({ db, secret, baseURL, trustedOrigins = [] }: CreateA
       enabled: true,
       // Keine öffentliche Registrierung: Nutzer legen Admins an (Seed, später Mitgliederverwaltung).
       disableSignUp: true,
-      minPasswordLength: 12,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
     },
     plugins: [
       organization({
