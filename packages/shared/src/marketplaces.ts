@@ -100,13 +100,16 @@ export function marketplaceFor(countryCode: string): AmazonMarketplace | undefin
 /** Kontotypen, die ein Profil ohne Connection haben kann (wie `accountInfo.type` bei Amazon). */
 export const FILE_PROFILE_ACCOUNT_TYPES = ['seller', 'vendor', 'agency'] as const;
 
-function isTimeZone(value: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: value });
-    return true;
-  } catch {
-    return false;
-  }
+let canonicalTimeZones: ReadonlySet<string> | undefined;
+
+/**
+ * Nur kanonische IANA-Namen (`Europe/Berlin`). `Intl` nimmt auch Offsets (`+01:00`), Kürzel (`CET`) und
+ * Kleinschreibung an; Postgres liest Offsets aber nach POSIX mit umgekehrtem Vorzeichen, die Tagesgrenzen
+ * des Profils lägen dann falsch.
+ */
+export function isCanonicalTimeZone(value: string): boolean {
+  canonicalTimeZones ??= new Set(Intl.supportedValuesOf('timeZone'));
+  return canonicalTimeZones.has(value);
 }
 
 export const fileProfileCreateSchema = z
@@ -115,9 +118,14 @@ export const fileProfileCreateSchema = z
     countryCode: z
       .string()
       .refine((code) => marketplaceFor(code) !== undefined, { message: 'unbekannter Marktplatz' }),
-    currencyCode: z.string().regex(/^[A-Z]{3}$/, 'dreistelliger Währungscode in Großbuchstaben'),
-    timezone: z.string().refine(isTimeZone, { message: 'unbekannte Zeitzone' }),
+    currencyCode: z.string(),
+    timezone: z.string().refine(isCanonicalTimeZone, { message: 'unbekannte Zeitzone' }),
     accountType: z.enum(FILE_PROFILE_ACCOUNT_TYPES),
+  })
+  // Amazon legt die Währung je Marktplatz fest; ein Tippfehler landete sonst in allen Umrechnungen.
+  .refine((input) => marketplaceFor(input.countryCode)?.currencyCode === input.currencyCode, {
+    message: 'Währung passt nicht zum Marktplatz',
+    path: ['currencyCode'],
   })
   .meta({ id: 'FileProfileCreate' });
 export type FileProfileCreate = z.infer<typeof fileProfileCreateSchema>;

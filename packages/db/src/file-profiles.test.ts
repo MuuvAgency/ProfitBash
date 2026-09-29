@@ -84,7 +84,12 @@ describe('createFileProfile', () => {
       );
     expect(event).toMatchObject({
       actorUserId: ids.admin,
-      target: { type: 'amazon_ads_profile', id: profile.id, source: 'file', after: input },
+      target: {
+        type: 'amazon_ads_profile',
+        id: profile.id,
+        source: 'file',
+        after: { ...input, marketplaceId: 'A1PA6795UKMFR9' },
+      },
     });
   });
 

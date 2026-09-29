@@ -960,13 +960,39 @@ Zelltypen und Werte-Listen, keine Datenzeilen; die Datei liegt nicht im Repo):
 Teilaufgaben (Reihenfolge):
 
 #### 1.11a Profil ohne Connection
-- [ ] Migration: `amazon_ads_profiles.connection_id` und `amazon_profile_id` nullable (die Konsole zeigt die Profil-ID nicht); CHECK:
+- [x] Migration: `amazon_ads_profiles.connection_id` und `amazon_profile_id` nullable (die Konsole zeigt die Profil-ID nicht); CHECK:
       mit Connection auch Amazon-Profil-ID. Der Unique-Index (Organisation, Amazon-Profil-ID) bleibt (NULL zählt nicht doppelt).
-- [ ] Anlegen durch Org-Admins: `POST /api/profiles` (Name, Land, Währung, Zeitzone mit Vorschlag aus dem Land, Kontotyp), zod,
+- [x] Anlegen durch Org-Admins: `POST /api/profiles` (Name, Land, Währung, Zeitzone mit Vorschlag aus dem Land, Kontotyp), zod,
       `audit_event` `profile.create`; Liste `GET /api/profiles/file` (Profile ohne Connection, über `visibleProfilesScope`).
-- [ ] Bestehende Stellen null-sicher (Profil-Sync, Jobs je Connection, „Zuletzt synchronisiert“, Connections-Seite); Dashboard und
+- [x] Bestehende Stellen null-sicher (Profil-Sync, Jobs je Connection, „Zuletzt synchronisiert“, Connections-Seite); Dashboard und
       Explorer zeigen Datei-Profile wie andere.
-- [ ] Connections-Seite: Abschnitt „Profile ohne Connection (Datei-Import)“ mit Anlegen-Dialog, Kunde zuordnen, Ausblenden.
+- [x] Connections-Seite: Abschnitt „Profile ohne Connection (Datei-Import)“ mit Anlegen-Dialog, Kunde zuordnen, Ausblenden.
+- [x] Umsetzung (Stand für 1.11b und später):
+  - **Schema:** Migration `0018_file_profiles` (beide Spalten nullable, CHECK `amazon_ads_profiles_connection_amazon_id_ck`). Der
+    zusammengesetzte FK (`connection_id`, `organization_id`) greift bei NULL nicht (MATCH SIMPLE). Alle Jobs wählen Profile über
+    `connection_id = …`, Datei-Profile erreichen also keinen Sync. `withAmazonProfileId` (`system-access.ts`) macht aus der
+    Amazon-Profil-ID der Connection-Profile wieder `string` und wirft, falls der CHECK je verletzt wäre.
+  - **Vorgaben:** `AMAZON_MARKETPLACES`/`marketplaceFor` (`packages/shared/src/marketplaces.ts`: EU-Marktplätze, UK, TR, US, CA mit
+    Währung, Zeitzone, Marktplatz-ID wie in den Amazon-Profilen). `fileProfileCreateSchema` (strikt): Name 1–120 Zeichen, bekannter
+    Marktplatz, **Währung = Währung des Marktplatzes**, Zeitzone nur als kanonischer IANA-Name (`isCanonicalTimeZone` über
+    `Intl.supportedValuesOf`; Offsets wie `+01:00` liest Postgres mit umgekehrtem Vorzeichen, Kürzel und Kleinschreibung ebenso
+    abgelehnt), Kontotyp `seller` | `vendor` | `agency`. Die Marktplatz-ID setzt der Server.
+  - **DB:** `createFileProfile` (`packages/db/src/file-profiles.ts`) prüft die Admin-Rolle, legt an und schreibt `profile.create`
+    (`source: 'file'`, `after` mit Marktplatz-ID) in einer Transaktion.
+  - **API:** `POST /api/profiles` (201, `Profile`) und `GET /api/profiles/file` (Liste über `visibleProfilesScope` mit ausgeblendeten
+    und entfernten, `connection_id is null`), beide `orgAdminOnly`. `Profile.connectionId` und `.amazonProfileId` (auch in den
+    Filter-Optionen) sind jetzt nullable. Zuordnen und Ausblenden über das bestehende `PATCH /api/profiles/:id`.
+  - **Datenstand:** „Letzter Sync“ im Dashboard übergeht Profile ohne Connection (bis 1.11c zählen dort nur Report-Syncs). „Daten
+    bis“ zeigt für ein Datei-Profil ohne Import „noch kein Datenstand“, wie bei einem neuen API-Profil.
+  - **Web:** `FileProfilesCard.vue` (eigene Kachel unter den Connections, auch ohne Connection und bei deren Ladefehler; Skelett,
+    Leer- und Fehlerzustand; `ProfileGrid` wiederverwendet), `CreateFileProfileDialog.vue` (Marktplatz, Kontotyp, Zeitzone mit
+    Suche als Auswahl, Währung nur als Anzeige). Query-Key `['profiles', org, 'file']` unter `allProfiles`, damit die optimistischen
+    Profil-Änderungen auch hier greifen. Im Browser-Pane geprüft (Anlegen, Anzeige, Dashboard und Explorer ohne Konsolenfehler).
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: Zeitzone nur kanonisch (vorher `Intl`-Prüfung, die `+01:00`
+    zuließ), Währung an den Marktplatz gebunden, Abschnitt unabhängig vom Laden der Connections, Marktplatz-ID im Audit, Hinweis
+    zu 1.11g. Bewusst so: Marktplatz und Kontotyp tragen sichtbare Überschriften plus `aria-label` am Select (wie die Auswahl der
+    Clients); `GET /api/profiles/file` neben `PATCH /api/profiles/{id}` (ein künftiges `GET /api/profiles/{id}` darf `file` nicht
+    als ID lesen).
 
 #### 1.11b Tabellen-Leser (`packages/sheets`)
 - [ ] XLSX gestreamt (fflate entpackt, saxes liest `sharedStrings` und die Blätter Zeile für Zeile), Blattnamen, Zellen als Text
@@ -993,7 +1019,12 @@ Teilaufgaben (Reihenfolge):
 - [ ] Hochladen je Profil (welche Datei, welcher Zeitraum), Verlauf der Importe mit Ergebnis und Fehlern, Hinweis bei veralteten Daten.
 
 #### 1.11g Zusammenführen mit der API (nach der Freigabe, mit 1.10)
-- [ ] Datei-Profil einer Connection zuordnen (Amazon-Profil-ID setzen), danach übernimmt der API-Sync dieselben Zeilen.
+- [ ] Datei-Profil mit dem API-Profil zusammenführen, danach übernimmt der API-Sync dieselben Zeilen.
+  - **Achtung (Review 1.11a):** Der OAuth-Callback plant sofort `profiles-sync`; der legt für dasselbe Amazon-Profil eine **neue**
+    Zeile an (die Amazon-Profil-ID des Datei-Profils ist leer, der Upsert findet keinen Konflikt). Nachträglich die ID am
+    Datei-Profil setzen scheitert am Unique-Index. Also entweder vor dem ersten Sync zuordnen (Callback bzw. Profil-Sync kennt die
+    Zuordnung, z. B. über Land und Konto-ID) oder die Zeilen des neuen Profils zusammenführen (Entities und Kennzahlen hängen je
+    `profile_id`; Entities über die Amazon-IDs abgleichen). Beim Umsetzen entscheiden.
 
 ## `.env.example`
 

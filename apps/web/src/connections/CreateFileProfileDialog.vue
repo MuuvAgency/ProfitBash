@@ -33,7 +33,7 @@ const timezone = ref('');
 const accountType = ref<FileProfileCreate['accountType']>('seller');
 const errorKey = ref<string | null>(null);
 
-/** Währung und Zeitzone folgen dem Marktplatz; von Hand geänderte Werte überschreibt erst der nächste Wechsel. */
+/** Währung und Zeitzone folgen dem Marktplatz; eine von Hand gewählte Zeitzone ersetzt erst der nächste Wechsel. */
 function applyMarketplace(code: string) {
   const marketplace = marketplaceFor(code);
   if (!marketplace) return;
@@ -62,6 +62,8 @@ const marketplaceOptions = computed(() =>
     label: countryName(m.countryCode),
   })).sort((a, b) => a.label.localeCompare(b.label, 'de')),
 );
+/** Kanonische IANA-Namen (wie die Prüfung in `fileProfileCreateSchema`). */
+const timezoneOptions = Intl.supportedValuesOf('timeZone');
 const accountTypeOptions = computed(() =>
   FILE_PROFILE_ACCOUNT_TYPES.map((type) => ({
     value: type,
@@ -82,8 +84,8 @@ async function submit() {
       await createProfile.mutateAsync({
         accountName: trimmed,
         countryCode: countryCode.value,
-        currencyCode: currencyCode.value.trim().toUpperCase(),
-        timezone: timezone.value.trim(),
+        currencyCode: currencyCode.value,
+        timezone: timezone.value,
         accountType: accountType.value,
       }),
     );
@@ -150,27 +152,25 @@ async function submit() {
           />
         </div>
         <div class="flex flex-col gap-space-sm">
-          <label for="create-file-profile-currency" class="text-body-sm font-semibold text-ink">
+          <span class="text-body-sm font-semibold text-ink">
             {{ t('connections.fileProfiles.dialog.currency') }}
-          </label>
-          <InputText
-            id="create-file-profile-currency"
-            v-model="currencyCode"
-            autocomplete="off"
-            maxlength="3"
-            class="font-data"
-            fluid
-          />
+          </span>
+          <!-- Amazon legt die Währung je Marktplatz fest: nur Anzeige. -->
+          <span
+            data-testid="file-profile-currency"
+            class="flex min-h-10 items-center rounded-control bg-well px-space-md font-data text-ink"
+            >{{ currencyCode }}</span
+          >
         </div>
         <div class="flex flex-col gap-space-sm">
-          <label for="create-file-profile-timezone" class="text-body-sm font-semibold text-ink">
+          <span class="text-body-sm font-semibold text-ink">
             {{ t('connections.fileProfiles.dialog.timezone') }}
-          </label>
-          <InputText
-            id="create-file-profile-timezone"
+          </span>
+          <Select
             v-model="timezone"
-            autocomplete="off"
-            maxlength="64"
+            :options="timezoneOptions"
+            filter
+            :aria-label="t('connections.fileProfiles.dialog.timezone')"
             class="font-data"
             fluid
           />

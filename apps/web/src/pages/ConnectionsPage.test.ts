@@ -787,12 +787,9 @@ describe('Profile ohne Connection (Datei-Import, 1.11a)', () => {
 
     await form!.get('input#create-file-profile-name').setValue(' Lumen UK ');
     await choose(form!, 'Marktplatz', 'Vereinigtes Königreich');
-    expect(
-      (form!.get('input#create-file-profile-currency').element as HTMLInputElement).value,
-    ).toBe('GBP');
-    expect(
-      (form!.get('input#create-file-profile-timezone').element as HTMLInputElement).value,
-    ).toBe('Europe/London');
+    // Währung legt der Marktplatz fest (nur Anzeige), die Zeitzone ist vorgeschlagen.
+    expect(form!.get('[data-testid="file-profile-currency"]').text()).toBe('GBP');
+    expect(form!.get('[role="combobox"][aria-label="Zeitzone"]').text()).toBe('Europe/London');
     await choose(form!, 'Kontotyp', 'Vendor');
     await form!.get('form').trigger('submit');
     await flushPromises();
@@ -829,6 +826,20 @@ describe('Profile ohne Connection (Datei-Import, 1.11a)', () => {
     await flushPromises();
     await vi.waitFor(() => expect(form.find('[role="alert"]').exists()).toBe(true));
     expect(dialog()).not.toBeNull();
+  });
+
+  it('zeigt den Abschnitt auch, wenn die Connections nicht laden', async () => {
+    stubFetch(
+      routes({
+        'GET /api/connections': serverError(),
+        'GET /api/profiles/file': json({ profiles: [fileProfile] }),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    await vi.waitFor(() =>
+      expect(wrapper.text()).toContain('Die Connections konnten nicht geladen werden.'),
+    );
+    await waitForRow(wrapper, 'Kranich Datei');
   });
 
   it('lässt einen Ladefehler der Datei-Profile nicht die Seite scheitern', async () => {
