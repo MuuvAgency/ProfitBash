@@ -1,0 +1,18 @@
+{
+  "name": "@profitbash/sheets",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tabellen lesen (XLSX gestreamt, CSV) ohne Umweg über number",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "saxes": "6.0.0"
+  }
+}
