@@ -5,6 +5,7 @@ import {
   EXPLORER_TABS,
   explorerStateFromRoute,
   explorerQuery,
+  explorerStateToQuery,
   levelFromPath,
   pathForLevel,
 } from './state';
@@ -59,6 +60,7 @@ describe('explorerStateFromRoute', () => {
       includeRemoved: true,
       adProducts: ['SPONSORED_BRANDS', 'SPONSORED_DISPLAY'],
       chartMetrics: ['clicks', 'acos'],
+      sort: null,
     });
   });
 
@@ -69,7 +71,17 @@ describe('explorerStateFromRoute', () => {
       includeRemoved: false,
       adProducts: [],
       chartMetrics: ['cost', 'sales'],
+      sort: null,
     });
+  });
+
+  it('Sortierung als eine Spalte mit Richtung (`sort=cost.desc`)', () => {
+    expect(explorerStateFromRoute('/ads/explorer', { sort: 'acos.asc' }).sort).toEqual({
+      column: 'acos',
+      direction: 'asc',
+    });
+    expect(explorerStateFromRoute('/ads/explorer', { sort: 'acos' }).sort).toBeNull();
+    expect(explorerStateFromRoute('/ads/explorer', { sort: '<x>.desc' }).sort).toBeNull();
   });
 
   it('ungültige Werte werden ignoriert', () => {
@@ -128,11 +140,41 @@ describe('explorerQuery (Filter für die API)', () => {
         includeRemoved: true,
         adProducts: ['SPONSORED_PRODUCTS'],
         chartMetrics: ['cost', 'sales'],
+        sort: null,
       }),
     ).toEqual({
       level: 'target',
       adProducts: ['SPONSORED_PRODUCTS'],
       filter: { campaignIds: [CAMPAIGN], adGroupIds: [AD_GROUP], includeRemoved: true },
     });
+  });
+});
+
+describe('explorerStateToQuery (Ansicht laden)', () => {
+  it('schreibt nur Abweichungen vom Standard und liest sie gleich zurück', () => {
+    const state = {
+      level: 'target' as const,
+      drill: { portfolioId: null, campaignId: CAMPAIGN, adGroupId: AD_GROUP },
+      includeRemoved: true,
+      adProducts: ['SPONSORED_BRANDS' as const, 'SPONSORED_PRODUCTS' as const],
+      chartMetrics: ['clicks', 'sales'] as ['clicks', 'sales'],
+      sort: { column: 'cost', direction: 'desc' as const },
+    };
+    const query = explorerStateToQuery(state);
+    expect(query).toEqual({
+      campaign: CAMPAIGN,
+      adGroup: AD_GROUP,
+      removed: '1',
+      adp: 'SPONSORED_PRODUCTS,SPONSORED_BRANDS',
+      m1: 'clicks',
+      sort: 'cost.desc',
+    });
+    expect(explorerStateFromRoute(pathForLevel('target'), query)).toEqual({
+      ...state,
+      adProducts: ['SPONSORED_PRODUCTS', 'SPONSORED_BRANDS'],
+    });
+    expect(
+      explorerStateToQuery({ ...explorerStateFromRoute('/ads/explorer', {}), adProducts: [] }),
+    ).toEqual({});
   });
 });

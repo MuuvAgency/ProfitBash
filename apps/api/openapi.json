@@ -2516,44 +2516,24 @@
           },
           "chartMetrics": {
             "type": "array",
-            "prefixItems": [
-              {
-                "type": "string",
-                "enum": [
-                  "impressions",
-                  "clicks",
-                  "cost",
-                  "sales",
-                  "purchases",
-                  "units",
-                  "ctr",
-                  "cpc",
-                  "cvr",
-                  "acos",
-                  "roas",
-                  "cpm",
-                  "vcpm"
-                ]
-              },
-              {
-                "type": "string",
-                "enum": [
-                  "impressions",
-                  "clicks",
-                  "cost",
-                  "sales",
-                  "purchases",
-                  "units",
-                  "ctr",
-                  "cpc",
-                  "cvr",
-                  "acos",
-                  "roas",
-                  "cpm",
-                  "vcpm"
-                ]
-              }
-            ]
+            "items": {
+              "type": "string",
+              "enum": [
+                "impressions",
+                "clicks",
+                "cost",
+                "sales",
+                "purchases",
+                "units",
+                "ctr",
+                "cpc",
+                "cvr",
+                "acos",
+                "roas",
+                "cpm",
+                "vcpm"
+              ]
+            }
           },
           "columns": {
             "anyOf": [

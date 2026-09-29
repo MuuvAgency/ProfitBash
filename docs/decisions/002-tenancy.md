@@ -2,7 +2,7 @@
 
 - **Status:** angenommen
 - **Datum:** 2026-09-25, Geltungsbereich von Punkt 5 am 2026-09-26 dokumentiert (Stand Code Phase 0, vor dem ersten Deploy),
-  am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt
+  am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt, am 2026-09-29 um gespeicherte Ansichten (`saved_views`)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -56,6 +56,13 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   gilt für alle Organisationen und wird nur vom plattformweiten Job `fx-rates-sync` geschrieben (`packages/db/src/fx-rates.ts`).
   Lesen darf jede Abfrage; Profildaten werden dadurch nicht sichtbar. Die Läufe von `fx-rates-sync` (`job_runs.organization_id`
   leer) zeigt der Sync-Status jeder Organisation (`SHARED_PLATFORM_JOB_NAMES`), andere plattformweite Läufe nicht.
+- **Gespeicherte Ansichten** (ab Phase 2, 2.9): `saved_views` gehört der Organisation und einem Besitzer
+  (`packages/db/src/saved-views.ts`). Persönliche Ansichten sieht nur der Besitzer, freigegebene alle Mitglieder der
+  Organisation (Mitgliedschaft über `getOrgRole()`); ändern und löschen Besitzer und Org-Admins. Der Zustand nennt Clients,
+  Profile und Drill-Down-IDs (Portfolio, Kampagne, Ad Group): Diese filtert der Access-Layer beim Speichern **und** beim Laden
+  (`filterSavedViewState` über `listVisibleClientsAndProfiles()` und `visibleProfilesScope()`), damit eine Ansicht nie
+  Unsichtbares speichert oder ausliefert, auch nicht nach späterem Ausblenden oder mit Profil-Freigaben (Phase 6). Die
+  Kennzahlen selbst liest die Ansicht nicht; sie laufen weiter über die Auswertungs-Endpunkte.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

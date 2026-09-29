@@ -212,7 +212,12 @@ export function csvSafe(value: string): string {
 }
 
 export function buildColumnDefs(
-  input: ColumnContext & { level: ExplorerLevel; visible: Set<string> },
+  input: ColumnContext & {
+    level: ExplorerLevel;
+    visible: Set<string>;
+    /** Sortierung aus der URL; alle anderen Spalten ausdrücklich ohne (sonst bliebe eine alte stehen). */
+    sort?: { column: string; direction: 'asc' | 'desc' } | null;
+  },
 ): ColDef<GridRow>[] {
   const { t, locale, level } = input;
   const currencyOf = (row: GridRow) => (row.isTotal ? input.displayCurrency : row.currencyCode);
@@ -387,5 +392,7 @@ export function buildColumnDefs(
     return spec.id === 'currency' ? { ...def, hide: !input.visible.has('currency') } : def;
   });
 
-  return [nameColumn, ...optional];
+  const sortOf = (colId: string | undefined) =>
+    input.sort && input.sort.column === colId ? input.sort.direction : null;
+  return [nameColumn, ...optional].map((def) => ({ ...def, sort: sortOf(def.colId) }));
 }

@@ -9,6 +9,7 @@ import type {
   GridReadyEvent,
   RowClassParams,
   SelectionChangedEvent,
+  SortChangedEvent,
 } from 'ag-grid-community';
 import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, shallowRef } from 'vue';
@@ -28,7 +29,11 @@ const props = defineProps<{
   context: NameCellContext;
 }>();
 
-const emit = defineEmits<{ selection: [ids: string[]] }>();
+const emit = defineEmits<{
+  selection: [ids: string[]];
+  /** Nur Änderungen durch den Nutzer (Klick auf einen Spaltenkopf), eine Spalte. */
+  sort: [sort: { column: string; direction: 'asc' | 'desc' } | null];
+}>();
 
 const api = shallowRef<GridApi<GridRow>>();
 
@@ -80,6 +85,12 @@ function onSelectionChanged({ api: gridApi }: SelectionChangedEvent<GridRow>) {
   );
 }
 
+function onSortChanged({ api: gridApi, source }: SortChangedEvent<GridRow>) {
+  if (source !== 'uiColumnSorted') return;
+  const sorted = gridApi.getColumnState().find((column) => column.sort);
+  emit('sort', sorted?.sort ? { column: sorted.colId, direction: sorted.sort } : null);
+}
+
 /**
  * CSV der geladenen Zeilen in aktueller Filterung und Sortierung (F6): Beträge als Decimal-String (Spalten mit
  * `useValueFormatterForExport: false`), dazu die Währung; ohne Summenzeile (sie gilt für alle Zeilen der Auswahl).
@@ -127,7 +138,9 @@ const components = { nameCell: markRaw(NameCell) };
     :selection-column-def="selectionColumnDef"
     :row-height="44"
     :suppress-cell-focus="true"
+    :suppress-multi-sort="true"
     @grid-ready="onGridReady"
     @selection-changed="onSelectionChanged"
+    @sort-changed="onSortChanged"
   />
 </template>

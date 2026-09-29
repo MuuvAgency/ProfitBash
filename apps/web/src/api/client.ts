@@ -7,6 +7,9 @@ import type {
   MeResponse,
   Profile,
   ProfilePatch,
+  SavedView,
+  SavedViewArea,
+  SavedViewState,
   Settings,
 } from '@profitbash/shared';
 import createClient, { type Middleware } from 'openapi-fetch';
@@ -174,6 +177,28 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/timeseries', { body: input })),
       explorerRows: (input: ExplorerRowsInput): Promise<ExplorerRowsData> =>
         unwrap(client.POST('/api/ads/explorer/rows', { body: input })),
+    },
+
+    /** Gespeicherte Ansichten (F8): eigene und freigegebene, Unsichtbares filtert der Server. */
+    savedViews: {
+      list: async (area: SavedViewArea): Promise<SavedView[]> =>
+        (await unwrap(client.GET('/api/saved-views', { params: { query: { area } } }))).views,
+      get: (id: string): Promise<SavedView> =>
+        unwrap(client.GET('/api/saved-views/{id}', { params: { path: { id } } })),
+      create: (input: {
+        name: string;
+        area: SavedViewArea;
+        shared?: boolean;
+        state: SavedViewState;
+      }): Promise<SavedView> => unwrap(client.POST('/api/saved-views', { body: input })),
+      update: (
+        id: string,
+        patch: { name?: string; shared?: boolean; state?: SavedViewState },
+      ): Promise<SavedView> =>
+        unwrap(client.PATCH('/api/saved-views/{id}', { params: { path: { id } }, body: patch })),
+      async remove(id: string): Promise<void> {
+        await unwrap(client.DELETE('/api/saved-views/{id}', { params: { path: { id } } }));
+      },
     },
 
     auth: {

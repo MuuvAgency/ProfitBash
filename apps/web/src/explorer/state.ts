@@ -55,6 +55,13 @@ export interface ExplorerState {
   /** Leer = alle Ad-Typen. */
   adProducts: AdProduct[];
   chartMetrics: [MetricKey, MetricKey];
+  /** Eine Spalte (`colId`) mit Richtung; `null` = Reihenfolge des Servers (Spend absteigend). */
+  sort: GridSort | null;
+}
+
+export interface GridSort {
+  column: string;
+  direction: 'asc' | 'desc';
 }
 
 export const DEFAULT_CHART_METRICS: [MetricKey, MetricKey] = ['cost', 'sales'];
@@ -68,7 +75,10 @@ export const EXPLORER_QUERY_KEYS = [
   'adp',
   'm1',
   'm2',
+  'sort',
 ];
+
+const SORT = /^([A-Za-z][A-Za-z0-9]{0,39})\.(asc|desc)$/;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -100,7 +110,31 @@ export function explorerStateFromRoute(path: string, query: LocationQuery): Expl
       isMetric(m1) ? m1 : DEFAULT_CHART_METRICS[0],
       isMetric(m2) ? m2 : DEFAULT_CHART_METRICS[1],
     ],
+    sort: sortFrom(one(query.sort)),
   };
+}
+
+function sortFrom(value: string | undefined): GridSort | null {
+  const match = value ? SORT.exec(value) : null;
+  return match ? { column: match[1]!, direction: match[2] as GridSort['direction'] } : null;
+}
+
+/** Parameter des Explorers für einen Zustand (Ansicht laden); Standardwerte fehlen wie in der Filterleiste. */
+export function explorerStateToQuery(state: Omit<ExplorerState, 'level'>): Record<string, string> {
+  const query: Record<string, string> = {};
+  for (const key of ['portfolioId', 'campaignId', 'adGroupId'] as const) {
+    const value = state.drill[key];
+    if (value) query[PARAM_OF[key]] = value;
+  }
+  if (state.includeRemoved) query.removed = '1';
+  if (state.adProducts.length > 0 && state.adProducts.length < AD_PRODUCTS.length) {
+    // Feste Reihenfolge (wie die Auswahl im Explorer), damit gleiche Zustände gleiche Links ergeben.
+    query.adp = AD_PRODUCTS.filter((p) => state.adProducts.includes(p)).join(',');
+  }
+  if (state.chartMetrics[0] !== DEFAULT_CHART_METRICS[0]) query.m1 = state.chartMetrics[0];
+  if (state.chartMetrics[1] !== DEFAULT_CHART_METRICS[1]) query.m2 = state.chartMetrics[1];
+  if (state.sort) query.sort = `${state.sort.column}.${state.sort.direction}`;
+  return query;
 }
 
 const DRILL_PARAM: Partial<Record<ExplorerLevel, keyof DrillDown>> = {

@@ -2,7 +2,7 @@
 import Button from 'primevue/button';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { RouterLink } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import FilterBar from '../analytics/FilterBar.vue';
 import ChangePill from '../analytics/ChangePill.vue';
 import KpiTile from '../analytics/KpiTile.vue';
@@ -18,7 +18,10 @@ import DataStatusTile from '../dashboard/DataStatusTile.vue';
 import { metricView } from '../dashboard/format';
 import { useDashboardQueries } from '../dashboard/queries';
 import { canAccess } from '../navigation/navigation';
+import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
+import { filtersFromView, viewState } from '../saved-views/view-state';
 import { useSessionStore } from '../stores/session';
+import type { SavedView } from '@profitbash/shared';
 
 /**
  * Dashboard (`phase-2.md` F11, 2.7) im Kinetic-Bento-Look: Hero-Kachel (Spend, Umsatz, Tagesverlauf), KPI-Kacheln,
@@ -53,6 +56,15 @@ const kpis = computed(() => {
 const refreshing = computed(
   () => queries.dashboard.isPlaceholderData.value || queries.heroSeries.isPlaceholderData.value,
 );
+// Gespeicherte Ansichten (F8): nur die Filterleiste.
+const currentView = computed(() =>
+  filters.ready.value ? viewState('dashboard', filters.state.value) : null,
+);
+const route = useRoute();
+function applyView(view: SavedView) {
+  const { view: _link, ...query } = route.query;
+  filters.update(filtersFromView(view.state), { query });
+}
 const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
 </script>
 
@@ -62,7 +74,16 @@ const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
       :eyebrow="t('dashboard.eyebrow')"
       :title="t('nav.dashboard')"
       :description="t('dashboard.description')"
-    />
+    >
+      <template #actions>
+        <SavedViewsMenu
+          area="dashboard"
+          :current="currentView"
+          link-path="/dashboard"
+          @apply="applyView"
+        />
+      </template>
+    </PageHeader>
 
     <FilterBar :filters="filters" :earliest-date="data?.meta.earliestDate ?? null" />
 
