@@ -180,6 +180,27 @@ describe('MembersPage', () => {
     );
   });
 
+  it('Laden, Fehler mit „Erneut versuchen“ und leere Liste (DoD)', async () => {
+    stubFetch(routes({ 'GET /api/members': () => new Promise<Response>(() => {}) } as never));
+    await mountWithApp(undefined, { path: '/admin/members' });
+    await vi.waitFor(() => expect(q('[aria-busy="true"] [data-skeleton]')).not.toBeNull());
+    cleanupMounted();
+
+    stubFetch(
+      routes({ 'GET /api/members': json({ error: { code: 'SERVER', message: 'x' } }, 500) }),
+    );
+    const failed = await mountWithApp(undefined, { path: '/admin/members' });
+    await vi.waitFor(() =>
+      expect(failed.wrapper.text()).toContain('Die Mitglieder konnten nicht geladen werden.'),
+    );
+    expect(failed.wrapper.text()).toContain('Erneut versuchen');
+    cleanupMounted();
+
+    stubFetch(routes({ 'GET /api/members': json({ members: [] }) }));
+    const empty = await mountWithApp(undefined, { path: '/admin/members' });
+    await vi.waitFor(() => expect(empty.wrapper.text()).toContain('Noch keine Mitglieder.'));
+  });
+
   it('nur für Org-Admins', async () => {
     stubFetch(routes({ 'GET /api/me': json(meFixture({ orgRole: 'editor' })) }));
     const { router } = await mountWithApp(undefined, { path: '/admin/members' });

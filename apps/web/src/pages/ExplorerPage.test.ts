@@ -489,6 +489,42 @@ describe('ExplorerPage', () => {
     expect(document.querySelector('.ag-header-cell[col-id="sales"]')).not.toBeNull();
   });
 
+  it('Ladezustand und leere Auswahl (DoD)', async () => {
+    stubFetch(routes(() => new Promise<Response>(() => {})));
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await vi.waitFor(() =>
+      expect(wrapper.find('[aria-busy="true"] [data-skeleton]').exists()).toBe(true),
+    );
+    cleanupMounted();
+
+    stubFetch(routes(() => json(rowsResponse([]))));
+    const empty = await mountExplorer('/ads/explorer/campaigns');
+    await vi.waitFor(() =>
+      expect(empty.wrapper.text()).toContain('Keine Zeilen für diese Auswahl.'),
+    );
+  });
+
+  it('SB-Kampagne ohne Kennzahlen (Preview-Lücke) trägt ein Kennzeichen', async () => {
+    stubFetch(
+      routes(() =>
+        json(
+          rowsResponse([
+            row(CAMPAIGN, 'SB Waldkauz Kollektion', '0', {
+              adProduct: 'SPONSORED_BRANDS',
+              hasMetrics: false,
+            }),
+          ]),
+        ),
+      ),
+    );
+    await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SB Waldkauz Kollektion');
+    const cell = [...document.querySelectorAll('.ag-cell[col-id="name"]')].find((c) =>
+      c.textContent?.includes('SB Waldkauz Kollektion'),
+    )!;
+    expect(cell.textContent).toContain('Keine Kennzahlen');
+  });
+
   it('Fehler beim Laden der Zeilen: Hinweis mit „Erneut versuchen“', async () => {
     stubFetch(routes(() => json({ error: { code: 'SERVER', message: 'x' } }, 500)));
     const { wrapper } = await mountExplorer('/ads/explorer/campaigns');

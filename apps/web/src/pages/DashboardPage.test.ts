@@ -310,6 +310,44 @@ describe('DashboardPage', () => {
     expect(names()).toEqual(['Ohne Client', 'Waldkauz (Demo)']);
   });
 
+  it('Ladezustand: Skeletons in Kachelform, solange die Kennzahlen laden (DoD)', async () => {
+    stubFetch(routes({ 'POST /api/ads/dashboard': () => new Promise<Response>(() => {}) }));
+    await mountWithApp(undefined, { path: '/dashboard' });
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('[aria-busy="true"]').length).toBeGreaterThanOrEqual(3),
+    );
+    expect(document.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0);
+    expect(document.querySelector('[data-kpi-value]')).toBeNull();
+  });
+
+  it('Leerer Zeitraum: Anteil je Ad-Typ und Tabelle sagen es (DoD)', async () => {
+    const empty = { ...dashboard(), byClient: [], byProfile: [], byAdProduct: [] };
+    stubFetch(routes({ 'POST /api/ads/dashboard': json(empty) }));
+    const { wrapper } = await mountDashboard();
+    await vi.waitFor(() =>
+      expect(wrapper.text().match(/Keine Kennzahlen im gewählten Zeitraum\./g)?.length).toBe(2),
+    );
+  });
+
+  it('Ansichten-Menü: leer und Ladefehler (DoD)', async () => {
+    stubFetch(routes({ 'GET /api/saved-views': json({ views: [] }) }));
+    const { wrapper } = await mountDashboard();
+    await wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Noch keine Ansichten gespeichert.'),
+    );
+    cleanupMounted();
+
+    stubFetch(
+      routes({ 'GET /api/saved-views': json({ error: { code: 'SERVER', message: 'x' } }, 500) }),
+    );
+    const failed = await mountDashboard();
+    await failed.wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Die Ansichten konnten nicht geladen werden.'),
+    );
+  });
+
   it('Fehler der Tagesreihe betrifft nur die Hero-Kachel', async () => {
     stubFetch(
       routes({

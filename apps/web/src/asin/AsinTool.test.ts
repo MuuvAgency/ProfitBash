@@ -169,6 +169,24 @@ describe('ASIN-Tool (F10)', () => {
     );
   });
 
+  it('Ladezustand und Fehler der Suche selbst (DoD)', async () => {
+    stubFetch({ ...routes(), 'POST /api/ads/asin-search': () => new Promise<Response>(() => {}) });
+    const pending = await search('B0DEMO0001');
+    await vi.waitFor(() =>
+      expect(pending.wrapper.find('[aria-busy="true"] [data-skeleton]').exists()).toBe(true),
+    );
+    cleanupMounted();
+    resetAsinTool();
+
+    stubFetch({
+      ...routes(),
+      'POST /api/ads/asin-search': json({ error: { code: 'SERVER', message: 'x' } }, 500),
+    });
+    const { wrapper } = await search('B0DEMO0001');
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Die Suche ist fehlgeschlagen.'));
+    expect(wrapper.text()).toContain('Erneut versuchen');
+  });
+
   it('Filteroptionen nicht ladbar: Fehler mit „Erneut versuchen“ statt ewigem Skeleton', async () => {
     stubFetch({
       ...routes(),

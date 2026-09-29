@@ -4,7 +4,7 @@
 > `docs/tasks/phase-1.md` (Umsetzungsnotizen 1.5–1.9, F8, F12), `docs/decisions/` (001 Stack, 002 Mandanten-Modell,
 > 003 Decimal-Library, 004 Amazon-API), `design/DESIGN.md` und die Referenzen `dashboard_home`, `werbekosten_ppc`.
 >
-> **Status: abgestimmt (2026-09-28).** Alle Fragen **F1–F14** unter „Fragen an Dominik“ sind entschieden (die Nummern gelten nur
+> **Status: abgeschlossen (2026-09-29),** alle Punkte der Definition of Done mit Beleg abgehakt. Abgestimmt am 2026-09-28. Alle Fragen **F1–F14** unter „Fragen an Dominik“ sind entschieden (die Nummern gelten nur
 > in dieser Datei; `phase-1.md` hat eigene F1–F14). Aufgaben, die von einer Frage abhängen, verweisen darauf.
 >
 > **Ausgangslage:** Es gibt vorerst keinen Ads-API-Zugang (`phase-1.md` F12). Entschieden (Dominik, 2026-09-28): Phase 2 wird
@@ -23,23 +23,78 @@ Die Agentur sieht ihre Amazon-Werbung, ohne die Konsole zu öffnen:
 
 ## Definition of Done
 
-- [ ] Dashboard und Explorer zeigen mit den Mock-Daten (SP, SB, SD; EUR, GBP, SEK) dieselben Summen wie eine unabhängige
+Abgehakt beim Abschluss von Phase 2 (2026-09-29), je Punkt mit Beleg. Die Tests stehen in den genannten Dateien; `pnpm test`
+lief dabei vollständig grün.
+
+- [x] Dashboard und Explorer zeigen mit den Mock-Daten (SP, SB, SD; EUR, GBP, SEK) dieselben Summen wie eine unabhängige
       SQL-Prüfung (Test), in Originalwährung bei einer Währung, sonst in der Anzeigewährung (Standard EUR) mit „≈“ (F3).
-- [ ] Kennzahlen je Ad-Typ werden richtig gelesen und gekennzeichnet (`plan.md` §5, Tabelle unter F4): Attributionsfenster, Klick-
+      **Beleg:** `packages/db/src/ads-analytics.test.ts`, „Unabhängige SQL-Prüfung der Summen (DoD)“: eigene SQL-Abfrage
+      ohne Access-Layer und ohne die CTEs des Moduls (Kurs je Zeile per Unterabfrage, Umsatz „wie Konsole“) gegen
+      `queryDashboard` und `queryExplorerRows` für Zeitraum und Vergleich (SEK ohne Kurs), eine Währung exakt (GBP);
+      Mutationen der Prüfung (Vendor-Regel, Zeilen ohne Kurs) lassen den Test scheitern. Dazu der Vergleich mit
+      `convertAmount` je Zeile (2.4) und „≈“ in `apps/web/src/explorer/columns.test.ts` und `KpiTile`.
+- [x] Kennzahlen je Ad-Typ werden richtig gelesen und gekennzeichnet (`plan.md` §5, Tabelle unter F4): Attributionsfenster, Klick-
       und View-Anteil bei SB/SD, SD-Same-SKU nur nach Klick, vCPM-Kampagnen, SB-Preview-Lücke, Spalten, die Amazon für einen Ad-Typ
       oder eine Ebene nicht liefert („–“, nie 0). Ein Test deckt jede dieser Regeln ab.
-- [ ] Alle Datenabfragen laufen über den Access-Layer (ADR 002); ausgeblendete und fremde Profile erscheinen nie (Test je Endpunkt,
+      **Beleg:** Attributionsfenster `packages/engine/src/attribution.test.ts` (SP 7 Tage Seller/Agency, 14 Tage Vendor, SB/SD
+      14 Tage inkl. Views, „14 Tage, nur Klicks“) und `ads-analytics.test.ts` „wählt die Attribution je Ad-Typ und Kontotyp“;
+      Klick-Anteil `attribution.test.ts` (SB/SD `*Clicks14d`) und `packages/amazon-ads/src/reports.test.ts`; SD-Same-SKU
+      nur nach Klick `attribution.test.ts` („Same-SKU aber nur nach Klick“, „SD-Same-SKU … als gemischt“); vCPM
+      `packages/engine/src/metrics.test.ts` (nur Zeilen mit sichtbaren Impressionen), `ads-analytics.test.ts` (SD-vCPM-Grundlagen),
+      `columns.test.ts` („je 1000 sichtbare Impr.“); SB-Preview-Lücke `ads-analytics-status.test.ts`, `DashboardPage.test.ts`
+      (Hinweis mit Anzahl) und `ExplorerPage.test.ts` (Kennzeichen an der Zeile); nicht gelieferte Spalten
+      `metric-availability.test.ts`, `metrics.test.ts` („zählt fehlende Werte nicht als 0“), `columns.test.ts` („–“, nie 0),
+      `hints.test.ts` und `KpiTile.test.ts` („Wert fehlt“).
+- [x] Alle Datenabfragen laufen über den Access-Layer (ADR 002); ausgeblendete und fremde Profile erscheinen nie (Test je Endpunkt,
       auch für gespeicherte Ansichten und die Client-Auswahl). Die Endpunkte prüfen Feature-Recht und Entitlement serverseitig.
-- [ ] Beträge bleiben bis zur Anzeige Decimal-Strings (kein `number` in API und Rechenkern), Kennzahlen mit Division durch 0 sind
+      **Beleg:** `apps/api/src/routes/analytics.test.ts`, „Access-Layer je Endpunkt (DoD)“: für `filter-options`,
+      `explorer/rows` (Kampagnen, Product Ads), `timeseries`, `dashboard`, `asin-search` je 401 ohne Session, 403 ohne Feature,
+      nichts vom ausgeblendeten Profil (Viewer und Admin, auch bei ausdrücklicher Auswahl) und nichts für eine fremde
+      Organisation (auch mit fremden IDs in Auswahl und Drill-Down), mit Gegenprobe. DB-Ebene `ads-analytics.test.ts`
+      (Sichtbarkeit, Drill-Down). Gespeicherte Ansichten `saved-views.test.ts` (API: fremde Organisation, ausgeblendete Profile
+      beim Anlegen, Ändern und nach dem Ausblenden beim Laden, Feature je Bereich auch für PATCH und DELETE, Löschen durch
+      andere) und `packages/db/src/saved-views.test.ts`. Mitglieder `members.test.ts` (API: nur Admins, auch PATCH, DELETE,
+      Link; fremde Organisation 404) und `packages/db/src/members.test.ts`. Client-Auswahl `access.test.ts`
+      (`listVisibleClientsAndProfiles` für Viewer und Admin).
+- [x] Beträge bleiben bis zur Anzeige Decimal-Strings (kein `number` in API und Rechenkern), Kennzahlen mit Division durch 0 sind
       „–“ statt 0 oder `Infinity`.
-- [ ] Jede Datenansicht hat Loading- (Skeleton), Empty- und Error-Zustand; ein fehlerhaftes Widget legt die Seite nicht lahm.
+      **Beleg:** `metrics.test.ts` („ergibt null statt Infinity oder 0 bei Division durch 0“, relative Veränderung bei 0,
+      Anteil bei Summe 0), `decimal.test.ts` (lehnt `Infinity`, `NaN`, Exponent ab), API-Antworten gegen die zod-Schemas mit
+      Beträgen als String (`analytics.test.ts`, `post`), Sortieren/Filtern ohne `number` (`decimal-compare.test.ts`,
+      `DecimalFilter.test.ts`), Chart nur zur Position als Zahl (`time-series.test.ts`), Anzeige „–“ (`analytics/metrics.test.ts`).
+- [x] Jede Datenansicht hat Loading- (Skeleton), Empty- und Error-Zustand; ein fehlerhaftes Widget legt die Seite nicht lahm.
       Alle Texte über i18n-Keys, Zahlen in JetBrains Mono über die Helper aus `packages/shared`.
-- [ ] Dashboard und Explorer im Browser-Pane geprüft: 1440 px (Sidebar ein- und ausgeklappt), Tablet, Handy (F13), Hell/Dunkel,
+      **Beleg:** Dashboard `DashboardPage.test.ts` (Skeletons, leerer Zeitraum, Fehler je Widget mit „Erneut versuchen“, Fehler
+      der Tagesreihe nur in der Hero-Kachel, Filteroptionen), Explorer `ExplorerPage.test.ts` (Skeleton, leere Auswahl,
+      Zeilen- und Vergleichsfehler), ASIN-Tool `AsinTool.test.ts` (Skeleton, leer, Fehler der Suche und der Filteroptionen),
+      Mitglieder `MembersPage.test.ts` (Skeleton, leer, Fehler), Ansichten-Menü (leer, Ladefehler), Sync-Status und
+      Connections (Phase 0/1). Skeletons tragen `data-skeleton` (`SkeletonBlock`). Texte über i18n (Review je
+      Aufgabe), Zahlen über `formatNumber`/`formatCurrency`/`formatPercent` in `font-data`.
+- [x] Dashboard und Explorer im Browser-Pane geprüft: 1440 px (Sidebar ein- und ausgeklappt), Tablet, Handy (F13), Hell/Dunkel,
       Konsole ohne Fehler und ohne Warnungen zu nicht registrierten AG-Grid-Modulen.
-- [ ] Jede schreibende Aktion (Mitglieder, gespeicherte Ansichten) erzeugt ein `audit_event` mit handelndem Nutzer; der neue Job (2.2)
+      **Beleg:** geprüft am 2026-09-29 mit den Demo-Daten: Dashboard und Explorer (Kampagnen, Targets) bei 1440 px mit
+      eingeklappter und ausgeklappter Sidebar (dunkel), Tablet 768 px (hell), Handy 375 px (dunkel); nirgends waagerechtes
+      Scrollen der Seite, keine Fehlerzustände, keine Skeletons nach dem Laden; Konsole nach einem vollen Neuladen ohne
+      Fehler und ohne AG-Grid- oder AG-Charts-Warnungen. Einzelprüfungen je Aufgabe in 2.7–2.13.
+- [x] Jede schreibende Aktion (Mitglieder, gespeicherte Ansichten) erzeugt ein `audit_event` mit handelndem Nutzer; der neue Job (2.2)
       läuft über `runJob` und erscheint im Sync-Status (Healthchecks optional, siehe 2.2).
-- [ ] Abfragen bleiben bei den Demo-Daten mit Volumen (2.3) unter 1 s (Messung im Test oder per `EXPLAIN ANALYZE` festgehalten).
-- [ ] `pnpm test`, `typecheck`, `lint`, `build` und beide Smoke-Tests grün, CI grün.
+      **Beleg:** `packages/db/src/members.test.ts` (`member.create`, `member.role_update`, `member.remove`, `member.link_create`
+      mit Admin, `member.password_set` mit dem Mitglied), `packages/db/src/saved-views.test.ts` (`saved_view.create`, `.update`,
+      `.delete` mit Handelndem), API-Stichproben in `members.test.ts` und `saved-views.test.ts`. Kursabruf
+      `apps/worker/src/worker.test.ts` (Lauf über `runJob` in `job_runs`, 06:00 Berlin, Wiederholung), `job-runs.test.ts` und
+      `SyncStatusPage.test.ts` („Wechselkurse (EZB)“ in jeder Organisation).
+- [x] Abfragen bleiben bei den Demo-Daten mit Volumen (2.3) unter 1 s (Messung im Test oder per `EXPLAIN ANALYZE` festgehalten).
+      **Präzisiert (Dominik, 2026-09-29, 2.4 „Offen“):** gilt für die Abfragen, auf die die Seite wartet (Zeilen ohne Vergleich,
+      Dashboard, Tagesreihen); der Vergleich wird nachgeladen. **Gemessen** (lokal, 2026-09-29, alle 6 Demo-Profile, 30 Tage,
+      Anzeige automatisch/EUR, 3 Läufe über `packages/db`): Zeilen ohne Vergleich Portfolios 24–108 ms, Kampagnen 25–43 ms,
+      Ad Groups 50–68 ms, Targets 779–879 ms, Product Ads 101–152 ms, **Suchbegriffe 962–1156 ms (Grenzfall)**; Dashboard mit
+      Vergleich 53–82 ms; Tagesreihe Kampagnen 18–23 ms, Targets 510–549 ms; nachgeladener Vergleich Targets 1,7 s,
+      Suchbegriffe 2,5–2,6 s. Im Browser bis zu den Zeilen: Targets 1,5 s (2.8). Bekannte Grenze: Suchbegriffe über alle
+      Profile und die Browser-Zeit großer Auswahlen; Voraggregation bzw. serverseitiges Row Model erst als eigene Aufgabe,
+      wenn echte Konten es verlangen (Entscheidung 2.4).
+- [x] `pnpm test`, `typecheck`, `lint`, `build` und beide Smoke-Tests grün, CI grün.
+      **Beleg:** lokal vor jedem Commit (zuletzt 2026-09-29); CI grün auf den PRs von 2.12, 2.13 und dem Abschluss (Merge
+      erst nach grüner CI).
 
 ## Voraussetzungen
 
