@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  CellKeyDownEvent,
   ColDef,
   ProcessCellForExportParams,
   RowSelectionOptions,
@@ -85,6 +86,21 @@ function onSelectionChanged({ api: gridApi }: SelectionChangedEvent<GridRow>) {
   );
 }
 
+/**
+ * Tastatur (2.13): Zellen sind fokussierbar (Pfeiltasten, Leertaste markiert die Zeile). Enter auf einer Zelle mit Link
+ * oder Knopf (Name mit Drill-Down, „teilt sich n ASINs“) löst ihn aus; ist das Element selbst fokussiert, handelt es
+ * ohnehin selbst.
+ */
+function onCellKeyDown({ event }: CellKeyDownEvent<GridRow>) {
+  if (!(event instanceof KeyboardEvent) || event.key !== 'Enter') return;
+  const cell = event.target;
+  if (!(cell instanceof HTMLElement) || !cell.classList.contains('ag-cell')) return;
+  const control = cell.querySelector<HTMLElement>('a[href], button');
+  if (!control) return;
+  event.preventDefault();
+  control.click();
+}
+
 function onSortChanged({ api: gridApi, source }: SortChangedEvent<GridRow>) {
   if (source !== 'uiColumnSorted') return;
   const sorted = gridApi.getColumnState().find((column) => column.sort);
@@ -137,10 +153,10 @@ const components = { nameCell: markRaw(NameCell) };
     :row-selection="rowSelection"
     :selection-column-def="selectionColumnDef"
     :row-height="44"
-    :suppress-cell-focus="true"
     :suppress-multi-sort="true"
     @grid-ready="onGridReady"
     @selection-changed="onSelectionChanged"
+    @cell-key-down="onCellKeyDown"
     @sort-changed="onSortChanged"
   />
 </template>

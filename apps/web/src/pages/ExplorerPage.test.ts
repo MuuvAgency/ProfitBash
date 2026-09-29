@@ -1,4 +1,5 @@
 import { flushPromises } from '@vue/test-utils';
+import MultiSelect from 'primevue/multiselect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExplorerRowsData, TimeSeriesData } from '../api/client';
 import { json, stubFetch, type RecordedRequest } from '../test/fetch-stub';
@@ -330,6 +331,20 @@ describe('ExplorerPage', () => {
     expect(router.currentRoute.value.query.q).toBeUndefined();
   });
 
+  it('Tastatur: Zellen sind fokussierbar, Enter auf dem Namen öffnet den Drill-Down (2.13)', async () => {
+    stubFetch(routes());
+    const { router } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    const cell = [...document.querySelectorAll<HTMLElement>('.ag-cell[col-id="name"]')].find((c) =>
+      c.textContent?.includes('SP Waldkauz Nistkasten'),
+    )!;
+    expect(cell.getAttribute('tabindex')).toBe('-1');
+    cell.focus();
+    cell.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushPromises();
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/ads/explorer/ad-groups'));
+  });
+
   it('Product Ads mit mehreren ASINs: Liste im Popover der Zelle', async () => {
     stubFetch(routes());
     await mountExplorer('/ads/explorer/product-ads');
@@ -393,6 +408,66 @@ describe('ExplorerPage', () => {
     expect(csv).toContain('"Währung"');
     expect(csv).toContain('"SP Waldkauz Nistkasten"');
     expect(csv).toContain('"EUR"');
+  });
+
+  it('CSV-Export in der Sortierung des Grids (aus der URL)', async () => {
+    stubFetch(routes());
+    let blob: Blob | undefined;
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((value) => {
+      blob = value as Blob;
+      return 'blob:csv';
+    });
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns?sort=cost.asc');
+    await waitForRow('SP Waldkauz Nistkasten');
+    await wrapper.find('button[data-explorer-export]').trigger('click');
+    await vi.waitFor(() => expect(blob).toBeDefined());
+    const csv = await blob!.text();
+    // Spend aufsteigend: 10 vor 20.125 (die API liefert absteigend).
+    expect(csv.indexOf(`"'=SUMME(1)"`)).toBeLessThan(csv.indexOf('"SP Waldkauz Nistkasten"'));
+  });
+
+  it('Fehler beim Nachladen des Vergleichs: Zeilen bleiben, eigener Hinweis mit „Erneut versuchen“', async () => {
+    stubFetch(
+      routes(({ body }) =>
+        (body as { comparison: unknown }).comparison === null
+          ? json(rowsResponse(campaigns()))
+          : json({ error: { code: 'SERVER', message: 'x' } }, 500),
+      ),
+    );
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    await vi.waitFor(() =>
+      expect(wrapper.text()).toContain('Der Vergleich konnte nicht geladen werden.'),
+    );
+    expect(wrapper.text()).toContain('Erneut versuchen');
+    expect(wrapper.text()).not.toContain('Die Zeilen konnten nicht geladen werden.');
+  });
+
+  it('speichert die Spaltenauswahl je Ebene (ui_state)', async () => {
+    const { requests } = stubFetch({
+      ...routes(),
+      'GET /api/settings/ui-state/explorer/columns.campaign': json({ value: null }),
+      'PUT /api/settings/ui-state/explorer/columns.campaign': new Response(null, { status: 204 }),
+    });
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    const picker = wrapper
+      .findAllComponents(MultiSelect)
+      .find((c) => String(c.props('inputId')).endsWith('-columns'))!;
+    picker.vm.$emit('update:modelValue', ['cost', 'sales']);
+    await vi.waitFor(() =>
+      expect(
+        requests.find(
+          (r) =>
+            r.method === 'PUT' && r.path === '/api/settings/ui-state/explorer/columns.campaign',
+        )?.body,
+      ).toEqual({ value: ['cost', 'sales'] }),
+    );
+    await vi.waitFor(() =>
+      expect(document.querySelector('.ag-header-cell[col-id="clicks"]')).toBeNull(),
+    );
+    expect(document.querySelector('.ag-header-cell[col-id="sales"]')).not.toBeNull();
   });
 
   it('Fehler beim Laden der Zeilen: Hinweis mit „Erneut versuchen“', async () => {

@@ -30,12 +30,15 @@ export function useExplorerRows(
     ),
     queryFn: () => api.analytics.explorerRows({ ...body.value, comparison: null }),
     enabled,
+    // Bis zu 10 000 Zeilen: keine tiefen Proxys (die Zeilen werden nie verändert, nur ersetzt; 2.13).
+    shallow: true,
   });
 
   const full = useQuery({
     queryKey: computed(() => ['analytics', 'explorer', body.value] as const),
     queryFn: () => api.analytics.explorerRows(body.value),
     enabled: computed(() => enabled.value && wantsComparison.value && base.isSuccess.value),
+    shallow: true,
   });
 
   const data = computed(() =>

@@ -105,6 +105,38 @@ describe('Explorer-Spalten', () => {
     expect(display(column(defs, 'cost'), total)).toBe(`≈ 100,00${nbsp}€`);
   });
 
+  it('Amazon-Werte übersetzt, Target-Ausdrücke lesbar statt als JSON (Name, Target, CSV)', () => {
+    const campaign = row({
+      attributes: { targetingType: 'AUTO', biddingStrategy: 'SALES_DOWN_ONLY' },
+    });
+    const campaignDefs = all('campaign');
+    expect(display(column(campaignDefs, 'targetingType'), campaign)).toBe('Automatisch');
+    expect(display(column(campaignDefs, 'biddingStrategy'), campaign)).toBe(
+      'Dynamisch, nur senken',
+    );
+
+    const expression = { matchType: 'PRODUCT_EXACT', asin: 'B0DEMO0001' };
+    const target = row({
+      name: JSON.stringify(expression),
+      attributes: { expression, matchType: 'PRODUCT_EXACT', keywordText: null },
+    });
+    const targetDefs = all('target');
+    expect(display(column(targetDefs, 'name'), target)).toBe('ASIN B0DEMO0001');
+    expect(display(column(targetDefs, 'matchType'), target)).toBe('Produkt');
+    const keyword = row({
+      name: 'nistkasten',
+      attributes: { keywordText: 'nistkasten', matchType: 'EXACT' },
+    });
+    expect(display(column(targetDefs, 'name'), keyword)).toBe('nistkasten');
+
+    const searchTerm = row({
+      name: 'nistkasten holz',
+      attributes: { expression, matchType: 'PRODUCT_EXACT' },
+    });
+    expect(display(column(all('searchTerm'), 'target'), searchTerm)).toBe('ASIN B0DEMO0001');
+    expect(display(column(all('searchTerm'), 'name'), searchTerm)).toBe('nistkasten holz');
+  });
+
   it('Sortierung aus dem Zustand: gewählte Spalte mit Richtung, alle anderen ohne', () => {
     const defs = buildColumnDefs({
       level: 'campaign',

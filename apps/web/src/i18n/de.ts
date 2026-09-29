@@ -715,6 +715,47 @@ export const de = {
       campaign: 'Kampagne',
       adGroup: 'Ad Group',
     },
+    /**
+     * Amazon-Werte (`phase-2.md` 2.13). Unbekannte erscheinen wie geliefert; welche Amazon tatsächlich liefert, prüft
+     * 1.10 mit echten Konten.
+     */
+    amazon: {
+      matchType: {
+        EXACT: 'Genau',
+        PHRASE: 'Wortgruppe',
+        BROAD: 'Weitgehend',
+        SEARCH_CLOSE_MATCH: 'Eng verwandt',
+        SEARCH_LOOSE_MATCH: 'Lose verwandt',
+        ASIN_SUBSTITUTE_RELATED: 'Ersatzprodukte',
+        ASIN_ACCESSORY_RELATED: 'Zubehör',
+        PRODUCT_EXACT: 'Produkt',
+        KEYWORDS_RELATED_TO_YOUR_BRAND: 'Keywords zur Marke',
+        KEYWORDS_RELATED_TO_YOUR_LANDING_PAGES: 'Keywords zur Zielseite',
+      },
+      targetingType: {
+        AUTO: 'Automatisch',
+        MANUAL: 'Manuell',
+        T00020: 'Kontext (Produkte)',
+        T00030: 'Zielgruppen',
+      },
+      biddingStrategy: {
+        SALES_DOWN_ONLY: 'Dynamisch, nur senken',
+        SALES_UP_AND_DOWN: 'Dynamisch, erhöhen und senken',
+        NONE: 'Feste Gebote',
+        RULE_BASED: 'Regelbasiert',
+      },
+      audienceEvent: {
+        VIEWS: 'Aufrufe',
+        PURCHASES: 'Käufe',
+      },
+      target: {
+        asin: 'ASIN {asin}',
+        category: 'Kategorie: {name}',
+        auto: 'Automatisch: {match}',
+        audience: 'Zielgruppe: {event}, {days} Tage',
+        theme: 'Thema: {match}',
+      },
+    },
     decimalFilter: {
       min: 'mindestens',
       max: 'höchstens',

@@ -12,6 +12,7 @@ import type { CellClassParams, ColDef, ValueGetterParams } from 'ag-grid-communi
 import { markRaw } from 'vue';
 import type { ExplorerRowsData } from '../api/client';
 import { changeTone, formatChange, type MetricKey } from '../analytics/metrics';
+import { amazonLabel, targetLabel } from './amazon-labels';
 import DecimalFilter from './DecimalFilter.vue';
 
 /**
@@ -334,15 +335,9 @@ export function buildColumnDefs(
     portfolio: () => text('portfolio', (row) => attr(row, 'portfolioName')),
     campaign: () => text('campaign', (row) => attr(row, 'campaignName')),
     adGroup: () => text('adGroup', (row) => attr(row, 'adGroupName')),
-    target: () =>
-      text('target', (row) => {
-        const keyword = attr(row, 'keywordText');
-        const match = attr(row, 'matchType');
-        if (keyword) return match ? `${keyword} · ${match}` : keyword;
-        const expression = row.attributes.expression;
-        return expression ? JSON.stringify(expression) : null;
-      }),
-    matchType: () => text('matchType', (row) => attr(row, 'matchType')),
+    target: () => text('target', (row) => targetLabel(row.attributes, input)),
+    matchType: () =>
+      text('matchType', (row) => amazonLabel('matchType', attr(row, 'matchType'), input)),
     negativeLevel: () =>
       text('negativeLevel', (row) => {
         const value = attr(row, 'level');
@@ -350,9 +345,15 @@ export function buildColumnDefs(
       }),
     asin: () => text('asin', (row) => attr(row, 'asin')),
     sku: () => text('sku', (row) => attr(row, 'sku')),
-    targetingType: () => text('targetingType', (row) => attr(row, 'targetingType')),
+    targetingType: () =>
+      text('targetingType', (row) =>
+        amazonLabel('targetingType', attr(row, 'targetingType'), input),
+      ),
     budget: () => amount('budget', 'budgetAmount', 'budgetCurrencyCode'),
-    biddingStrategy: () => text('biddingStrategy', (row) => attr(row, 'biddingStrategy')),
+    biddingStrategy: () =>
+      text('biddingStrategy', (row) =>
+        amazonLabel('biddingStrategy', attr(row, 'biddingStrategy'), input),
+      ),
     costType: () =>
       text('costType', (row) =>
         attr(row, 'costType') === 'VCPM' ? 'vCPM' : row.adProduct ? 'CPC' : null,
@@ -379,7 +380,17 @@ export function buildColumnDefs(
     valueGetter: ({ data }) => {
       if (!data) return null;
       if (data.isTotal) return t('explorer.total');
-      const name = data.name ?? t('explorer.unknownName');
+      // Targets und Negatives ohne Keyword heißen in der DB wie ihr Ausdruck (JSON): lesbar machen (2.13).
+      const expression = data.attributes.expression;
+      const readable =
+        (level === 'target' || level === 'negative') &&
+        !attr(data, 'keywordText') &&
+        expression !== null &&
+        typeof expression === 'object' &&
+        Object.keys(expression).length > 0
+          ? targetLabel(data.attributes, input)
+          : null;
+      const name = readable ?? data.name ?? t('explorer.unknownName');
       return data.removed ? t('explorer.removedSuffix', { name }) : name;
     },
   };
