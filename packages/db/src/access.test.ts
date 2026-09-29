@@ -400,6 +400,14 @@ describe('listVisibleClientsAndProfiles', () => {
     });
     expect(empty).toBeDefined();
 
+    // Auch der Admin bekommt in der Auswahl nur sichtbare Profile (Ausblenden gilt für Auswertungen aller Rollen).
+    const asAdmin = await listVisibleClientsAndProfiles(testDb.db, {
+      userId: ids.admin,
+      orgId: ids.muuv,
+    });
+    expect(asAdmin.clients).toEqual(result.clients);
+    expect(asAdmin.profiles.map((p) => p.id)).toEqual(seen);
+
     expect(
       await listVisibleClientsAndProfiles(testDb.db, { userId: ids.outsider, orgId: ids.muuv }),
     ).toEqual({ clients: [], profiles: [] });
