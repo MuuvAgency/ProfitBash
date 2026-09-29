@@ -513,6 +513,10 @@ describe('ExplorerPage', () => {
               adProduct: 'SPONSORED_BRANDS',
               hasMetrics: false,
             }),
+            row(CAMPAIGN2, 'SB Waldkauz Marke', '4', {
+              adProduct: 'SPONSORED_BRANDS',
+              hasMetrics: true,
+            }),
           ]),
         ),
       ),
@@ -523,6 +527,10 @@ describe('ExplorerPage', () => {
       c.textContent?.includes('SB Waldkauz Kollektion'),
     )!;
     expect(cell.textContent).toContain('Keine Kennzahlen');
+    const withMetrics = [...document.querySelectorAll('.ag-cell[col-id="name"]')].find((c) =>
+      c.textContent?.includes('SB Waldkauz Marke'),
+    )!;
+    expect(withMetrics.textContent).not.toContain('Keine Kennzahlen');
   });
 
   it('Fehler beim Laden der Zeilen: Hinweis mit „Erneut versuchen“', async () => {

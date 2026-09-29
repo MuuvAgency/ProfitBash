@@ -19,6 +19,7 @@
     "db:seed": "pnpm --filter @profitbash/api run seed",
     "demo:load": "pnpm --filter @profitbash/worker run demo:load",
     "db:rotate-keys": "pnpm --filter @profitbash/db run rotate-keys",
+    "analytics:measure": "pnpm --filter @profitbash/db run measure-analytics",
     "api:generate": "pnpm --filter @profitbash/api run openapi && pnpm --filter @profitbash/web run api:generate"
   },
   "devDependencies": {

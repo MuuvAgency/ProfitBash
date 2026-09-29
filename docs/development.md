@@ -59,3 +59,8 @@ Die lokale DB neu füllen:
 
 Zurück zu den kleinen Mock-Daten: `AMAZON_ADS_MOCK_SCALE` entfernen und die Schritte 1 und 3 ohne `demo:load`
 wiederholen, dann in der App „Amazon verbinden“.
+
+## Tempo der Auswertungen messen
+
+`pnpm analytics:measure` misst mit den Demo-Daten die Abfragen von Dashboard und Explorer (alle Profile, letzte 30 Tage,
+je 3 Läufe; nur lesend). Die Ergebnisse von Phase 2 stehen in `docs/tasks/phase-2.md` (Definition of Done).

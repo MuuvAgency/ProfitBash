@@ -627,7 +627,8 @@ beforeAll(async () => {
         cost: '3',
         sales14d: '50',
         purchases14d: 1,
-        salesClicks14d: '50',
+        // Klick-Anteil kleiner als Klick + View (SB), damit die Attribution in den Summen unterscheidbar ist.
+        salesClicks14d: '30',
         purchasesClicks14d: 1,
       }),
       productAdId: ids.adMulti,
@@ -1181,6 +1182,7 @@ describe('Unabhängige SQL-Prüfung der Summen (DoD)', () => {
     profileIds: string[],
     range: { from: string; to: string },
     target: string | null,
+    table = 'amazon_ads_campaign_daily_metrics',
   ) {
     const rate = (currency: string) => `case when ${currency} = 'EUR' then 1 else (
         select r.rate from fx_rates r where r.quote = ${currency} and r.date <= m.date
@@ -1195,7 +1197,7 @@ describe('Unabhängige SQL-Prüfung der Summen (DoD)', () => {
               coalesce(sum(m.cost * f.factor), 0)::text as cost,
               coalesce(sum(case when m.ad_product = 'SPONSORED_PRODUCTS' and p.account_type <> 'vendor'
                                 then m.sales_7d else m.sales_14d end * f.factor), 0)::text as sales
-         from amazon_ads_campaign_daily_metrics m
+         from ${table} m
          join amazon_ads_profiles p on p.id = m.profile_id
          cross join lateral (select ${factor} as factor) f
         where m.profile_id = any($1::uuid[]) and m.date between $2 and $3 and f.factor is not null`,
@@ -1206,7 +1208,7 @@ describe('Unabhängige SQL-Prüfung der Summen (DoD)', () => {
 
   const visible = () => [ids.de, ids.uk, ids.se];
 
-  it('Summen in EUR (gemischte Währungen, SP/SB/SD) gleich in Dashboard und Explorer', async () => {
+  it('Kampagnen-Summen in EUR (gemischte Währungen, SP und SD) gleich in Dashboard und Explorer', async () => {
     for (const range of [PERIOD, COMPARISON]) {
       const expected = await independentSums(visible(), range, 'EUR');
       const dashboard = await queryDashboard(testDb.db, { ...base(), period: range });
@@ -1227,6 +1229,29 @@ describe('Unabhängige SQL-Prüfung der Summen (DoD)', () => {
     }
   });
 
+  it('Product Ads mit SB-Kennzahlen (14 Tage inkl. Views) gleich der Prüfung', async () => {
+    const expected = await independentSums(
+      visible(),
+      PERIOD,
+      'EUR',
+      'amazon_ads_product_ad_daily_metrics',
+    );
+    const sb = await testDb.db.$client.unsafe<{ count: string }[]>(
+      `select count(*)::text as count from amazon_ads_product_ad_daily_metrics
+        where ad_product = 'SPONSORED_BRANDS' and sales_14d is not null and date between $1 and $2`,
+      [PERIOD.from, PERIOD.to],
+    );
+    expect(Number(sb[0]!.count)).toBeGreaterThan(0);
+    const explorer = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'productAd',
+      filter: { includeRemoved: true },
+    });
+    expect(explorer.totals.current.clicks).toBe(expected.clicks);
+    expect(round(explorer.totals.current.cost)).toBe(round(expected.cost));
+    expect(round(explorer.totals.current.sales)).toBe(round(expected.sales));
+  });
+
   it('eine Währung: Originalbeträge exakt, ohne Umrechnung', async () => {
     const expected = await independentSums([ids.uk], PERIOD, null);
     const dashboard = await queryDashboard(testDb.db, { ...base(), profileIds: [ids.uk] });
@@ -1235,5 +1260,14 @@ describe('Unabhängige SQL-Prüfung der Summen (DoD)', () => {
     expect(dashboard.totals.current.cost).toBe(expected.cost);
     expect(dashboard.totals.current.clicks).toBe(expected.clicks);
     expect(parseDecimal(dashboard.totals.current.sales!).eq(expected.sales)).toBe(true);
+    const explorer = await queryExplorerRows(testDb.db, {
+      ...base(),
+      profileIds: [ids.uk],
+      level: 'campaign',
+      filter: { includeRemoved: true },
+    });
+    expect(explorer.currency).toBe('GBP');
+    expect(explorer.converted).toBe(false);
+    expect(explorer.totals.current).toEqual(dashboard.totals.current);
   });
 });
