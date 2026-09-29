@@ -24,6 +24,7 @@ const submitting = ref(false);
 const errorKey = ref<string | null>(null);
 
 const sessionExpired = computed(() => route.query.reason === 'expired' && !errorKey.value);
+const passwordSet = computed(() => route.query.reason === 'passwordSet' && !errorKey.value);
 
 async function submit() {
   errorKey.value = null;
@@ -108,6 +109,13 @@ async function submit() {
             class="rounded-control bg-violet-wash px-space-md py-space-sm text-body-sm text-ink"
           >
             {{ t('login.sessionExpired') }}
+          </p>
+          <p
+            v-if="passwordSet"
+            role="status"
+            class="rounded-control bg-violet-wash px-space-md py-space-sm text-body-sm text-ink"
+          >
+            {{ t('login.passwordSet') }}
           </p>
 
           <form class="flex flex-col gap-space-lg" novalidate @submit.prevent="submit">

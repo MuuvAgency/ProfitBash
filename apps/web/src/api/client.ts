@@ -4,7 +4,9 @@ import type {
   Connection,
   JobRun,
   JobRunListQuery,
+  Member,
   MeResponse,
+  OrgRole,
   Profile,
   ProfilePatch,
   SavedView,
@@ -177,6 +179,29 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/timeseries', { body: input })),
       explorerRows: (input: ExplorerRowsInput): Promise<ExplorerRowsData> =>
         unwrap(client.POST('/api/ads/explorer/rows', { body: input })),
+    },
+
+    /** Mitglieder (F9, nur Org-Admins). Links zum Passwort-Setzen kommen nur beim Anlegen bzw. Neu-Erzeugen. */
+    members: {
+      list: async (): Promise<Member[]> => (await unwrap(client.GET('/api/members'))).members,
+      create: (input: { email: string; name: string; role: OrgRole }) =>
+        unwrap(client.POST('/api/members', { body: input })),
+      updateRole: (id: string, role: OrgRole): Promise<Member> =>
+        unwrap(client.PATCH('/api/members/{id}', { params: { path: { id } }, body: { role } })),
+      async remove(id: string): Promise<void> {
+        await unwrap(client.DELETE('/api/members/{id}', { params: { path: { id } } }));
+      },
+      renewLink: (id: string) =>
+        unwrap(client.POST('/api/members/{id}/password-link', { params: { path: { id } } })),
+    },
+
+    /** Öffentlich (ohne Session): Link zum Passwort-Setzen prüfen und einlösen, Token im Body. */
+    passwordLinks: {
+      inspect: (token: string) =>
+        unwrap(client.POST('/api/password-links/inspect', { body: { token } })),
+      async redeem(token: string, password: string): Promise<void> {
+        await unwrap(client.POST('/api/password-links/redeem', { body: { token, password } }));
+      },
     },
 
     /** Gespeicherte Ansichten (F8): eigene und freigegebene, Unsichtbares filtert der Server. */
