@@ -514,6 +514,67 @@ describe('Access-Layer je Endpunkt (DoD)', () => {
       ['/api/ads/asin-search', query({ terms: ['B0TEST0001', 'SKU-1'] })],
     ] as const;
 
+  // Das ausgeblendete Profil bekommt auch ein Product Ad mit derselben ASIN und Kennzahlen (777), damit die Prüfung auf
+  // Ebene Product Ads und in der ASIN-Suche etwas finden könnte.
+  beforeAll(async () => {
+    const { db } = ctx.testDb;
+    const [group] = await db
+      .insert(amazonAdsAdGroups)
+      .values({
+        organizationId: orgId,
+        profileId: ids.hidden,
+        campaignId: ids.spHidden,
+        amazonAdGroupId: 'g-hidden',
+        adProduct: SP,
+        name: 'AG versteckt',
+        syncedAt: new Date(),
+      })
+      .returning({ id: amazonAdsAdGroups.id });
+    const [ad] = await db
+      .insert(amazonAdsProductAds)
+      .values({
+        organizationId: orgId,
+        profileId: ids.hidden,
+        campaignId: ids.spHidden,
+        adGroupId: group!.id,
+        amazonAdId: 'a-hidden',
+        adProduct: SP,
+        asin: 'B0TEST0001',
+        sku: 'SKU-1',
+        state: 'ENABLED',
+        syncedAt: new Date(),
+      })
+      .returning({ id: amazonAdsProductAds.id });
+    await db.insert(amazonAdsProductAdDailyMetrics).values({
+      organizationId: orgId,
+      profileId: ids.hidden,
+      productAdId: ad!.id,
+      date: '2026-09-01',
+      adProduct: SP,
+      currencyCode: 'EUR',
+      impressions: 7770,
+      clicks: 77,
+      cost: '777',
+      sales7d: '777',
+      sales14d: '777',
+      purchases7d: 7,
+      purchases14d: 7,
+      importedAt: new Date(),
+    });
+    hiddenAd = ad!.id;
+  });
+  let hiddenAd = '';
+
+  /** Spend je Tag der Tagesreihe (Kampagnen). */
+  const seriesCost = async (selection: Record<string, unknown>, cookie = viewer) =>
+    (
+      await post<TimeSeriesResponse>(
+        '/api/ads/timeseries',
+        query({ level: 'campaign', ...selection }),
+        cookie,
+      )
+    ).body.days.map((day) => [day.date, day.sums.cost]);
+
   /** Die Antwort nennt nichts vom Ziel (IDs, Namen, Beträge). */
   const leaks = (body: unknown, needles: string[]) =>
     needles.filter((needle) => JSON.stringify(body).includes(needle));
@@ -552,16 +613,23 @@ describe('Access-Layer je Endpunkt (DoD)', () => {
     expect(leaks(asin.body, ['B0TEST0001'])).toEqual(['B0TEST0001']);
     const options = await post('/api/ads/filter-options', {});
     expect(leaks(options.body, [ids.de, 'Nordwind'])).toEqual([ids.de, 'Nordwind']);
-    // Die Tagesreihe nennt keine IDs: Summe der sichtbaren Profile ohne das ausgeblendete (999).
-    const series = await post<TimeSeriesResponse>(
-      '/api/ads/timeseries',
-      query({ level: 'campaign' }),
-    );
-    expect(series.body.days.length).toBeGreaterThan(0);
+    // Die Tagesreihe nennt keine IDs: genaue Summen der sichtbaren Profile (DE 10 + UK 8,60 £ ≈ 10 €), ohne 999.
+    expect(await seriesCost({})).toEqual([
+      ['2026-09-01', '20'],
+      ['2026-09-02', '5'],
+    ]);
   });
 
   it('zeigt ausgeblendete Profile an keinem Endpunkt, auch nicht bei ausdrücklicher Auswahl (Viewer und Admin)', async () => {
-    const needles = [ids.hidden, ids.spHidden, 'SP versteckt', '999'];
+    const needles = [
+      ids.hidden,
+      ids.spHidden,
+      hiddenAd,
+      'SP versteckt',
+      'AG versteckt',
+      '999',
+      '777',
+    ];
     for (const cookie of [viewer, admin]) {
       for (const [path, body] of endpoints()) {
         for (const selection of [
@@ -578,6 +646,18 @@ describe('Access-Layer je Endpunkt (DoD)', () => {
           expect(leaks(res.body, needles), `${path} ${JSON.stringify(selection)}`).toEqual([]);
         }
       }
+    }
+    // Tagesreihe ohne IDs: genaue Summen statt Suche nach Werten.
+    for (const cookie of [viewer, admin]) {
+      expect(await seriesCost({}, cookie)).toEqual([
+        ['2026-09-01', '20'],
+        ['2026-09-02', '5'],
+      ]);
+      expect(await seriesCost({ profileIds: [ids.hidden, ids.de] }, cookie)).toEqual([
+        ['2026-09-01', '10'],
+        ['2026-09-02', '5'],
+      ]);
+      expect(await seriesCost({ profileIds: [ids.hidden] }, cookie)).toEqual([]);
     }
   });
 
@@ -621,6 +701,10 @@ describe('Access-Layer je Endpunkt (DoD)', () => {
         expect(res.status, `${path} ${JSON.stringify(extra)}`).toBe(200);
         expect(leaks(res.body, needles), `${path} ${JSON.stringify(extra)}`).toEqual([]);
       }
+    }
+    // Tagesreihe ohne IDs: die fremde Organisation hat keine Kennzahlen, also keine Tage, auch mit Muuvs IDs.
+    for (const selection of [{}, { profileIds: [ids.de, ids.uk] }, { clientIds: [ids.client] }]) {
+      expect(await seriesCost(selection, foreign), JSON.stringify(selection)).toEqual([]);
     }
   });
 });

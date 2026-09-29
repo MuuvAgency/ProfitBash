@@ -313,15 +313,24 @@ describe('DashboardPage', () => {
   it('Ladezustand: Skeletons in Kachelform, solange die Kennzahlen laden (DoD)', async () => {
     stubFetch(routes({ 'POST /api/ads/dashboard': () => new Promise<Response>(() => {}) }));
     await mountWithApp(undefined, { path: '/dashboard' });
-    await vi.waitFor(() =>
-      expect(document.querySelectorAll('[aria-busy="true"]').length).toBeGreaterThanOrEqual(3),
-    );
-    expect(document.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0);
+    // Je Widget (Hero, KPI-Kacheln, Anteil, Datenstand, Tabelle) Skeletons in der Kachel, die gerade lädt.
+    await vi.waitFor(() => {
+      const busy = [...document.querySelectorAll('[aria-busy="true"]')].filter((tile) =>
+        tile.querySelector('[data-skeleton]'),
+      );
+      expect(busy.length).toBeGreaterThanOrEqual(4);
+    });
     expect(document.querySelector('[data-kpi-value]')).toBeNull();
   });
 
   it('Leerer Zeitraum: Anteil je Ad-Typ und Tabelle sagen es (DoD)', async () => {
-    const empty = { ...dashboard(), byClient: [], byProfile: [], byAdProduct: [] };
+    const empty = {
+      ...dashboard(),
+      total: total('0', '0'),
+      byClient: [],
+      byProfile: [],
+      byAdProduct: [],
+    };
     stubFetch(routes({ 'POST /api/ads/dashboard': json(empty) }));
     const { wrapper } = await mountDashboard();
     await vi.waitFor(() =>
@@ -329,7 +338,17 @@ describe('DashboardPage', () => {
     );
   });
 
-  it('Ansichten-Menü: leer und Ladefehler (DoD)', async () => {
+  it('Ansichten-Menü: Laden, leer und Ladefehler (DoD)', async () => {
+    stubFetch(routes({ 'GET /api/saved-views': () => new Promise<Response>(() => {}) }));
+    const pending = await mountDashboard();
+    await pending.wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector('.p-popover [data-skeleton], [role="dialog"] [data-skeleton]'),
+      ).not.toBeNull(),
+    );
+    cleanupMounted();
+
     stubFetch(routes({ 'GET /api/saved-views': json({ views: [] }) }));
     const { wrapper } = await mountDashboard();
     await wrapper.find('[data-saved-views]').trigger('click');

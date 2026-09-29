@@ -59,14 +59,24 @@ describe('/api/members', () => {
       (await call('POST', '/members', editor, { email: 'x@muuv.test', name: 'X', role: 'viewer' }))
         .status,
     ).toBe(403);
-    // Auch Ändern, Entfernen und Link neu erzeugen nur für Admins (hier mit der eigenen ID des Admins als Ziel).
+    // Auch Ändern, Entfernen und Link neu erzeugen nur für Admins. Ziel ist ein gewöhnliches Mitglied (kein Superadmin,
+    // dessen Schutz sonst ebenfalls 403 ergäbe); geprüft wird der Fehlercode der Rollenprüfung.
+    await createUser(ctx, { email: 'ziel@muuv.test', org: { id: orgId, role: 'viewer' } });
     const list = await call<{ members: Member[] }>('GET', '/members', admin);
-    const target = list.body.members.find((m) => m.email === ctx.seeded.email)!;
-    expect((await call('PATCH', `/members/${target.id}`, editor, { role: 'viewer' })).status).toBe(
-      403,
+    const target = list.body.members.find((m) => m.email === 'ziel@muuv.test')!;
+    for (const [method, path, body] of [
+      ['PATCH', `/members/${target.id}`, { role: 'editor' }],
+      ['DELETE', `/members/${target.id}`, undefined],
+      ['POST', `/members/${target.id}/password-link`, undefined],
+    ] as const) {
+      const res = await call<ErrorResponse>(method, path, editor, body);
+      expect(res.status, `${method} ${path}`).toBe(403);
+      expect(res.body.error.code, `${method} ${path}`).toBe('FORBIDDEN');
+    }
+    // Gegenprobe: Der Admin darf es.
+    expect((await call('PATCH', `/members/${target.id}`, admin, { role: 'editor' })).status).toBe(
+      200,
     );
-    expect((await call('DELETE', `/members/${target.id}`, editor)).status).toBe(403);
-    expect((await call('POST', `/members/${target.id}/password-link`, editor)).status).toBe(403);
   });
 
   it('anlegen → Link im Fragment; Passwort setzen → Anmeldung; Link nur einmal; Token nie im Log', async () => {

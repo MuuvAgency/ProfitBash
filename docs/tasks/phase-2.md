@@ -28,11 +28,14 @@ lief dabei vollständig grün.
 
 - [x] Dashboard und Explorer zeigen mit den Mock-Daten (SP, SB, SD; EUR, GBP, SEK) dieselben Summen wie eine unabhängige
       SQL-Prüfung (Test), in Originalwährung bei einer Währung, sonst in der Anzeigewährung (Standard EUR) mit „≈“ (F3).
-      **Beleg:** `packages/db/src/ads-analytics.test.ts`, „Unabhängige SQL-Prüfung der Summen (DoD)“: eigene SQL-Abfrage
-      ohne Access-Layer und ohne die CTEs des Moduls (Kurs je Zeile per Unterabfrage, Umsatz „wie Konsole“) gegen
-      `queryDashboard` und `queryExplorerRows` für Zeitraum und Vergleich (SEK ohne Kurs), eine Währung exakt (GBP);
-      Mutationen der Prüfung (Vendor-Regel, Zeilen ohne Kurs) lassen den Test scheitern. Dazu der Vergleich mit
-      `convertAmount` je Zeile (2.4) und „≈“ in `apps/web/src/explorer/columns.test.ts` und `KpiTile`.
+      **Beleg:** `packages/db/src/ads-analytics.test.ts`, „Unabhängige SQL-Prüfung der Summen (DoD)“, mit der von Hand
+      geprüften Datenlage der Testdatei (nicht den Demo-Daten aus 2.3): eigene SQL-Abfrage ohne Access-Layer und ohne die
+      CTEs des Moduls (Umsatz „wie Konsole“ je Zeile; den Kurs sucht sie nach derselben Regel „letzter Kurs an oder vor dem
+      Tag“ per Unterabfrage) gegen `queryDashboard` und `queryExplorerRows`: Kampagnen (SP, SD; EUR, GBP, SEK) für Zeitraum
+      und Vergleich (SEK ohne Kurs), Product Ads mit SB-Kennzahlen (14 Tage inkl. Views), eine Währung exakt (GBP, Dashboard
+      und Explorer). Mutationen der Prüfung (Vendor-Regel, SB-Klick-Anteil statt Klick + View, Zeilen ohne Kurs) lassen die
+      Tests scheitern. Unabhängig vom SQL: Vergleich mit `convertAmount` je Zeile in TypeScript (2.4); „≈“ in
+      `apps/web/src/explorer/columns.test.ts` und `KpiTile.test.ts`.
 - [x] Kennzahlen je Ad-Typ werden richtig gelesen und gekennzeichnet (`plan.md` §5, Tabelle unter F4): Attributionsfenster, Klick-
       und View-Anteil bei SB/SD, SD-Same-SKU nur nach Klick, vCPM-Kampagnen, SB-Preview-Lücke, Spalten, die Amazon für einen Ad-Typ
       oder eine Ebene nicht liefert („–“, nie 0). Ein Test deckt jede dieser Regeln ab.
@@ -49,12 +52,13 @@ lief dabei vollständig grün.
       auch für gespeicherte Ansichten und die Client-Auswahl). Die Endpunkte prüfen Feature-Recht und Entitlement serverseitig.
       **Beleg:** `apps/api/src/routes/analytics.test.ts`, „Access-Layer je Endpunkt (DoD)“: für `filter-options`,
       `explorer/rows` (Kampagnen, Product Ads), `timeseries`, `dashboard`, `asin-search` je 401 ohne Session, 403 ohne Feature,
-      nichts vom ausgeblendeten Profil (Viewer und Admin, auch bei ausdrücklicher Auswahl) und nichts für eine fremde
-      Organisation (auch mit fremden IDs in Auswahl und Drill-Down), mit Gegenprobe. DB-Ebene `ads-analytics.test.ts`
+      nichts vom ausgeblendeten Profil (Viewer und Admin, auch bei ausdrücklicher Auswahl; das Profil hat Kampagne, Product Ad
+      mit derselben ASIN und Kennzahlen) und nichts für eine fremde Organisation (auch mit fremden IDs in Auswahl und
+      Drill-Down); die Tagesreihe (ohne IDs) mit genauen Tagessummen bzw. ohne Tage; Gegenprobe mit sichtbaren Daten. DB-Ebene `ads-analytics.test.ts`
       (Sichtbarkeit, Drill-Down). Gespeicherte Ansichten `saved-views.test.ts` (API: fremde Organisation, ausgeblendete Profile
       beim Anlegen, Ändern und nach dem Ausblenden beim Laden, Feature je Bereich auch für PATCH und DELETE, Löschen durch
-      andere) und `packages/db/src/saved-views.test.ts`. Mitglieder `members.test.ts` (API: nur Admins, auch PATCH, DELETE,
-      Link; fremde Organisation 404) und `packages/db/src/members.test.ts`. Client-Auswahl `access.test.ts`
+      andere) und `packages/db/src/saved-views.test.ts`. Mitglieder `members.test.ts` (API: nur Admins, auch PATCH, DELETE und
+      Link an einem gewöhnlichen Mitglied mit Fehlercode der Rollenprüfung; fremde Organisation 404) und `packages/db/src/members.test.ts`. Client-Auswahl `access.test.ts`
       (`listVisibleClientsAndProfiles` für Viewer und Admin).
 - [x] Beträge bleiben bis zur Anzeige Decimal-Strings (kein `number` in API und Rechenkern), Kennzahlen mit Division durch 0 sind
       „–“ statt 0 oder `Infinity`.
@@ -85,16 +89,26 @@ lief dabei vollständig grün.
       `SyncStatusPage.test.ts` („Wechselkurse (EZB)“ in jeder Organisation).
 - [x] Abfragen bleiben bei den Demo-Daten mit Volumen (2.3) unter 1 s (Messung im Test oder per `EXPLAIN ANALYZE` festgehalten).
       **Präzisiert (Dominik, 2026-09-29, 2.4 „Offen“):** gilt für die Abfragen, auf die die Seite wartet (Zeilen ohne Vergleich,
-      Dashboard, Tagesreihen); der Vergleich wird nachgeladen. **Gemessen** (lokal, 2026-09-29, alle 6 Demo-Profile, 30 Tage,
-      Anzeige automatisch/EUR, 3 Läufe über `packages/db`): Zeilen ohne Vergleich Portfolios 24–108 ms, Kampagnen 25–43 ms,
-      Ad Groups 50–68 ms, Targets 779–879 ms, Product Ads 101–152 ms, **Suchbegriffe 962–1156 ms (Grenzfall)**; Dashboard mit
-      Vergleich 53–82 ms; Tagesreihe Kampagnen 18–23 ms, Targets 510–549 ms; nachgeladener Vergleich Targets 1,7 s,
-      Suchbegriffe 2,5–2,6 s. Im Browser bis zu den Zeilen: Targets 1,5 s (2.8). Bekannte Grenze: Suchbegriffe über alle
-      Profile und die Browser-Zeit großer Auswahlen; Voraggregation bzw. serverseitiges Row Model erst als eigene Aufgabe,
-      wenn echte Konten es verlangen (Entscheidung 2.4).
+      Dashboard, Tagesreihen); der Vergleich wird nachgeladen. **Gemessen** mit `pnpm analytics:measure`
+      (`packages/db/src/measure-analytics-cli.ts`; lokal, 2026-09-29, alle 6 Demo-Profile, 30 Tage, Anzeige automatisch/EUR,
+      je 3 Läufe, zwei Messreihen): Zeilen ohne Vergleich Portfolios 24–108 ms, Kampagnen 24–43 ms, Ad Groups 47–69 ms,
+      Targets 750–996 ms (erster Lauf kalt), Product Ads 98–152 ms, **Suchbegriffe 924–1156 ms**; Dashboard mit Vergleich
+      52–85 ms; Tagesreihe Kampagnen 17–24 ms, Targets 488–549 ms; nachgeladener Vergleich Targets 1,6–1,7 s, Suchbegriffe
+      2,4–2,6 s. Im Browser bis zu den Zeilen: Targets 1,5 s (2.8).
+      **Entschieden (Dominik, 2026-09-29): Suchbegriffe über alle Profile (knapp über 1 s) als bekannte Grenze akzeptiert**
+      (seltene Auswahl; ein Client oder eine Kampagne ist deutlich schneller); Beschleunigung mit der Voraggregation, falls
+      echte Konten es verlangen (2.4).
 - [x] `pnpm test`, `typecheck`, `lint`, `build` und beide Smoke-Tests grün, CI grün.
-      **Beleg:** lokal vor jedem Commit (zuletzt 2026-09-29); CI grün auf den PRs von 2.12, 2.13 und dem Abschluss (Merge
-      erst nach grüner CI).
+      **Beleg:** lokal vor jedem Commit (zuletzt 2026-09-29): `pnpm test` (alle Pakete), `typecheck`, `lint`, `build`,
+      `scripts/smoke-bundles.sh` und `scripts/smoke-db-backup.sh` mit Exit-Code 0. CI grün auf den PRs von 2.12 (#38) und
+      2.13 (#39); der PR dieses Abschlusses wird per Auto-Merge erst nach grüner CI gemergt.
+
+Review des Abschlusses (unabhängig): keine kritischen Befunde. Übernommen: Entscheidung zu den Suchbegriffen eingeholt statt
+still abgehakt, SB in der SQL-Prüfung (Product Ads, Klick-Anteil unterscheidbar), Prüfungen, die nicht ins Leere laufen
+(ausgeblendetes Product Ad, genaue Tagessummen, Mitglied ohne Superadmin-Schutz mit Fehlercode), eine Währung auch im
+Explorer, Skeletons je Kachel, Gegenprobe zum SB-Kennzeichen, realistisch leerer Zeitraum, Laden im Ansichten-Menü, Messbefehl
+`pnpm analytics:measure`, ehrliche Formulierung zu Datenlage und CI. Bewusst so: Die SQL-Prüfung sucht den Kurs nach derselben
+Regel wie das Modul (die Regel ist die Vorgabe; unabhängig davon prüft `convertAmount` in TypeScript).
 
 ## Voraussetzungen
 
@@ -498,7 +512,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     **Entschieden (Dominik, 2026-09-29), Rest:** Die DoD „unter 1 s“ gilt für die Datenbank-Abfragen, die die Seite wartend
     braucht (Zeilen ohne Vergleich, Dashboard, Tagesreihen); die größte Auswahl (Targets, alle 6 Profile, 30 Tage) braucht im
     Browser 1,5 s bis zu den Zeilen, 3,1 s mit Vergleich, und bleibt als bekannte Grenze festgehalten. Voraggregation bzw.
-    serverseitiges Row Model (b, c) erst als eigene Aufgabe, wenn echte Konten es verlangen.
+    serverseitiges Row Model (b, c) erst als eigene Aufgabe, wenn echte Konten es verlangen. Dazu (2026-09-29): Suchbegriffe
+    über alle Profile ohne Vergleich (0,92–1,16 s, knapp über 1 s) als bekannte Grenze akzeptiert (DoD oben).
 
 ### 2.5 API (`apps/api`)
 - [x] Middleware `requireFeature(key, 'view')`: prüft Entitlement und Rolle serverseitig (`resolveFeatureAccess`), `403` mit
