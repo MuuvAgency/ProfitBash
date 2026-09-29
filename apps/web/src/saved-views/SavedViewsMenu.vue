@@ -198,6 +198,8 @@ const dialogTitle = computed(() => {
       icon-pos="left"
       severity="secondary"
       size="small"
+      class="max-w-[16rem]"
+      :pt="{ label: { class: 'truncate' } }"
       aria-haspopup="dialog"
       :aria-expanded="open"
       @click="popover?.toggle($event)"
