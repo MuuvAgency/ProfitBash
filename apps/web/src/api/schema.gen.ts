@@ -1253,6 +1253,332 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/saved-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eigene und freigegebene Ansichten eines Bereichs */
+        get: {
+            parameters: {
+                query: {
+                    area: "dashboard" | "explorer";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Eigene zuerst, dann nach Name. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SavedViewList"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht, kein Recht oder nicht änderbar. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Ansicht speichern */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SavedViewCreate"];
+                };
+            };
+            responses: {
+                /** @description Gespeicherte Ansicht. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SavedView"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht, kein Recht oder nicht änderbar. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Name vergeben oder zu viele eigene Ansichten. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/saved-views/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eine Ansicht (eigene oder freigegebene) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ansicht. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SavedView"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht, kein Recht oder nicht änderbar. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Ansicht nicht gefunden (oder persönliche Ansicht eines anderen). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Ansicht löschen */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gelöscht. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht, kein Recht oder nicht änderbar. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Ansicht nicht gefunden (oder persönliche Ansicht eines anderen). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Umbenennen, freigeben oder aktuellen Zustand übernehmen */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SavedViewPatch"];
+                };
+            };
+            responses: {
+                /** @description Geänderte Ansicht. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SavedView"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht, kein Recht oder nicht änderbar. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Ansicht nicht gefunden (oder persönliche Ansicht eines anderen). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Name vergeben oder zu viele eigene Ansichten. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1740,6 +2066,83 @@ export interface components {
             currency?: "auto" | string;
             /** @enum {string} */
             attribution?: "console" | "clicks14d";
+        };
+        SavedViewList: {
+            views: components["schemas"]["SavedView"][];
+        };
+        SavedView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            area: "dashboard" | "explorer";
+            shared: boolean;
+            owner: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            own: boolean;
+            canEdit: boolean;
+            canShare: boolean;
+            state: components["schemas"]["SavedViewState"];
+            hiddenItems: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        SavedViewState: {
+            filters: components["schemas"]["SavedViewFilters"];
+            explorer?: components["schemas"]["SavedViewExplorer"];
+        };
+        SavedViewFilters: {
+            clientIds: string[];
+            withoutClient: boolean;
+            profileIds: string[] | null;
+            period: {
+                /** @enum {string} */
+                preset: "yesterday" | "last7" | "last14" | "last30" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth" | "monthBeforeLast" | "thirdLastMonth" | "last12Months" | "yearToDate" | "lastYear" | "custom";
+                range?: components["schemas"]["DateRange"];
+            };
+            /** @enum {string} */
+            comparison: "previous" | "previousYear" | "off";
+            currency: "auto" | string;
+            /** @enum {string} */
+            attribution: "console" | "clicks14d";
+        };
+        SavedViewExplorer: {
+            /** @enum {string} */
+            level: "portfolio" | "campaign" | "adGroup" | "target" | "productAd" | "searchTerm" | "negative";
+            drill: {
+                portfolioId: string | null;
+                campaignId: string | null;
+                adGroupId: string | null;
+            };
+            includeRemoved: boolean;
+            adProducts: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            chartMetrics: [
+                "impressions" | "clicks" | "cost" | "sales" | "purchases" | "units" | "ctr" | "cpc" | "cvr" | "acos" | "roas" | "cpm" | "vcpm",
+                "impressions" | "clicks" | "cost" | "sales" | "purchases" | "units" | "ctr" | "cpc" | "cvr" | "acos" | "roas" | "cpm" | "vcpm"
+            ];
+            columns: string[] | null;
+            sort: {
+                column: string;
+                /** @enum {string} */
+                direction: "asc" | "desc";
+            } | null;
+        };
+        SavedViewCreate: {
+            name: string;
+            /** @enum {string} */
+            area: "dashboard" | "explorer";
+            shared?: boolean;
+            state: components["schemas"]["SavedViewState"];
+        };
+        SavedViewPatch: {
+            name?: string;
+            shared?: boolean;
+            state?: components["schemas"]["SavedViewState"];
         };
     };
     responses: never;

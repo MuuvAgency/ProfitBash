@@ -2237,6 +2237,420 @@
         "required": [
           "period"
         ]
+      },
+      "SavedViewList": {
+        "type": "object",
+        "properties": {
+          "views": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SavedView"
+            }
+          }
+        },
+        "required": [
+          "views"
+        ]
+      },
+      "SavedView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "dashboard",
+              "explorer"
+            ]
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "own": {
+            "type": "boolean"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canShare": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SavedViewState"
+          },
+          "hiddenItems": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "area",
+          "shared",
+          "owner",
+          "own",
+          "canEdit",
+          "canShare",
+          "state",
+          "hiddenItems",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SavedViewState": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/SavedViewFilters"
+          },
+          "explorer": {
+            "$ref": "#/components/schemas/SavedViewExplorer"
+          }
+        },
+        "required": [
+          "filters"
+        ]
+      },
+      "SavedViewFilters": {
+        "type": "object",
+        "properties": {
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500
+          },
+          "withoutClient": {
+            "type": "boolean"
+          },
+          "profileIds": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 1000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "preset": {
+                "type": "string",
+                "enum": [
+                  "yesterday",
+                  "last7",
+                  "last14",
+                  "last30",
+                  "thisWeek",
+                  "lastWeek",
+                  "thisMonth",
+                  "lastMonth",
+                  "monthBeforeLast",
+                  "thirdLastMonth",
+                  "last12Months",
+                  "yearToDate",
+                  "lastYear",
+                  "custom"
+                ]
+              },
+              "range": {
+                "$ref": "#/components/schemas/DateRange"
+              }
+            },
+            "required": [
+              "preset"
+            ]
+          },
+          "comparison": {
+            "type": "string",
+            "enum": [
+              "previous",
+              "previousYear",
+              "off"
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            ]
+          },
+          "attribution": {
+            "type": "string",
+            "enum": [
+              "console",
+              "clicks14d"
+            ]
+          }
+        },
+        "required": [
+          "clientIds",
+          "withoutClient",
+          "profileIds",
+          "period",
+          "comparison",
+          "currency",
+          "attribution"
+        ]
+      },
+      "SavedViewExplorer": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "portfolio",
+              "campaign",
+              "adGroup",
+              "target",
+              "productAd",
+              "searchTerm",
+              "negative"
+            ]
+          },
+          "drill": {
+            "type": "object",
+            "properties": {
+              "portfolioId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "campaignId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "adGroupId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "portfolioId",
+              "campaignId",
+              "adGroupId"
+            ]
+          },
+          "includeRemoved": {
+            "type": "boolean"
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SPONSORED_PRODUCTS",
+                "SPONSORED_BRANDS",
+                "SPONSORED_DISPLAY"
+              ]
+            },
+            "maxItems": 3
+          },
+          "chartMetrics": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "string",
+                "enum": [
+                  "impressions",
+                  "clicks",
+                  "cost",
+                  "sales",
+                  "purchases",
+                  "units",
+                  "ctr",
+                  "cpc",
+                  "cvr",
+                  "acos",
+                  "roas",
+                  "cpm",
+                  "vcpm"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "impressions",
+                  "clicks",
+                  "cost",
+                  "sales",
+                  "purchases",
+                  "units",
+                  "ctr",
+                  "cpc",
+                  "cvr",
+                  "acos",
+                  "roas",
+                  "cpm",
+                  "vcpm"
+                ]
+              }
+            ]
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9]{0,39}$"
+                },
+                "maxItems": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "column": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9]{0,39}$"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "asc",
+                      "desc"
+                    ]
+                  }
+                },
+                "required": [
+                  "column",
+                  "direction"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "level",
+          "drill",
+          "includeRemoved",
+          "adProducts",
+          "chartMetrics",
+          "columns",
+          "sort"
+        ]
+      },
+      "SavedViewCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "dashboard",
+              "explorer"
+            ]
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SavedViewState"
+          }
+        },
+        "required": [
+          "name",
+          "area",
+          "state"
+        ]
+      },
+      "SavedViewPatch": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SavedViewState"
+          }
+        }
       }
     },
     "parameters": {}
@@ -3421,6 +3835,360 @@
           },
           "403": {
             "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/saved-views": {
+      "get": {
+        "tags": [
+          "Gespeicherte Ansichten"
+        ],
+        "summary": "Eigene und freigegebene Ansichten eines Bereichs",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dashboard",
+                "explorer"
+              ]
+            },
+            "required": true,
+            "name": "area",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eigene zuerst, dann nach Name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedViewList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht, kein Recht oder nicht änderbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Gespeicherte Ansichten"
+        ],
+        "summary": "Ansicht speichern",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedViewCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Gespeicherte Ansicht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht, kein Recht oder nicht änderbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name vergeben oder zu viele eigene Ansichten.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/saved-views/{id}": {
+      "get": {
+        "tags": [
+          "Gespeicherte Ansichten"
+        ],
+        "summary": "Eine Ansicht (eigene oder freigegebene)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ansicht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht, kein Recht oder nicht änderbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ansicht nicht gefunden (oder persönliche Ansicht eines anderen).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Gespeicherte Ansichten"
+        ],
+        "summary": "Umbenennen, freigeben oder aktuellen Zustand übernehmen",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedViewPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Geänderte Ansicht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht, kein Recht oder nicht änderbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ansicht nicht gefunden (oder persönliche Ansicht eines anderen).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name vergeben oder zu viele eigene Ansichten.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Gespeicherte Ansichten"
+        ],
+        "summary": "Ansicht löschen",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Gelöscht."
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht, kein Recht oder nicht änderbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ansicht nicht gefunden (oder persönliche Ansicht eines anderen).",
             "content": {
               "application/json": {
                 "schema": {
