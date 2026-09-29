@@ -15,7 +15,7 @@ import { useGridMinWidth } from '../grid/min-width';
 import DurationCell from './cells/DurationCell.vue';
 import ResultCell from './cells/ResultCell.vue';
 import StatusCell from './cells/StatusCell.vue';
-import TruncatedCell from './cells/TruncatedCell.vue';
+import WrappedCell from './cells/WrappedCell.vue';
 import type { JobRunGridContext } from './cells/types';
 import { elapsedMs, RUNNING_DURATION_TICK_MS, useJobRunLabels } from './labels';
 
@@ -38,7 +38,8 @@ const DATA_CELL = `${CELL} font-data`;
 
 /**
  * Spalten mit kurzem, nie gekürztem Inhalt passen sich ihm an (Locale des Zeitstempels, Minuten in der
- * Dauer, „Fehlgeschlagen“). Den Rest teilen sich Amazon-Konto und Ergebnis, die gekürzt werden dürfen.
+ * Dauer, „Fehlgeschlagen“). Den Rest teilen sich Amazon-Konto und Ergebnis, die umbrechen (F14: passt bei 1440 px
+ * auch mit klassischer Scrollbar, Reserve für die angepassten Spalten in `SYNC_AUTO_SIZED_WIDTH`).
  */
 const AUTO_SIZED = ['status', 'job', 'startedAt', 'duration'];
 /** Die Zellen bringen ihr Padding mit; die Voreinstellung (20 px) nähme den gekürzten Spalten Platz. */
@@ -98,7 +99,11 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     colId: 'connection',
     headerName: t('sync.column.connection'),
     valueGetter: ({ data }) => (data ? labels.connection(data) : ''),
-    cellRenderer: markRaw(TruncatedCell),
+    cellRenderer: markRaw(WrappedCell),
+    // Wie „Ergebnis“: Die Zelle zentriert selbst, die Zeile wächst mit dem umbrochenen Text.
+    cellClass: 'leading-normal',
+    autoHeight: true,
+    // Platz für „amazon-ads-mock@“ in einer Zeile.
     minWidth: 180,
     flex: 1,
   },
@@ -129,10 +134,10 @@ const columnDefs = computed<ColDef<JobRun>[]>(() => [
     // Kein Flex: Der Wrapper der autoHeight-Zelle schrumpfte sonst nicht unter seine Inhaltsbreite und
     // ragte über die Zelle hinaus. Vertikal zentriert die Zelle selbst.
     cellClass: 'leading-normal',
-    // Aufgeklappt wächst die Zeile mit dem Fehlertext.
+    // Die Zeile wächst mit umbrochenen Zählern und dem aufgeklappten Fehlertext.
     autoHeight: true,
     sortable: false,
-    minWidth: 280,
+    minWidth: 220,
     flex: 2,
   },
 ]);

@@ -434,9 +434,14 @@ bis dahin öffnen diese Menüpunkte eine Platzhalterseite „Folgt in Kürze“.
 - [ ] Seed einmalig in Produktion ausführen (gebündelter `seed`, Admin-Daten aus Railway-Variablen, danach entfernen).
 - [ ] Railway-Postgres mit Backups; der Hobby-Plan enthält keine, deshalb nächtlicher `pg_dump` in einen privaten Speicher.
   - [x] Entscheidung (Dominik, 2026-09-26): Railway-Cron-Service, age, Cloudflare R2 (Lifecycle 14 Tage), Healthchecks, monatlicher Test-Restore.
+    Geändert (Dominik, 2026-09-29): Überwachung ohne Healthchecks.io, in der App (siehe unten).
   - [x] Im Repo: `ops/db-backup/` (Dockerfile, `backup.sh`, `restore-test.sh`), Smoke-Test `scripts/smoke-db-backup.sh`
     mit Fake-S3 (`scripts/fake-s3.mjs`), in der CI gegen das gebaute Image. Anleitung in `docs/deploy.md` („Backups“), ADR 001 nachgezogen.
-  - [ ] Auf Railway eingerichtet, erster Upload nach R2 und erster Test-Restore geprüft (braucht Konten: Railway, R2, Healthchecks.io).
+  - [ ] **Überwachung in der App statt Healthchecks.io** (Dominik, 2026-09-29, `phase-2.md` 2.2 „Offen für 0.9“): Das Backup
+    trägt jeden Lauf in die eigene Datenbank ein (`job_runs`, plattformweit wie `fx-rates-sync`, im Sync-Status); das
+    Dashboard warnt Admins, wenn das letzte gelungene Backup älter als 26 Std. ist. Ein ausbleibender Lauf fällt so ohne
+    externes Konto auf. Wie der monatliche Test-Restore (lokal) ohne Healthchecks überwacht wird, beim Umsetzen klären.
+  - [ ] Auf Railway eingerichtet, erster Upload nach R2 und erster Test-Restore geprüft (braucht Konten: Railway, R2).
     Offen bis dahin: Nimmt R2 die SigV4-Signatur von curl an (der Fake-S3 prüft nur Form und Prüfsumme; erst ein Dump
     über 1 MiB nutzt `Expect: 100-continue`)? Hauptversion des Railway-Postgres = 17 (sonst Basis-Image anheben)?
     Ernstfall-Restore (`docs/deploy.md`) einmal gegen eine Wegwerf-Datenbank durchspielen. R2-Bucket-Lock (7 Tage) setzen.

@@ -30,3 +30,10 @@ export function useGridMinWidth() {
     },
   };
 }
+
+/**
+ * Obergrenze der Mindestbreite für Tabellen, die ohne waagerechtes Scrollen passen sollen (Sync-Status, Profiltabelle;
+ * `phase-2.md` F14): Bei 1440 px mit ausgeklappter Sidebar und klassischer Scrollbar (15 px) bleiben 1113 px für den
+ * Inhalt (gemessen in 2.12), Windows-Scrollbars sind 17 px breit; dazu etwas Reserve.
+ */
+export const FIT_WIDTH_AT_1440 = 1080;

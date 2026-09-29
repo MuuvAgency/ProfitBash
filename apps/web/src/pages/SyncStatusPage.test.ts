@@ -2,6 +2,8 @@ import { formatDateTime, type JobRun } from '@profitbash/shared';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch } from '../test/fetch-stub';
+import { FIT_WIDTH_AT_1440 } from '../grid/min-width';
+import { SYNC_AUTO_SIZED_WIDTH } from '../sync/layout';
 import { JOB_RUNS_POLL_INTERVAL_MS } from '../sync/queries';
 import { CONNECTION_ID, connectionFixture, jobRunFixture, meFixture } from '../test/fixtures';
 import { cleanupMounted, mountWithApp } from '../test/mount';
@@ -248,7 +250,7 @@ describe('SyncStatusPage', () => {
     );
   });
 
-  it('nennt gekürzte Texte (Amazon-Konto, Zähler) vollständig im Tooltip', async () => {
+  it('bricht lange Texte (Amazon-Konto, Zähler) um statt zu kürzen: lesbar auch ohne Tooltip (Touch, F14)', async () => {
     const longEmail = jobRunFixture({
       connection: {
         id: CONNECTION_ID,
@@ -260,11 +262,35 @@ describe('SyncStatusPage', () => {
     const { wrapper } = await mountPage();
     const longRow = await waitForRow(wrapper, longEmail);
 
-    const account = longRow.get('[col-id="connection"] [title]');
-    expect(account.attributes('title')).toBe('amazon-ads-sehr-lang@kunde.test');
-    expect(account.classes()).toContain('truncate');
-    const counters = longRow.get('[col-id="result"] .truncate');
-    expect(counters.attributes('title')).toBe(counters.text());
+    const account = longRow.get('[col-id="connection"] [data-wrap]');
+    expect(account.text()).toBe('amazon-ads-sehr-lang@kunde.test');
+    const counters = longRow.get('[col-id="result"] [data-wrap]');
+    expect(counters.text()).toContain('4 Profile');
+    expect(longRow.findAll('.truncate')).toHaveLength(0);
+    expect(longRow.findAll('[title]')).toHaveLength(0);
+  });
+
+  it('passt mit den Mindestbreiten bei 1440 px auch mit klassischer Scrollbar (F14)', async () => {
+    stubFetch(routes([succeeded]));
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, succeeded);
+
+    // happy-dom misst keine Texte: Die an den Inhalt angepassten Spalten (Status, Job, Start, Dauer) prüft der
+    // Browser (2.12); hier die Untergrenzen von Amazon-Konto und Ergebnis mit Platz für diese Spalten.
+    const width = (colId: string) =>
+      parseFloat(
+        (wrapper.get(`.ag-header-cell[col-id="${colId}"]`).element as HTMLElement).style.width,
+      );
+    const grid = wrapper.get('section[role="region"]').element.firstElementChild as HTMLElement;
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThan(0));
+    // Mindestbreite des Grids = angepasste Spalten + Mindestbreiten von Amazon-Konto und Ergebnis (Flex).
+    const autoSized = ['status', 'job', 'startedAt', 'duration'].reduce(
+      (sum, id) => sum + width(id),
+      0,
+    );
+    expect(parseFloat(grid.style.minWidth) - autoSized).toBeLessThanOrEqual(
+      FIT_WIDTH_AT_1440 - SYNC_AUTO_SIZED_WIDTH,
+    );
   });
 
   it('gibt der Tabelle eine Mindestbreite aus den Spalten, darunter scrollt die Seite', async () => {
@@ -273,8 +299,8 @@ describe('SyncStatusPage', () => {
     await waitForRow(wrapper, succeeded);
 
     const grid = wrapper.get('section[role="region"]').element.firstElementChild as HTMLElement;
-    // Mindestens die Mindestbreiten von Amazon-Konto (180), Dauer (160) und Ergebnis (280).
-    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThanOrEqual(620));
+    // Mindestens die Mindestbreiten von Amazon-Konto (180), Dauer (160) und Ergebnis (220).
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBeGreaterThanOrEqual(560));
   });
 
   it('hält in der Dauer Platz für laufende Jobs frei (sie wächst ohne neue Zeilen)', async () => {

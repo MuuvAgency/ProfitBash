@@ -301,6 +301,8 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     EZB-Arbeitstage; Ostern: Dienstag nach Ostern 5 Tage, also keine Warnung). Mit Ostern und Weihnachten testen.
   - **Offen für 0.9 (Deploy):** Ohne Healthchecks.io fehlt auch die externe Überwachung des Backups (`HEALTHCHECKS_DB_BACKUP_URL`,
     `docs/deploy.md`); vor dem Deploy mit Dominik klären, ob das Backup anders überwacht wird.
+    **Entschieden (Dominik, 2026-09-29): in der App.** Das Backup schreibt seine Läufe in die eigene Datenbank (Sync-Status),
+    das Dashboard warnt Admins, wenn das letzte gelungene Backup älter als 26 Std. ist; umgesetzt mit 0.9 (`phase-0.md`).
 
 ### 2.3 Demo-Daten mit Volumen (F12)
 - [x] Generator im Mock-Anbieter nach F12, deterministisch (fester Seed), nur erfundene Namen; Seed-Schritt für Clients und
@@ -438,6 +440,10 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     Sortierung auf dem Server (F7). Kampagnen, Dashboard, Drill-Down und ein Client bleiben unter 1 s.
     **Entschieden (Dominik, 2026-09-28): (a) Vergleich nachladen.** Der Explorer lädt die Zeilen ohne Vergleich (unter 1 s) und
     den Vergleich danach; die Spalten „Veränderung“ füllen sich, sobald er da ist (2.8).
+    **Entschieden (Dominik, 2026-09-29), Rest:** Die DoD „unter 1 s“ gilt für die Datenbank-Abfragen, die die Seite wartend
+    braucht (Zeilen ohne Vergleich, Dashboard, Tagesreihen); die größte Auswahl (Targets, alle 6 Profile, 30 Tage) braucht im
+    Browser 1,5 s bis zu den Zeilen, 3,1 s mit Vergleich, und bleibt als bekannte Grenze festgehalten. Voraggregation bzw.
+    serverseitiges Row Model (b, c) erst als eigene Aufgabe, wenn echte Konten es verlangen.
 
 ### 2.5 API (`apps/api`)
 - [x] Middleware `requireFeature(key, 'view')`: prüft Entitlement und Rolle serverseitig (`resolveFeatureAccess`), `403` mit
@@ -650,7 +656,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     zurückgesetzt, Drill-Down verwirft tiefere IDs, CSV mit BOM (Excel), Formeln in Texten entschärft (`csvSafe`), fehlende
     Werte leer, Ad-Typen in fester Reihenfolge in der URL, Brotkrumen speichern nur echte Namen, Zeilenzahl formatiert,
     Chart-Anfrage ohne Vergleich im Schlüssel, `aria-expanded` am ASIN-Knopf, konstante Grid-Optionen, Download robuster.
-  - **Offen (klein, später):** Amazon-Enums unübersetzt (Match-Typ, Targeting, Gebotsstrategie) und Ausdrücke von Targets als
+  - **Offen (klein, später)** (Dominik, 2026-09-29: jetzt als 2.13): Amazon-Enums unübersetzt (Match-Typ, Targeting, Gebotsstrategie) und Ausdrücke von Targets als
     JSON; nach einer Änderung in der Filterleiste gelten Brotkrumen-Namen aus den Zeilen statt aus dem Verlauf;
     `suppressCellFocus` (Tastatur-Navigation im Grid aus, Links per Tab erreichbar); Zeilen der Abfrage als `shallow`
     (weniger Proxys bei 10 000 Zeilen); weitere Tests (CSV nach Sortierung, Spaltenauswahl speichern, Vergleichsfehler).
@@ -797,9 +803,29 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     lange SKU-Listen länger, aber weit unter URL-Grenzen), die Entscheidung für ein Suchfeld mit URL-Parameter steht oben.
 
 ### 2.12 Alte Tabellen ohne waagerechtes Scrollen (F14)
-- [ ] Sync-Status (`/ops/sync`) und Profiltabelle (`/admin/connections`) passen bei 1440 px (Sidebar ein- und ausgeklappt) auch mit
+- [x] Sync-Status (`/ops/sync`) und Profiltabelle (`/admin/connections`) passen bei 1440 px (Sidebar ein- und ausgeklappt) auch mit
       klassischer Scrollbar ohne waagerechtes Scrollen; gekürzte Texte auch auf Touch lesbar (nicht nur per Tooltip).
-- [ ] Im Browser-Pane mit klassischer Scrollbar prüfen (Scrollbar-Breite per CSS nachgestellt, da das Pane Overlay-Scrollbars hat).
+- [x] Im Browser-Pane mit klassischer Scrollbar prüfen (Scrollbar-Breite per CSS nachgestellt, da das Pane Overlay-Scrollbars hat).
+- [x] Umsetzung (Stand für 2.13 und später):
+  - **Gemessen vorher** (Browser-Pane, 1440 px, Scrollbar per `::-webkit-scrollbar { width: 15px }` und `html { overflow-y:
+    scroll }` nachgestellt): Inhalt 1113 px bei ausgeklappter, 1289 px bei eingeklappter Sidebar. Sync-Status brauchte
+    1122 px, die Profiltabelle 1120 px, beide scrollten also ausgeklappt waagerecht.
+  - **Umbrechen statt kürzen:** Amazon-Konto und Zähler im Sync-Status (`WrappedCell`, vorher `TruncatedCell` mit `title`),
+    Land, Kontoname und Zeitzone in der Profiltabelle brechen um; die Zeile wächst mit (`autoHeight`, Zelle ohne Flex wie
+    „Ergebnis“, `whitespace-normal` gegen das `nowrap` von AG Grid). `WrapText` (`components/common`) setzt bevorzugte
+    Umbruchstellen nach „@“ und „/“ (`amazon-ads-mock@` / `profitbash.test`, `Europe/` / `Stockholm`), notfalls bricht
+    `wrap-anywhere` im Wort. Nur die erste Zeile eines Fehlers bleibt gekürzt; der ganze Text steht per Klick darunter.
+  - **„Entfernt“** an einem Profil ist ein Knopf mit Popover (`aria-haspopup`, `aria-expanded`) statt eines Tooltips.
+  - **Mindestbreiten:** Sync-Status Ergebnis 280 → 220 px (Amazon-Konto bleibt 180, damit die E-Mail auf zwei Zeilen passt);
+    Profiltabelle Land 235 → 170 px. Obergrenze `FIT_WIDTH_AT_1440` = 1080 px (`grid/min-width.ts`; 1113 minus Reserve,
+    Windows-Scrollbars 17 px), Reserve für die an den Inhalt angepassten Spalten des Sync-Status `SYNC_AUTO_SIZED_WIDTH` =
+    670 px (`sync/layout.ts`, gemessen). Tests prüfen beide Grenzen (happy-dom misst keine Texte; die angepassten Spalten
+    nur im Browser).
+  - **Gemessen nachher:** beide Tabellen 1113 von 1113 px (ausgeklappt) bzw. 1289 von 1289 px (eingeklappt), Seite ohne
+    waagerechtes Scrollen, auch auf dem Handy (375 px; die Tabelle scrollt dort in ihrer Kachel, F13). Hell und Dunkel,
+    Konsole ohne Fehler und ohne AG-Warnungen.
+  - Nicht geändert: Die Client-Auswahl der Profiltabelle kürzt den gewählten Namen im Feld („Waldkauz (D…“); geöffnet steht
+    er ganz da, auch auf Touch.
 
 ## `.env.example`
 
