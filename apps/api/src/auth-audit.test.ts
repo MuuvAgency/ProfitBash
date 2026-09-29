@@ -5,8 +5,8 @@ import {
   createTestContext,
   createUser,
   readJson,
-  request,
   signIn,
+  TEST_APP_URL,
   type TestContext,
 } from './testing';
 
@@ -32,6 +32,22 @@ beforeAll(async () => {
 afterAll(async () => {
   await ctx?.close();
 });
+
+/**
+ * Direkt an better-auth (ohne die Allowlist der App, `app.ts`): Die Organisations-Endpunkte sind per HTTP gesperrt, die
+ * Audit-Hooks gelten aber für jeden Aufruf (z. B. künftige serverseitige Aufrufe über `auth.api.*`).
+ */
+function authRequest(path: string, options: { method: string; cookie?: string; json?: unknown }) {
+  const headers = new Headers({ origin: TEST_APP_URL, 'content-type': 'application/json' });
+  if (options.cookie) headers.set('cookie', options.cookie);
+  return ctx.auth.handler(
+    new Request(`${TEST_APP_URL}${path}`, {
+      method: options.method,
+      headers,
+      body: JSON.stringify(options.json ?? {}),
+    }),
+  );
+}
 
 async function eventsFor(action: string) {
   return ctx.testDb.db
@@ -70,7 +86,7 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
   });
 
   it('Organisation umbenennen', async () => {
-    const res = await request(ctx, '/api/auth/organization/update', {
+    const res = await authRequest('/api/auth/organization/update', {
       method: 'POST',
       cookie: adminCookie,
       json: { organizationId: ctx.seeded.organizationId, data: { name: 'Muuv GmbH' } },
@@ -93,7 +109,7 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
 
   it('Rolle eines Mitglieds ändern (mit vorheriger Rolle)', async () => {
     const id = await memberId(users.viewer);
-    const res = await request(ctx, '/api/auth/organization/update-member-role', {
+    const res = await authRequest('/api/auth/organization/update-member-role', {
       method: 'POST',
       cookie: adminCookie,
       json: { memberId: id, role: 'editor', organizationId: ctx.seeded.organizationId },
@@ -118,7 +134,7 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
   it('abgelehnte Änderungen erzeugen kein Audit-Event', async () => {
     const editorCookie = await signIn(ctx, 'editor@muuv.test');
     const before = await eventsFor('member.role_update');
-    const res = await request(ctx, '/api/auth/organization/update-member-role', {
+    const res = await authRequest('/api/auth/organization/update-member-role', {
       method: 'POST',
       cookie: editorCookie,
       json: { memberId: await memberId(users.leaver), role: 'admin' },
@@ -129,7 +145,7 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
 
   it('Mitglied entfernen', async () => {
     const id = await memberId(users.editor);
-    const res = await request(ctx, '/api/auth/organization/remove-member', {
+    const res = await authRequest('/api/auth/organization/remove-member', {
       method: 'POST',
       cookie: adminCookie,
       json: { memberIdOrEmail: id, organizationId: ctx.seeded.organizationId },
@@ -147,7 +163,7 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
 
   it('Organisation selbst verlassen', async () => {
     const id = await memberId(users.leaver);
-    const res = await request(ctx, '/api/auth/organization/leave', {
+    const res = await authRequest('/api/auth/organization/leave', {
       method: 'POST',
       cookie: await signIn(ctx, 'leaver@muuv.test'),
       json: { organizationId: ctx.seeded.organizationId },
@@ -164,7 +180,7 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
   });
 
   it('Einladung anlegen und zurückziehen', async () => {
-    const invite = await request(ctx, '/api/auth/organization/invite-member', {
+    const invite = await authRequest('/api/auth/organization/invite-member', {
       method: 'POST',
       cookie: adminCookie,
       json: { email: 'neu@muuv.test', role: 'viewer', organizationId: ctx.seeded.organizationId },
@@ -172,7 +188,7 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
     expect(invite.status).toBe(200);
     const { id } = await readJson<{ id: string }>(invite);
 
-    const cancel = await request(ctx, '/api/auth/organization/cancel-invitation', {
+    const cancel = await authRequest('/api/auth/organization/cancel-invitation', {
       method: 'POST',
       cookie: adminCookie,
       json: { invitationId: id },
@@ -192,14 +208,14 @@ describe('Audit-Events für Schreibvorgänge über better-auth', () => {
 describe('Einladung annehmen', () => {
   it('der Eingeladene ist der Handelnde', async () => {
     const invitee = await createUser(ctx, { email: 'gast@muuv.test' });
-    const invite = await request(ctx, '/api/auth/organization/invite-member', {
+    const invite = await authRequest('/api/auth/organization/invite-member', {
       method: 'POST',
       cookie: adminCookie,
       json: { email: 'gast@muuv.test', role: 'viewer', organizationId: ctx.seeded.organizationId },
     });
     const { id } = await readJson<{ id: string }>(invite);
 
-    const accept = await request(ctx, '/api/auth/organization/accept-invitation', {
+    const accept = await authRequest('/api/auth/organization/accept-invitation', {
       method: 'POST',
       cookie: await signIn(ctx, 'gast@muuv.test'),
       json: { invitationId: id },
@@ -218,7 +234,7 @@ describe('Einladung annehmen', () => {
 
 describe('Org-Admins können ihre Organisation nicht löschen (Rollenrechte)', () => {
   it('lehnt das Löschen ab, die Organisation bleibt bestehen', async () => {
-    const res = await request(ctx, '/api/auth/organization/delete', {
+    const res = await authRequest('/api/auth/organization/delete', {
       method: 'POST',
       cookie: adminCookie,
       json: { organizationId: ctx.seeded.organizationId },

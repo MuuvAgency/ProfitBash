@@ -63,6 +63,9 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   (`filterSavedViewState` über `listVisibleClientsAndProfiles()` und `visibleProfilesScope()`), damit eine Ansicht nie
   Unsichtbares speichert oder ausliefert, auch nicht nach späterem Ausblenden oder mit Profil-Freigaben (Phase 6). Die
   Kennzahlen selbst liest die Ansicht nicht; sie laufen weiter über die Auswertungs-Endpunkte.
+- **Mitgliederverwaltung** (ab Phase 2, 2.10): `packages/db/src/members.ts` und `member_password_links` lesen und schreiben
+  Mitgliedschaften der aktiven Organisation hinter `orgAdminOnly` (wie Clients und Connections). Die öffentlichen Endpunkte
+  zum Setzen des Passworts finden die Organisation über den Hash des Tokens, nicht über eine Eingabe.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

@@ -206,6 +206,26 @@ describe('/api/members', () => {
     }
   });
 
+  it('Org-Admins ohne Plattform-Rolle können den Superadmin nicht übernehmen', async () => {
+    await createUser(ctx, { email: 'orgadmin@muuv.test', org: { id: orgId, role: 'admin' } });
+    const orgAdmin = await signIn(ctx, 'orgadmin@muuv.test');
+    const list = await call<{ members: Member[] }>('GET', '/members', orgAdmin);
+    const superadmin = list.body.members.find((m) => m.email === ctx.seeded.email)!;
+    const link = await call<ErrorResponse>(
+      'POST',
+      `/members/${superadmin.id}/password-link`,
+      orgAdmin,
+    );
+    expect(link.status).toBe(403);
+    expect(link.body.error.code).toBe('MEMBER_PROTECTED');
+    expect(
+      (await call('PATCH', `/members/${superadmin.id}`, orgAdmin, { role: 'viewer' })).status,
+    ).toBe(403);
+    expect((await call('DELETE', `/members/${superadmin.id}`, orgAdmin)).status).toBe(403);
+    // Der Superadmin selbst darf.
+    expect((await call('POST', `/members/${superadmin.id}/password-link`, admin)).status).toBe(201);
+  });
+
   it('ungültiges Token: gleiche Antwort wie abgelaufen, Format geprüft', async () => {
     expect(
       (await call('POST', '/password-links/inspect', '', { token: 'c'.repeat(43) })).status,

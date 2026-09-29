@@ -11,6 +11,7 @@ import BrandMark from '../components/brand/BrandMark.vue';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { errorMessageKey } from '../i18n';
+import { useSessionStore } from '../stores/session';
 
 /**
  * Passwort über den einmaligen Link setzen (`phase-2.md` F9, 2.10), öffentlich, ohne Session. Das Token steht im Fragment
@@ -28,12 +29,14 @@ onMounted(() => {
 });
 
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+// Das Token gehört nicht in den Schlüssel (Query-Cache, Devtools); die Seite prüft genau einen Link.
 const info = useQuery({
-  queryKey: ['password-link', token],
+  queryKey: ['password-link'],
   queryFn: () => api.passwordLinks.inspect(token.value),
   enabled: TOKEN.test(token.value),
   retry: false,
   staleTime: Infinity,
+  gcTime: 0,
 });
 
 const password = ref('');
@@ -41,6 +44,9 @@ const repeat = ref('');
 const showPassword = ref(false);
 const submitting = ref(false);
 const errorKey = ref<string | null>(null);
+/** Angemeldet (z. B. der Admin testet den Link): `/login` leitete weiter, deshalb der Hinweis hier. */
+const doneWhileSignedIn = ref(false);
+const session = useSessionStore();
 
 async function submit() {
   errorKey.value = null;
@@ -55,7 +61,11 @@ async function submit() {
   submitting.value = true;
   try {
     await api.passwordLinks.redeem(token.value, password.value);
-    await router.replace({ path: '/login', query: { reason: 'passwordSet' } });
+    token.value = '';
+    password.value = '';
+    repeat.value = '';
+    if (session.status === 'authenticated') doneWhileSignedIn.value = true;
+    else await router.replace({ path: '/login', query: { reason: 'passwordSet' } });
   } catch (error) {
     errorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
   } finally {
@@ -78,8 +88,15 @@ async function submit() {
         </p>
       </div>
 
+      <p
+        v-if="doneWhileSignedIn"
+        role="status"
+        class="rounded-control bg-violet-wash px-space-md py-space-sm text-body-sm text-ink"
+      >
+        {{ t('setPassword.doneSignedIn', { name: session.me?.user.name ?? '' }) }}
+      </p>
       <InlineError
-        v-if="!TOKEN.test(token) || info.isError.value"
+        v-else-if="!TOKEN.test(token) || info.isError.value"
         :message="t('setPassword.invalid')"
       />
       <div v-else-if="!info.data.value" class="flex flex-col gap-space-sm" aria-busy="true">

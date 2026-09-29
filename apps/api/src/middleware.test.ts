@@ -136,6 +136,21 @@ describe('better-auth über HTTP: nur freigegebene Endpunkte', () => {
     expect(revoke.status).toBe(404);
   });
 
+  it('sperrt die Mitgliederverwaltung von better-auth (eigene Endpunkte unter /api/members, 2.10)', async () => {
+    for (const path of [
+      '/api/auth/organization/remove-member',
+      '/api/auth/organization/update-member-role',
+      '/api/auth/organization/invite-member',
+      '/api/auth/organization/accept-invitation',
+      '/api/auth/organization/leave',
+      '/api/auth/organization/update',
+      '/api/auth/organization/delete',
+    ]) {
+      const res = await request(ctx, path, { method: 'POST', cookie: cookies.admin, json: {} });
+      expect(res.status, path).toBe(404);
+    }
+  });
+
   it('Abmelden bleibt möglich', async () => {
     const cookie = await signIn(ctx, 'viewer@muuv.test');
     const res = await request(ctx, '/api/auth/sign-out', { method: 'POST', cookie, json: {} });

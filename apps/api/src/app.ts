@@ -28,15 +28,20 @@ const MAX_BODY_BYTES = 64 * 1024;
  * Admin-Plugin) werden erst freigegeben, wenn sie mit Audit und UI gebraucht werden.
  * Serverseitige Aufrufe über `auth.api.*` (z. B. im Seed) sind davon nicht betroffen.
  */
-const PUBLIC_AUTH_PATHS = ['/sign-in/email', '/sign-out', '/get-session', '/ok', '/error'];
-const PUBLIC_AUTH_PREFIXES = ['/organization/'];
+const PUBLIC_AUTH_PATHS = [
+  '/sign-in/email',
+  '/sign-out',
+  '/get-session',
+  '/ok',
+  '/error',
+  // Organisation wechseln (Account-Menü). Mitglieder verwaltet die App selbst (`/api/members`, 2.10): Die
+  // better-auth-Endpunkte dafür (entfernen, Rolle, einladen, verlassen) kennen weder den Schutz des letzten Admins noch
+  // das Beenden der Sessions und bleiben deshalb gesperrt.
+  '/organization/set-active',
+];
 
 function isPublicAuthPath(path: string): boolean {
-  const authPath = path.slice('/api/auth'.length);
-  return (
-    PUBLIC_AUTH_PATHS.includes(authPath) ||
-    PUBLIC_AUTH_PREFIXES.some((prefix) => authPath.startsWith(prefix))
-  );
+  return PUBLIC_AUTH_PATHS.includes(path.slice('/api/auth'.length));
 }
 
 /** Antwortet auf ungültige Eingaben (zod) im einheitlichen Fehlerformat. */

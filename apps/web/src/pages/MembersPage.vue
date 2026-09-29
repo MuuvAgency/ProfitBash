@@ -78,6 +78,27 @@ const renewLink = useMutation({
   onError: (error, member) => (rowError.value = { memberId: member.id, message: errorText(error) }),
 });
 
+/** Rückfrage vor Aktionen mit Folgen: neuer Link für ein aktives Konto, eigene Rolle herabsetzen. */
+const pendingConfirm = ref<
+  { kind: 'renew'; member: Member } | { kind: 'demoteSelf'; member: Member; role: OrgRole } | null
+>(null);
+
+function onRenew(member: Member) {
+  if (member.status === 'active') pendingConfirm.value = { kind: 'renew', member };
+  else renewLink.mutate(member);
+}
+function onRole(member: Member, role: OrgRole) {
+  if (member.isSelf && member.role === 'admin' && role !== 'admin') {
+    pendingConfirm.value = { kind: 'demoteSelf', member, role };
+  } else changeRole.mutate({ member, role });
+}
+function confirmPending() {
+  const pending = pendingConfirm.value;
+  pendingConfirm.value = null;
+  if (pending?.kind === 'renew') renewLink.mutate(pending.member);
+  else if (pending) changeRole.mutate({ member: pending.member, role: pending.role });
+}
+
 async function copyLink() {
   if (!shownLink.value) return;
   try {
@@ -219,7 +240,7 @@ function askRemove(member: Member) {
                 fluid
                 :aria-label="t('members.roleOf', { name: member.name })"
                 :disabled="changeRole.isPending.value"
-                @update:model-value="(role: OrgRole) => changeRole.mutate({ member, role })"
+                @update:model-value="(role: OrgRole) => onRole(member, role)"
               />
             </div>
             <span class="flex items-center gap-space-sm text-body-sm text-ink">
@@ -238,7 +259,7 @@ function askRemove(member: Member) {
                 size="small"
                 :aria-label="t('members.renewLinkFor', { name: member.name })"
                 :loading="renewLink.isPending.value && renewLink.variables.value?.id === member.id"
-                @click="renewLink.mutate(member)"
+                @click="onRenew(member)"
               />
               <Button
                 v-if="!member.isSelf"
@@ -363,6 +384,36 @@ function askRemove(member: Member) {
         <div class="flex justify-end gap-space-sm">
           <Button :label="t('common.close')" severity="secondary" text @click="shownLink = null" />
           <Button icon="pi pi-copy" :label="t('members.link.copy')" @click="copyLink" />
+        </div>
+      </div>
+    </Dialog>
+
+    <!-- Rückfrage -->
+    <Dialog
+      :visible="pendingConfirm !== null"
+      modal
+      :header="pendingConfirm ? t(`members.confirm.${pendingConfirm.kind}.title`) : ''"
+      :style="{ width: 'min(28rem, calc(100vw - 2rem))' }"
+      @update:visible="(visible) => !visible && (pendingConfirm = null)"
+    >
+      <div v-if="pendingConfirm" class="flex flex-col gap-space-lg">
+        <p class="text-body-md text-ink">
+          {{
+            t(`members.confirm.${pendingConfirm.kind}.text`, { name: pendingConfirm.member.name })
+          }}
+        </p>
+        <div class="flex justify-end gap-space-sm">
+          <Button
+            :label="t('common.cancel')"
+            severity="secondary"
+            text
+            @click="pendingConfirm = null"
+          />
+          <Button
+            data-member-confirm
+            :label="t(`members.confirm.${pendingConfirm.kind}.action`)"
+            @click="confirmPending"
+          />
         </div>
       </div>
     </Dialog>
