@@ -11,4 +11,5 @@ export * from './features';
 export * from './format';
 export * from './logger';
 export * from './roles';
+export * from './saved-views';
 export * from './slug';

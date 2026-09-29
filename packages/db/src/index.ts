@@ -15,3 +15,4 @@ export * from './maintenance';
 export * from './system-access';
 export { runMigrations } from './migrate';
 export * from './fx-rates';
+export * from './saved-views';
