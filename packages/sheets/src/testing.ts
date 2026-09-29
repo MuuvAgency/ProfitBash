@@ -20,6 +20,8 @@ export interface BuildXlsxOptions {
   absoluteTargets?: boolean;
   /** Zellen ohne `r`-Attribut schreiben (Position aus der Reihenfolge). */
   withoutCellRefs?: boolean;
+  /** Teile unkomprimiert ablegen (ZIP-Methode 0). */
+  stored?: boolean;
   /** Zusätzliche Dateien im Paket (z. B. für Größentests). */
   extraFiles?: Record<string, Uint8Array>;
 }
@@ -107,5 +109,5 @@ export function buildXlsx(sheets: TestSheet[], options: BuildXlsxOptions = {}): 
       .join('')}</sst>`,
   );
   Object.assign(files, options.extraFiles ?? {});
-  return zipSync(files);
+  return zipSync(files, options.stored ? { level: 0 } : {});
 }

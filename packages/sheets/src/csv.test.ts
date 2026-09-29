@@ -27,6 +27,8 @@ describe('forEachCsvRow', () => {
       ['1', '2,5', '3'],
     ]);
     expect(rowsOf('a\tb\n1\t2').delimiter).toBe('\t');
+    // Das Trennzeichen im Feld in Anführungszeichen zählt nicht (sonst gewönne hier das Komma).
+    expect(rowsOf('"x,y,z";a;b\n1;2;3').delimiter).toBe(';');
   });
 
   it('entfernt die BOM und dekodiert UTF-8 aus Bytes', () => {
@@ -57,9 +59,13 @@ describe('forEachCsvRow', () => {
     );
   });
 
-  it('zählt Zeilennummern ab 1 wie in Excel', () => {
+  it('zählt Zeilennummern ab 1 wie in Excel, leere Zeilen mitgezählt', () => {
     const numbers: number[] = [];
-    forEachCsvRow('a\n"x\ny"\nb', (_row, rowNumber) => numbers.push(rowNumber));
-    expect(numbers).toEqual([1, 2, 3]);
+    forEachCsvRow('a\n"x\ny"\n\nb', (_row, rowNumber) => numbers.push(rowNumber));
+    expect(numbers).toEqual([1, 2, 4]);
+  });
+
+  it('lehnt Text nach einem schließenden Anführungszeichen ab', () => {
+    expect(() => rowsOf('a,b\n"x"y,1')).toThrow(expect.objectContaining({ code: 'INVALID_CSV' }));
   });
 });

@@ -17,22 +17,42 @@ export interface SheetInfo {
 }
 
 export interface XlsxOptions {
-  /** Höchstens so viele Bytes entpackt, über alle gelesenen Teile (Schutz vor Zip-Bomben). */
+  /**
+   * Höchstens so viele Bytes entpackt, über alle gelesenen Teile der Datei, auch wenn ein Blatt mehrfach
+   * gelesen wird (Schutz vor Zip-Bomben).
+   */
   maxUncompressedBytes?: number;
+  /** Höchstens so viele Zellen je gelesenem Blatt, aufgefüllte Lücken und leere Zeilen mitgezählt. */
+  maxCells?: number;
 }
 
 export type RowCallback = (row: string[], rowNumber: number) => void;
 
 export interface XlsxWorkbook {
   sheets: SheetInfo[];
-  /** Ruft `callback` je Zeile auf, synchron und in Reihenfolge; fehlende Zeilen kommen als `[]`. */
+  /**
+   * Ruft `callback` je Zeile auf, synchron und in Reihenfolge; fehlende Zeilen kommen als `[]`. Scheitert
+   * das Lesen mittendrin, sind die Zeilen davor schon geliefert: Aufrufer schreiben erst nach dem Ende.
+   */
   forEachRow(sheetName: string, callback: RowCallback): void;
 }
 
 export const DEFAULT_MAX_UNCOMPRESSED_BYTES = 500 * 1024 * 1024;
-const CHUNK_BYTES = 64 * 1024;
+/** Große Bulk-Dateien haben rund 200 000 Zeilen × 75 Spalten. */
+export const DEFAULT_MAX_CELLS = 30_000_000;
+/** Grenzen von Excel: 1 048 576 Zeilen, Spalten bis XFD. */
+export const MAX_ROWS = 1_048_576;
+export const MAX_COLUMNS = 16_384;
+/**
+ * Eingabe je Schritt beim Entpacken. fflate liefert alles, was ein Schritt ergibt, als ein Stück; Deflate
+ * packt höchstens rund 1:1032, ein Stück bleibt so unter etwa 8 MB, bevor das Budget greift.
+ */
+const CHUNK_BYTES = 8 * 1024;
 
 // --- ZIP ------------------------------------------------------------------------------------------
+// Eigenes Zentralverzeichnis statt Streaming über die lokalen Kopfzeilen: Dort stehen verlässliche Größen,
+// auch bei Data Descriptors (Bit 3). Zip64 (über 4 GB bzw. 65 535 Einträge) wird nicht gelesen und scheitert
+// als beschädigt; Excel-Dateien der Werbekonsole erreichen das nicht.
 
 interface ZipEntry {
   name: string;
@@ -155,11 +175,27 @@ interface XmlHandlers {
   text?(text: string): void;
 }
 
-function parseXml(file: Uint8Array, entry: ZipEntry, budget: Budget, handlers: XmlHandlers): void {
+type Fail = (reason: string) => never;
+
+/**
+ * Fehler mit Teil und Position, ohne Text aus der Datei (Kundendaten) und ohne die englische Meldung von
+ * saxes.
+ */
+function parseXml(
+  file: Uint8Array,
+  entry: ZipEntry,
+  budget: Budget,
+  handlers: XmlHandlers | ((fail: Fail) => XmlHandlers),
+): void {
   const parser = new SaxesParser({ xmlns: false });
-  parser.on('error', (error) => {
-    throw new SheetReadError('INVALID_XML', `Ungültiges XML in ${entry.name}: ${error.message}`);
-  });
+  const fail: Fail = (reason) => {
+    throw new SheetReadError(
+      'INVALID_XML',
+      `${reason} in ${entry.name} (Zeile ${parser.line}, Spalte ${parser.column}).`,
+    );
+  };
+  parser.on('error', () => fail('Ungültiges XML'));
+  if (typeof handlers === 'function') handlers = handlers(fail);
   if (handlers.open) {
     const open = handlers.open;
     parser.on('opentag', (tag: SaxesTagPlain) => open(localName(tag.name), tag.attributes));
@@ -209,11 +245,14 @@ function richTextCollector() {
   };
 }
 
+/** Spalte aus einer Zelladresse (`AA12` → 26); `null` ohne Buchstaben, `Infinity` jenseits von XFD. */
 function columnIndex(ref: string): number | null {
   const match = /^([A-Z]+)\d*$/i.exec(ref);
   if (!match) return null;
+  const letters = match[1]!.toUpperCase();
+  if (letters.length > 3) return Infinity;
   let index = 0;
-  for (const char of match[1]!.toUpperCase()) index = index * 26 + (char.charCodeAt(0) - 64);
+  for (const char of letters) index = index * 26 + (char.charCodeAt(0) - 64);
   return index - 1;
 }
 
@@ -292,6 +331,14 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
       }
       const strings = loadSharedStrings();
       const inline = richTextCollector();
+      const maxCells = options.maxCells ?? DEFAULT_MAX_CELLS;
+      let cells = 0;
+      const countCells = (count: number) => {
+        cells += count;
+        if (cells > maxCells) {
+          throw new SheetReadError('TOO_LARGE', `Blatt „${sheetName}“ hat zu viele Zellen.`);
+        }
+      };
 
       let row: string[] = [];
       let rowNumber = 0;
@@ -302,19 +349,27 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
       let value = '';
       let inInline = false;
 
-      parseXml(file, entry, budget, {
+      parseXml(file, entry, budget, (fail) => ({
         open(name, attributes) {
           if (name === 'row') {
-            const declaredNumber = Number(attributes.r);
-            rowNumber =
-              Number.isSafeInteger(declaredNumber) && declaredNumber > emitted
-                ? declaredNumber
-                : emitted + 1;
+            if (attributes.r === undefined) {
+              rowNumber = emitted + 1;
+            } else {
+              const declaredNumber = Number(attributes.r);
+              if (!Number.isSafeInteger(declaredNumber) || declaredNumber < 1) {
+                fail('Ungültige Zeilennummer');
+              }
+              if (declaredNumber > MAX_ROWS) fail('Zeilennummer jenseits der Grenze von Excel');
+              if (declaredNumber <= emitted) fail('Zeilen doppelt oder nicht aufsteigend');
+              rowNumber = declaredNumber;
+            }
+            if (rowNumber > MAX_ROWS) fail('Zu viele Zeilen');
             row = [];
             column = -1;
           } else if (name === 'c') {
             const index = attributes.r ? columnIndex(attributes.r) : null;
             column = index ?? column + 1;
+            if (column >= MAX_COLUMNS) fail('Spalte jenseits der Grenze von Excel');
             cellType = attributes.t;
             value = '';
           } else if (name === 'v') {
@@ -337,11 +392,16 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
             let text = value;
             if (cellType === 's') {
               const index = Number(value);
-              text = Number.isSafeInteger(index) ? (strings[index] ?? '') : '';
+              const shared = Number.isSafeInteger(index) ? strings[index] : undefined;
+              if (shared === undefined) return fail('Verweis auf einen fehlenden gemeinsamen Text');
+              text = shared;
             }
+            if (column < row.length) fail('Zelle doppelt oder nicht aufsteigend');
+            countCells(column + 1 - row.length);
             while (row.length < column) row.push('');
             row[column] = text;
           } else if (name === 'row') {
+            countCells(Math.max(0, rowNumber - 1 - emitted));
             while (emitted < rowNumber - 1) {
               emitted++;
               callback([], emitted);
@@ -354,7 +414,7 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
           if (inInline) inline.text(text);
           else if (inValue) value += text;
         },
-      });
+      }));
     },
   };
 }

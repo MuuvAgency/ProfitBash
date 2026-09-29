@@ -995,9 +995,35 @@ Teilaufgaben (Reihenfolge):
     als ID lesen).
 
 #### 1.11b Tabellen-Leser (`packages/sheets`)
-- [ ] XLSX gestreamt (fflate entpackt, saxes liest `sharedStrings` und die Blätter Zeile für Zeile), Blattnamen, Zellen als Text
+- [x] XLSX gestreamt (fflate entpackt, saxes liest `sharedStrings` und die Blätter Zeile für Zeile), Blattnamen, Zellen als Text
       (Zahlen verlustfrei als Quelltext, keine Umwandlung über `number`), Größendeckel entpackt. CSV (RFC 4180, Trennzeichen `,`/`;`,
       BOM). Tests nur mit synthetischen Dateien, die der Test selbst erzeugt.
+- [x] Umsetzung (Stand für 1.11c und später):
+  - **Paket** `@profitbash/sheets` (nur Server, Abhängigkeiten `fflate` 0.8.3 und `saxes` 6.0.0, exakt gepinnt).
+    `openXlsx(datei, { maxUncompressedBytes, maxCells })` → `{ sheets: [{ name, state }], forEachRow(blatt, cb) }`;
+    `forEachCsvRow(text | bytes, cb, { maxBytes })` → `{ delimiter }`; Fehler als `SheetReadError` mit `code`
+    (`NOT_XLSX`, `INVALID_XML`, `TOO_LARGE`, `SHEET_NOT_FOUND`, `INVALID_CSV`); Meldungen nennen Teil, Zeile und Spalte, nie
+    Inhalte der Datei. Test-Baustein `buildXlsx` unter `@profitbash/sheets/testing` (synthetische Dateien, auch unkomprimiert).
+  - **XLSX:** eigenes Zentralverzeichnis der ZIP (verlässliche Größen auch bei Data Descriptors; Zip64 und Verschlüsselung
+    abgelehnt), Entpacken in 8-KB-Schritten (ein Stück höchstens rund 8 MB, bevor das Budget greift), UTF-8 streng, saxes
+    (keine Entities aus DTDs, externe DOCTYPEs werden nicht geladen). `sharedStrings`, `inlineStr` samt Rich Text (ohne
+    `rPh`), Typen `s`/`str`/`b`/`e`/`n` als Text, Zahlen als Quelltext (Gleitkomma-Reste wie `123.45000000000002` bleiben stehen:
+    Normalisieren ist Sache der Abbildung in 1.11d/e). Spalte aus der Adresse (sonst fortlaufend), Lücken als `''`, fehlende
+    Zeilen als `[]` (Zeilennummern bleiben richtig). Abgelehnt: Zeilen über 1 048 576 oder nicht aufsteigend, Spalten jenseits
+    XFD oder doppelt, Verweise auf fehlende gemeinsame Texte; mehr als `maxCells` (Standard 30 Mio., Lücken mitgezählt) oder
+    `maxUncompressedBytes` (Standard 500 MB über die ganze Datei) → `TOO_LARGE`. Zeilen vor einem Fehler sind schon geliefert:
+    Aufrufer schreiben erst nach dem Ende des Blatts.
+  - **CSV:** RFC 4180, Trennzeichen `,`/`;`/Tab aus der Kopfzeile (außerhalb von Anführungszeichen), BOM, CRLF, Zeilennummern wie
+    in Excel (leere Zeilen zählen mit, werden nicht geliefert), Text nach schließendem Anführungszeichen abgelehnt, Standardgrenze
+    200 MB (als Text im Speicher).
+  - **Gemessen** (lokal): echte Bulk-Datei (Dominik, SP, 9 Blätter) 52 ms, Zeilenzahlen wie eine unabhängige Auswertung;
+    synthetisch 200 000 Zeilen × 11 Spalten (10 MB gepackt) 2,2 s bei 72 MB Heap; CSV 400 000 Zeilen (45 MB) 0,6 s.
+  - Review (unabhängig): Übernommen: Grenzen für Zeilennummern, Spalten und Zellen (vorher legte eine winzige Datei mit
+    `r="30000000"` den Prozess lahm), Ablehnung doppelter und rückwärts laufender Zeilen und fehlender gemeinsamer Texte (vorher
+    still umnummeriert bzw. leer), kleinere Entpack-Schritte, Fehler ohne saxes-Text, Tests für unkomprimierte Teile, Umlaute
+    über Stückgrenzen und das Trennzeichen in Anführungszeichen, CSV-Zeilennummern und Text nach Anführungszeichen. Bewusst so:
+    doppelte Namen im ZIP-Verzeichnis (der letzte gilt), `xl/workbook.xml` fest statt über `_rels/.rels`, eine Signatur im
+    Archiv-Kommentar (Amazon erzeugt nichts davon).
 
 #### 1.11c Upload und Import-Job
 - [ ] Tabelle `file_imports` (Organisation, Profil, Art `bulk` | `daily_report`, Dateiname, Größe, SHA-256, Status, Zähler, Fehler,

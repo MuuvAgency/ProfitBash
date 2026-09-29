@@ -158,4 +158,86 @@ describe('openXlsx', () => {
     ).toThrow('Abbruch');
     expect(seen).toEqual(['1', '2']);
   });
+
+  describe('Grenzen und Unstimmigkeiten (Review 1.11b)', () => {
+    const sheetFile = (sheetXml: string) =>
+      zipSync({
+        'xl/workbook.xml': strToU8(
+          '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        ),
+        'xl/_rels/workbook.xml.rels': strToU8(
+          '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+        ),
+        'xl/worksheets/sheet1.xml': strToU8(
+          `<worksheet><sheetData>${sheetXml}</sheetData></worksheet>`,
+        ),
+      });
+    const read = (sheetXml: string, options?: Parameters<typeof openXlsx>[1]) =>
+      rowsOf(sheetFile(sheetXml), 'S', options);
+
+    it('lehnt Zeilennummern jenseits von Excel ab, ohne Millionen leerer Zeilen zu liefern', () => {
+      let calls = 0;
+      expect(() =>
+        openXlsx(sheetFile('<row r="30000000"><c r="A30000000"><v>1</v></c></row>')).forEachRow(
+          'S',
+          () => calls++,
+        ),
+      ).toThrow(expect.objectContaining({ code: 'INVALID_XML' }));
+      expect(calls).toBe(0);
+    });
+
+    it('lehnt Spalten jenseits von XFD ab', () => {
+      expect(() => read('<row r="1"><c r="ZZZZZZ1"><v>1</v></c></row>')).toThrow(
+        expect.objectContaining({ code: 'INVALID_XML' }),
+      );
+      expect(read('<row r="1"><c r="XFD1"><v>1</v></c></row>')[0]).toHaveLength(16384);
+    });
+
+    it('begrenzt die Zahl der Zellen samt aufgefüllter Lücken', () => {
+      const rows = Array.from(
+        { length: 20 },
+        (_, i) => `<row r="${i + 1}"><c r="XFD${i + 1}"><v>1</v></c></row>`,
+      ).join('');
+      expect(() => read(rows, { maxCells: 100_000 })).toThrow(
+        expect.objectContaining({ code: 'TOO_LARGE' }),
+      );
+    });
+
+    it('lehnt doppelte oder rückwärts laufende Zeilennummern ab', () => {
+      expect(() =>
+        read('<row r="2"><c r="A2"><v>b</v></c></row><row r="1"><c r="A1"><v>a</v></c></row>'),
+      ).toThrow(expect.objectContaining({ code: 'INVALID_XML' }));
+      expect(() =>
+        read('<row r="1"><c r="A1"><v>a</v></c></row><row r="1"><c r="A1"><v>b</v></c></row>'),
+      ).toThrow(expect.objectContaining({ code: 'INVALID_XML' }));
+    });
+
+    it('lehnt Verweise auf fehlende gemeinsame Texte ab, statt sie leer zu liefern', () => {
+      expect(() => read('<row r="1"><c r="A1" t="s"><v>99</v></c></row>')).toThrow(
+        expect.objectContaining({ code: 'INVALID_XML' }),
+      );
+      expect(() => read('<row r="1"><c r="A1" t="s"><v>abc</v></c></row>')).toThrow(
+        expect.objectContaining({ code: 'INVALID_XML' }),
+      );
+    });
+
+    it('liest unkomprimierte Teile, auch mit Umlauten über Stückgrenzen hinweg', () => {
+      const text = 'ä'.repeat(70_000);
+      const file = buildXlsx([{ name: 'A', rows: [[text], ['Ende']] }], { stored: true });
+      expect(rowsOf(file, 'A')).toEqual([[text], ['Ende']]);
+    });
+
+    it('nennt im Fehler nur Teil und Position, keinen Inhalt', () => {
+      try {
+        read('<row r="1"><c r="A1" t="inlineStr"><is><t>Geheimer Kampagnenname</is></c></row>');
+        expect.unreachable();
+      } catch (error) {
+        expect(error).toBeInstanceOf(SheetReadError);
+        const message = (error as Error).message;
+        expect(message).toContain('xl/worksheets/sheet1.xml');
+        expect(message).not.toContain('Geheim');
+        expect(message).toMatch(/Zeile \d+, Spalte \d+/);
+      }
+    });
+  });
 });
