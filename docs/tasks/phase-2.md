@@ -834,6 +834,33 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     den Zählern ist nicht Platz für beide in einer Zeile; 1 : 1 ließe die Zähler öfter umbrechen). `SYNC_AUTO_SIZED_WIDTH`
     ist gemessen: bei neuen oder längeren Job-Namen neu messen.
 
+### 2.13 Kleine offene Punkte des Explorers (aus 2.8)
+**Entschieden (Dominik, 2026-09-29): jetzt, vor dem Abschluss von Phase 2.**
+- [x] Amazon-Werte übersetzt (Match-Typ, Targeting, Gebotsstrategie), unbekannte wie geliefert.
+- [x] Ausdrücke von Targets ohne Keyword lesbar statt als JSON (Name, Spalte „Target“, CSV).
+- [x] Tastatur-Navigation im Grid (ohne `suppressCellFocus`), Enter löst den Link bzw. Knopf der Zelle aus.
+- [x] Zeilen der Abfrage als `shallow` (keine tiefen Proxys bei 10 000 Zeilen).
+- [x] Tests: CSV in der Sortierung des Grids, Spaltenauswahl speichern, Fehler beim Nachladen des Vergleichs.
+- [x] Umsetzung (Stand für Phase 3):
+  - **`explorer/amazon-labels.ts`:** `amazonLabel(kind, value)` über i18n-Keys `explorer.amazon.<kind>.<WERT>`; bekannt
+    sind die Werte aus dem Mock (Match-Typen EXACT/PHRASE/BROAD, Auto-Targeting `SEARCH_CLOSE_MATCH` usw., `PRODUCT_EXACT`,
+    SB-Themen, Targeting AUTO/MANUAL und SD-Taktiken T00020/T00030, Gebotsstrategie `SALES_DOWN_ONLY` u. a.). Welche Werte
+    Amazon wirklich liefert, zeigt 1.10; unbekannte erscheinen unverändert. `targetLabel(attributes)` baut den Text aus
+    `keywordText`/`matchType`/`expression` (Keyword · Match-Typ, „ASIN …“, „Kategorie: …“, „Zielgruppe: Aufrufe, 30 Tage“,
+    „Automatisch: Eng verwandt“, „Thema: Keywords zur Marke“, sonst „Schlüssel: Wert“-Liste). Die Art ergibt sich aus den
+    Feldern des Ausdrucks, weil Negatives und Suchbegriffe keinen `targetType` tragen. Keine API-Änderung.
+  - **Name** von Targets und Negatives ohne Keyword: die DB liefert `coalesce(keyword_text, expression::text)`; die Spalte
+    „Name“ zeigt `targetLabel`, sobald es einen Ausdruck gibt (Filter, Sortierung und CSV nutzen denselben Text).
+  - **Tastatur** (`ExplorerGrid.vue`): Zellen fokussierbar (Pfeiltasten, Leertaste markiert die Zeile), `onCellKeyDown`
+    klickt bei Enter auf einer fokussierten Zelle deren ersten Link oder Knopf (Drill-Down, „teilt sich n ASINs“).
+    Sync-Status und Profiltabelle behalten `suppressCellFocus` (dort sind Auswahl und Schalter per Tab erreichbar).
+  - **`shallow: true`** für beide Zeilen-Abfragen (`useExplorerRows`); die Zeilen werden nie verändert, nur ersetzt.
+  - Browser-Pane geprüft (Demo-Daten, 1440 px): Targets ohne JSON (SP, SB-Themen, SD-Zielgruppen und Kategorien),
+    Match-Typen übersetzt, Klick auf „Status“, Pfeil links, Enter öffnet die Ad Groups der Kampagne; Konsole ohne Fehler
+    und ohne AG-Warnungen.
+  - Nicht in 2.13: Brotkrumen-Namen nach einer Änderung der Filterleiste (aus den Zeilen statt aus dem Verlauf) bleiben
+    als bekannte Grenze aus 2.8.
+
 ## `.env.example`
 
 Neu in Phase 2: `HEALTHCHECKS_FX_RATES_SYNC_URL` (2.2, optional), optional `AMAZON_ADS_MOCK_SCALE` (2.3, nur Entwicklung).
@@ -850,7 +877,7 @@ Neu in Phase 2: `HEALTHCHECKS_FX_RATES_SYNC_URL` (2.2, optional), optional `AMAZ
 
 ## Reihenfolge für Claude Code
 
-2.1 → 2.2 → 2.3 → 2.4 → 2.5 → 2.6 → 2.7 → 2.8 → 2.9 → 2.10 → 2.11 → 2.12.
+2.1 → 2.2 → 2.3 → 2.4 → 2.5 → 2.6 → 2.7 → 2.8 → 2.9 → 2.10 → 2.11 → 2.12 → 2.13.
 
 Eine frische Session je Aufgabe (2.4 und 2.8 ggf. geteilt). Nach jedem Schritt: Tests grün, kleiner Commit, Häkchen in dieser
 Datei, Umsetzungsnotizen unter der Aufgabe („Umsetzung (Stand für …)“ wie in Phase 1).
