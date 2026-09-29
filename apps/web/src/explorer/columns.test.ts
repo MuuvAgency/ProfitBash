@@ -105,6 +105,20 @@ describe('Explorer-Spalten', () => {
     expect(display(column(defs, 'cost'), total)).toBe(`≈ 100,00${nbsp}€`);
   });
 
+  it('Sortierung aus dem Zustand: gewählte Spalte mit Richtung, alle anderen ohne', () => {
+    const defs = buildColumnDefs({
+      level: 'campaign',
+      visible: new Set(['cost', 'sales']),
+      sort: { column: 'sales', direction: 'asc' },
+      ...ctx,
+    });
+    expect(column(defs, 'sales').sort).toBe('asc');
+    expect(column(defs, 'cost').sort).toBeNull();
+    expect(column(defs, 'name').sort).toBeNull();
+    const unsorted = buildColumnDefs({ level: 'campaign', visible: new Set(['cost']), ...ctx });
+    expect(column(unsorted, 'cost').sort).toBeNull();
+  });
+
   it('fehlende Werte als „–“, nie 0', () => {
     expect(display(column(all('campaign'), 'units'), row())).toBe('–');
   });

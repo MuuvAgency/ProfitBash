@@ -1,6 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue';
-import { useRoute, useRouter, type HistoryState, type RouteLocationRaw } from 'vue-router';
+import {
+  useRoute,
+  useRouter,
+  type HistoryState,
+  type LocationQuery,
+  type RouteLocationRaw,
+} from 'vue-router';
 import { api } from '../api';
 import {
   filterStateFromQuery,
@@ -112,14 +118,22 @@ export function useAnalyticsFilters() {
     }
   }
 
-  function update(patch: Partial<FilterState>) {
+  /**
+   * Auswahl ändern (neuer Verlaufseintrag, gespeichert als letzte Auswahl). `target` ersetzt Pfad und übrige Parameter
+   * (Ansicht laden: Ebene und Drill-Down der Ansicht statt der aktuellen) und ergänzt den Verlaufseintrag.
+   */
+  function update(
+    patch: Partial<FilterState>,
+    target?: { path?: string; query?: LocationQuery; state?: HistoryState },
+  ) {
     const next: FilterState = { ...state.value, ...patch };
     local.value = next;
     // Für andere Seiten (Explorer) ohne eigenen Verlaufseintrag.
     queryClient.setQueryData(uiStateQueryKey, next);
     void router.push({
-      query: mergeFilterQuery(route.query, next),
-      state: { [HISTORY_STATE_KEY]: toHistoryValue(next) },
+      ...(target?.path && { path: target.path }),
+      query: mergeFilterQuery(target?.query ?? route.query, next),
+      state: { ...target?.state, [HISTORY_STATE_KEY]: toHistoryValue(next) },
       // Gleiche URL bei anderer Profilauswahl ist trotzdem ein neuer Eintrag.
       force: true,
     });

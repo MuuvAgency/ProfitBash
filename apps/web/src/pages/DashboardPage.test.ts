@@ -367,3 +367,67 @@ describe('DashboardPage', () => {
     expect(requests.some((r) => r.path === '/api/ads/dashboard')).toBe(false);
   });
 });
+
+describe('Gespeicherte Ansichten im Dashboard (F8)', () => {
+  it('lädt die Filterleiste einer Ansicht und behält andere Parameter nicht', async () => {
+    const { requests } = stubFetch(
+      routes({
+        'GET /api/saved-views': json({
+          views: [
+            {
+              id: '00000000-0000-4000-8000-0000000000e2',
+              name: 'Letzte Woche ohne Vergleich',
+              area: 'dashboard',
+              shared: false,
+              owner: { id: 'user-1', name: 'Dominik' },
+              own: true,
+              canEdit: true,
+              canShare: true,
+              hiddenItems: 0,
+              createdAt: '2026-09-28T08:00:00.000Z',
+              updatedAt: '2026-09-28T08:00:00.000Z',
+              state: {
+                filters: {
+                  clientIds: [],
+                  withoutClient: false,
+                  profileIds: null,
+                  period: { preset: 'lastWeek' },
+                  comparison: 'off',
+                  currency: 'EUR',
+                  attribution: 'clicks14d',
+                },
+              },
+            },
+          ],
+        }),
+      }),
+    );
+    const { wrapper, router } = await mountDashboard();
+    await wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Letzte Woche ohne Vergleich'),
+    );
+    // Eigene Ansicht: Aktionen vorhanden
+    expect(
+      document.querySelector('[aria-label="„Letzte Woche ohne Vergleich“ löschen"]'),
+    ).not.toBeNull();
+    [...document.querySelectorAll<HTMLButtonElement>('[data-saved-view] button')]
+      .find((b) => b.textContent?.includes('Letzte Woche'))!
+      .click();
+    await vi.waitFor(() =>
+      expect(router.currentRoute.value.query).toEqual({
+        period: 'lastWeek',
+        cmp: 'off',
+        cur: 'EUR',
+        attr: 'clicks14d',
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(requests.filter((r) => r.path === '/api/ads/dashboard').at(-1)?.body).toMatchObject({
+        comparison: null,
+        currency: 'EUR',
+        attribution: 'clicks14d',
+      }),
+    );
+  });
+});

@@ -2121,10 +2121,7 @@ export interface components {
             };
             includeRemoved: boolean;
             adProducts: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
-            chartMetrics: [
-                "impressions" | "clicks" | "cost" | "sales" | "purchases" | "units" | "ctr" | "cpc" | "cvr" | "acos" | "roas" | "cpm" | "vcpm",
-                "impressions" | "clicks" | "cost" | "sales" | "purchases" | "units" | "ctr" | "cpc" | "cvr" | "acos" | "roas" | "cpm" | "vcpm"
-            ];
+            chartMetrics: ("impressions" | "clicks" | "cost" | "sales" | "purchases" | "units" | "ctr" | "cpc" | "cvr" | "acos" | "roas" | "cpm" | "vcpm")[];
             columns: string[] | null;
             sort: {
                 column: string;

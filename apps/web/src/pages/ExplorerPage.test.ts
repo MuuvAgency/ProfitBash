@@ -160,6 +160,7 @@ function routes(rows: Responder = defaultRows) {
     'POST /api/ads/filter-options': json(filterOptions),
     'POST /api/ads/explorer/rows': rows,
     'POST /api/ads/timeseries': json(series()),
+    'GET /api/saved-views': json({ views: [] }),
   };
 }
 
@@ -375,5 +376,166 @@ describe('ExplorerPage', () => {
       expect(wrapper.text()).toContain('Die Zeilen konnten nicht geladen werden.'),
     );
     expect(wrapper.text()).toContain('Erneut versuchen');
+  });
+});
+
+const VIEW_ID = '00000000-0000-4000-8000-0000000000e1';
+
+function savedView(patch: Record<string, unknown> = {}) {
+  return {
+    id: VIEW_ID,
+    name: 'Top-Targets Waldkauz',
+    area: 'explorer',
+    shared: true,
+    owner: { id: 'user-2', name: 'Emil' },
+    own: false,
+    canEdit: false,
+    canShare: false,
+    hiddenItems: 0,
+    createdAt: '2026-09-28T08:00:00.000Z',
+    updatedAt: '2026-09-28T08:00:00.000Z',
+    state: {
+      filters: {
+        clientIds: [C1],
+        withoutClient: false,
+        profileIds: null,
+        period: { preset: 'last7' },
+        comparison: 'off',
+        currency: 'auto',
+        attribution: 'console',
+      },
+      explorer: {
+        level: 'target',
+        drill: { portfolioId: null, campaignId: CAMPAIGN, adGroupId: null },
+        includeRemoved: false,
+        adProducts: [],
+        chartMetrics: ['clicks', 'sales'],
+        columns: ['cost', 'sales'],
+        sort: { column: 'cost', direction: 'asc' },
+      },
+    },
+    ...patch,
+  };
+}
+
+const button = (selector: string) => document.querySelector<HTMLElement>(selector)!;
+
+describe('Gespeicherte Ansichten im Explorer (F8)', () => {
+  it('speichert Filterleiste, Ebene, Drill-Down, Spalten, Sortierung und Chart', async () => {
+    const { requests } = stubFetch({
+      ...routes(),
+      'POST /api/saved-views': ({ body }) =>
+        json({ ...savedView(), ...(body as object), own: true, canEdit: true }, 201),
+    });
+    const { wrapper } = await mountExplorer(
+      `/ads/explorer/ad-groups?campaign=${CAMPAIGN}&sort=sales.desc&m1=clicks`,
+    );
+    await waitForRow('AG Nistkasten');
+    await wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() => expect(button('[data-saved-views-create]')).toBeTruthy());
+    await vi.waitFor(() =>
+      expect(button('[data-saved-views-create]').hasAttribute('disabled')).toBe(false),
+    );
+    button('[data-saved-views-create]').click();
+    await flushPromises();
+    const input = document.querySelector<HTMLInputElement>('[data-saved-view-name]')!;
+    input.value = 'Meine Ad Groups';
+    input.dispatchEvent(new Event('input'));
+    // Admin darf freigeben
+    expect(document.querySelector('[data-saved-view-shared]')).not.toBeNull();
+    button('[data-saved-view-submit]').click();
+    await vi.waitFor(() =>
+      expect(requests.some((r) => r.method === 'POST' && r.path === '/api/saved-views')).toBe(true),
+    );
+    const body = requests.find((r) => r.method === 'POST' && r.path === '/api/saved-views')!.body;
+    expect(body).toMatchObject({
+      name: 'Meine Ad Groups',
+      area: 'explorer',
+      shared: false,
+      state: {
+        filters: { period: { preset: 'last30' }, comparison: 'previous' },
+        explorer: {
+          level: 'adGroup',
+          drill: { portfolioId: null, campaignId: CAMPAIGN, adGroupId: null },
+          chartMetrics: ['clicks', 'sales'],
+          columns: null,
+          sort: { column: 'sales', direction: 'desc' },
+        },
+      },
+    });
+  });
+
+  it('lädt eine Ansicht: Ebene, Drill-Down und Sortierung in die URL, Spalten als eigene Auswahl', async () => {
+    const { requests } = stubFetch({
+      ...routes(),
+      'GET /api/saved-views': json({ views: [savedView()] }),
+      'PUT /api/settings/ui-state/explorer/columns.target': new Response(null, { status: 204 }),
+    });
+    const { wrapper, router } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    await wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Top-Targets Waldkauz'));
+    expect(document.body.textContent).toContain('von Emil');
+    // Fremde Ansicht ohne Recht: keine Aktionen außer „Link kopieren“
+    expect(
+      document.querySelector(`[data-saved-view="${VIEW_ID}"] [aria-label^="„Top"]`),
+    ).toBeNull();
+    [...document.querySelectorAll<HTMLButtonElement>(`[data-saved-view="${VIEW_ID}"] button`)]
+      .find((b) => b.textContent?.includes('Top-Targets'))!
+      .click();
+    await flushPromises();
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/ads/explorer/targets'));
+    expect(router.currentRoute.value.query).toEqual({
+      campaign: CAMPAIGN,
+      m1: 'clicks',
+      sort: 'cost.asc',
+      clients: C1,
+      period: 'last7',
+      cmp: 'off',
+    });
+    await vi.waitFor(() =>
+      expect(
+        requests.find((r) => r.path === '/api/settings/ui-state/explorer/columns.target')?.body,
+      ).toEqual({ value: ['cost', 'sales'] }),
+    );
+    await vi.waitFor(() =>
+      expect(rowRequests(requests).at(-1)).toMatchObject({
+        level: 'target',
+        clientIds: [C1],
+        filter: { campaignIds: [CAMPAIGN] },
+      }),
+    );
+    // Aktive Ansicht steht auf dem Knopf.
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-saved-views]').text()).toContain('Top-Targets Waldkauz'),
+    );
+  });
+
+  it('Link mit ?view=<id> lädt die Ansicht und entfernt den Parameter', async () => {
+    stubFetch({
+      ...routes(),
+      [`GET /api/saved-views/${VIEW_ID}`]: json(savedView({ hiddenItems: 2 })),
+      'PUT /api/settings/ui-state/explorer/columns.target': new Response(null, { status: 204 }),
+    });
+    const { wrapper, router } = await mountExplorer(`/ads/explorer?view=${VIEW_ID}`);
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/ads/explorer/targets'));
+    expect(router.currentRoute.value.query.view).toBeUndefined();
+    await vi.waitFor(() =>
+      expect(wrapper.text()).toContain('2 Einträge dieser Ansicht sind für dich nicht sichtbar'),
+    );
+  });
+
+  it('Viewer speichern nur persönlich', async () => {
+    stubFetch({ ...routes(), 'GET /api/me': json(meFixture({ orgRole: 'viewer' })) });
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    await wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() =>
+      expect(button('[data-saved-views-create]').hasAttribute('disabled')).toBe(false),
+    );
+    button('[data-saved-views-create]').click();
+    await flushPromises();
+    expect(document.querySelector('[data-saved-view-shared]')).toBeNull();
+    expect(document.body.textContent).toContain('Freigeben können Editoren und Admins.');
   });
 });

@@ -8,6 +8,8 @@ export const de = {
     close: 'Schließen',
     loading: 'Wird geladen …',
     backHome: 'Zur Startseite',
+    cancel: 'Abbrechen',
+    save: 'Speichern',
   },
   login: {
     pageTitle: 'Anmelden',
@@ -407,6 +409,41 @@ export const de = {
         'Die letzten 14 Tage vor „Daten bis“ sind vorläufig: Amazon korrigiert sie noch, bis die Attributionsfenster abgeschlossen sind.',
     },
   },
+  savedViews: {
+    button: 'Ansichten',
+    title: 'Gespeicherte Ansichten',
+    own: 'Meine Ansichten',
+    team: 'Für das Team',
+    by: 'von {name}',
+    empty:
+      'Noch keine Ansichten gespeichert. Stelle Filter und Tabelle ein und speichere sie als Ansicht.',
+    loadFailed: 'Die Ansichten konnten nicht geladen werden.',
+    saveCurrent: 'Aktuelle Ansicht speichern',
+    sharedHint: 'Für das Team freigegeben',
+    copyLink: 'Link zu „{name}“ kopieren',
+    copied: 'Link kopiert',
+    copyFailed: 'Der Link konnte nicht kopiert werden.',
+    overwrite: '„{name}“ mit dem aktuellen Stand überschreiben',
+    share: '„{name}“ für das Team freigeben',
+    unshare: 'Freigabe von „{name}“ aufheben',
+    rename: '„{name}“ umbenennen',
+    delete: '„{name}“ löschen',
+    deleteAction: 'Löschen',
+    deleteConfirm: 'Die Ansicht „{name}“ wird gelöscht. Das lässt sich nicht rückgängig machen.',
+    name: 'Name',
+    nameRequired: 'Bitte gib einen Namen ein.',
+    shareWithTeam: 'Für das Team freigeben',
+    personalOnly: 'Die Ansicht ist persönlich. Freigeben können Editoren und Admins.',
+    hiddenItems:
+      'Ein Eintrag dieser Ansicht ist für dich nicht sichtbar und wurde weggelassen. | {count} Einträge dieser Ansicht sind für dich nicht sichtbar und wurden weggelassen.',
+    linkNotFound: 'Die verlinkte Ansicht gibt es nicht oder sie ist nicht freigegeben.',
+    dismiss: 'Hinweis schließen',
+    dialog: {
+      create: 'Ansicht speichern',
+      rename: 'Ansicht umbenennen',
+      delete: 'Ansicht löschen',
+    },
+  },
   dashboard: {
     eyebrow: 'Übersicht',
     description: 'Amazon-Ads-Kennzahlen der gewählten Clients und Profile.',
@@ -602,6 +639,12 @@ export const de = {
     CONNECTION_NOT_FOUND: 'Die Connection gibt es nicht mehr. Bitte lade die Seite neu.',
     PROFILE_NOT_FOUND: 'Das Profil gibt es nicht mehr. Bitte lade die Seite neu.',
     CLIENT_NOT_FOUND: 'Den Client gibt es nicht mehr. Bitte lade die Seite neu.',
+    SAVED_VIEW_NAME_TAKEN: 'Du hast schon eine Ansicht mit diesem Namen.',
+    SAVED_VIEW_LIMIT_REACHED:
+      'Du hast die Höchstzahl eigener Ansichten erreicht. Lösche zuerst eine.',
+    SAVED_VIEW_SHARE_FORBIDDEN: 'Freigeben können nur Editoren und Admins.',
+    SAVED_VIEW_FORBIDDEN: 'Diese Ansicht können nur ihr Besitzer und Admins ändern.',
+    SAVED_VIEW_NOT_FOUND: 'Die Ansicht gibt es nicht mehr.',
     CLIENT_SLUG_TAKEN:
       'Einen Client mit diesem Namen gibt es schon. Bitte wähle ihn aus der Liste.',
     CURRENCY_NOT_SELECTABLE:

@@ -32,8 +32,12 @@ import {
   explorerStateFromRoute,
   pathForLevel,
   type DrillDown,
+  type GridSort,
 } from '../explorer/state';
+import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
+import { explorerTarget, filtersFromView, viewState } from '../saved-views/view-state';
 import { useSessionStore } from '../stores/session';
+import type { SavedView } from '@profitbash/shared';
 
 /**
  * Explorer (`phase-2.md` F6, F7, 2.8): Reiter je Ebene, Drill-Down mit Brotkrumen, Chart über dem Grid, Spaltenauswahl,
@@ -213,6 +217,14 @@ function onAdProducts(value: AdProduct[]) {
 function onRemoved(event: Event) {
   setQuery({ removed: (event.target as HTMLInputElement).checked ? '1' : undefined });
 }
+/** Sortierung per Klick: ohne neuen Verlaufseintrag (sonst stünde jeder Klick in der Zurück-Taste). */
+function onSort(sort: GridSort | null) {
+  const value = sort ? `${sort.column}.${sort.direction}` : undefined;
+  if (value === (route.query.sort ?? undefined)) return;
+  const query: LocationQueryRaw = { ...route.query, sort: value };
+  if (value === undefined) delete query.sort;
+  void router.replace({ path: route.path, query, state: link(route.path, query).state });
+}
 function onChartMetrics([m1, m2]: [MetricKey, MetricKey]) {
   setQuery({ m1: m1 === 'cost' ? undefined : m1, m2: m2 === 'sales' ? undefined : m2 });
 }
@@ -246,6 +258,39 @@ function onColumns(value: string[]) {
   saveColumns.mutate(value);
 }
 
+// --- Gespeicherte Ansichten (F8) ------------------------------------------------------------
+
+/** Spaltenauswahl der Ebene; `null` = Standard der Ebene (gleich, ob gespeichert oder nicht). */
+const storedColumnList = computed(() => {
+  const visible = visibleColumns.value;
+  const defaults = defaultVisibleColumns(level.value);
+  const isDefault = visible.size === defaults.size && [...visible].every((c) => defaults.has(c));
+  return isDefault ? null : [...visible];
+});
+const currentView = computed(() =>
+  filters.ready.value && storedColumns.isFetched.value
+    ? viewState('explorer', filters.state.value, {
+        explorer: state.value,
+        columns: storedColumnList.value,
+      })
+    : null,
+);
+function applyView(view: SavedView) {
+  const explorer = view.state.explorer;
+  if (!explorer) return;
+  // Spalten wie selbst gewählt (ui_state der Ebene); `null` = Standard der Ebene.
+  const key = `columns.${explorer.level}`;
+  const columns = explorer.columns ?? [...defaultVisibleColumns(explorer.level)];
+  queryClient.setQueryData(['ui-state', 'explorer', key], columns);
+  void api.putUiState('explorer', key, columns).catch(() => undefined);
+  const target = explorerTarget(view.state);
+  filters.update(filtersFromView(view.state), {
+    path: target.path,
+    query: target.query,
+    state: { [CRUMBS_KEY]: {} },
+  });
+}
+
 // --- Grid ----------------------------------------------------------------------------------
 
 const accountTypes = computed(
@@ -255,6 +300,7 @@ const columnDefs = computed(() =>
   buildColumnDefs({
     level: level.value,
     visible: visibleColumns.value,
+    sort: state.value.sort,
     t,
     te,
     locale: locale.value,
@@ -322,7 +368,16 @@ const truncatedText = computed(() => {
       :eyebrow="t('explorer.eyebrow')"
       :title="t('nav.explorer')"
       :description="t('explorer.description')"
-    />
+    >
+      <template #actions>
+        <SavedViewsMenu
+          area="explorer"
+          :current="currentView"
+          link-path="/ads/explorer"
+          @apply="applyView"
+        />
+      </template>
+    </PageHeader>
 
     <FilterBar :filters="filters" :earliest-date="data?.meta.earliestDate ?? null" />
 
@@ -492,6 +547,7 @@ const truncatedText = computed(() => {
           :column-defs="columnDefs"
           :context="gridContext"
           @selection="(ids) => (selectedIds = ids)"
+          @sort="onSort"
         />
       </section>
     </template>

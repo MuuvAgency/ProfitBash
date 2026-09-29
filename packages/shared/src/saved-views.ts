@@ -60,7 +60,8 @@ export const savedViewExplorerSchema = z
     includeRemoved: z.boolean(),
     /** Leer = alle Ad-Typen. */
     adProducts: z.array(adProductSchema).max(3),
-    chartMetrics: z.tuple([z.enum(CHANGE_KEYS), z.enum(CHANGE_KEYS)]),
+    // Array statt Tupel: OpenAPI-Typen kennen keine Tupel (Web und Server hätten sonst verschiedene Typen).
+    chartMetrics: z.array(z.enum(CHANGE_KEYS)).length(2),
     /** Sichtbare Spalten der Ebene; `null` = Standard. */
     columns: orNull(z.array(columnId).max(80)),
     /** `null` = Standard (Spend absteigend vom Server). */
