@@ -108,10 +108,12 @@ beforeAll(async () => {
   });
   await syncConnectionProfiles(deps(), { organizationId, connectionId }, run());
   // Reihenfolge wie im Job (Fortsetzen nach Zeitbudget).
-  profiles = await testDb.db
+  const rows = await testDb.db
     .select({ id: amazonAdsProfiles.id, amazonProfileId: amazonAdsProfiles.amazonProfileId })
     .from(amazonAdsProfiles)
     .orderBy(amazonAdsProfiles.createdAt, amazonAdsProfiles.id);
+  // Profile einer Connection tragen immer eine Amazon-Profil-ID.
+  profiles = rows.map((row) => ({ id: row.id, amazonProfileId: row.amazonProfileId! }));
 });
 
 afterAll(async () => {

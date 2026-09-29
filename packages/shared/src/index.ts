@@ -10,6 +10,7 @@ export * from './decimal-compare';
 export * from './features';
 export * from './format';
 export * from './logger';
+export * from './marketplaces';
 export * from './members';
 export * from './roles';
 export * from './saved-views';

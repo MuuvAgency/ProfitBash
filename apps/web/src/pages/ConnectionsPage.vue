@@ -13,6 +13,8 @@ import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { browserNavigation } from '../connections/browser-navigation';
 import ConnectionCard from '../connections/ConnectionCard.vue';
 import CreateClientDialog from '../connections/CreateClientDialog.vue';
+import CreateFileProfileDialog from '../connections/CreateFileProfileDialog.vue';
+import FileProfilesCard from '../connections/FileProfilesCard.vue';
 import { oauthNotice } from '../connections/oauth-notice';
 import {
   useClientsQuery,
@@ -106,6 +108,9 @@ function patchProfile(profile: Profile, patch: ProfilePatch) {
 
 /** Profil, für das gerade ein neuer Client angelegt wird. */
 const clientDialogProfile = ref<Profile | null>(null);
+
+/** Dialog „Profil ohne Connection anlegen“ (Datei-Import, 1.11a). */
+const fileProfileDialogOpen = ref(false);
 
 function onClientCreated(client: Client) {
   const profile = clientDialogProfile.value;
@@ -232,10 +237,25 @@ function onClientCreated(client: Client) {
       />
     </template>
 
+    <FileProfilesCard
+      v-if="connectionsQuery.isSuccess.value"
+      :clients="clients"
+      :clients-ready="clientsQuery.isSuccess.value"
+      :show-removed="showRemoved"
+      @create="fileProfileDialogOpen = true"
+      @patch="patchProfile"
+      @create-client="(profile) => (clientDialogProfile = profile)"
+    />
+
     <CreateClientDialog
       :account-name="clientDialogProfile?.accountName ?? null"
       @created="onClientCreated"
       @close="clientDialogProfile = null"
+    />
+    <CreateFileProfileDialog
+      :visible="fileProfileDialogOpen"
+      @created="fileProfileDialogOpen = false"
+      @close="fileProfileDialogOpen = false"
     />
   </div>
 </template>

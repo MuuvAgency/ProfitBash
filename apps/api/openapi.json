@@ -562,7 +562,10 @@
             "format": "uuid"
           },
           "connectionId": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "clientId": {
@@ -573,7 +576,10 @@
             "format": "uuid"
           },
           "amazonProfileId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "amazonAccountId": {
             "type": [
@@ -644,6 +650,42 @@
           "syncedAt",
           "metricsImportedThrough"
         ]
+      },
+      "FileProfileCreate": {
+        "type": "object",
+        "properties": {
+          "accountName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "accountType": {
+            "type": "string",
+            "enum": [
+              "seller",
+              "vendor",
+              "agency"
+            ]
+          }
+        },
+        "required": [
+          "accountName",
+          "countryCode",
+          "currencyCode",
+          "timezone",
+          "accountType"
+        ],
+        "additionalProperties": false
       },
       "ProfilePatch": {
         "type": "object",
@@ -872,7 +914,10 @@
                   "type": "string"
                 },
                 "amazonProfileId": {
-                  "type": "string"
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "accountName": {
                   "type": "string"
@@ -3393,6 +3438,106 @@
           },
           "404": {
             "description": "Nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles": {
+      "post": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Profil ohne Connection für den Datei-Import anlegen (nur Admin)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileProfileCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Angelegtes Profil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles/file": {
+      "get": {
+        "tags": [
+          "Connections"
+        ],
+        "summary": "Profile ohne Connection inkl. ausgeblendeter und entfernter (nur Admin)",
+        "responses": {
+          "200": {
+            "description": "Profile nach Land und Name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
             "content": {
               "application/json": {
                 "schema": {

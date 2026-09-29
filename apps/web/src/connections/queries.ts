@@ -1,4 +1,4 @@
-import type { Client, Profile, ProfilePatch } from '@profitbash/shared';
+import type { Client, FileProfileCreate, Profile, ProfilePatch } from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onBeforeUnmount, readonly, ref, toValue, type MaybeRefOrGetter } from 'vue';
 import { api } from '../api';
@@ -13,6 +13,8 @@ export const connectionKeys = {
   allProfiles: (orgId: string | null) => ['profiles', orgId] as const,
   profiles: (orgId: string | null, connectionId: string) =>
     ['profiles', orgId, connectionId] as const,
+  /** Profile ohne Connection (Datei-Import); unter `allProfiles`, damit Profil-Änderungen sie mit erfassen. */
+  fileProfiles: (orgId: string | null) => ['profiles', orgId, 'file'] as const,
   clients: (orgId: string | null) => ['clients', orgId] as const,
 };
 
@@ -42,6 +44,25 @@ export function useProfilesQuery(
     queryFn: () => api.listProfiles(toValue(connectionId)),
     enabled: computed(() => orgId.value !== null),
     refetchInterval: pollInterval(polling),
+  });
+}
+
+export function useFileProfilesQuery() {
+  const orgId = useActiveOrgId();
+  return useQuery({
+    queryKey: computed(() => connectionKeys.fileProfiles(orgId.value)),
+    queryFn: () => api.listFileProfiles(),
+    enabled: computed(() => orgId.value !== null),
+  });
+}
+
+export function useCreateFileProfile() {
+  const orgId = useActiveOrgId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: FileProfileCreate) => api.createFileProfile(input),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: connectionKeys.fileProfiles(orgId.value) }),
   });
 }
 

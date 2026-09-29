@@ -152,6 +152,14 @@ beforeEach(async () => {
   ctx.jobs.enqueuedInTransaction.length = 0;
 });
 
+const fileProfileInput = {
+  accountName: 'Beispielmarke FR',
+  countryCode: 'FR',
+  currencyCode: 'EUR',
+  timezone: 'Europe/Paris',
+  accountType: 'vendor',
+};
+
 async function errorCode(res: Response): Promise<string> {
   return (await readJson<ErrorResponse>(res)).error.code;
 }
@@ -163,6 +171,8 @@ describe('Rechte', () => {
       ['POST', `/api/connections/${ids.connection}/sync`, {}],
       ['GET', `/api/connections/${ids.connection}/profiles`],
       ['PATCH', `/api/profiles/${ids.visible}`, { isHidden: true }],
+      ['POST', '/api/profiles', fileProfileInput],
+      ['GET', '/api/profiles/file'],
       ['GET', '/api/clients'],
       ['POST', '/api/clients', { name: 'Neu' }],
       ['PATCH', `/api/clients/${ids.client}`, { name: 'Neu' }],
@@ -559,5 +569,81 @@ describe('Clients', () => {
       json: {},
     });
     expect(empty.status).toBe(400);
+  });
+});
+
+describe('Profile ohne Connection (1.11a)', () => {
+  it('POST /api/profiles legt ein Datei-Profil mit Audit an, GET /api/profiles/file listet es', async () => {
+    const res = await request(ctx, '/api/profiles', {
+      method: 'POST',
+      json: fileProfileInput,
+      cookie: admin,
+    });
+    expect(res.status).toBe(201);
+    const created = await readJson<Profile>(res);
+    expect(created).toMatchObject({
+      ...fileProfileInput,
+      connectionId: null,
+      amazonProfileId: null,
+      amazonAccountId: null,
+      marketplaceId: 'A13V1IB3VIYZZH',
+      clientId: null,
+      isHidden: false,
+      removedAt: null,
+      syncedAt: null,
+      metricsImportedThrough: null,
+    });
+
+    const [event] = await ctx.testDb.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'profile.create'));
+    expect(event?.target).toMatchObject({ id: created.id, source: 'file' });
+
+    // Ein Datei-Profil der anderen Organisation erscheint nicht.
+    await ctx.testDb.db.insert(amazonAdsProfiles).values({
+      ...fileProfileInput,
+      organizationId: otherOrgId,
+      connectionId: null,
+      amazonProfileId: null,
+      accountName: 'Fremdes Datei-Profil',
+    });
+    const list = await readJson<{ profiles: Profile[] }>(
+      await request(ctx, '/api/profiles/file', { cookie: admin }),
+    );
+    expect(list.profiles.map((p) => p.id)).toEqual([created.id]);
+
+    // Nicht in der Profilliste der Connection.
+    const ofConnection = await readJson<{ profiles: Profile[] }>(
+      await request(ctx, `/api/connections/${ids.connection}/profiles`, { cookie: admin }),
+    );
+    expect(ofConnection.profiles.map((p) => p.id)).not.toContain(created.id);
+
+    // Zuordnen und Ausblenden wie bei anderen Profilen.
+    const patched = await request(ctx, `/api/profiles/${created.id}`, {
+      method: 'PATCH',
+      json: { clientId: ids.client, isHidden: true },
+      cookie: admin,
+    });
+    expect(patched.status).toBe(200);
+    expect(await readJson<Profile>(patched)).toMatchObject({
+      clientId: ids.client,
+      isHidden: true,
+    });
+  });
+
+  it('lehnt ungültige Eingaben mit 400 ab', async () => {
+    const res = await request(ctx, '/api/profiles', {
+      method: 'POST',
+      json: { ...fileProfileInput, countryCode: 'XX' },
+      cookie: admin,
+    });
+    expect(res.status).toBe(400);
+    const extra = await request(ctx, '/api/profiles', {
+      method: 'POST',
+      json: { ...fileProfileInput, connectionId: ids.connection },
+      cookie: admin,
+    });
+    expect(extra.status).toBe(400);
   });
 });

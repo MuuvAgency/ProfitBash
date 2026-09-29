@@ -141,7 +141,8 @@ export async function canSeeProfile(
 
 export interface VisibleProfileSummary {
   id: string;
-  amazonProfileId: string;
+  /** `null` bei Profilen ohne Connection (Datei-Import). */
+  amazonProfileId: string | null;
   accountName: string;
   countryCode: string;
   currencyCode: string;
