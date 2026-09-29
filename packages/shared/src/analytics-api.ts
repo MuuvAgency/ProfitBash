@@ -346,7 +346,8 @@ export const filterOptionsResponseSchema = z
     profiles: z.array(
       z.object({
         id: z.string(),
-        amazonProfileId: z.string(),
+        /** `null` bei Profilen ohne Connection (Datei-Import). */
+        amazonProfileId: z.string().nullable(),
         accountName: z.string(),
         countryCode: z.string(),
         currencyCode: z.string(),

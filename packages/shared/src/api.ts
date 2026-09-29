@@ -260,10 +260,11 @@ export const profileSchema = z
   .object({
     /** Interne ID (`profileId`). */
     id: z.uuid(),
-    connectionId: z.uuid(),
+    /** `null` bei Profilen ohne Connection (Datei-Import, `phase-1.md` 1.11a). */
+    connectionId: z.uuid().nullable(),
     clientId: z.uuid().nullable(),
-    /** Amazons Profil-ID, immer als String. */
-    amazonProfileId: z.string(),
+    /** Amazons Profil-ID, immer als String; `null` bei Profilen ohne Connection. */
+    amazonProfileId: z.string().nullable(),
     amazonAccountId: z.string().nullable(),
     accountName: z.string(),
     countryCode: z.string(),

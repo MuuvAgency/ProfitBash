@@ -2,6 +2,7 @@ import type {
   AmazonOAuthStart,
   Client,
   Connection,
+  FileProfileCreate,
   JobRun,
   JobRunListQuery,
   Member,
@@ -155,6 +156,13 @@ export function createApi(options: ApiOptions = {}) {
           client.GET('/api/connections/{id}/profiles', { params: { path: { id: connectionId } } }),
         )
       ).profiles,
+
+    /** Profile ohne Connection (Datei-Import) inkl. ausgeblendeter und entfernter. */
+    listFileProfiles: async (): Promise<Profile[]> =>
+      (await unwrap(client.GET('/api/profiles/file'))).profiles,
+
+    createFileProfile: (input: FileProfileCreate): Promise<Profile> =>
+      unwrap(client.POST('/api/profiles', { body: input })),
 
     updateProfile: (profileId: string, patch: ProfilePatch): Promise<Profile> =>
       unwrap(

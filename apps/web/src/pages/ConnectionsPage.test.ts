@@ -45,6 +45,7 @@ function routes(overrides: Parameters<typeof stubFetch>[0] = {}) {
     'GET /api/connections': json({ connections: [connectionFixture()] }),
     [`GET ${PROFILES_PATH}`]: json({ profiles: [nordwindDe, nordwindUk, lindenhofSe] }),
     'GET /api/clients': json({ clients: [nordwind] }),
+    'GET /api/profiles/file': json({ profiles: [] }),
     ...overrides,
   };
 }
@@ -72,7 +73,11 @@ async function waitForRow(wrapper: Wrapper, accountName: string) {
 }
 
 /** Wählt eine Option in einem PrimeVue-Select (das Overlay hängt am <body>). */
-async function choose(wrapper: Wrapper, comboboxLabel: string, optionLabel: string) {
+async function choose(
+  wrapper: Wrapper | DOMWrapper<Element>,
+  comboboxLabel: string,
+  optionLabel: string,
+) {
   await wrapper.get(`[role="combobox"][aria-label="${comboboxLabel}"]`).trigger('click');
   await flushPromises();
   const option = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
@@ -700,5 +705,140 @@ describe('ConnectionsPage', () => {
     const cancel = form.findAll('button').find((b) => b.text() === 'Abbrechen')!;
     expect(cancel.attributes('disabled')).toBeDefined();
     expect(closeButton()).toBe(false);
+  });
+});
+
+describe('Profile ohne Connection (Datei-Import, 1.11a)', () => {
+  const fileProfile = profileFixture({
+    accountName: 'Kranich Datei',
+    connectionId: null,
+    amazonProfileId: null,
+    amazonAccountId: null,
+    syncedAt: null,
+    metricsImportedThrough: null,
+  });
+
+  function fileSection(wrapper: Wrapper) {
+    return wrapper.get('section[aria-label="Profile ohne Connection"]');
+  }
+
+  it('zeigt Datei-Profile in einem eigenen Abschnitt, getrennt von den Connections', async () => {
+    stubFetch(routes({ 'GET /api/profiles/file': json({ profiles: [fileProfile] }) }));
+    const { wrapper } = await mountPage();
+    const fileRow = await waitForRow(wrapper, 'Kranich Datei');
+    expect(fileSection(wrapper).text()).toContain('Kranich Datei');
+    expect(fileSection(wrapper).text()).toContain('Datei-Import');
+    expect(fileRow.text()).toContain('Deutschland');
+    expect(fileSection(wrapper).text()).not.toContain('Nordwind GmbH');
+  });
+
+  it('zeigt den Abschnitt auch ohne Connection', async () => {
+    stubFetch(
+      routes({
+        'GET /api/connections': json({ connections: [] }),
+        'GET /api/profiles/file': json({ profiles: [fileProfile] }),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Noch kein Amazon-Konto verbunden'));
+    await waitForRow(wrapper, 'Kranich Datei');
+  });
+
+  it('erklärt einen leeren Abschnitt', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountPage();
+    await vi.waitFor(() =>
+      expect(fileSection(wrapper).text()).toContain('Noch keine Profile ohne Connection'),
+    );
+  });
+
+  it('legt ein Profil an: Währung und Zeitzone kommen aus dem Marktplatz', async () => {
+    let profiles: Profile[] = [];
+    const created = profileFixture({
+      ...fileProfile,
+      accountName: 'Lumen UK',
+      countryCode: 'UK',
+      currencyCode: 'GBP',
+      timezone: 'Europe/London',
+      accountType: 'vendor',
+    });
+    const { requests } = stubFetch(
+      routes({
+        'GET /api/profiles/file': () => json({ profiles }),
+        'POST /api/profiles': () => {
+          profiles = [created];
+          return json(created, 201);
+        },
+      }),
+    );
+    const { wrapper } = await mountPage();
+    await vi.waitFor(() => expect(fileSection(wrapper).text()).toContain('Profil anlegen'));
+    await button(wrapper, 'Profil anlegen').trigger('click');
+    await flushPromises();
+
+    const form = dialog();
+    expect(form?.text()).toContain('Profil ohne Connection anlegen');
+    // Sichtbare Labels für alle Felder.
+    for (const label of ['Name', 'Marktplatz', 'Währung', 'Zeitzone', 'Kontotyp']) {
+      expect(form!.text()).toContain(label);
+    }
+    await form!.get('form').trigger('submit');
+    expect(form!.text()).toContain('Bitte einen Namen eingeben.');
+
+    await form!.get('input#create-file-profile-name').setValue(' Lumen UK ');
+    await choose(form!, 'Marktplatz', 'Vereinigtes Königreich');
+    expect(
+      (form!.get('input#create-file-profile-currency').element as HTMLInputElement).value,
+    ).toBe('GBP');
+    expect(
+      (form!.get('input#create-file-profile-timezone').element as HTMLInputElement).value,
+    ).toBe('Europe/London');
+    await choose(form!, 'Kontotyp', 'Vendor');
+    await form!.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(requests.filter((r) => r.method === 'POST').map((r) => [r.path, r.body])).toEqual([
+      [
+        '/api/profiles',
+        {
+          accountName: 'Lumen UK',
+          countryCode: 'UK',
+          currencyCode: 'GBP',
+          timezone: 'Europe/London',
+          accountType: 'vendor',
+        },
+      ],
+    ]);
+    await vi.waitFor(() => expect(dialog()).toBeNull());
+    await waitForRow(wrapper, 'Lumen UK');
+  });
+
+  it('zeigt einen Fehler beim Anlegen im Dialog', async () => {
+    stubFetch(
+      routes({
+        'POST /api/profiles': json({ error: { code: 'VALIDATION_ERROR', message: 'x' } }, 400),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    await vi.waitFor(() => expect(fileSection(wrapper).text()).toContain('Profil anlegen'));
+    await button(wrapper, 'Profil anlegen').trigger('click');
+    await flushPromises();
+    const form = dialog()!;
+    await form.get('input#create-file-profile-name').setValue('Lumen');
+    await form.get('form').trigger('submit');
+    await flushPromises();
+    await vi.waitFor(() => expect(form.find('[role="alert"]').exists()).toBe(true));
+    expect(dialog()).not.toBeNull();
+  });
+
+  it('lässt einen Ladefehler der Datei-Profile nicht die Seite scheitern', async () => {
+    stubFetch(routes({ 'GET /api/profiles/file': serverError() }));
+    const { wrapper } = await mountPage();
+    await waitForRow(wrapper, 'Nordwind GmbH');
+    await vi.waitFor(() =>
+      expect(fileSection(wrapper).text()).toContain(
+        'Profile ohne Connection konnten nicht geladen werden',
+      ),
+    );
   });
 });

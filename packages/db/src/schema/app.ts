@@ -124,14 +124,18 @@ export const amazonAdsProfiles = pgTable(
     /** Interne ID. In der App heißt sie `profileId`, die Amazon-ID immer `amazonProfileId`. */
     id: id(),
     organizationId: organizationId(),
-    /** Aktueller Zugriffsweg. Gehört zwingend zur selben Organisation (zusammengesetzter FK). */
-    connectionId: uuid('connection_id')
-      .notNull()
-      .references(() => connections.id, { onDelete: 'cascade' }),
+    /**
+     * Aktueller Zugriffsweg. Gehört zwingend zur selben Organisation (zusammengesetzter FK). Leer bei
+     * Profilen ohne Connection, deren Daten per Datei-Import kommen (`phase-1.md` 1.11a).
+     */
+    connectionId: uuid('connection_id').references(() => connections.id, { onDelete: 'cascade' }),
     /** Zugeordneter Client derselben Organisation (zusammengesetzter FK). */
     clientId: uuid('client_id').references(() => clients.id, { onDelete: 'set null' }),
-    /** Amazon-Profil-ID. Immer Text, weil die Zahl JavaScripts sichere Ganzzahlgrenze überschreiten kann. */
-    amazonProfileId: text('amazon_profile_id').notNull(),
+    /**
+     * Amazon-Profil-ID. Immer Text, weil die Zahl JavaScripts sichere Ganzzahlgrenze überschreiten kann.
+     * Leer nur bei Profilen ohne Connection (die Werbekonsole zeigt die ID nicht); mit Connection Pflicht.
+     */
+    amazonProfileId: text('amazon_profile_id'),
     /** Amazon `accountInfo.id` (Seller-/Vendor-/Entity-ID), wird von späteren APIs gebraucht. */
     amazonAccountId: text('amazon_account_id'),
     accountName: text('account_name').notNull(),
@@ -165,6 +169,10 @@ export const amazonAdsProfiles = pgTable(
       columns: [t.clientId, t.organizationId],
       foreignColumns: [clients.id, clients.organizationId],
     }),
+    check(
+      'amazon_ads_profiles_connection_amazon_id_ck',
+      sql`${t.connectionId} is null or ${t.amazonProfileId} is not null`,
+    ),
     index('amazon_ads_profiles_org_idx').on(t.organizationId),
     index('amazon_ads_profiles_connection_idx').on(t.connectionId),
     index('amazon_ads_profiles_client_idx').on(t.clientId),

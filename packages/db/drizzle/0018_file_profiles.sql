@@ -1,0 +1,3 @@
+ALTER TABLE "amazon_ads_profiles" ALTER COLUMN "connection_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "amazon_ads_profiles" ALTER COLUMN "amazon_profile_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "amazon_ads_profiles" ADD CONSTRAINT "amazon_ads_profiles_connection_amazon_id_ck" CHECK ("amazon_ads_profiles"."connection_id" is null or "amazon_ads_profiles"."amazon_profile_id" is not null);

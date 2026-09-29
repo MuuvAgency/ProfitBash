@@ -233,6 +233,32 @@ export const de = {
       cancel: 'Abbrechen',
       required: 'Bitte einen Namen eingeben.',
     },
+    /** Profile ohne Connection (`phase-1.md` 1.11a): Daten kommen per Datei-Import aus der Werbekonsole. */
+    fileProfiles: {
+      title: 'Profile ohne Connection',
+      description:
+        'Für Werbekonten ohne API-Zugang. Die Daten kommen per Datei-Import aus der Amazon-Werbekonsole (Bulk-Datei und Tagesberichte).',
+      create: 'Profil anlegen',
+      empty:
+        'Noch keine Profile ohne Connection. Lege eines an, um Dateien aus der Werbekonsole zu importieren.',
+      emptyFiltered:
+        'Alle Profile ohne Connection sind entfernt. „Entfernte anzeigen“ blendet sie ein.',
+      loadError: 'Die Profile ohne Connection konnten nicht geladen werden.',
+      dialog: {
+        title: 'Profil ohne Connection anlegen',
+        name: 'Name',
+        nameHint: 'Zum Beispiel der Name des Werbekontos in der Konsole.',
+        marketplace: 'Marktplatz',
+        currency: 'Währung',
+        timezone: 'Zeitzone',
+        defaultsHint:
+          'Währung und Zeitzone folgen dem Marktplatz, wie Amazon sie für Werbeprofile nutzt. Tage werden in dieser Zeitzone gezählt.',
+        accountType: 'Kontotyp',
+        submit: 'Anlegen',
+        cancel: 'Abbrechen',
+        required: 'Bitte einen Namen eingeben.',
+      },
+    },
   },
   sync: {
     eyebrow: 'Betrieb',

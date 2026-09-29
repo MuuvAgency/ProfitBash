@@ -109,7 +109,20 @@ export async function findUnseenProfiles(
           : undefined,
       ),
     );
-  return rows.map((row) => row.amazonProfileId);
+  return rows.map((row) => withAmazonProfileId(row).amazonProfileId);
+}
+
+/**
+ * Profile einer Connection tragen immer eine Amazon-Profil-ID (CHECK
+ * `amazon_ads_profiles_connection_amazon_id_ck`); nur Profile ohne Connection (Datei-Import) haben keine.
+ */
+function withAmazonProfileId<T extends { amazonProfileId: string | null }>(
+  row: T,
+): T & { amazonProfileId: string } {
+  if (row.amazonProfileId === null) {
+    throw new Error('Profil einer Connection ohne Amazon-Profil-ID (verletzt den CHECK).');
+  }
+  return row as T & { amazonProfileId: string };
 }
 
 export interface JobProfile {
@@ -127,7 +140,7 @@ export async function listJobProfiles(
   db: DbOrTx,
   input: { organizationId: string; connectionId: string },
 ): Promise<JobProfile[]> {
-  return db
+  const rows = await db
     .select({
       id: amazonAdsProfiles.id,
       amazonProfileId: amazonAdsProfiles.amazonProfileId,
@@ -142,6 +155,7 @@ export async function listJobProfiles(
       ),
     )
     .orderBy(amazonAdsProfiles.createdAt, amazonAdsProfiles.id);
+  return rows.map(withAmazonProfileId);
 }
 
 /**
@@ -228,6 +242,7 @@ export async function assignProfilesToClient(
     )
     .for('update');
   if (before.length === 0) return [];
+  // Die Abfrage filtert nach Amazon-Profil-IDs, `null` kommt also nicht vor.
   // Der zusammengesetzte FK (client_id, organization_id) verhindert Clients anderer Organisationen.
   await db
     .update(amazonAdsProfiles)
@@ -241,7 +256,7 @@ export async function assignProfilesToClient(
         ),
       ),
     );
-  return before;
+  return before.map(withAmazonProfileId);
 }
 
 /** Setzt `removed_at` (nichts wird gelöscht). Nur Profile, die noch an der Connection hängen. */

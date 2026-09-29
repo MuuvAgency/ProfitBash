@@ -173,6 +173,36 @@ describe('queryDashboardStatus', () => {
     expect((await queryDashboardStatus(testDb.db, viewer(), SELECTION)).lastSyncAt).toBeNull();
   });
 
+  it('„Letzter Sync“ übergeht Profile ohne Connection (Datei-Import, 1.11a)', async () => {
+    const [file] = await testDb.db
+      .insert(amazonAdsProfiles)
+      .values({
+        organizationId: ids.org,
+        connectionId: null,
+        amazonProfileId: null,
+        accountName: 'Datei',
+        countryCode: 'DE',
+        currencyCode: 'EUR',
+        timezone: 'Europe/Berlin',
+        accountType: 'seller',
+      })
+      .returning({ id: amazonAdsProfiles.id });
+    try {
+      expect(
+        (
+          await queryDashboardStatus(
+            testDb.db,
+            { ...viewer(), profileIds: [ids.de, file!.id] },
+            SELECTION,
+          )
+        ).lastSyncAt,
+      ).toBe('2026-09-11T04:00:00.000Z');
+    } finally {
+      const { eq } = await import('drizzle-orm');
+      await testDb.db.delete(amazonAdsProfiles).where(eq(amazonAdsProfiles.id, file!.id));
+    }
+  });
+
   it('„Daten bis“ je Ad-Typ und hängende Ad-Typen je Profil (nicht über verschiedene Profile verglichen)', async () => {
     const status = await queryDashboardStatus(testDb.db, deFr(), SELECTION);
     expect(status.adProducts).toEqual([

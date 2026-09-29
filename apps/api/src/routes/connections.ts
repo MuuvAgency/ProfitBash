@@ -2,6 +2,7 @@ import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 import { REPORT_AD_PRODUCT_SELECTION } from '@profitbash/amazon-ads';
 import {
   canSeeProfile,
+  createFileProfile,
   metricsImportedThroughSql,
   recordAuditEvent,
   schema,
@@ -12,6 +13,7 @@ import {
 import {
   connectionListSchema,
   errorResponseSchema,
+  fileProfileCreateSchema,
   idParamSchema,
   profileListSchema,
   profilePatchSchema,
@@ -21,7 +23,7 @@ import {
   type Connection,
   type Profile,
 } from '@profitbash/shared';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { AppDeps, AppEnv } from '../context';
 import { ApiError } from '../errors';
 import { orgAdminOnly } from '../middleware';
@@ -166,6 +168,32 @@ const patchProfileRoute = createRoute({
   },
 });
 
+const createFileProfileRoute = createRoute({
+  method: 'post',
+  path: '/profiles',
+  tags: ['Connections'],
+  summary: 'Profil ohne Connection für den Datei-Import anlegen (nur Admin)',
+  request: { body: { required: true, content: json(fileProfileCreateSchema) } },
+  responses: {
+    201: { description: 'Angelegtes Profil.', content: json(profileSchema) },
+    400: errors[400],
+    401: errors[401],
+    403: errors[403],
+  },
+});
+
+const listFileProfilesRoute = createRoute({
+  method: 'get',
+  path: '/profiles/file',
+  tags: ['Connections'],
+  summary: 'Profile ohne Connection inkl. ausgeblendeter und entfernter (nur Admin)',
+  responses: {
+    200: { description: 'Profile nach Land und Name.', content: json(profileListSchema) },
+    401: errors[401],
+    403: errors[403],
+  },
+});
+
 async function requireConnection(db: Db, organizationId: string, connectionId: string) {
   const connection = await findConnection(db, organizationId, connectionId);
   if (!connection) throw new ApiError(404, 'CONNECTION_NOT_FOUND', 'Connection nicht gefunden.');
@@ -235,6 +263,46 @@ export function registerConnectionRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
               inArray(amazonAdsProfiles.id, scope.ids),
               eq(amazonAdsProfiles.connectionId, connection.id),
             ),
+          )
+          .orderBy(
+            asc(amazonAdsProfiles.countryCode),
+            asc(amazonAdsProfiles.accountName),
+            asc(amazonAdsProfiles.id),
+          )
+      : [];
+    return c.json({ profiles: rows.map(toProfile) }, 200);
+  });
+
+  app.openapi({ ...createFileProfileRoute, middleware }, async (c) => {
+    const auth = c.get('auth');
+    const organizationId = orgOf(auth);
+    const { id } = await createFileProfile(db, {
+      userId: auth.user.id,
+      orgId: organizationId,
+      input: c.req.valid('json'),
+    });
+    const [row] = await db
+      .select(profileColumns)
+      .from(amazonAdsProfiles)
+      .where(eq(amazonAdsProfiles.id, id));
+    if (!row) throw new Error('Angelegtes Profil nicht gefunden.');
+    return c.json(toProfile(row), 201);
+  });
+
+  app.openapi({ ...listFileProfilesRoute, middleware }, async (c) => {
+    const auth = c.get('auth');
+    const scope = await visibleProfilesScope(db, {
+      userId: auth.user.id,
+      orgId: orgOf(auth),
+      includeHidden: true,
+      includeRemoved: true,
+    });
+    const rows = scope
+      ? await db
+          .select(profileColumns)
+          .from(amazonAdsProfiles)
+          .where(
+            and(inArray(amazonAdsProfiles.id, scope.ids), isNull(amazonAdsProfiles.connectionId)),
           )
           .orderBy(
             asc(amazonAdsProfiles.countryCode),
