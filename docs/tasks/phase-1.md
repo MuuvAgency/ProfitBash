@@ -892,6 +892,10 @@ Nach F11.
 ### 1.11 Datei-Import (optional, nur mit Auslöser)
 **Entschieden (Dominik, 2026-09-27):** Wird nur gebaut, wenn Phase 2 fertig ist und die Ads-API-Freigabe dann immer noch fehlt
 (Dominik kann den Stichtag ändern). Sonst nicht bauen.
+**Ausgelöst (Dominik, 2026-09-29):** Phase 2 ist fertig, die Freigabe fehlt weiter; 1.11 kommt vor Phase 3 (`phase-3.md` F1).
+Die Schreibschicht bleibt quellenneutral: Phase 3 übermittelt Änderungen bis zur Freigabe als Bulk-Datei (`phase-3.md` F2).
+Beim Umsetzen zuerst in Teilaufgaben zerlegen (Formate der Bulk-Datei und der Reports prüfen, Profil ohne Connection,
+Upload, Import-Job) und Fragen an Dominik sammeln (u. a. welche Reports er herunterladen kann und wie oft).
 - Entities aus der Bulk-Datei der Werbekonsole, Tageskennzahlen aus den täglichen Sponsored-Ads-Reports der Konsole.
 - Profile von Hand anlegen (Profil ohne Connection).
 - Upload und Import-Job über `runJob`; geschrieben wird über dieselbe Schreibschicht wie der API-Sync (1.5, normalisierte Datensätze).
