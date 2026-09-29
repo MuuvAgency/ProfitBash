@@ -120,6 +120,10 @@ describe('MembersPage', () => {
           s.props('ariaLabel') === 'Rolle von Dominik',
       )!;
     select.vm.$emit('update:modelValue', 'viewer');
+    await flushPromises();
+    // Eigene Admin-Rolle abgeben: erst nach Rückfrage.
+    expect(document.body.textContent).toContain('Du verlierst sofort den Zugriff');
+    q('[data-member-confirm]').click();
     await vi.waitFor(() =>
       expect(wrapper.text()).toContain('Die Organisation braucht mindestens einen Admin.'),
     );
@@ -139,6 +143,41 @@ describe('MembersPage', () => {
     expect(requests.some((r) => r.method === 'DELETE')).toBe(false);
     q('[data-member-remove-confirm]').click();
     await vi.waitFor(() => expect(requests.some((r) => r.method === 'DELETE')).toBe(true));
+  });
+
+  it('neuer Link für ein aktives Konto fragt nach, für einen offenen Link nicht', async () => {
+    const { requests } = stubFetch(
+      routes({
+        [`POST /api/members/${SELF}/password-link`]: json(
+          { url: LINK, expiresAt: '2026-10-06T08:00:00.000Z' },
+          201,
+        ),
+        [`POST /api/members/${EMIL}/password-link`]: json(
+          { url: LINK, expiresAt: '2026-10-06T08:00:00.000Z' },
+          201,
+        ),
+      }),
+    );
+    const { wrapper } = await mountWithApp(undefined, { path: '/admin/members' });
+    await vi.waitFor(() => expect(wrapper.text()).toContain('emil@muuv.test'));
+    await wrapper
+      .find('[aria-label="Neuen Link zum Passwort-Setzen für Emil erzeugen"]')
+      .trigger('click');
+    await vi.waitFor(() => expect(requests.some((r) => r.path.includes(EMIL))).toBe(true));
+    await vi.waitFor(() => expect(q<HTMLInputElement>('[data-member-link]')?.value).toBe(LINK));
+    q<HTMLElement>('.p-dialog-close-button, [aria-label="Schließen"]')?.click();
+    await flushPromises();
+
+    await wrapper
+      .find('[aria-label="Neuen Link zum Passwort-Setzen für Dominik erzeugen"]')
+      .trigger('click');
+    await flushPromises();
+    expect(document.body.textContent).toContain('hat schon ein Passwort');
+    expect(requests.some((r) => r.path.includes(`${SELF}/password-link`))).toBe(false);
+    q('[data-member-confirm]').click();
+    await vi.waitFor(() =>
+      expect(requests.some((r) => r.path.includes(`${SELF}/password-link`))).toBe(true),
+    );
   });
 
   it('nur für Org-Admins', async () => {

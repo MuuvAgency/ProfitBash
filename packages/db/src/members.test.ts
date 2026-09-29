@@ -270,7 +270,55 @@ describe('Entfernen', () => {
   });
 });
 
+describe('Superadmins (Plattform-Rolle)', () => {
+  it('nur ein Superadmin setzt Links, Rolle oder Entfernen für einen Superadmin', async () => {
+    const { member, userId } = await newMember('boss@muuv.test', 'admin');
+    await testDb.db.update(users).set({ role: 'superadmin' }).where(eq(users.id, userId));
+    const asOrgAdmin = { ...admin(), actorIsSuperadmin: false };
+    expect(
+      await errorCode(
+        regeneratePasswordLink(testDb.db, { ...asOrgAdmin, memberId: member.id, now: NOW }),
+      ),
+    ).toBe('PROTECTED');
+    expect(
+      await errorCode(
+        updateMemberRole(testDb.db, {
+          ...asOrgAdmin,
+          memberId: member.id,
+          role: 'viewer',
+          now: NOW,
+        }),
+      ),
+    ).toBe('PROTECTED');
+    expect(await errorCode(removeMember(testDb.db, { ...asOrgAdmin, memberId: member.id }))).toBe(
+      'PROTECTED',
+    );
+    // Ein Superadmin darf es.
+    await regeneratePasswordLink(testDb.db, {
+      ...admin(),
+      actorIsSuperadmin: true,
+      memberId: member.id,
+      now: NOW,
+    });
+    // Wiederaufnahme eines Superadmins ohne Mitgliedschaft ebenfalls nur durch Superadmins.
+    await removeMember(testDb.db, { ...admin(), actorIsSuperadmin: true, memberId: member.id });
+    expect(
+      await errorCode(addMember(testDb.db, { ...asOrgAdmin, userId, role: 'viewer', now: NOW })),
+    ).toBe('PROTECTED');
+  });
+});
+
 describe('Einmal-Link', () => {
+  it('gleichzeitiges Einlösen: genau eines gelingt', async () => {
+    const { token } = await newMember('emil@muuv.test');
+    const results = await Promise.all(
+      [1, 2, 3].map((n) =>
+        redeemPasswordLink(testDb.db, { token, passwordHash: `h${n}`, now: NOW }),
+      ),
+    );
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
+
   it('setzt das Passwort genau einmal, beendet Sessions, Audit mit dem Mitglied als Handelndem', async () => {
     const { token, userId } = await newMember('emil@muuv.test');
     expect(await inspectPasswordLink(testDb.db, token, NOW)).toMatchObject({

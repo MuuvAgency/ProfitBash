@@ -450,6 +450,18 @@ export const de = {
       copy: 'Link kopieren',
       copied: 'Link kopiert.',
     },
+    confirm: {
+      renew: {
+        title: 'Neuen Link erzeugen',
+        text: '{name} hat schon ein Passwort. Es gilt weiter, bis der neue Link benutzt wird; danach gilt nur das neue. Offene Links verfallen.',
+        action: 'Link erzeugen',
+      },
+      demoteSelf: {
+        title: 'Eigene Admin-Rolle abgeben',
+        text: 'Du verlierst sofort den Zugriff auf die Admin-Bereiche, auch auf diese Seite.',
+        action: 'Rolle ändern',
+      },
+    },
     remove: {
       title: 'Mitglied entfernen',
       text: '{name} verliert den Zugang zu dieser Organisation und wird abgemeldet. Persönliche gespeicherte Ansichten werden gelöscht, für das Team freigegebene bleiben.',
@@ -466,6 +478,8 @@ export const de = {
     submit: 'Passwort speichern',
     tooShort: 'Das Passwort braucht mindestens {min} Zeichen.',
     mismatch: 'Die beiden Passwörter stimmen nicht überein.',
+    doneSignedIn:
+      'Passwort gesetzt. In diesem Browser bist du noch als {name} angemeldet; melde dich ab, um den neuen Zugang zu nutzen.',
     invalid:
       'Dieser Link gilt nicht (mehr). Er ist abgelaufen, wurde schon benutzt oder durch einen neuen ersetzt. Bitte frag bei der Administration nach einem neuen Link.',
   },
@@ -713,6 +727,7 @@ export const de = {
     MEMBER_SELF: 'Dein eigenes Konto kannst du hier nicht entfernen.',
     MEMBER_OTHER_ORGANIZATION:
       'Dieses Mitglied gehört auch zu einer anderen Organisation; sein Passwort lässt sich hier nicht setzen.',
+    MEMBER_PROTECTED: 'Dieses Konto können nur Plattform-Admins ändern.',
     MEMBER_NOT_FOUND: 'Das Mitglied gibt es nicht mehr.',
     PASSWORD_LINK_INVALID:
       'Dieser Link gilt nicht (mehr). Bitte frag bei der Administration nach einem neuen Link.',

@@ -13,7 +13,7 @@ import { accounts, memberPasswordLinks, members, savedViews, sessions, users } f
  */
 
 export type MemberErrorCode =
-  'NOT_FOUND' | 'LAST_ADMIN' | 'SELF' | 'EMAIL_TAKEN' | 'OTHER_ORGANIZATION';
+  'NOT_FOUND' | 'LAST_ADMIN' | 'SELF' | 'EMAIL_TAKEN' | 'OTHER_ORGANIZATION' | 'PROTECTED';
 
 export class MemberError extends Error {
   constructor(
@@ -41,6 +41,18 @@ export interface MemberAdminInput {
   orgId: string;
   /** Handelnder Org-Admin. */
   actorUserId: string;
+  /**
+   * Handelnder ist Superadmin (Plattform-Rolle). Nur dann lassen sich Superadmins ändern, entfernen, wieder aufnehmen oder
+   * mit einem Link versehen; sonst könnte ein Org-Admin über „Link neu erzeugen“ das Superadmin-Konto übernehmen.
+   */
+  actorIsSuperadmin?: boolean;
+}
+
+const protectedUser = () =>
+  new MemberError('PROTECTED', 'Dieses Konto können nur Plattform-Admins ändern.');
+
+function assertMayManage(input: MemberAdminInput, targetRole: string | null) {
+  if (targetRole === 'superadmin' && !input.actorIsSuperadmin) throw protectedUser();
 }
 
 const DAY_MS = 86_400_000;
@@ -165,11 +177,12 @@ export async function addMember(
   return db.transaction(async (tx) => {
     // Sperrt den Nutzer, damit zwei gleichzeitige Anfragen nicht beide eine Mitgliedschaft anlegen.
     const [user] = await tx
-      .select({ id: users.id, email: users.email })
+      .select({ id: users.id, email: users.email, role: users.role })
       .from(users)
       .where(eq(users.id, input.userId))
       .for('update');
     if (!user) throw notFound();
+    assertMayManage(input, user.role);
     const [existing] = await tx
       .select({ n: count() })
       .from(members)
@@ -205,25 +218,31 @@ export async function addMember(
   });
 }
 
-/** Mitgliedschaft der Organisation sperren (`FOR UPDATE`), sonst `NOT_FOUND`. */
-async function lockMember(tx: DbOrTx, orgId: string, memberId: string) {
-  const [row] = await tx
-    .select({ id: members.id, userId: members.userId, role: members.role })
-    .from(members)
-    .where(and(eq(members.id, memberId), eq(members.organizationId, orgId)))
-    .for('update');
-  if (!row) throw notFound();
-  return row;
-}
-
-/** Weitere Admins außer `memberId`; sperrt alle Admins der Organisation gegen gleichzeitiges Herabstufen. */
-async function otherAdmins(tx: DbOrTx, orgId: string, memberId: string): Promise<number> {
+/**
+ * Admins der Organisation sperren (`FOR UPDATE`, nach ID geordnet, damit sich gleichzeitige Änderungen nicht gegenseitig
+ * blockieren), danach die Ziel-Mitgliedschaft; sonst `NOT_FOUND`. Liefert dazu, wie viele Admins außer dem Ziel bleiben.
+ */
+async function lockMember(tx: DbOrTx, input: MemberAdminInput, memberId: string) {
   const admins = await tx
     .select({ id: members.id })
     .from(members)
-    .where(and(eq(members.organizationId, orgId), eq(members.role, 'admin')))
+    .where(and(eq(members.organizationId, input.orgId), eq(members.role, 'admin')))
+    .orderBy(asc(members.id))
     .for('update');
-  return admins.filter((a) => a.id !== memberId).length;
+  const [row] = await tx
+    .select({
+      id: members.id,
+      userId: members.userId,
+      role: members.role,
+      platformRole: users.role,
+    })
+    .from(members)
+    .innerJoin(users, eq(users.id, members.userId))
+    .where(and(eq(members.id, memberId), eq(members.organizationId, input.orgId)))
+    .for('update', { of: members });
+  if (!row) throw notFound();
+  assertMayManage(input, row.platformRole);
+  return { ...row, otherAdmins: admins.filter((a) => a.id !== row.id).length };
 }
 
 const lastAdmin = () =>
@@ -234,9 +253,9 @@ export async function updateMemberRole(
   input: MemberAdminInput & { memberId: string; role: OrgRole; now: Date },
 ): Promise<MemberRecord> {
   return db.transaction(async (tx) => {
-    const member = await lockMember(tx, input.orgId, input.memberId);
-    if (member.role === 'admin' && input.role !== 'admin') {
-      if ((await otherAdmins(tx, input.orgId, member.id)) === 0) throw lastAdmin();
+    const member = await lockMember(tx, input, input.memberId);
+    if (member.role === 'admin' && input.role !== 'admin' && member.otherAdmins === 0) {
+      throw lastAdmin();
     }
     if (member.role !== input.role) {
       await tx.update(members).set({ role: input.role }).where(eq(members.id, member.id));
@@ -269,13 +288,11 @@ export async function removeMember(
 ): Promise<void> {
   const now = new Date();
   await db.transaction(async (tx) => {
-    const member = await lockMember(tx, input.orgId, input.memberId);
+    const member = await lockMember(tx, input, input.memberId);
     if (member.userId === input.actorUserId) {
       throw new MemberError('SELF', 'Das eigene Konto lässt sich hier nicht entfernen.');
     }
-    if (member.role === 'admin' && (await otherAdmins(tx, input.orgId, member.id)) === 0) {
-      throw lastAdmin();
-    }
+    if (member.role === 'admin' && member.otherAdmins === 0) throw lastAdmin();
     await tx.delete(members).where(eq(members.id, member.id));
     await tx
       .update(memberPasswordLinks)
@@ -287,6 +304,8 @@ export async function removeMember(
           openLink,
         ),
       );
+    // Alle Sessions, nicht nur die dieser Organisation: Außer über Phase 6 gibt es keine weiteren Mitgliedschaften, und
+    // eine Session ohne Mitgliedschaft sähe ohnehin nichts.
     const ended = await tx
       .delete(sessions)
       .where(eq(sessions.userId, member.userId))
@@ -326,7 +345,7 @@ export async function regeneratePasswordLink(
   input: MemberAdminInput & { memberId: string; now: Date },
 ): Promise<{ token: string; expiresAt: Date }> {
   return db.transaction(async (tx) => {
-    const member = await lockMember(tx, input.orgId, input.memberId);
+    const member = await lockMember(tx, input, input.memberId);
     const [elsewhere] = await tx
       .select({ n: count() })
       .from(members)

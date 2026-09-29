@@ -715,13 +715,56 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     darüber, unkritisch), herabgestufte Besitzer ändern ihre freigegebenen Ansichten weiter (nur neu freigeben nicht).
 
 ### 2.10 Mitglieder (`/admin/members`, F9)
-- [ ] Liste mit Name, E-Mail, Rolle, Status (Link offen/aktiv); anlegen, Rolle ändern, entfernen, Link neu erzeugen; Schutz des
+- [x] Liste mit Name, E-Mail, Rolle, Status (Link offen/aktiv); anlegen, Rolle ändern, entfernen, Link neu erzeugen; Schutz des
       letzten Admins. Entfernen löscht die persönlichen gespeicherten Ansichten des Mitglieds, freigegebene bleiben (2.9).
       **Entschieden (Dominik, 2026-09-29):** Nach dem Setzen des Passworts geht es zur Anmeldung (Hinweis „Passwort gesetzt“),
       keine automatische Anmeldung. Eigene Endpunkte hinter `orgAdminOnly` nach den Sicherheitsregeln in F9; Audit mit handelndem Admin.
-- [ ] Seite zum Setzen des Passworts über den Link (öffentlich, ohne Session, Token im Fragment), Link nur einmal nutzbar.
-- [ ] Tests: fremde Organisation, abgelaufener, benutzter und neu erzeugter Link, Entfernen beendet Sessions, letzter Admin,
+- [x] Seite zum Setzen des Passworts über den Link (öffentlich, ohne Session, Token im Fragment), Link nur einmal nutzbar.
+- [x] Tests: fremde Organisation, abgelaufener, benutzter und neu erzeugter Link, Entfernen beendet Sessions, letzter Admin,
       Token taucht nicht im Log auf.
+- [x] Umsetzung (Stand für 2.11 und später):
+  - **Tabelle** `member_password_links` (Migration `0017_member_password_links`): Organisation, Nutzer, `token_hash`
+    (Hex-SHA-256, eindeutig), `created_by`, `expires_at` (7 Tage, `PASSWORD_LINK_VALID_DAYS`), `used_at`, `revoked_at`. Das
+    Token (32 Zufallsbytes, base64url, 43 Zeichen) steht nur in der Antwort beim Anlegen bzw. Neu-Erzeugen und im Fragment
+    des Links (`<APP_URL>/set-password#<token>`), nie in DB, Audit oder Log (Test: `ctx.logs`, Audit, Zeile).
+  - **Zugriffe** (`packages/db/src/members.ts`, Verwaltung der Eigentümer-Org nach ADR 002): `listMembers` (Status
+    `pending` = gültiger offener Link, `active` = Passwort gesetzt, `expired`), `findUserByEmail`, `addMember` (nur für
+    Nutzer **ohne** Mitgliedschaft: neu angelegt oder früher entfernt; sonst `EMAIL_TAKEN`), `updateMemberRole`,
+    `removeMember`, `regeneratePasswordLink`, `inspectPasswordLink`, `redeemPasswordLink`. Letzter Admin: Admins der
+    Organisation werden nach ID geordnet gesperrt (`FOR UPDATE`), dann das Ziel; weder herabstufen noch entfernen
+    (`LAST_ADMIN`). Eigenes Konto nicht entfernen (`SELF`). **Superadmins** (Plattform-Rolle) ändern, entfernen, wieder
+    aufnehmen oder mit einem Link versehen nur Superadmins (`PROTECTED`), sonst übernähme ein Org-Admin über „Neuer Link“ das
+    Superadmin-Konto (Review). Kein Link für Nutzer, die auch in einer anderen Organisation Mitglied sind
+    (`OTHER_ORGANIZATION`, Phase 6). Entfernen: Mitgliedschaft löschen, offene Links sperren, **alle** Sessions des Nutzers
+    löschen, persönliche Ansichten der Organisation löschen (freigegebene bleiben, 2.9); der Nutzer selbst bleibt
+    (Audit-Verweise, Wiederaufnahme). Einlösen: ein atomares `UPDATE` (nicht benutzt, nicht gesperrt, nicht abgelaufen,
+    Mitgliedschaft besteht), dann Passwort der Anmeldung per E-Mail setzen oder anlegen (wie better-auth: `credential`,
+    `accountId` = Nutzer-ID, Hash von `ctx.password.hash`), alle Sessions beenden. Audit: `member.create`,
+    `member.role_update`, `member.remove`, `member.link_create` (handelnder Admin), `member.password_set` (das Mitglied).
+  - **API** (`routes/members.ts`, Tag „Mitglieder“): `GET|POST /api/members`, `PATCH|DELETE /api/members/{id}`,
+    `POST /api/members/{id}/password-link` hinter `orgAdminOnly`; neue Nutzer über `auth.api.createUser` ohne Session und ohne
+    Passwort (Plattform-Rolle `user`; gleichzeitiges Anlegen derselben E-Mail → `409`). Öffentlich:
+    `POST /api/password-links/inspect` und `/redeem` (Token im Body; unbekannt, benutzt, gesperrt und abgelaufen gleich:
+    `410 PASSWORD_LINK_INVALID`; erst prüfen, dann hashen). Fehler `MEMBER_EMAIL_TAKEN`, `MEMBER_LAST_ADMIN`, `MEMBER_SELF`,
+    `MEMBER_OTHER_ORGANIZATION` (409), `MEMBER_PROTECTED` (403), `MEMBER_NOT_FOUND` (404, auch fremde Organisation).
+  - **better-auth-Allowlist** (`app.ts`): Von den Organisations-Endpunkten ist per HTTP nur noch `organization/set-active`
+    offen; entfernen, Rolle ändern, einladen, verlassen, umbenennen und löschen laufen nicht mehr an Schutz des letzten Admins
+    und Sessions vorbei (Review). `auth-audit.test.ts` ruft sie direkt über `auth.handler` auf (die Audit-Hooks bleiben).
+  - **Web:** `pages/MembersPage.vue` (Liste ohne waagerechtes Scrollen, auf dem Handy gestapelt; Rolle je Zeile,
+    Status mit Punkt, „Neuer Link“ (Rückfrage bei aktivem Konto), Entfernen mit Rückfrage, eigene Admin-Rolle abgeben mit
+    Rückfrage; Anlegen mit E-Mail, Name, Rolle; Link-Dialog „nur jetzt sichtbar“ mit Kopieren). `pages/SetPasswordPage.vue`
+    (Route `/set-password`, öffentlich): Token aus dem Fragment, sofort aus der Adresszeile entfernt, nicht im Query-Schlüssel;
+    zeigt Name und E-Mail, Passwort zweimal (mindestens 12 Zeichen, `MIN_PASSWORD_LENGTH`), danach `/login?reason=passwordSet`
+    mit Hinweis; ist im Browser jemand angemeldet, bleibt der Hinweis auf der Seite (sonst leitete `/login` weiter).
+  - Browser-Pane geprüft: anlegen, Link öffnen (Fragment verschwindet), Passwort setzen, Zweitnutzung `410`, Log nur mit
+    Pfaden, Status „Aktiv“, entfernen; Handy und Dunkel.
+  - Review (unabhängig): **kritisch** Übernahme des Superadmin-Kontos über „Neuer Link“ bzw. Wiederaufnahme (behoben mit
+    `PROTECTED` und Tests). Übernommen: better-auth-Mitgliederpfade gesperrt, erst prüfen dann hashen, Sperrreihenfolge gegen
+    Deadlocks, `409` bei gleichzeitigem Anlegen, Rückfragen (aktives Konto, eigene Rolle), Hinweis bei angemeldetem Browser,
+    Token nicht im Query-Schlüssel, Test für gleichzeitiges Einlösen. Bewusst so: Entfernen beendet alle Sessions des Nutzers
+    (weitere Mitgliedschaften gibt es erst mit Phase 6), Org-Admins können Passwörter anderer Org-Admins derselben
+    Organisation per Link zurücksetzen (sie verwalten die Organisation ohnehin; im Audit sichtbar), kein Rate-Limit auf den
+    öffentlichen Endpunkten (Token mit 256 Bit, Hash erst nach gültigem Link).
 
 ### 2.11 ASIN-Quick-Tool (F10)
 - [ ] Popover in den Quick-Tools nach F10 (Feature `sp-explorer`, Recht `view`), Zeitraum aus der Filterleiste bzw. Standard,

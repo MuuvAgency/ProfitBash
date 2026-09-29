@@ -1,6 +1,7 @@
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch } from '../test/fetch-stub';
+import { meFixture } from '../test/fixtures';
 import { cleanupMounted, mountWithApp } from '../test/mount';
 
 const TOKEN = 'Abc_-'.repeat(8) + 'xyz';
@@ -69,6 +70,23 @@ describe('SetPasswordPage', () => {
       password: 'ein-langes-passwort',
     });
     await vi.waitFor(() => expect(wrapper.text()).toContain('Passwort gesetzt.'));
+  });
+
+  it('angemeldet in diesem Browser: Hinweis statt Weiterleitung', async () => {
+    setHash(`#${TOKEN}`);
+    stubFetch({
+      ...routes(),
+      'GET /api/me': json(meFixture()),
+      'GET /api/settings/ui-state/shell/sidebar': json({ value: null }),
+      'POST /api/password-links/redeem': new Response(null, { status: 204 }),
+    });
+    const { wrapper, router } = await mountWithApp(undefined, { path: '/set-password' });
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Zugang für Nora'));
+    input('set-password', 'ein-langes-passwort');
+    input('set-password-repeat', 'ein-langes-passwort');
+    await wrapper.find('form').trigger('submit');
+    await vi.waitFor(() => expect(wrapper.text()).toContain('noch als Dominik angemeldet'));
+    expect(router.currentRoute.value.path).toBe('/set-password');
   });
 
   it('abgelaufener oder fehlender Link: Hinweis statt Formular', async () => {

@@ -147,6 +147,7 @@ const ERROR_STATUS: Record<MemberError['code'], [ContentfulStatusCode, string]> 
   SELF: [409, 'MEMBER_SELF'],
   EMAIL_TAKEN: [409, 'MEMBER_EMAIL_TAKEN'],
   OTHER_ORGANIZATION: [409, 'MEMBER_OTHER_ORGANIZATION'],
+  PROTECTED: [403, 'MEMBER_PROTECTED'],
 };
 
 async function mapErrors<T>(run: () => Promise<T>): Promise<T> {
@@ -181,7 +182,11 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
   const middleware = orgAdminOnly(deps);
   const adminOf = (c: { get(key: 'auth'): AppEnv['Variables']['auth'] }) => {
     const session = c.get('auth');
-    return { orgId: session.activeOrganization!.organizationId, actorUserId: session.user.id };
+    return {
+      orgId: session.activeOrganization!.organizationId,
+      actorUserId: session.user.id,
+      actorIsSuperadmin: session.user.role === 'superadmin',
+    };
   };
   const linkUrl = (token: string) => `${new URL(SET_PASSWORD_PATH, deps.appUrl).href}#${token}`;
 
@@ -202,10 +207,25 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
     }
     // Ohne Passwort (kein Login möglich, bis der Link benutzt ist) und ohne Session: better-auth prüft dann keine
     // Superadmin-Rechte; die Admin-Prüfung für diese Organisation macht `orgAdminOnly`.
-    const userId =
-      existing?.id ?? (await auth.api.createUser({ body: { email, name, role: 'user' } })).user.id;
+    let userId = existing?.id;
+    if (!userId) {
+      try {
+        userId = (await auth.api.createUser({ body: { email, name, role: 'user' } })).user.id;
+      } catch (err) {
+        // Gleichzeitig mit derselben E-Mail angelegt: wie vergeben behandeln.
+        if (await findUserByEmail(db, email)) {
+          throw new ApiError(
+            409,
+            'MEMBER_EMAIL_TAKEN',
+            'Diese E-Mail-Adresse gehört schon zu einem Mitglied.',
+          );
+        }
+        throw err;
+      }
+    }
+    const newUserId = userId;
     const { member, token, expiresAt } = await mapErrors(() =>
-      addMember(db, { ...adminOf(c), userId, role, now: new Date() }),
+      addMember(db, { ...adminOf(c), userId: newUserId, role, now: new Date() }),
     );
     return c.json(
       {
@@ -252,6 +272,9 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
 
   app.openapi(redeemRoute, async (c) => {
     const { token, password } = c.req.valid('json');
+    // Erst prüfen, dann hashen: Der Hash kostet Rechenzeit, der Endpunkt ist öffentlich. Die eigentliche Prüfung (einmal,
+    // nicht abgelaufen) macht `redeemPasswordLink` atomar.
+    if (!(await inspectPasswordLink(db, token, new Date()))) throw linkInvalid();
     const context = await auth.$context;
     const passwordHash = await context.password.hash(password);
     if (!(await redeemPasswordLink(db, { token, passwordHash, now: new Date() })))
