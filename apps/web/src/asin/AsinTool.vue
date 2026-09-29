@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatNumber } from '@profitbash/shared';
+import { formatDay, formatNumber } from '@profitbash/shared';
 import { useQuery } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Textarea from 'primevue/textarea';
@@ -21,6 +21,7 @@ import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { parseProductTerms, pathForLevel } from '../explorer/state';
 import { useSessionStore } from '../stores/session';
+import { asinToolInput, asinToolTerms } from './state';
 
 /**
  * ASIN-Quick-Tool (`phase-2.md` F10, 2.11): Wo wird eine ASIN oder SKU beworben, und was bringt sie? Sucht in ASIN und
@@ -54,8 +55,8 @@ const filterState = computed(() => {
   return options.data.value ? sanitizeFilterState(raw, options.data.value) : raw;
 });
 
-const input = ref('');
-const terms = ref<string[]>([]);
+const input = asinToolInput;
+const terms = asinToolTerms;
 const inputError = ref(false);
 
 function submit() {
@@ -81,6 +82,15 @@ const search = useQuery({
   enabled: ready,
   staleTime: 60_000,
 });
+
+/** Ohne Filteroptionen keine Suche: Fehler zeigen statt ewigem Skeleton. */
+const failed = computed(
+  () => search.isError.value || (options.isError.value && !options.data.value),
+);
+function retry() {
+  if (options.isError.value) void options.refetch();
+  else void search.refetch();
+}
 
 type Row = ExplorerRowsData['rows'][number];
 const rows = computed(() => search.data.value?.rows ?? []);
@@ -111,7 +121,24 @@ function explorerLink(row?: Row): RouteLocationRaw {
     query: { ...(campaign && { campaign }), ...(adGroup && { adGroup }), q },
   };
 }
-const periodLabel = computed(() => t(`analytics.period.${filterState.value.period.preset}`));
+const periodLabel = computed(() => {
+  const { period } = filterState.value;
+  return period.preset === 'custom' && period.range
+    ? t('analytics.filter.range', {
+        from: formatDay(period.range.from, locale.value),
+        to: formatDay(period.range.to, locale.value),
+      })
+    : t(`analytics.period.${period.preset}`);
+});
+/** Eine Live-Region für Anzahl, leeres Ergebnis und Fehler (bleibt eingehängt, nur der Text wechselt). */
+const statusText = computed(() => {
+  if (terms.value.length === 0) return '';
+  if (failed.value) return t('asinTool.failed');
+  const data = search.data.value;
+  if (!data) return '';
+  if (data.rows.length === 0) return t('asinTool.empty');
+  return t('asinTool.count', { count: formatNumber(data.totalRows, locale.value) }, data.totalRows);
+});
 </script>
 
 <template>
@@ -147,30 +174,21 @@ const periodLabel = computed(() => t(`analytics.period.${filterState.value.perio
       </div>
     </form>
 
+    <p role="status" aria-live="polite" class="text-body-sm text-ink-secondary empty:hidden">
+      {{ statusText }}
+    </p>
     <template v-if="terms.length > 0">
       <InlineError
-        v-if="search.isError.value"
+        v-if="failed"
         :message="t('asinTool.failed')"
         retryable
-        :retrying="search.isFetching.value"
-        @retry="search.refetch()"
+        :retrying="search.isFetching.value || options.isFetching.value"
+        @retry="retry"
       />
       <div v-else-if="!search.data.value" class="flex flex-col gap-space-sm" aria-busy="true">
         <SkeletonBlock v-for="n in 3" :key="n" height="3.5rem" />
       </div>
-      <p v-else-if="rows.length === 0" class="text-body-sm text-ink-secondary">
-        {{ t('asinTool.empty') }}
-      </p>
-      <template v-else>
-        <p class="text-body-sm text-ink-secondary" role="status">
-          {{
-            t(
-              'asinTool.count',
-              { count: formatNumber(search.data.value.totalRows, locale) },
-              search.data.value.totalRows,
-            )
-          }}
-        </p>
+      <template v-else-if="rows.length > 0">
         <ul class="flex max-h-80 flex-col gap-space-xs overflow-y-auto" data-asin-results>
           <li v-for="row in shown" :key="row.id">
             <RouterLink
@@ -209,8 +227,10 @@ const periodLabel = computed(() => t(`analytics.period.${filterState.value.perio
             </RouterLink>
           </li>
         </ul>
-        <p v-if="rows.length > SHOWN" class="text-body-sm text-ink-tertiary">
-          {{ t('asinTool.more', { count: formatNumber(rows.length - SHOWN, locale) }) }}
+        <p v-if="search.data.value.totalRows > SHOWN" class="text-body-sm text-ink-tertiary">
+          {{
+            t('asinTool.more', { count: formatNumber(search.data.value.totalRows - SHOWN, locale) })
+          }}
         </p>
       </template>
       <RouterLink

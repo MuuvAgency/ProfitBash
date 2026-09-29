@@ -489,5 +489,12 @@ describe('Suche nach ASIN/SKU im Explorer (2.11)', () => {
     );
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    for (const [path, level] of [
+      ['/api/ads/timeseries', 'campaign'],
+      ['/api/ads/explorer/rows', 'negative'],
+    ] as const) {
+      const other = await post(path, query({ level, filter: { productSearch: ['B0X'] } }));
+      expect(other.status, `${path} ${level}`).toBe(400);
+    }
   });
 });

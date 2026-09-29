@@ -767,10 +767,34 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     öffentlichen Endpunkten (Token mit 256 Bit, Hash erst nach gültigem Link).
 
 ### 2.11 ASIN-Quick-Tool (F10)
-- [ ] Popover in den Quick-Tools nach F10 (Feature `sp-explorer`, Recht `view`), Zeitraum aus der Filterleiste bzw. Standard,
+- [x] Popover in den Quick-Tools nach F10 (Feature `sp-explorer`, Recht `view`), Zeitraum aus der Filterleiste bzw. Standard,
       Sprung in den Explorer.
       **Entschieden (Dominik, 2026-09-29):** Der Reiter Product Ads bekommt ein Suchfeld „ASIN/SKU“; das Tool öffnet ihn mit den
       gesuchten Werten, ein Klick auf eine Zeile öffnet zusätzlich deren Ad Group.
+- [x] Umsetzung (Stand für 2.12 und später):
+  - **API:** `filter.productSearch` (1–100 ASINs/SKUs, je bis 60 Zeichen, dasselbe Schema wie `terms` der ASIN-Suche) für
+    `explorer/rows` und `timeseries`, nur auf Ebene `productAd` (sonst `400 VALIDATION_ERROR`); die DB-Schicht sucht wie
+    `asin-search` in ASIN, SKU und `extra.asins`, ohne Groß-/Kleinschreibung.
+  - **Explorer:** Suchfeld „ASIN/SKU“ im Reiter Product Ads (Enter oder Knopf, Aufheben), URL-Parameter `q` (Begriffe mit
+    Komma), `parseProductTerms` (Leerzeichen, Komma, Semikolon, Zeilenumbruch; doppelte ohne Groß-/Kleinschreibung und zu
+    lange Begriffe fallen weg, höchstens 100). Andere Reiter nehmen `q` nicht mit; leeres Ergebnis mit eigenem Text.
+    Gespeicherte Ansichten tragen die Suche als optionales `explorer.productSearch`, nur im Reiter Product Ads.
+  - **ASIN-Tool** (`src/asin/AsinTool.vue` im Popover `QuickTools.vue`, nur mit `sp-explorer`/`view`, sonst der
+    Platzhalter): Eingabe mehrerer ASINs/SKUs, Suche über `/api/ads/asin-search` mit der **zuletzt benutzten** Auswahl der
+    Filterleiste (`ui_state`, bereinigt mit `sanitizeFilterState`, z. B. nicht wählbare Währung → automatisch), ohne
+    Vergleich und ohne die URL der aktuellen Seite zu ändern; Zeitraum sichtbar („zuletzt in der Filterleiste gewählt“,
+    eigener Zeitraum mit Daten). Treffer (höchstens 30 gezeigt, „und n weitere“ aus `totalRows`) mit ASIN/SKU, Ad-Typ,
+    Status, „teilt sich n ASINs“, Profil › Kampagne › Ad Group, Spend, Umsatz, ACoS in der Originalwährung; Klick öffnet
+    Product Ads der Ad Group mit der Suche, „Alle im Explorer öffnen“ nur mit der Suche. Eingabe bleibt beim Schließen des
+    Popovers erhalten (`src/asin/state.ts`); eine Live-Region für Anzahl, leeres Ergebnis und Fehler; Fehler (auch
+    Filteroptionen) mit „Erneut versuchen“.
+  - Browser-Pane geprüft (Demo-Daten): Suche nach ASIN und SKU (auch SD nur mit SKU, SB-Kollektion mit „teilt sich
+    3 ASINs“), Sprung in den Explorer mit Ad Group und Suche, Konsole ohne Fehler.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: Fehlerzustand bei fehlenden Filteroptionen, Text zum
+    Zeitraum (die Filterleiste einer Seite mit geteiltem Link kann von der zuletzt gespeicherten Auswahl abweichen), Daten
+    bei eigenem Zeitraum, „weitere“ aus `totalRows`, `q` nicht in andere Reiter und Ansichten, Eingabe bleibt, Live-Region,
+    Tests (Fehler, eigener Zeitraum, andere Ebenen). Bewusst so: `q` darf bis 100 Begriffe tragen (100 ASINs rund 1,1 KB;
+    lange SKU-Listen länger, aber weit unter URL-Grenzen), die Entscheidung für ein Suchfeld mit URL-Parameter steht oben.
 
 ### 2.12 Alte Tabellen ohne waagerechtes Scrollen (F14)
 - [ ] Sync-Status (`/ops/sync`) und Profiltabelle (`/admin/connections`) passen bei 1440 px (Sidebar ein- und ausgeklappt) auch mit

@@ -37,7 +37,8 @@ export function viewState(
       chartMetrics: [...e.chartMetrics],
       columns: explorer.columns ? [...explorer.columns] : null,
       sort: e.sort ? { ...e.sort } : null,
-      ...(e.productSearch.length > 0 && { productSearch: [...e.productSearch] }),
+      ...(e.level === 'productAd' &&
+        e.productSearch.length > 0 && { productSearch: [...e.productSearch] }),
     };
   }
   return state;
