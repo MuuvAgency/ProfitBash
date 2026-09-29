@@ -663,8 +663,7 @@
             "type": "string"
           },
           "currencyCode": {
-            "type": "string",
-            "pattern": "^[A-Z]{3}$"
+            "type": "string"
           },
           "timezone": {
             "type": "string"

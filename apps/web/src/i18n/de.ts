@@ -252,7 +252,7 @@ export const de = {
         currency: 'Währung',
         timezone: 'Zeitzone',
         defaultsHint:
-          'Währung und Zeitzone folgen dem Marktplatz, wie Amazon sie für Werbeprofile nutzt. Tage werden in dieser Zeitzone gezählt.',
+          'Amazon legt die Währung je Marktplatz fest. Die Zeitzone ist die übliche des Marktplatzes; Tage werden in ihr gezählt.',
         accountType: 'Kontotyp',
         submit: 'Anlegen',
         cancel: 'Abbrechen',

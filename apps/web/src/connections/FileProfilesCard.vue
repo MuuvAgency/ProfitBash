@@ -19,6 +19,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const profilesQuery = useFileProfilesQuery();
 const allProfiles = computed(() => profilesQuery.data.value ?? []);
+// Heute setzt nichts `removedAt` an Datei-Profilen; der Filter gilt wie bei den Connections für später (1.11d).
 const profiles = computed(() =>
   props.showRemoved ? allProfiles.value : allProfiles.value.filter((p) => !p.removedAt),
 );

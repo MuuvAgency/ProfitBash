@@ -30,6 +30,7 @@ export async function createFileProfile(
   await requireAdmin(db, input);
   const values = input.input;
   return db.transaction(async (tx) => {
+    const marketplaceId = marketplaceFor(values.countryCode)?.marketplaceId ?? null;
     const [row] = await tx
       .insert(amazonAdsProfiles)
       .values({
@@ -40,7 +41,7 @@ export async function createFileProfile(
         countryCode: values.countryCode,
         currencyCode: values.currencyCode,
         timezone: values.timezone,
-        marketplaceId: marketplaceFor(values.countryCode)?.marketplaceId ?? null,
+        marketplaceId,
         accountType: values.accountType,
       })
       .returning({ id: amazonAdsProfiles.id });
@@ -49,7 +50,12 @@ export async function createFileProfile(
       organizationId: input.orgId,
       actorUserId: input.userId,
       action: 'profile.create',
-      target: { type: 'amazon_ads_profile', id: row.id, source: 'file', after: values },
+      target: {
+        type: 'amazon_ads_profile',
+        id: row.id,
+        source: 'file',
+        after: { ...values, marketplaceId },
+      },
     });
     return row;
   });

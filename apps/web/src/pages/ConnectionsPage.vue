@@ -237,8 +237,9 @@ function onClientCreated(client: Client) {
       />
     </template>
 
+    <!-- Unabhängig von den Connections: auch bei deren Ladefehler sichtbar. -->
     <FileProfilesCard
-      v-if="connectionsQuery.isSuccess.value"
+      v-if="!connectionsQuery.isPending.value"
       :clients="clients"
       :clients-ready="clientsQuery.isSuccess.value"
       :show-removed="showRemoved"

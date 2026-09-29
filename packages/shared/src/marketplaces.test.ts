@@ -54,6 +54,27 @@ describe('fileProfileCreateSchema', () => {
     );
   });
 
+  it('verlangt kanonische IANA-Zeitzonen (Postgres liest Offsets mit umgekehrtem Vorzeichen)', () => {
+    for (const timezone of ['+01:00', 'EST', 'CET', 'europe/berlin', 'UTC+1']) {
+      expect(fileProfileCreateSchema.safeParse({ ...valid, timezone }).success, timezone).toBe(
+        false,
+      );
+    }
+    expect(fileProfileCreateSchema.safeParse({ ...valid, timezone: 'Europe/London' }).success).toBe(
+      true,
+    );
+  });
+
+  it('verlangt die Währung des Marktplatzes (Amazon legt sie je Marktplatz fest)', () => {
+    expect(fileProfileCreateSchema.safeParse({ ...valid, currencyCode: 'USD' }).success).toBe(
+      false,
+    );
+    expect(
+      fileProfileCreateSchema.safeParse({ ...valid, countryCode: 'SE', currencyCode: 'SEK' })
+        .success,
+    ).toBe(true);
+  });
+
   it('lässt keine weiteren Felder zu (etwa eine Connection)', () => {
     expect(
       fileProfileCreateSchema.safeParse({ ...valid, connectionId: crypto.randomUUID() }).success,
