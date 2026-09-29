@@ -9,7 +9,7 @@ import type {
 import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, reactive, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
+import { AUTO_HEIGHT_CELL, gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
 import { useGridMinWidth } from '../grid/min-width';
 import { useSessionStore } from '../stores/session';
 import { countryName } from './country';
@@ -63,12 +63,8 @@ function accountTypeLabel(type: string | undefined) {
 /** Zellen zentrieren ihren Inhalt vertikal; Steuerelemente erben sonst die Zeilenhöhe des Grids. */
 const CELL = 'flex items-center leading-normal';
 const DATA_CELL = `${CELL} font-data`;
-/**
- * Spalten mit umbrechendem Text (F14: passt bei 1440 px auch mit klassischer Scrollbar, lesbar ohne Tooltip): Die Zeile
- * wächst mit, die Zelle zentriert selbst. Kein Flex an der Zelle, der Wrapper der autoHeight-Zelle schrumpfte sonst nicht
- * unter seine Inhaltsbreite (wie im Sync-Status).
- */
-const WRAPPED = { cellClass: 'leading-normal', autoHeight: true } as const;
+/** Spalten mit umbrechendem Text (F14: passt bei 1440 px auch mit klassischer Scrollbar, lesbar ohne Tooltip). */
+const WRAPPED = { cellClass: AUTO_HEIGHT_CELL, autoHeight: true } as const;
 
 const columnDefs = computed<ColDef<Profile>[]>(() => {
   const { locale } = session.preferences;

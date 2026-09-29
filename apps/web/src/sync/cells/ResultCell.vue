@@ -32,7 +32,7 @@ const accessibleLabel = computed(() =>
 
 <!-- Zähler des Laufs; bei Fehlern darunter der Schalter mit der ersten Zeile, aufgeklappt der ganze Text. -->
 <template>
-  <div v-if="run" class="flex min-h-[52px] w-full min-w-0 flex-col justify-center gap-1 py-2">
+  <div v-if="run" class="flex min-h-[50px] w-full min-w-0 flex-col justify-center gap-1 py-2">
     <!-- Umbrechen statt kürzen: ohne Tooltip lesbar, auch auf Touch (F14). -->
     <span v-if="counters.length > 0" data-wrap class="min-w-0 whitespace-normal wrap-break-word">
       <template v-for="(part, index) in counters" :key="part.key">

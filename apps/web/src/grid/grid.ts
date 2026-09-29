@@ -77,3 +77,12 @@ export const gridTheme = themeQuartz.withParams({
   columnBorder: false,
   headerRowBorder: true,
 });
+
+/**
+ * Zellklasse für Spalten mit `autoHeight` und umbrechendem Text (`phase-2.md` 2.12): Die Zelle zentriert den Wrapper von
+ * AG Grid vertikal (auch wenn eine andere Spalte die Zeile höher macht), der Wrapper darf unter seine Inhaltsbreite
+ * schrumpfen (sonst ragte er über die Zelle hinaus). Die Renderer bringen `min-h-[50px]` mit: 52 px Zeilenhöhe minus
+ * 1 px Rand oben und unten.
+ */
+export const AUTO_HEIGHT_CELL =
+  'flex items-center leading-normal [&>.ag-cell-wrapper]:min-w-0 [&>.ag-cell-wrapper]:flex-1';

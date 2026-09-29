@@ -826,6 +826,13 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     Konsole ohne Fehler und ohne AG-Warnungen.
   - Nicht geändert: Die Client-Auswahl der Profiltabelle kürzt den gewählten Namen im Feld („Waldkauz (D…“); geöffnet steht
     er ganz da, auch auf Touch.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: umbrechende Zellen vertikal mittig, auch wenn eine andere
+    Spalte die Zeile höher macht (`AUTO_HEIGHT_CELL` in `grid/grid.ts`: Flex an der Zelle, der Wrapper von AG Grid darf
+    schrumpfen; ersetzt den Umweg „kein Flex an der Zelle“), Zeilen ohne Umbruch wieder 52 px (Renderer `min-h-[50px]`
+    wegen 1 px Rand oben und unten), exakte Mindestbreite der Profiltabelle im Test (1055 px), Hover am Knopf „Entfernt“
+    über die Fläche. Bewusst so: Die Standard-E-Mail steht im Sync-Status bei ausgeklappter Sidebar auf zwei Zeilen (neben
+    den Zählern ist nicht Platz für beide in einer Zeile; 1 : 1 ließe die Zähler öfter umbrechen). `SYNC_AUTO_SIZED_WIDTH`
+    ist gemessen: bei neuen oder längeren Job-Namen neu messen.
 
 ## `.env.example`
 
