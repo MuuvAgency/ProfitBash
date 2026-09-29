@@ -93,6 +93,8 @@ function onSelectionChanged({ api: gridApi }: SelectionChangedEvent<GridRow>) {
  */
 function onCellKeyDown({ event }: CellKeyDownEvent<GridRow>) {
   if (!(event instanceof KeyboardEvent) || event.key !== 'Enter') return;
+  // Gehaltenes Enter klickte wiederholt (Popover flackert, Route doppelt); Modifikatoren bleiben dem Browser.
+  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   const cell = event.target;
   if (!(cell instanceof HTMLElement) || !cell.classList.contains('ag-cell')) return;
   const control = cell.querySelector<HTMLElement>('a[href], button');

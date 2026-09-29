@@ -123,11 +123,21 @@ describe('Explorer-Spalten', () => {
     const targetDefs = all('target');
     expect(display(column(targetDefs, 'name'), target)).toBe('ASIN B0DEMO0001');
     expect(display(column(targetDefs, 'matchType'), target)).toBe('Produkt');
+    // Echte Zeilen tragen neben dem Keyword auch den Ausdruck: Der Name bleibt das Keyword.
     const keyword = row({
       name: 'nistkasten',
-      attributes: { keywordText: 'nistkasten', matchType: 'EXACT' },
+      attributes: {
+        keywordText: 'nistkasten',
+        matchType: 'EXACT',
+        expression: { matchType: 'EXACT', keyword: 'nistkasten' },
+      },
     });
     expect(display(column(targetDefs, 'name'), keyword)).toBe('nistkasten');
+    const negative = row({
+      name: JSON.stringify({ event: 'VIEWS', lookback: 30 }),
+      attributes: { expression: { event: 'VIEWS', lookback: 30 }, keywordText: null },
+    });
+    expect(display(column(all('negative'), 'name'), negative)).toBe('Zielgruppe: Aufrufe, 30 Tage');
 
     const searchTerm = row({
       name: 'nistkasten holz',
