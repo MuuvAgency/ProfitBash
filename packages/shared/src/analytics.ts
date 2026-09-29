@@ -46,3 +46,27 @@ export function isFxRateStale(latestRateDate: string | null, now: Date): boolean
     (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${latestRateDate}T00:00:00Z`)) / 86_400_000;
   return days > FX_RATES_STALE_AFTER_DAYS;
 }
+
+/** Voreinstellungen des Zeitraums der Filterleiste (`phase-2.md` F5); Rechnung im Web (`analytics/periods.ts`). */
+export const PERIOD_PRESETS = [
+  'yesterday',
+  'last7',
+  'last14',
+  'last30',
+  'thisWeek',
+  'lastWeek',
+  'thisMonth',
+  'lastMonth',
+  'monthBeforeLast',
+  'thirdLastMonth',
+  'last12Months',
+  'yearToDate',
+  'lastYear',
+  'custom',
+] as const;
+export type PeriodPreset = (typeof PERIOD_PRESETS)[number];
+export const DEFAULT_PERIOD_PRESET: PeriodPreset = 'last30';
+
+export const COMPARISON_MODES = ['previous', 'previousYear', 'off'] as const;
+export type ComparisonMode = (typeof COMPARISON_MODES)[number];
+export const DEFAULT_COMPARISON_MODE: ComparisonMode = 'previous';

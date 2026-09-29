@@ -7,28 +7,20 @@
  * - Wochen beginnen am Montag; „Letzte 12 Monate“ = die 12 vollen Monate vor dem laufenden.
  */
 
-export const PERIOD_PRESETS = [
-  'yesterday',
-  'last7',
-  'last14',
-  'last30',
-  'thisWeek',
-  'lastWeek',
-  'thisMonth',
-  'lastMonth',
-  'monthBeforeLast',
-  'thirdLastMonth',
-  'last12Months',
-  'yearToDate',
-  'lastYear',
-  'custom',
-] as const;
-export type PeriodPreset = (typeof PERIOD_PRESETS)[number];
-export const DEFAULT_PERIOD_PRESET: PeriodPreset = 'last30';
-
-export const COMPARISON_MODES = ['previous', 'previousYear', 'off'] as const;
-export type ComparisonMode = (typeof COMPARISON_MODES)[number];
-export const DEFAULT_COMPARISON_MODE: ComparisonMode = 'previous';
+export {
+  COMPARISON_MODES,
+  DEFAULT_COMPARISON_MODE,
+  DEFAULT_PERIOD_PRESET,
+  PERIOD_PRESETS,
+  type ComparisonMode,
+  type PeriodPreset,
+} from '@profitbash/shared';
+import {
+  COMPARISON_MODES,
+  PERIOD_PRESETS,
+  type ComparisonMode,
+  type PeriodPreset,
+} from '@profitbash/shared';
 
 export interface DateRange {
   from: string;
