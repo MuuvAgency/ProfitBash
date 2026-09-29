@@ -57,6 +57,23 @@ describe('Zustand einer Ansicht (F8)', () => {
     });
   });
 
+  it('Suche nach ASIN/SKU im Reiter Product Ads gehört zur Ansicht', () => {
+    const explorer = explorerStateFromRoute('/ads/explorer/product-ads', { q: 'B0AAA0001,SKU-7' });
+    const state = viewState('explorer', filters, { explorer, columns: null });
+    expect(state.explorer?.productSearch).toEqual(['B0AAA0001', 'SKU-7']);
+    expect(explorerTarget(state)).toEqual({
+      path: '/ads/explorer/product-ads',
+      query: { q: 'B0AAA0001,SKU-7' },
+    });
+    // Ohne Suche fehlt das Feld (ältere Ansichten haben es nicht).
+    const plain = viewState('explorer', filters, {
+      explorer: explorerStateFromRoute('/ads/explorer/campaigns', {}),
+      columns: null,
+    });
+    expect(plain.explorer && 'productSearch' in plain.explorer).toBe(false);
+    expect(explorerTarget(plain).query).toEqual({});
+  });
+
   it('Ziel im Explorer: Pfad der Ebene und nur die Parameter der Ansicht', () => {
     const explorer = explorerStateFromRoute('/ads/explorer/targets', { campaign: CAMPAIGN });
     const state = viewState('explorer', filters, { explorer, columns: null });

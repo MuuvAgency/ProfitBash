@@ -7,6 +7,7 @@ import {
   explorerQuery,
   explorerStateToQuery,
   levelFromPath,
+  parseProductTerms,
   pathForLevel,
 } from './state';
 
@@ -61,6 +62,7 @@ describe('explorerStateFromRoute', () => {
       adProducts: ['SPONSORED_BRANDS', 'SPONSORED_DISPLAY'],
       chartMetrics: ['clicks', 'acos'],
       sort: null,
+      productSearch: [],
     });
   });
 
@@ -72,6 +74,7 @@ describe('explorerStateFromRoute', () => {
       adProducts: [],
       chartMetrics: ['cost', 'sales'],
       sort: null,
+      productSearch: [],
     });
   });
 
@@ -141,6 +144,7 @@ describe('explorerQuery (Filter für die API)', () => {
         adProducts: ['SPONSORED_PRODUCTS'],
         chartMetrics: ['cost', 'sales'],
         sort: null,
+        productSearch: [],
       }),
     ).toEqual({
       level: 'target',
@@ -159,6 +163,7 @@ describe('explorerStateToQuery (Ansicht laden)', () => {
       adProducts: ['SPONSORED_BRANDS' as const, 'SPONSORED_PRODUCTS' as const],
       chartMetrics: ['clicks', 'sales'] as ['clicks', 'sales'],
       sort: { column: 'cost', direction: 'desc' as const },
+      productSearch: [],
     };
     const query = explorerStateToQuery(state);
     expect(query).toEqual({
@@ -176,5 +181,29 @@ describe('explorerStateToQuery (Ansicht laden)', () => {
     expect(
       explorerStateToQuery({ ...explorerStateFromRoute('/ads/explorer', {}), adProducts: [] }),
     ).toEqual({});
+  });
+});
+
+describe('Suche nach ASIN/SKU (F10, 2.11)', () => {
+  it('Eingabe: Leerzeichen, Komma, Semikolon oder Zeilenumbruch trennen, doppelte fallen weg', () => {
+    expect(parseProductTerms(' B0AAA0001, b0aaa0001\nSKU-7;  B0BBB0002\t')).toEqual([
+      'B0AAA0001',
+      'SKU-7',
+      'B0BBB0002',
+    ]);
+    expect(parseProductTerms('   ')).toEqual([]);
+    expect(
+      parseProductTerms(Array.from({ length: 120 }, (_, i) => `A${i}`).join(' ')),
+    ).toHaveLength(100);
+    expect(parseProductTerms(`${'x'.repeat(61)} OK`)).toEqual(['OK']);
+  });
+
+  it('steht als `q` in der URL und wirkt nur im Reiter Product Ads', () => {
+    const state = explorerStateFromRoute('/ads/explorer/product-ads', { q: 'B0AAA0001,SKU-7' });
+    expect(state.productSearch).toEqual(['B0AAA0001', 'SKU-7']);
+    expect(explorerQuery(state).filter).toEqual({ productSearch: ['B0AAA0001', 'SKU-7'] });
+    expect(explorerStateToQuery(state)).toEqual({ q: 'B0AAA0001,SKU-7' });
+    const campaigns = explorerStateFromRoute('/ads/explorer/campaigns', { q: 'B0AAA0001' });
+    expect(explorerQuery(campaigns).filter).toEqual({});
   });
 });

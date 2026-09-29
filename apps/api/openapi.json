@@ -1672,6 +1672,16 @@
               },
               "includeRemoved": {
                 "type": "boolean"
+              },
+              "productSearch": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "minItems": 1,
+                "maxItems": 100
               }
             }
           }
@@ -1967,6 +1977,16 @@
               },
               "includeRemoved": {
                 "type": "boolean"
+              },
+              "productSearch": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "minItems": 1,
+                "maxItems": 100
               }
             }
           },
@@ -2584,6 +2604,15 @@
                 "type": "null"
               }
             ]
+          },
+          "productSearch": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "maxItems": 100
           }
         },
         "required": [

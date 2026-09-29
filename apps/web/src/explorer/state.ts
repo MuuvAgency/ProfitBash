@@ -57,6 +57,30 @@ export interface ExplorerState {
   chartMetrics: [MetricKey, MetricKey];
   /** Eine Spalte (`colId`) mit Richtung; `null` = Reihenfolge des Servers (Spend absteigend). */
   sort: GridSort | null;
+  /** ASINs/SKUs der Suche im Reiter Product Ads (`q`, F10); leer = keine Suche. */
+  productSearch: string[];
+}
+
+/** Wie `MAX_ASIN_SEARCH_TERMS` und die Länge je Begriff in `@profitbash/shared`. */
+const MAX_PRODUCT_TERMS = 100;
+const MAX_TERM_LENGTH = 60;
+
+/**
+ * Eingabe von ASINs/SKUs (auch aus der Zwischenablage): getrennt durch Leerzeichen, Komma, Semikolon oder Zeilenumbruch,
+ * doppelte (ohne Groß-/Kleinschreibung) fallen weg, zu lange Begriffe ebenso, höchstens 100.
+ */
+export function parseProductTerms(text: string): string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const raw of text.split(/[\s,;]+/)) {
+    const term = raw.trim();
+    if (!term || term.length > MAX_TERM_LENGTH || seen.has(term.toUpperCase())) continue;
+    seen.add(term.toUpperCase());
+    // Wie eingegeben: Die Suche ignoriert Groß-/Kleinschreibung.
+    terms.push(term);
+    if (terms.length === MAX_PRODUCT_TERMS) break;
+  }
+  return terms;
 }
 
 export interface GridSort {
@@ -76,6 +100,7 @@ export const EXPLORER_QUERY_KEYS = [
   'm1',
   'm2',
   'sort',
+  'q',
 ];
 
 const SORT = /^([A-Za-z][A-Za-z0-9]{0,39})\.(asc|desc)$/;
@@ -111,6 +136,7 @@ export function explorerStateFromRoute(path: string, query: LocationQuery): Expl
       isMetric(m2) ? m2 : DEFAULT_CHART_METRICS[1],
     ],
     sort: sortFrom(one(query.sort)),
+    productSearch: parseProductTerms(one(query.q) ?? ''),
   };
 }
 
@@ -134,6 +160,7 @@ export function explorerStateToQuery(state: Omit<ExplorerState, 'level'>): Recor
   if (state.chartMetrics[0] !== DEFAULT_CHART_METRICS[0]) query.m1 = state.chartMetrics[0];
   if (state.chartMetrics[1] !== DEFAULT_CHART_METRICS[1]) query.m2 = state.chartMetrics[1];
   if (state.sort) query.sort = `${state.sort.column}.${state.sort.direction}`;
+  if (state.productSearch.length > 0) query.q = state.productSearch.join(',');
   return query;
 }
 
@@ -181,6 +208,8 @@ export function explorerQuery(state: ExplorerState) {
       ...(drill.campaignId && { campaignIds: [drill.campaignId] }),
       ...(drill.adGroupId && { adGroupIds: [drill.adGroupId] }),
       ...(state.includeRemoved && { includeRemoved: true }),
+      ...(state.level === 'productAd' &&
+        state.productSearch.length > 0 && { productSearch: state.productSearch }),
     },
   };
 }

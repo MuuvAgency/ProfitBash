@@ -66,6 +66,8 @@ export const savedViewExplorerSchema = z
     columns: orNull(z.array(columnId).max(80)),
     /** `null` = Standard (Spend absteigend vom Server). */
     sort: orNull(z.object({ column: columnId, direction: z.enum(['asc', 'desc']) })),
+    /** Suche nach ASIN/SKU im Reiter Product Ads (2.11); fehlt bei älteren Ansichten. */
+    productSearch: z.array(z.string().trim().min(1).max(60)).max(100).optional(),
   })
   .meta({ id: 'SavedViewExplorer' });
 export type SavedViewExplorer = z.infer<typeof savedViewExplorerSchema>;

@@ -26,6 +26,7 @@ export type TimeSeriesInput = Schemas['TimeSeriesRequest'];
 export type TimeSeriesData = Schemas['TimeSeriesResponse'];
 export type ExplorerRowsInput = Schemas['ExplorerRowsRequest'];
 export type ExplorerRowsData = Schemas['ExplorerRowsResponse'];
+export type AsinSearchInput = Schemas['AsinSearchRequest'];
 
 export interface ApiOptions {
   /**
@@ -179,6 +180,8 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/timeseries', { body: input })),
       explorerRows: (input: ExplorerRowsInput): Promise<ExplorerRowsData> =>
         unwrap(client.POST('/api/ads/explorer/rows', { body: input })),
+      asinSearch: (input: AsinSearchInput): Promise<ExplorerRowsData> =>
+        unwrap(client.POST('/api/ads/asin-search', { body: input })),
     },
 
     /** Mitglieder (F9, nur Org-Admins). Links zum Passwort-Setzen kommen nur beim Anlegen bzw. Neu-Erzeugen. */
