@@ -12,7 +12,8 @@ export interface CsvOptions {
 
 export type CsvDelimiter = ',' | ';' | '\t';
 
-export const DEFAULT_MAX_CSV_BYTES = 500 * 1024 * 1024;
+/** Als Text im Speicher (UTF-16 doppelt so groß); echte Berichte sind deutlich kleiner. */
+export const DEFAULT_MAX_CSV_BYTES = 200 * 1024 * 1024;
 
 function decode(input: string | Uint8Array): string {
   if (typeof input === 'string') return input;
@@ -55,8 +56,9 @@ export function forEachCsvRow(
   const endRow = () => {
     row.push(field);
     field = '';
-    // Leere Zeilen (auch am Ende) tragen keine Daten.
-    if (!(row.length === 1 && row[0] === '')) callback(row, ++rowNumber);
+    // Leere Zeilen tragen keine Daten, zählen aber mit (Zeilennummern wie in Excel).
+    rowNumber++;
+    if (!(row.length === 1 && row[0] === '')) callback(row, rowNumber);
     row = [];
   };
 
@@ -81,6 +83,13 @@ export function forEachCsvRow(
       }
       field = value;
       i = end;
+      const after = text[i];
+      if (after !== undefined && after !== delimiter && after !== '\r' && after !== '\n') {
+        throw new SheetReadError(
+          'INVALID_CSV',
+          `Zeile ${rowNumber + 1}: Text nach einem schließenden Anführungszeichen.`,
+        );
+      }
     } else if (char === delimiter) {
       row.push(field);
       field = '';
