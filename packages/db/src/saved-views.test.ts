@@ -345,6 +345,60 @@ describe('Access-Layer beim Speichern und Laden (ADR 002)', () => {
     }
   });
 
+  it('meldet, wenn von einer eingeschränkten Auswahl nichts sichtbar bleibt (statt still „alle“)', async () => {
+    const view = await create(ids.admin, {
+      state: { filters: filters({ clientIds: [ids.clientForeign], profileIds: [ids.hidden] }) },
+    });
+    expect(view.state.filters).toMatchObject({ clientIds: [], profileIds: null });
+    expect(view.selectionHidden).toBe(true);
+    const unrestricted = await create(ids.admin, { name: 'Alle' });
+    expect(unrestricted.selectionHidden).toBe(false);
+    const partly = await create(ids.admin, {
+      name: 'Teil',
+      state: { filters: filters({ clientIds: [ids.clientA, ids.clientForeign] }) },
+    });
+    expect(partly.selectionHidden).toBe(false);
+  });
+
+  it('Liste mit vielen Ansichten prüft die Sichtbarkeit einmal (keine Abfrage je Ansicht)', async () => {
+    for (let i = 0; i < 5; i++) {
+      await create(ids.admin, {
+        name: `V${i}`,
+        area: 'explorer',
+        state: {
+          filters: filters({ profileIds: [ids.de, ids.hidden] }),
+          explorer: explorer({ campaignId: i % 2 ? ids.campaignDe : ids.campaignHidden }),
+        },
+      });
+    }
+    const list = await listSavedViews(testDb.db, { ...as(ids.admin), area: 'explorer' });
+    expect(list.map((v) => v.state.explorer?.drill.campaignId)).toEqual([
+      null,
+      ids.campaignDe,
+      null,
+      ids.campaignDe,
+      null,
+    ]);
+    expect(list.every((v) => v.state.filters.profileIds?.join() === ids.de)).toBe(true);
+  });
+
+  it('Ansichten mit veraltetem Zustand bleiben sichtbar und löschbar (Standardzustand)', async () => {
+    const [row] = await testDb.db
+      .insert(savedViews)
+      .values({
+        organizationId: ids.org,
+        ownerUserId: ids.viewer,
+        name: 'Alt',
+        area: 'explorer',
+        state: { filters: { period: 'irgendwas' } },
+      })
+      .returning({ id: savedViews.id });
+    const [listed] = await listSavedViews(testDb.db, { ...as(ids.viewer), area: 'explorer' });
+    expect(listed).toMatchObject({ id: row!.id, name: 'Alt', outdated: true });
+    expect(listed?.state.explorer?.level).toBe('campaign');
+    await deleteSavedView(testDb.db, { ...as(ids.viewer), id: row!.id });
+  });
+
   it('lässt fremde Drill-Down-IDs auch ohne Profilauswahl nicht durch', async () => {
     const view = await create(ids.admin, {
       area: 'explorer',
@@ -416,6 +470,19 @@ describe('Ändern und Löschen', () => {
     expect(await errorCode(deleteSavedView(testDb.db, { ...as(ids.admin), id: view.id }))).toBe(
       'NOT_FOUND',
     );
+  });
+
+  it('Admin nimmt die Freigabe einer fremden Ansicht zurück und bekommt das Ergebnis', async () => {
+    const view = await create(ids.editor, { shared: true });
+    const unshared = await updateSavedView(testDb.db, {
+      ...as(ids.admin),
+      id: view.id,
+      canShare: true,
+      patch: { shared: false },
+    });
+    expect(unshared).toMatchObject({ id: view.id, shared: false, own: false, canEdit: true });
+    expect(await getSavedView(testDb.db, { ...as(ids.admin), id: view.id })).toBeNull();
+    expect((await getSavedView(testDb.db, { ...as(ids.editor), id: view.id }))?.shared).toBe(false);
   });
 
   it('freigeben nur mit Schreibrecht, zurücknehmen darf der Besitzer immer', async () => {

@@ -32,7 +32,8 @@ const props = defineProps<{
   /** Pfad für „Link kopieren“ (`/dashboard`, `/ads/explorer`). */
   linkPath: string;
 }>();
-const emit = defineEmits<{ apply: [view: SavedView] }>();
+/** `replace`: ohne neuen Verlaufseintrag (Laden über einen Link, sonst stünde der Link doppelt im Verlauf). */
+const emit = defineEmits<{ apply: [view: SavedView, options: { replace: boolean }] }>();
 
 const { t } = useI18n();
 const id = useId();
@@ -61,10 +62,16 @@ const active = computed(() =>
 
 const notice = ref<string | null>(null);
 
-function apply(view: SavedView) {
+function apply(view: SavedView, replace = false) {
   popover.value?.hide();
+  // Nichts Sichtbares übrig: Die Auswahl hieße „alle Profile“, das wäre eine andere Ansicht.
+  if (view.selectionHidden || view.outdated) {
+    notice.value = t(view.outdated ? 'savedViews.outdated' : 'savedViews.selectionHidden');
+    return false;
+  }
   notice.value = view.hiddenItems > 0 ? t('savedViews.hiddenItems', view.hiddenItems) : null;
-  emit('apply', view);
+  emit('apply', view, { replace });
+  return true;
 }
 
 // --- Link mit ?view=<id> -------------------------------------------------------------------
@@ -81,12 +88,24 @@ watch(
   async (viewId) => {
     if (!viewId || viewId === loadedViewId) return;
     loadedViewId = viewId;
+    const dropLinkParam = () => {
+      const { view: _view, ...query } = route.query;
+      void router.replace({
+        path: route.path,
+        query,
+        state: router.options.history.state as never,
+      });
+    };
     try {
-      apply(await api.savedViews.get(viewId));
+      const view = await api.savedViews.get(viewId);
+      // Eine Ansicht des anderen Bereichs (Dashboard-Link im Explorer) passt nicht auf diese Seite.
+      if (view.area !== props.area) {
+        notice.value = t('savedViews.linkNotFound');
+        dropLinkParam();
+      } else if (!apply(view, true)) dropLinkParam();
     } catch {
       notice.value = t('savedViews.linkNotFound');
-      const { view: _view, ...query } = route.query;
-      void router.replace({ path: route.path, query, state: history.state as never });
+      dropLinkParam();
     }
   },
   { immediate: true },
@@ -94,7 +113,7 @@ watch(
 
 // --- Dialog: speichern, umbenennen, löschen -------------------------------------------------
 
-type DialogMode = { kind: 'create' } | { kind: 'rename' | 'delete'; view: SavedView };
+type DialogMode = { kind: 'create' } | { kind: 'rename' | 'delete' | 'overwrite'; view: SavedView };
 const dialog = ref<DialogMode | null>(null);
 const name = ref('');
 const shared = ref(false);
@@ -116,6 +135,9 @@ const save = useMutation({
   mutationFn: async (mode: DialogMode) => {
     if (mode.kind === 'delete') return api.savedViews.remove(mode.view.id);
     if (mode.kind === 'rename') return api.savedViews.update(mode.view.id, { name: name.value });
+    if (mode.kind === 'overwrite') {
+      return api.savedViews.update(mode.view.id, { state: props.current! });
+    }
     return api.savedViews.create({
       name: name.value,
       area: props.area,
@@ -133,11 +155,12 @@ const save = useMutation({
 function submit() {
   const mode = dialog.value;
   if (!mode) return;
-  if (mode.kind !== 'delete' && !name.value.trim()) {
+  const confirmOnly = mode.kind === 'delete' || mode.kind === 'overwrite';
+  if (!confirmOnly && !name.value.trim()) {
     dialogError.value = t('savedViews.nameRequired');
     return;
   }
-  if (mode.kind === 'create' && !props.current) return;
+  if ((mode.kind === 'create' || mode.kind === 'overwrite') && !props.current) return;
   dialogError.value = null;
   save.mutate(mode);
 }
@@ -160,9 +183,6 @@ const change = useMutation({
   onError: (error) => (actionError.value = errorText(error)),
 });
 
-function overwrite(view: SavedView) {
-  if (props.current) change.mutate({ view, patch: { state: props.current } });
-}
 function toggleShared(view: SavedView) {
   change.mutate({ view, patch: { shared: !view.shared } });
 }
@@ -307,7 +327,7 @@ const dialogTitle = computed(() => {
                       severity="secondary"
                       :disabled="!current || change.isPending.value"
                       :aria-label="t('savedViews.overwrite', { name: view.name })"
-                      @click="overwrite(view)"
+                      @click="openDialog({ kind: 'overwrite', view })"
                     />
                     <Button
                       v-if="view.canShare || view.shared"
@@ -373,6 +393,14 @@ const dialogTitle = computed(() => {
         <p v-if="dialog?.kind === 'delete'" class="text-body-md text-ink">
           {{ t('savedViews.deleteConfirm', { name: dialog.view.name }) }}
         </p>
+        <p v-else-if="dialog?.kind === 'overwrite'" class="text-body-md text-ink">
+          {{
+            t(dialog.view.own ? 'savedViews.overwriteConfirm' : 'savedViews.overwriteConfirmTeam', {
+              name: dialog.view.name,
+              owner: dialog.view.owner.name,
+            })
+          }}
+        </p>
         <template v-else>
           <div class="flex flex-col gap-space-sm">
             <label :for="`${id}-name`" class="text-body-sm font-semibold text-ink">
@@ -416,7 +444,13 @@ const dialogTitle = computed(() => {
           <Button
             type="submit"
             data-saved-view-submit
-            :label="dialog?.kind === 'delete' ? t('savedViews.deleteAction') : t('common.save')"
+            :label="
+              dialog?.kind === 'delete'
+                ? t('savedViews.deleteAction')
+                : dialog?.kind === 'overwrite'
+                  ? t('savedViews.overwriteAction')
+                  : t('common.save')
+            "
             :severity="dialog?.kind === 'delete' ? 'danger' : undefined"
             :loading="save.isPending.value"
           />

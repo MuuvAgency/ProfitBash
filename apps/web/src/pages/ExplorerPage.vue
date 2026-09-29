@@ -275,7 +275,7 @@ const currentView = computed(() =>
       })
     : null,
 );
-function applyView(view: SavedView) {
+function applyView(view: SavedView, { replace }: { replace: boolean }) {
   const explorer = view.state.explorer;
   if (!explorer) return;
   // Spalten wie selbst gewählt (ui_state der Ebene); `null` = Standard der Ebene.
@@ -288,6 +288,7 @@ function applyView(view: SavedView) {
     path: target.path,
     query: target.query,
     state: { [CRUMBS_KEY]: {} },
+    replace,
   });
 }
 

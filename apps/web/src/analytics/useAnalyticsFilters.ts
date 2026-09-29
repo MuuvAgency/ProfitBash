@@ -124,13 +124,13 @@ export function useAnalyticsFilters() {
    */
   function update(
     patch: Partial<FilterState>,
-    target?: { path?: string; query?: LocationQuery; state?: HistoryState },
+    target?: { path?: string; query?: LocationQuery; state?: HistoryState; replace?: boolean },
   ) {
     const next: FilterState = { ...state.value, ...patch };
     local.value = next;
     // Für andere Seiten (Explorer) ohne eigenen Verlaufseintrag.
     queryClient.setQueryData(uiStateQueryKey, next);
-    void router.push({
+    void router[target?.replace ? 'replace' : 'push']({
       ...(target?.path && { path: target.path }),
       query: mergeFilterQuery(target?.query ?? route.query, next),
       state: { ...target?.state, [HISTORY_STATE_KEY]: toHistoryValue(next) },

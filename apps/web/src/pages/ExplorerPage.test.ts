@@ -392,6 +392,8 @@ function savedView(patch: Record<string, unknown> = {}) {
     canEdit: false,
     canShare: false,
     hiddenItems: 0,
+    selectionHidden: false,
+    outdated: false,
     createdAt: '2026-09-28T08:00:00.000Z',
     updatedAt: '2026-09-28T08:00:00.000Z',
     state: {
@@ -522,6 +524,65 @@ describe('Gespeicherte Ansichten im Explorer (F8)', () => {
     expect(router.currentRoute.value.query.view).toBeUndefined();
     await vi.waitFor(() =>
       expect(wrapper.text()).toContain('2 Einträge dieser Ansicht sind für dich nicht sichtbar'),
+    );
+  });
+
+  it('Link führt ohne neuen Verlaufseintrag zur Ansicht (Zurück springt nicht auf den Link)', async () => {
+    stubFetch({
+      ...routes(),
+      [`GET /api/saved-views/${VIEW_ID}`]: json(savedView()),
+      'PUT /api/settings/ui-state/explorer/columns.target': new Response(null, { status: 204 }),
+    });
+    const { router } = await mountExplorer(`/ads/explorer?view=${VIEW_ID}`);
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/ads/explorer/targets'));
+    // Zurück führt vor den Link, nicht auf ihn (dort würde die Ansicht erneut geladen).
+    const seen: string[] = [];
+    router.afterEach((to) => void seen.push(to.fullPath));
+    router.back();
+    await flushPromises();
+    expect(seen.some((path) => path.includes('view='))).toBe(false);
+  });
+
+  it('Link auf eine Dashboard-Ansicht oder ohne sichtbare Auswahl lädt nichts und sagt es', async () => {
+    stubFetch({
+      ...routes(),
+      [`GET /api/saved-views/${VIEW_ID}`]: json(savedView({ area: 'dashboard' })),
+    });
+    const { wrapper, router } = await mountExplorer(`/ads/explorer/campaigns?view=${VIEW_ID}`);
+    await vi.waitFor(() => expect(router.currentRoute.value.query.view).toBeUndefined());
+    expect(router.currentRoute.value.path).toBe('/ads/explorer/campaigns');
+    expect(wrapper.text()).toContain('Die verlinkte Ansicht gibt es nicht');
+    cleanupMounted();
+
+    stubFetch({
+      ...routes(),
+      [`GET /api/saved-views/${VIEW_ID}`]: json(savedView({ selectionHidden: true })),
+    });
+    const second = await mountExplorer(`/ads/explorer/campaigns?view=${VIEW_ID}`);
+    await vi.waitFor(() => expect(second.router.currentRoute.value.query.view).toBeUndefined());
+    expect(second.router.currentRoute.value.path).toBe('/ads/explorer/campaigns');
+    expect(second.wrapper.text()).toContain('Die Ansicht wurde nicht geladen.');
+  });
+
+  it('Überschreiben einer Team-Ansicht fragt vorher nach', async () => {
+    const { requests } = stubFetch({
+      ...routes(),
+      'GET /api/saved-views': json({ views: [savedView({ canEdit: true })] }),
+      [`PATCH /api/saved-views/${VIEW_ID}`]: json(savedView({ canEdit: true })),
+    });
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    await wrapper.find('[data-saved-views]').trigger('click');
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Top-Targets Waldkauz'));
+    button('[aria-label="„Top-Targets Waldkauz“ mit dem aktuellen Stand überschreiben"]').click();
+    await flushPromises();
+    expect(document.body.textContent).toContain('Das betrifft alle, die sie nutzen.');
+    expect(requests.some((r) => r.method === 'PATCH')).toBe(false);
+    button('[data-saved-view-submit]').click();
+    await vi.waitFor(() =>
+      expect(requests.find((r) => r.method === 'PATCH')?.body).toMatchObject({
+        state: { explorer: { level: 'campaign' } },
+      }),
     );
   });
 

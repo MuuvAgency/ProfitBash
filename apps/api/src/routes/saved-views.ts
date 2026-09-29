@@ -144,6 +144,8 @@ function toResponse(record: SavedViewRecord, canWrite: boolean): SavedView {
     canShare: record.canEdit && canWrite,
     state: record.state,
     hiddenItems: record.hiddenItems,
+    selectionHidden: record.selectionHidden,
+    outdated: record.outdated,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
