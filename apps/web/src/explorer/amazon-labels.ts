@@ -61,15 +61,21 @@ export function targetLabel(attributes: Record<string, unknown>, labels: Labels)
   if (asin) return t('explorer.amazon.target.asin', { asin });
 
   const category = text(expression.productCategoryResolved) ?? text(expression.productCategoryId);
-  if (category) return t('explorer.amazon.target.category', { name: category });
+  if (category) {
+    const name = t('explorer.amazon.target.category', { name: category });
+    // Verfeinerungen (z. B. Marke, Preis) dazu, sonst hießen verschiedene Targets derselben Kategorie gleich.
+    const refinements = fieldList(expression, ['productCategoryId', 'productCategoryResolved']);
+    return refinements ? `${name} (${refinements})` : name;
+  }
 
   const event = text(expression.event);
   if (event) {
     const eventKey = `explorer.amazon.audienceEvent.${event}`;
-    return t('explorer.amazon.target.audience', {
-      event: labels.te(eventKey) ? t(eventKey) : event,
-      days: text(expression.lookback) ?? '–',
-    });
+    const shown = labels.te(eventKey) ? t(eventKey) : event;
+    const days = text(expression.lookback);
+    return days
+      ? t('explorer.amazon.target.audience', { event: shown, days })
+      : t('explorer.amazon.target.audienceWithoutDays', { event: shown });
   }
 
   if (matchType && AUTO_MATCH_TYPES.has(matchType)) {
@@ -81,7 +87,13 @@ export function targetLabel(attributes: Record<string, unknown>, labels: Labels)
   if (match) return match;
 
   // Unbekannte Form: Schlüssel und Werte als Liste statt JSON.
+  return fieldList(expression, []);
+}
+
+/** Einfache Felder eines Ausdrucks als „Schlüssel: Wert“-Liste (ohne die genannten), `null` ohne solche Felder. */
+function fieldList(expression: Record<string, unknown>, skip: string[]): string | null {
   const parts = Object.entries(expression)
+    .filter(([key]) => !skip.includes(key))
     .map(([key, value]) => {
       const shown = text(value) ?? (typeof value === 'boolean' ? String(value) : null);
       return shown === null ? null : `${key}: ${shown}`;

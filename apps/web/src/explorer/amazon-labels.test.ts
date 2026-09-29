@@ -64,6 +64,23 @@ describe('targetLabel', () => {
     ).toBe('Thema: Keywords zur Marke');
   });
 
+  it('Kategorie mit Verfeinerungen, Zielgruppe ohne Zeitraum', () => {
+    expect(
+      targetLabel(
+        {
+          expression: {
+            productCategoryId: '42',
+            productCategoryResolved: 'Leuchten',
+            brand: 'Lumen',
+            priceMax: '30',
+          },
+        },
+        labels,
+      ),
+    ).toBe('Kategorie: Leuchten (brand: Lumen, priceMax: 30)');
+    expect(targetLabel({ expression: { event: 'PURCHASES' } }, labels)).toBe('Zielgruppe: Käufe');
+  });
+
   it('Unbekannte Ausdrücke als lesbare Liste, leere als null', () => {
     expect(targetLabel({ expression: { foo: 'bar', size: 3 } }, labels)).toBe('foo: bar, size: 3');
     expect(targetLabel({ expression: {} }, labels)).toBeNull();

@@ -345,6 +345,25 @@ describe('ExplorerPage', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/ads/explorer/ad-groups'));
   });
 
+  it('Tastatur: Enter auf dem fokussierten Link selbst oder mit Wiederholung löst nichts zusätzlich aus', async () => {
+    stubFetch(routes());
+    const { router } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    const cell = () =>
+      [...document.querySelectorAll<HTMLElement>('.ag-cell[col-id="name"]')].find((c) =>
+        c.textContent?.includes('SP Waldkauz Nistkasten'),
+      )!;
+    // Der Link handelt selbst (nativ); happy-dom führt das nicht aus, der Handler darf nicht zusätzlich klicken.
+    cell()
+      .querySelector('a')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    for (const init of [{ repeat: true }, { metaKey: true }, { ctrlKey: true }]) {
+      cell().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, ...init }));
+    }
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/ads/explorer/campaigns');
+  });
+
   it('Product Ads mit mehreren ASINs: Liste im Popover der Zelle', async () => {
     stubFetch(routes());
     await mountExplorer('/ads/explorer/product-ads');

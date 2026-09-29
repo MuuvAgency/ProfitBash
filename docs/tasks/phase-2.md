@@ -656,7 +656,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     zurückgesetzt, Drill-Down verwirft tiefere IDs, CSV mit BOM (Excel), Formeln in Texten entschärft (`csvSafe`), fehlende
     Werte leer, Ad-Typen in fester Reihenfolge in der URL, Brotkrumen speichern nur echte Namen, Zeilenzahl formatiert,
     Chart-Anfrage ohne Vergleich im Schlüssel, `aria-expanded` am ASIN-Knopf, konstante Grid-Optionen, Download robuster.
-  - **Offen (klein, später)** (Dominik, 2026-09-29: jetzt als 2.13): Amazon-Enums unübersetzt (Match-Typ, Targeting, Gebotsstrategie) und Ausdrücke von Targets als
+  - **Offen (klein, später)** (Dominik, 2026-09-29: jetzt als 2.13; erledigt in 2.13 außer den Brotkrumen-Namen): Amazon-Enums unübersetzt (Match-Typ, Targeting, Gebotsstrategie) und Ausdrücke von Targets als
     JSON; nach einer Änderung in der Filterleiste gelten Brotkrumen-Namen aus den Zeilen statt aus dem Verlauf;
     `suppressCellFocus` (Tastatur-Navigation im Grid aus, Links per Tab erreichbar); Zeilen der Abfrage als `shallow`
     (weniger Proxys bei 10 000 Zeilen); weitere Tests (CSV nach Sortierung, Spaltenauswahl speichern, Vergleichsfehler).
@@ -860,6 +860,12 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     und ohne AG-Warnungen.
   - Nicht in 2.13: Brotkrumen-Namen nach einer Änderung der Filterleiste (aus den Zeilen statt aus dem Verlauf) bleiben
     als bekannte Grenze aus 2.8.
+  - Review (unabhängig): keine kritischen Befunde; `shallow`, Tastatur ohne Doppelklick und Schutz lesbarer Namen bestätigt.
+    Übernommen: Verfeinerungen einer Kategorie im Text („Kategorie: Leuchten (brand: Lumen)“), Zielgruppe ohne Zeitraum
+    ohne „– Tage“, kein Klick bei gehaltenem Enter oder mit Modifikatoren, Tests mit realistischen Keyword-Zeilen (mit
+    Ausdruck), Negatives und fokussiertem Link. Bewusst so: Match-Typen heißen wie im deutschen Marktumfeld üblich
+    („Genau“, „Wortgruppe“, „Weitgehend“), damit Nutzer sie wiedererkennen (einzelne Fachbegriffe, keine übernommenen
+    Texte); die übrigen Texte sind eigene Formulierungen.
 
 ## `.env.example`
 

@@ -753,6 +753,7 @@ export const de = {
         category: 'Kategorie: {name}',
         auto: 'Automatisch: {match}',
         audience: 'Zielgruppe: {event}, {days} Tage',
+        audienceWithoutDays: 'Zielgruppe: {event}',
         theme: 'Thema: {match}',
       },
     },
