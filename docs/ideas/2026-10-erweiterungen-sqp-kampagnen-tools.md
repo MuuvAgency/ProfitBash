@@ -14,7 +14,7 @@
 |---|---|---|---|
 | **A. SQP-Import und Organic-Indikator** | Organischen Rang je Suchbegriff und Woche schätzen, ohne Rank-Tracker; Branded-Kannibalisierung und Funnel-Lücken sehen | Nein (CSV aus Brand Analytics); später SP-API | Nach 1.11, als eigener Block vor oder neben Phase 3 (F-S1) |
 | **B. Suchbegriffe: N-Gramme, Harvest/Negate/Beobachten** | Kern der täglichen Optimierung; Daten liegen schon in der Bulk-Datei (Suchbegriff-Blätter) | Nein | Lesen: nach 1.11; Aktionen über Warenkorb in Phase 3 |
-| **C. Kampagnen-Setup nach Struktur-Katalog** | SKC-Standard, Graduation-Pfad, Bulk-Datei-Export | Nein (Bulk-Datei) | Phase 4 (wie geplant), Inhalte unten |
+| **C. Kampagnen-Setup nach Struktur-Katalog** | Bausteine + Presets je Use Case (Kontrolle, Funnel-Hub, Launch …), Graduation-Kanten, Bulk-Datei-Export | Nein (Bulk-Datei) | Phase 4 (wie geplant), Inhalte unten |
 | **D. Gebots-Stack-Simulator** | Effektives Gebot aus Basis × Strategie × Placement × Audience × B2B | Nein | Phase 4 als Quick-Tool |
 | **E. Leitplanken „kein Geld verbrennen“** | vCPM, Off-Amazon, B2B, Placements, Sponsored Prompts, Branded CPCs als Prüfungen | Teilweise | Warnungen in Phase 3/4, Checks in Phase 5 |
 | **F. Optimizer-Leitplanken** | Grenzen je Woche, Gebotsboden, Glättung, Schattenmodus | Nein (Bulk-Weg) | Phase 5 |
@@ -134,6 +134,62 @@ Anzeige = welches Produkt. Target = wo und zu welchem Basisgebot. **Ad Group = n
 - **Graduation-Pfad** aus dem Sheets-Tool übernehmen: NB Auto → Breit → Exakt → SKE, BD graduiert nie. Phase 4 legt die
   Zielkampagne an, Phase 5 schlägt die Graduation automatisch vor.
 
+### C.2a Gegencheck: vernetzter Funnel (Fox Performance, „Der Amazon PPC Funnel“, Funnel-Edition 2026)
+
+**Aufbau dort:** Eine aktiv gemanagte **Auto-Kampagne als Discovery-Hub** speist drei Funnel. Gewinner werden nach rechts graduiert
+(enger), Verlierer negiert.
+- **A Keyword:** Auto → **Breit+ je Keyword-Cluster (statt Phrase)** → Exakt → Single-Keyword-Exakt → Skalierungs-Layer
+  (AMC-Audiences „High interest/High purchase intent“, B2B-Modifier). SB Video und Header auf dieselben Exakt-Gewinner.
+- **B Produkt/ASIN:** Kategorie (mit Refinements Preis/Sterne/Marke) → PAT → Single-ASIN-Kampagne; **PAT Expanded mit der eigenen ASIN
+  als Seed**; SB Header/Video auf PDPs; **Page Shielding** auf eigene ASINs; **Conquesting-Liste** (Wettbewerber < 4 Sterne,
+  < 10 Reviews, Komplementärprodukte, teurer als X €).
+- **C Display:** SD-Kategorie → SD-PAT; **Retargeting Views und Käufe**, je eigene und Wettbewerber-ASINs; Look-Back-Fenster
+  parallel testen (eigene 7–90 Tage, Wettbewerber bis 365 Tage), ausgerichtet am Wiederkauf-Intervall.
+- **Prinzipien:** „Narrow → Broad“ (Auto, Breit, Kategorie, Retargeting tragen zunehmend mehr als SKC allein), Placement-Modifier
+  1× im Monat je Format nachziehen, **Optimierungs-Takt 1× pro Woche**, **TACoS-first** (Break-even-TACoS = Marge vor Werbung).
+
+**Abgleich mit Swade (SKC-lastig) und dem Muuv-Sheets-Tool:**
+
+| Punkt | Swade | Fox | Muuv heute | Bewertung |
+|---|---|---|---|---|
+| Rolle der Auto-Kampagne | Harvesting, günstige Ausspielung | Hub **und** eigener Performer | NB-Startpunkt | Fox ergänzt: Auto aktiv managen (4 Match-Arten getrennt bieten/negieren) |
+| Phrase | – | ersetzt durch Breit-Cluster | `KW-PH` vorhanden | Phrase **optional** je Preset, Default Breit-Cluster |
+| SKC | > 75 % der Kampagnen | Endstufe für Top-Keywords | SKE als Endstufe | einig: SKC nur für Targets mit Volumen |
+| Brand-Trennung | – | nur Page Shielding | **BD/NB** getrennt, BD graduiert nie | Muuv behalten, Fox fehlt die Trennung von Marken-Suchbegriffen |
+| Produkt-Targeting | CAT/PAT ergänzend | eigener Funnel bis Single-ASIN + Conquesting | – | **übernehmen**, Lücke im Sheets-Tool |
+| Display/Retargeting | – | eigener Funnel | – | übernehmen, aber **nur CPC**, nie vCPM (Abschnitt E) |
+| B2B-Modifier | als Option | Skalierungs-Layer | – | nur mit Inkrementalitäts-Check (B2B-Beispiel in E: Spend +70 %, organischer B2B −50 %) |
+| Takt | – | 1× pro Woche | 1× pro Woche (Stabilisierungsphase) | einig; passt zu den Wochen-Grenzen in F |
+
+### C.2b Vorschlag: Struktur-Katalog mit Presets je Use Case („beide Wege“)
+
+Statt einer festen Struktur baut Phase 4 einen **Katalog aus Bausteinen** mit **Graduation-Kanten**. Ein **Preset** wählt Bausteine
+und Parameter aus und wird **je Client und je ASIN** gesetzt, sodass sich Strukturen in einem Konto mischen lassen.
+
+- **Bausteine (Beispiele):** `AUTO` (4 Match-Arten, optional getrennt), `KW-BROAD-CLUSTER`, `KW-PHRASE`, `KW-EXACT` (multi),
+  `KW-EXACT-SINGLE`, `BRAND-DEF` (eigene Marke), `CAT`, `PAT`, `PAT-EXPANDED-SELF`, `PAT-SINGLE-ASIN`, `PAT-CONQUEST`,
+  `PAT-SHIELD` (eigene ASINs), `SB-HEADER-KW`, `SB-VIDEO-KW`, `SB-PAT`, `SD-CAT`, `SD-PAT`, `SD-RT-VIEWS`, `SD-RT-PURCHASE`.
+  Je Baustein: Ad-Typ, Targeting, Struktur (1:1:1 / 1:1:n / 1:n:1), Gebotsstrategie, Placement-/Audience-/B2B-Defaults,
+  Off-Amazon aus, Namensbaustein.
+- **Graduation-Kanten** (Engine-Regeln, in Phase 5 automatisch vorgeschlagen): z. B. `AUTO → KW-BROAD-CLUSTER | KW-EXACT | PAT`,
+  `KW-EXACT → KW-EXACT-SINGLE` (ab Mindestvolumen), `PAT → PAT-SINGLE-ASIN`, `KW-EXACT-SINGLE → SB-VIDEO-KW`. Beim Graduieren wird
+  in der Quelle automatisch negiert. `BRAND-DEF` hat keine ausgehende Kante.
+- **Presets (Start):**
+
+| Preset | Use Case | Schwerpunkt |
+|---|---|---|
+| **Kontrolle** (Swade-Logik) | Hero-ASIN mit hohem Volumen, enges Ziel-ACoS | viel `KW-EXACT-SINGLE`, Broad nur Root-Terms, Auto/CAT/PAT als Zulieferer |
+| **Funnel-Hub** (Fox-Logik) | Skalierung, breiter Katalog, wenig Zeit je ASIN | Auto-Hub, Breit-Cluster statt Phrase, PAT-Funnel, SD-Retargeting, Skalierungs-Layer |
+| **Launch** | neue ASIN, Ranking-Ziel | Auto + Breit-Cluster + Exakt auf Haupt-Keywords mit TOS-Fokus, SQP-Band als Erfolgsmaß (A) |
+| **Profit/Defend** | Bestandsprodukt, Marge knapp | `BRAND-DEF` mit gedeckeltem CPC (SQP-Check Branded), `PAT-SHIELD`, SD-RT-Purchase, Wachstums-Bausteine pausiert |
+| **Verbrauchsgut** | Wiederkauf-Produkte | zusätzlich `SD-RT-PURCHASE` mit Look-Backs am Wiederkauf-Intervall |
+| **Muuv-Standard** | Default | Hybrid: Funnel-Hub + BD/NB-Trennung + SKC ab Volumen-Schwelle |
+
+- Presets sind **Daten** (eigener Katalog je Organisation, editierbar). Dominik pflegt sie, nichts ist hart codiert, und die
+  Bezeichnungen sind eigene (Eigenständigkeit).
+- **Wann ein Preset wechselt** (Vorschlag, Phase 5): Launch → Kontrolle oder Funnel-Hub, sobald das SQP-Band zwei Wochen
+  Seite 1 hält; jeder Wechsel bleibt ein Vorschlag im Warenkorb, nie automatisch.
+
 ### C.3 Bulk-Erzeugung
 
 Je neuer 1:1:1-Kampagne mindestens 4 Zeilen (Kampagne, Ad Group, Produktanzeige, Keyword/Target), mehr bei Anpassungen
@@ -249,6 +305,10 @@ eigene DE-Kalibrierung des Organic-Indikators, Profit-Sicht (Phase 7), Betriebsk
 - **F-S6 – Optimizer-Grenzen:** Wöchentliche Maximaländerung (Vorschlag 30–35 %) und Gebotsboden (Vorschlag 60 % CPC) als
   Default je Organisation, überschreibbar je Client?
 - **F-S7 – vCPM und Off-Amazon im Setup:** standardmäßig blocken (Empfehlung) oder nur warnen?
+- **F-S8 – Struktur-Katalog (C.2b):** Presets je Client und ASIN (Empfehlung) oder nur je Client? Welche Presets zum Start
+  (Empfehlung: Muuv-Standard, Kontrolle, Funnel-Hub; Launch, Profit/Defend und Verbrauchsgut danach)? Phrase weiter anbieten?
+- **F-S9 – Conquesting-Kriterien** (Sterne, Reviews, Preis) brauchen Katalogdaten der Wettbewerber (Keepa/SP-API). Bis dahin:
+  Conquesting-Liste von Hand pflegen (Empfehlung)?
 
 ## 7. Quellen
 
@@ -259,7 +319,7 @@ eigene DE-Kalibrierung des Organic-Indikators, Profit-Sicht (Phase 7), Betriebsk
 - Amazon SP-API, Brand-Analytics-Berichte – https://developer-docs.amazon/sp-api/docs/report-type-values-analytics
 - GitHub-Issue zur SQP-Quote – https://github.com/amzn/selling-partner-api-models/issues/5240
 - Folien (nicht im Repo, von Dominik): „Mastering Sponsored Product Campaigns on Amazon“ (A. Swade, Quartile),
-  „How to Stop Burning Money On Amazon Ads“ (SYNQ × myrealprofit)
+  „How to Stop Burning Money On Amazon Ads“ (SYNQ × myrealprofit), „Der Amazon PPC Funnel“ (Fox Performance, Funnel-Edition 2026)
 
 ## 8. Prompt für die nächste Claude-Code-Session
 
@@ -267,7 +327,7 @@ eigene DE-Kalibrierung des Organic-Indikators, Profit-Sicht (Phase 7), Betriebsk
 Lies CLAUDE.md, docs/plan.md, docs/tasks/phase-1.md (1.11), docs/tasks/phase-3.md und
 docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md.
 Ziel dieser Session: die Ideen aus dem Ideen-Dokument in die Planung übernehmen, noch kein Code.
-1. Stelle mir die Fragen F-S1 bis F-S7 gesammelt zu Beginn (mit deinen Empfehlungen).
+1. Stelle mir die Fragen F-S1 bis F-S9 gesammelt zu Beginn (mit deinen Empfehlungen).
 2. Trage meine Antworten mit Datum ein und übernimm die Bausteine in docs/plan.md (Roadmap, Navigation,
    Feature-Keys) und als Aufgabenpunkte in die passende Phasen-Datei (ggf. neue Datei für den SQP-Block).
 3. Halte Eigenständigkeit ein: keine Texte/Tabellen/Schwellen aus SYNQ 1:1, Schwellen als konfigurierbare Daten.
