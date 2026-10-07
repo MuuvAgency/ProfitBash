@@ -1227,6 +1227,8 @@ Teilaufgaben (Reihenfolge):
     schnellen Importen (vorher blieb „Noch keine Bulk-Datei“ bis zum Neuladen stehen), Zahlen in `font-data`, Fehlertext beim
     Wählen einer Datei zurückgesetzt, Dateiauswahl nur XLSX für Bulk-Dateien, Größe in Hinweis und Fehlertext aus
     `FILE_IMPORT_MAX_BYTES`, Hinweis-Texte in einem Composable (`connections/staleness.ts`), ungenutzte Texte entfernt.
+  - **Offen:** Prüfung im Browser-Pane (1440 px, Tablet, Handy, Hell/Dunkel, Konsole) mit einer echten Bulk-Datei ist noch nicht
+    gemacht (die Session konnte sich lokal nicht anmelden). In der nächsten Session nachholen, Befunde als eigener kleiner PR.
 
 #### 1.11g Zusammenführen mit der API (nach der Freigabe, mit 1.10)
 - [ ] Datei-Profil mit dem API-Profil zusammenführen, danach übernimmt der API-Sync dieselben Zeilen.
