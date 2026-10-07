@@ -119,11 +119,12 @@ export interface SearchTermRules {
 export const SEARCH_TERM_CLASSES = ['harvest', 'negate', 'watch'] as const;
 export type SearchTermClass = (typeof SEARCH_TERM_CLASSES)[number];
 
-/** Warum ein Begriff nur beobachtet wird. */
+/** Warum ein Begriff nur beobachtet wird (dieselben Werte wie `SEARCH_TERM_WATCH_REASON_KEYS` in `@profitbash/shared`). */
 export const SEARCH_TERM_WATCH_REASONS = [
   'protected',
   'alreadyTargeted',
   'acosAboveTarget',
+  'noSales',
   'tooFewData',
 ] as const;
 export type SearchTermWatchReason = (typeof SEARCH_TERM_WATCH_REASONS)[number];
@@ -134,34 +135,52 @@ export interface SearchTermClassification {
   reason: SearchTermWatchReason | null;
 }
 
+/** Wörter für den Schutz-Abgleich: zusätzlich an Satzzeichen getrennt („nordwind-lampe“ enthält „nordwind“). */
+function protectionWords(term: string): string[] {
+  return term
+    .normalize('NFC')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word !== '');
+}
+
 /**
- * Enthält der Suchbegriff einen geschützten Begriff als ganze, zusammenhängende Wortfolge? Wortteile zählen
- * nicht („nordwind“ schützt nicht „nordwinde“).
+ * Prüfer für geschützte Begriffe, einmal je Liste vorbereitet: Enthält der Suchbegriff einen davon als ganze,
+ * zusammenhängende Wortfolge? Wortteile zählen nicht („nordwind“ schützt nicht „nordwinde“); Bindestrich,
+ * Apostroph und andere Satzzeichen trennen Wörter (anders als bei den N-Grammen).
  */
+export function createProtectedTermMatcher(
+  protectedTerms: readonly string[],
+): (searchTerm: string) => boolean {
+  const needles = protectedTerms.map(protectionWords).filter((needle) => needle.length > 0);
+  return (searchTerm) => {
+    if (needles.length === 0) return false;
+    const words = protectionWords(searchTerm);
+    return needles.some((needle) => {
+      for (let start = 0; start + needle.length <= words.length; start++) {
+        if (needle.every((word, offset) => words[start + offset] === word)) return true;
+      }
+      return false;
+    });
+  };
+}
+
+/** Einzelprüfung; für viele Suchbegriffe `createProtectedTermMatcher`. */
 export function isProtectedSearchTerm(
   searchTerm: string,
   protectedTerms: readonly string[],
 ): boolean {
-  const words = tokenizeSearchTerm(searchTerm);
-  return protectedTerms.some((entry) => {
-    const needle = tokenizeSearchTerm(entry);
-    if (needle.length === 0) return false;
-    for (let start = 0; start + needle.length <= words.length; start++) {
-      if (needle.every((word, offset) => words[start + offset] === word)) return true;
-    }
-    return false;
-  });
+  return createProtectedTermMatcher(protectedTerms)(searchTerm);
 }
 
 /**
- * Einstufung einer Suchbegriff-Zeile. Negieren: genug Klicks, kein Kauf, genug Spend; geschützte Begriffe nie.
- * Harvest: genug Käufe, ACoS höchstens am Ziel und noch kein exaktes Target (`alreadyTargeted`). Sonst
- * Beobachten mit Grund. Grenzwerte zählen mit.
+ * Einstufung einer Suchbegriff-Zeile. Negieren: genug Klicks, kein Kauf, genug Spend; geschützte Begriffe
+ * (`protected`) nie. Harvest: genug Käufe, ACoS höchstens am Ziel und noch kein exaktes Target
+ * (`alreadyTargeted`). Sonst Beobachten mit Grund. Grenzwerte zählen mit.
  */
 export function classifySearchTerm(
-  row: SearchTermSums & { searchTerm: string; alreadyTargeted: boolean },
+  row: SearchTermSums & { protected: boolean; alreadyTargeted: boolean },
   rules: SearchTermRules,
-  protectedTerms: readonly string[],
 ): SearchTermClassification {
   const watch = (reason: SearchTermWatchReason): SearchTermClassification => ({
     classification: 'watch',
@@ -175,17 +194,15 @@ export function classifySearchTerm(
     parseDecimal(row.clicks).gte(rules.negateMinClicks) &&
     cost.gte(parseDecimal(rules.negateMinCost))
   ) {
-    return isProtectedSearchTerm(row.searchTerm, protectedTerms)
-      ? watch('protected')
-      : { classification: 'negate', reason: null };
+    return row.protected ? watch('protected') : { classification: 'negate', reason: null };
   }
 
   if (purchases.isZero() || purchases.lt(rules.harvestMinPurchases)) return watch('tooFewData');
   if (row.alreadyTargeted) return watch('alreadyTargeted');
   const sales = parseDecimal(row.sales);
-  // ACoS ≤ Ziel ohne Division: Spend ≤ Ziel × Umsatz. Ohne Umsatz gibt es keinen ACoS.
-  if (sales.lte(0) || cost.gt(parseDecimal(rules.harvestMaxAcos).times(sales))) {
-    return watch('acosAboveTarget');
-  }
+  // Ohne Umsatz gibt es keinen ACoS (Käufe ohne Umsatz kommen in den Blättern vereinzelt vor).
+  if (sales.lte(0)) return watch('noSales');
+  // ACoS ≤ Ziel ohne Division: Spend ≤ Ziel × Umsatz.
+  if (cost.gt(parseDecimal(rules.harvestMaxAcos).times(sales))) return watch('acosAboveTarget');
   return { classification: 'harvest', reason: null };
 }

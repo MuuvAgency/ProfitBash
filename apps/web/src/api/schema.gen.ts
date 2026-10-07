@@ -3300,7 +3300,7 @@ export interface components {
             /** @enum {string} */
             classification: "harvest" | "negate" | "watch";
             /** @enum {string|null} */
-            reason: "protected" | "alreadyTargeted" | "acosAboveTarget" | "tooFewData" | null;
+            reason: "protected" | "alreadyTargeted" | "acosAboveTarget" | "noSales" | "tooFewData" | null;
             protected: boolean;
             alreadyTargeted: boolean;
         };

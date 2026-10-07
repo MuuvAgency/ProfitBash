@@ -2,7 +2,8 @@
 
 - **Status:** angenommen
 - **Datum:** 2026-09-25, Geltungsbereich von Punkt 5 am 2026-09-26 dokumentiert (Stand Code Phase 0, vor dem ersten Deploy),
-  am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt, am 2026-09-29 um gespeicherte Ansichten (`saved_views`)
+  am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt, am 2026-09-29 um gespeicherte Ansichten (`saved_views`),
+  am 2026-10-07 um die Suchbegriff-Regeln (`search_term_rules`) und geschützte Begriffe
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -66,6 +67,12 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
 - **Mitgliederverwaltung** (ab Phase 2, 2.10): `packages/db/src/members.ts` und `member_password_links` lesen und schreiben
   Mitgliedschaften der aktiven Organisation hinter `orgAdminOnly` (wie Clients und Connections). Die öffentlichen Endpunkte
   zum Setzen des Passworts finden die Organisation über den Hash des Tokens, nicht über eine Eingabe.
+- **Suchbegriff-Regeln und geschützte Begriffe** (ab Phase 2b, 2b.2): `search_term_rules` gehört der Organisation
+  (`packages/db/src/search-terms.ts`); lesen dürfen alle Mitglieder (`getOrgRole()`), schreiben mit Recht `write` im Feature
+  `sp-explorer` (prüft die API). Die geschützten Begriffe eines Clients (`clients.protected_terms`) pflegen Org-Admins über
+  die Clients-Verwaltung; die Suchbegriff-Analyse liest sie nur über ein sichtbares Profil dieses Clients mit
+  (`querySearchTermPeriod` nach `visibleProfilesScope()`). Für Kunden-Orgs (Phase 6) gilt dafür dieselbe offene Frage wie
+  für andere Client-Daten.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

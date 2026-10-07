@@ -3314,6 +3314,7 @@
               "protected",
               "alreadyTargeted",
               "acosAboveTarget",
+              "noSales",
               "tooFewData",
               null
             ]

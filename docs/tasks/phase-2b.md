@@ -146,8 +146,8 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
   - **Engine** (`packages/engine/src/search-terms.ts`): `tokenizeSearchTerm` (klein, an Leerraum getrennt, Satzzeichen bleiben
     im Wort), `buildNgrams(rows, sizes = [1, 2, 3])` (je Zeile zählt ein Baustein einmal; `searchTerms` = verschiedene
     Suchbegriffe; sortiert nach Spend, Länge, Text), `isProtectedSearchTerm` (geschützter Begriff als ganze, zusammenhängende
-    Wortfolge, keine Wortteile), `classifySearchTerm(row, rules, protectedTerms)` → `harvest` | `negate` | `watch` mit Grund
-    bei `watch` (`protected`, `alreadyTargeted`, `acosAboveTarget`, `tooFewData`). Grenzwerte zählen mit; ACoS-Vergleich ohne
+    Wortfolge, keine Wortteile), `classifySearchTerm(row, rules)` → `harvest` | `negate` | `watch` mit Grund
+    bei `watch` (`protected`, `alreadyTargeted`, `acosAboveTarget`, `noSales`, `tooFewData`). Grenzwerte zählen mit; ACoS-Vergleich ohne
     Division (Spend ≤ Ziel × Umsatz); Käufe ohne Umsatz sind kein Harvest. Geschützte Begriffe werden nie negiert, dürfen aber
     geerntet werden. Negieren gilt auch für schon exakt gebuchte Begriffe.
   - **Einstufung je Zeile** (Suchbegriff je Target, wie das Blatt): Negativ-Vorschläge gehören in die Quellkampagne. Folge:
@@ -176,6 +176,18 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
   - **Geschützte Begriffe:** `PATCH /api/clients/{id}` nimmt `protectedTerms` (höchstens 200, je 80 Zeichen; gespeichert
     klein, Leerraum zusammengefasst, ohne Doppelte, sortiert), `Client.protectedTerms` in allen Antworten, Audit
     `client.update` mit den Listen. Profile ohne Client haben keine geschützten Begriffe.
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung, Joins (je höchstens eine Zeile), Decimal-Rechnung und
+    „nie Summen über Zeiträume“ bestätigt. Übernommen: Der Schutz trennt Wörter auch an Satzzeichen („nordwind-lampe“ ist
+    durch „nordwind“ geschützt; die N-Gramme trennen weiter nur an Leerraum), `createProtectedTermMatcher` bereitet die
+    Begriffe einmal je Anfrage vor, `classifySearchTerm` bekommt `protected` als Merker; eigener Grund `noSales` (Käufe
+    ohne Umsatz) statt `acosAboveTarget`; Abgleich „schon exakt gebucht“ in Vergleichsform (klein, NFC, Leerraum
+    zusammengefasst); Tests mit denselben Amazon-IDs und einem exakten Keyword in einem fremden und im ausgeblendeten
+    Profil; ADR 002 um `search_term_rules` und geschützte Begriffe ergänzt. Bewusst so bzw. bekannte Grenzen:
+    `alreadyTargeted` prüft nur das Target (nicht den Zustand von Kampagne und Ad Group) und gilt über Ad-Typen hinweg
+    (ein exaktes SB-Keyword zählt auch für einen SP-Suchbegriff); `listSearchTermPeriods` gruppiert die ganze Tabelle
+    (bei Wachstum eine Zeitraum-Tabelle); bei mehr als 10 000 Zeilen fallen die mit dem kleinsten Spend aus `rows`, die
+    Zähler zählen sie (2b.2b nennt das); Wertebereiche der Regeln nur über zod (wie 2b.1); ein Speichern ohne Änderung
+    schreibt trotzdem ein Audit-Event; `POST` für die Zeiträume wie die übrigen Auswertungs-Endpunkte.
   - **Nicht enthalten:** Oberfläche (2b.2b), Zeitraum-Feld im Upload (2b.2c), Hinweis „schon negiert“ (vorhandene Negatives
     werden nicht gegen die Vorschläge geprüft), Obergrenze beim Lesen sehr großer Zeiträume (alle Zeilen eines Zeitraums
     werden geladen; echte Dateien haben einige hundert Zeilen).
