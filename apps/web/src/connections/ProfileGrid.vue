@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { formatDay, type Client, type Profile, type ProfilePatch } from '@profitbash/shared';
+import {
+  formatDay,
+  type Client,
+  type Locale,
+  type Profile,
+  type ProfilePatch,
+} from '@profitbash/shared';
 import type {
   ColDef,
   GetRowIdParams,
@@ -26,7 +32,10 @@ const props = defineProps<{
   profiles: Profile[];
   clients: Client[];
   clientsReady: boolean;
-  /** Profile ohne Connection: Spalten „Letzter Import“ und „Dateien“ (1.11f). */
+  /**
+   * Profile ohne Connection: Spalten „Letzter Import“ und „Dateien“ (1.11f) statt Zeitzone und „Daten bis“ (ohne
+   * Tagesberichte gibt es keinen Datenstand, `phase-1.md` 1.11e), damit die Tabelle bei 1440 px ohne Scrollen passt.
+   */
   fileImports?: boolean;
 }>();
 const emit = defineEmits<{
@@ -111,25 +120,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       cellClass: DATA_CELL,
       width: 85,
     },
-    {
-      colId: 'timezone',
-      headerName: t('connections.profiles.column.timezone'),
-      field: 'timezone',
-      cellRenderer: markRaw(TimezoneCell),
-      ...WRAPPED,
-      // „Europe/Stockholm“ passt; längere („America/Los_Angeles“) brechen nach „/“ um.
-      minWidth: 165,
-      flex: 1,
-    },
-    {
-      // Sortiert nach dem Tag (`YYYY-MM-DD`), angezeigt im Format der Sprache.
-      colId: 'metricsImportedThrough',
-      headerName: t('connections.profiles.column.metricsImportedThrough'),
-      field: 'metricsImportedThrough',
-      valueFormatter: ({ value }) => formatDay(value, locale),
-      cellClass: DATA_CELL,
-      width: 115,
-    },
+    ...(props.fileImports ? [] : apiOnlyColumns(locale)),
     ...(props.fileImports
       ? [
           {
@@ -138,7 +129,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
             field: 'lastBulkImportAt',
             cellRenderer: markRaw(LastImportCell),
             ...WRAPPED,
-            minWidth: 170,
+            width: 170,
           } satisfies ColDef<Profile>,
         ]
       : []),
@@ -172,6 +163,31 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
   }
   return columns;
 });
+
+/** Zeitzone und „Daten bis“: nur für Profile mit Connection. */
+function apiOnlyColumns(locale: Locale): ColDef<Profile>[] {
+  return [
+    {
+      colId: 'timezone',
+      headerName: t('connections.profiles.column.timezone'),
+      field: 'timezone',
+      cellRenderer: markRaw(TimezoneCell),
+      ...WRAPPED,
+      // „Europe/Stockholm“ passt; längere („America/Los_Angeles“) brechen nach „/“ um.
+      minWidth: 165,
+      flex: 1,
+    },
+    {
+      // Sortiert nach dem Tag (`YYYY-MM-DD`), angezeigt im Format der Sprache.
+      colId: 'metricsImportedThrough',
+      headerName: t('connections.profiles.column.metricsImportedThrough'),
+      field: 'metricsImportedThrough',
+      valueFormatter: ({ value }) => formatDay(value, locale),
+      cellClass: DATA_CELL,
+      width: 115,
+    },
+  ];
+}
 
 /** Konstant: Ein neues Objekt je Render setzte die Spalten zurück (z. B. geänderte Breiten). */
 const defaultColDef: ColDef<Profile> = {

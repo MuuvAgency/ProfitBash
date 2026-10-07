@@ -4,13 +4,11 @@ import {
   formatDateTime,
   formatNumber,
   type FileImport,
-  type FileImportKind,
   type Profile,
 } from '@profitbash/shared';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
-import Select from 'primevue/select';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ApiError } from '../api';
@@ -43,29 +41,20 @@ const profileId = computed(() => props.profile?.id ?? null);
 const importsQuery = useFileImportsQuery(profileId);
 const upload = useUploadFileImport();
 
-const kind = ref<FileImportKind>('bulk');
+/** ID der zuletzt angenommenen Datei: Der Hinweis „läuft im Hintergrund“ gilt nur, bis ihr Import fertig ist. */
+const acceptedId = ref<string | null>(null);
 const file = ref<File | null>(null);
 const complete = ref(false);
 const errorKey = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 
 watch(profileId, () => {
-  kind.value = 'bulk';
+  acceptedId.value = null;
   file.value = null;
   complete.value = false;
   errorKey.value = null;
   upload.reset();
 });
-
-// Tagesberichte importiert erst 1.11e; bis dahin sichtbar, aber nicht wählbar.
-const kindOptions = computed(() => [
-  { value: 'bulk', label: t('connections.fileImports.kind.bulk'), disabled: false },
-  {
-    value: 'daily_report',
-    label: t('connections.fileImports.kind.daily_reportPending'),
-    disabled: true,
-  },
-]);
 
 const title = computed(() =>
   props.profile
@@ -86,6 +75,13 @@ const maxSize = computed(
 const removed = computed(() => Boolean(props.profile?.removedAt));
 const imports = computed(() => importsQuery.data.value ?? []);
 
+/** Angenommene Datei, solange sie noch nicht im Verlauf steht oder dort wartet bzw. läuft. */
+const importRunning = computed(() => {
+  if (!acceptedId.value) return false;
+  const accepted = imports.value.find((fileImport) => fileImport.id === acceptedId.value);
+  return !accepted || isOpenFileImport(accepted);
+});
+
 // Dateien, die im Verlauf als wartend oder laufend zu sehen waren; endet eine, ändern sich „Letzter Import“ und die
 // Hinweise am Profil. Je ID, damit ein leerer Verlauf (Dialog geschlossen) nichts auslöst.
 const seenOpen = new Set<string>();
@@ -102,6 +98,7 @@ function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
   file.value = target.files?.[0] ?? null;
   errorKey.value = null;
+  acceptedId.value = null;
   upload.reset();
 }
 
@@ -119,10 +116,12 @@ async function submit() {
   try {
     const created = await upload.mutateAsync({
       profileId: props.profile.id,
-      kind: kind.value,
+      // Es gibt nur Bulk-Dateien: Tagesberichte als Datei entfallen (`phase-1.md` 1.11e).
+      kind: 'bulk',
       file: file.value,
-      complete: kind.value === 'bulk' && complete.value,
+      complete: complete.value,
     });
+    acceptedId.value = created.id;
     emit('uploaded', created.profileId, created.id);
     file.value = null;
     complete.value = false;
@@ -175,46 +174,30 @@ function result(fileImport: FileImport) {
         <form v-else class="flex flex-col gap-space-md" novalidate @submit.prevent="submit">
           <InlineError v-if="errorKey" :message="t(errorKey, { size: maxSize })" />
           <p
-            v-if="upload.isSuccess.value"
+            v-if="importRunning"
             role="status"
             class="rounded-control bg-violet-wash px-space-md py-space-sm text-body-sm text-ink"
           >
             {{ t('connections.fileImports.upload.accepted') }}
           </p>
-          <div class="grid gap-space-md md:grid-cols-2">
-            <div class="flex flex-col gap-space-sm">
-              <label id="file-import-kind-label" class="text-body-sm font-semibold text-ink">
-                {{ t('connections.fileImports.upload.kind') }}
-              </label>
-              <Select
-                v-model="kind"
-                :options="kindOptions"
-                option-label="label"
-                option-value="value"
-                option-disabled="disabled"
-                aria-labelledby="file-import-kind-label"
-                fluid
-              />
-            </div>
-            <div class="flex flex-col gap-space-sm">
-              <label for="file-import-file" class="text-body-sm font-semibold text-ink">
-                {{ t('connections.fileImports.upload.file') }}
-              </label>
-              <input
-                id="file-import-file"
-                ref="fileInput"
-                type="file"
-                :accept="kind === 'bulk' ? '.xlsx' : '.xlsx,.csv'"
-                aria-describedby="file-import-file-hint"
-                class="rounded-control border border-outline bg-tile px-space-sm py-space-xs text-body-sm text-ink file:mr-space-sm file:rounded-control file:border-0 file:bg-well file:px-space-sm file:py-space-xs file:text-ink"
-                @change="onFileChange"
-              />
-              <p id="file-import-file-hint" class="text-body-sm text-ink-secondary">
-                {{ t('connections.fileImports.upload.fileHint', { size: maxSize }) }}
-              </p>
-            </div>
+          <div class="flex flex-col gap-space-sm">
+            <label for="file-import-file" class="text-body-sm font-semibold text-ink">
+              {{ t('connections.fileImports.upload.file') }}
+            </label>
+            <input
+              id="file-import-file"
+              ref="fileInput"
+              type="file"
+              accept=".xlsx"
+              aria-describedby="file-import-file-hint"
+              class="rounded-control border border-outline bg-tile px-space-sm py-space-xs text-body-sm text-ink file:mr-space-sm file:rounded-control file:border-0 file:bg-well file:px-space-sm file:py-space-xs file:text-ink"
+              @change="onFileChange"
+            />
+            <p id="file-import-file-hint" class="text-body-sm text-ink-secondary">
+              {{ t('connections.fileImports.upload.fileHint', { size: maxSize }) }}
+            </p>
           </div>
-          <div v-if="kind === 'bulk'" class="flex flex-col gap-space-xs">
+          <div class="flex flex-col gap-space-xs">
             <div class="flex items-center gap-space-sm">
               <Checkbox
                 v-model="complete"
@@ -266,9 +249,10 @@ function result(fileImport: FileImport) {
         <p v-else-if="imports.length === 0" class="text-body-md text-ink-secondary">
           {{ t('connections.fileImports.history.empty') }}
         </p>
-        <div v-else class="overflow-x-auto">
-          <table class="w-full min-w-[40rem] border-collapse text-left text-body-sm">
-            <thead>
+        <!-- Unter `sm` stapelt jede Datei ihre Angaben (kein waagerechtes Scrollen im Dialog auf dem Handy). -->
+        <div v-else class="sm:overflow-x-auto">
+          <table class="w-full border-collapse text-left text-body-sm sm:min-w-[34rem]">
+            <thead class="max-sm:sr-only">
               <tr class="border-b border-line text-ink-secondary">
                 <th scope="col" class="py-space-xs pr-space-md font-semibold">
                   {{ t('connections.fileImports.history.uploadedAt') }}
@@ -288,12 +272,12 @@ function result(fileImport: FileImport) {
               <tr
                 v-for="fileImport in imports"
                 :key="fileImport.id"
-                class="border-b border-line align-top last:border-b-0"
+                class="border-b border-line align-top last:border-b-0 max-sm:flex max-sm:flex-col max-sm:gap-space-xs max-sm:py-space-sm"
               >
-                <td class="py-space-sm pr-space-md font-data whitespace-nowrap text-ink">
+                <td class="font-data whitespace-nowrap text-ink sm:py-space-sm sm:pr-space-md">
                   {{ formatDateTime(fileImport.createdAt, session.preferences.locale) }}
                 </td>
-                <td class="py-space-sm pr-space-md text-ink">
+                <td class="text-ink sm:py-space-sm sm:pr-space-md">
                   <span class="break-all">{{ fileImport.fileName }}</span>
                   <span class="block text-ink-secondary">
                     {{ t(`connections.fileImports.kind.${fileImport.kind}`) }}
@@ -302,7 +286,7 @@ function result(fileImport: FileImport) {
                     </template>
                   </span>
                 </td>
-                <td class="py-space-sm pr-space-md whitespace-nowrap text-ink">
+                <td class="whitespace-nowrap text-ink sm:py-space-sm sm:pr-space-md">
                   <span class="inline-flex items-center gap-1.5">
                     <span
                       :class="['size-2 shrink-0 rounded-full', STATUS_DOT[fileImport.status]]"
@@ -311,7 +295,7 @@ function result(fileImport: FileImport) {
                     {{ t(`connections.fileImports.status.${fileImport.status}`) }}
                   </span>
                 </td>
-                <td class="py-space-sm text-ink">
+                <td class="text-ink sm:py-space-sm">
                   <span v-if="fileImport.status === 'imported'">
                     <template v-for="(part, index) in result(fileImport)" :key="part.key">
                       <template v-if="index > 0"> · </template>
