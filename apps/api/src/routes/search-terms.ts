@@ -9,8 +9,8 @@ import {
 import {
   buildNgrams,
   classifySearchTerm,
+  createProtectedTermMatcher,
   deriveMetrics,
-  isProtectedSearchTerm,
   sumDecimals,
   type SearchTermSums,
 } from '@profitbash/engine';
@@ -168,15 +168,16 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
 
     // Einstufung, Zähler, Summe und N-Gramme über **alle** Zeilen; gekürzt wird erst die Antwort.
     const counts = { harvest: 0, negate: 0, watch: 0 };
+    const isProtected = createProtectedTermMatcher(protectedTerms);
     const rows = result.rows.map((row) => {
-      const classification = classifySearchTerm(row, rules, protectedTerms);
+      const flagged = { ...row, protected: isProtected(row.searchTerm) };
+      const classification = classifySearchTerm(flagged, rules);
       counts[classification.classification] += 1;
       return {
-        ...row,
+        ...flagged,
         adProduct: row.adProduct as AdProduct,
         ...derived(row),
         ...classification,
-        protected: isProtectedSearchTerm(row.searchTerm, protectedTerms),
       };
     });
     const totalSums = Object.fromEntries(

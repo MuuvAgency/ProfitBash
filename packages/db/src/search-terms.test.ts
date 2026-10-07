@@ -188,7 +188,7 @@ beforeAll(async () => {
     .insert(amazonAdsTargets)
     .values([
       target('T-BROAD', { keywordText: 'lampe', matchType: 'BROAD' }),
-      target('T-EXACT', { keywordText: 'LED Lampe', matchType: 'EXACT', state: 'PAUSED' }),
+      target('T-EXACT', { keywordText: 'LED  Lampe', matchType: 'EXACT', state: 'PAUSED' }),
       target('T-PHRASE', { keywordText: 'lampe rot', matchType: 'PHRASE' }),
       target('T-ARCHIVED', { keywordText: 'lampe blau', matchType: 'EXACT', state: 'ARCHIVED' }),
       target('T-REMOVED', {
@@ -233,6 +233,58 @@ beforeAll(async () => {
     new Date('2026-10-02T08:00:00Z'),
   );
   await write(ids.org, ids.hidden, A, [term('versteckt', '777')]);
+
+  // Dieselben Amazon-IDs und ein exaktes Keyword in einem fremden und im ausgeblendeten Profil: Die Joins und der
+  // Abgleich „schon exakt gebucht“ dürfen nur das eigene Profil treffen.
+  for (const [organizationId, profileId] of [
+    [ids.otherOrg, ids.foreign],
+    [ids.org, ids.hidden],
+  ] as const) {
+    const [otherCampaign] = await db
+      .insert(amazonAdsCampaigns)
+      .values({
+        organizationId,
+        profileId,
+        amazonCampaignId: 'C1',
+        adProduct: SP,
+        name: 'FREMDE KAMPAGNE',
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsCampaigns.id });
+    const [otherAdGroup] = await db
+      .insert(amazonAdsAdGroups)
+      .values({
+        organizationId,
+        profileId,
+        campaignId: otherCampaign!.id,
+        amazonAdGroupId: 'AG1',
+        adProduct: SP,
+        name: 'FREMDE AD GROUP',
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsAdGroups.id });
+    const other = { organizationId, profileId, campaignId: otherCampaign!.id, adProduct: SP };
+    await db.insert(amazonAdsTargets).values([
+      {
+        ...other,
+        adGroupId: otherAdGroup!.id,
+        amazonTargetId: 'T-BROAD',
+        targetType: 'keyword',
+        keywordText: 'FREMDES KEYWORD',
+        matchType: 'PHRASE',
+        state: 'ENABLED',
+      },
+      {
+        ...other,
+        adGroupId: otherAdGroup!.id,
+        amazonTargetId: 'T-FREMD-EXACT',
+        targetType: 'keyword',
+        keywordText: 'lampe rot',
+        matchType: 'EXACT',
+        state: 'ENABLED',
+      },
+    ]);
+  }
   await write(ids.otherOrg, ids.foreign, A, [term('fremd', '555')]);
 });
 
@@ -344,6 +396,12 @@ describe('querySearchTermPeriod', () => {
     });
   });
 
+  it('verbindet nie mit gleichnamigen Amazon-IDs anderer Profile (keine fremden Namen, keine doppelten Zeilen)', async () => {
+    const result = await query();
+    expect(result?.rows).toHaveLength(7);
+    expect(JSON.stringify(result)).not.toContain('FREMD');
+  });
+
   it('hält fehlende Entities aus (Datei als Teilmenge)', async () => {
     const result = await query();
     expect(result?.rows.find((r) => r.searchTerm === 'unbekannt')).toMatchObject({
@@ -360,13 +418,13 @@ describe('querySearchTermPeriod', () => {
     });
   });
 
-  it('erkennt vorhandene exakte Targets (ohne Groß-/Kleinschreibung, auch pausiert und als ASIN)', async () => {
+  it('erkennt vorhandene exakte Targets (ohne Groß-/Kleinschreibung und doppelte Leerzeichen, auch pausiert und als ASIN)', async () => {
     const result = await query();
     const targeted = Object.fromEntries(result!.rows.map((r) => [r.searchTerm, r.alreadyTargeted]));
     expect(targeted).toEqual({
       'led lampe': true,
       b0test0001: true,
-      // nur als Wortgruppe gebucht, archiviert oder entfernt: noch kein exaktes Target
+      // nur als Wortgruppe gebucht (exakt nur in einem anderen Profil), archiviert oder entfernt: noch kein Target
       'lampe rot': false,
       'lampe blau': false,
       'lampe gelb': false,

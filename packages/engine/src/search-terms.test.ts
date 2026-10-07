@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildNgrams,
   classifySearchTerm,
+  createProtectedTermMatcher,
   isProtectedSearchTerm,
   tokenizeSearchTerm,
   type SearchTermRules,
@@ -117,6 +118,21 @@ describe('isProtectedSearchTerm', () => {
     expect(isProtectedSearchTerm('nordwind led lampe', ['nordwind lampe'])).toBe(false);
   });
 
+  it('trennt für den Schutz auch an Satzzeichen (Bindestrich, Apostroph, Komma)', () => {
+    expect(isProtectedSearchTerm('nordwind-lampe', ['nordwind'])).toBe(true);
+    expect(isProtectedSearchTerm("nordwind's lampe", ['Nordwind'])).toBe(true);
+    expect(isProtectedSearchTerm('lampe,nordwind', ['nordwind'])).toBe(true);
+    expect(isProtectedSearchTerm('nordwind lampe', ['nordwind-lampe'])).toBe(true);
+    expect(isProtectedSearchTerm('nordwinde-lampe', ['nordwind'])).toBe(false);
+  });
+
+  it('bereitet die Begriffe einmal vor (gleiches Ergebnis je Suchbegriff)', () => {
+    const matches = createProtectedTermMatcher(['Nordwind', ' ', 'hero lampe']);
+    expect(matches('NORDWIND led')).toBe(true);
+    expect(matches('die hero-lampe')).toBe(true);
+    expect(matches('lampe')).toBe(false);
+  });
+
   it('übergeht leere geschützte Begriffe', () => {
     expect(isProtectedSearchTerm('lampe', ['', '  '])).toBe(false);
   });
@@ -129,12 +145,14 @@ describe('classifySearchTerm', () => {
   ) =>
     classifySearchTerm(
       {
-        searchTerm: options.searchTerm ?? 'led lampe',
+        protected: isProtectedSearchTerm(
+          options.searchTerm ?? 'led lampe',
+          options.protectedTerms ?? [],
+        ),
         alreadyTargeted: options.alreadyTargeted ?? false,
         ...sums(overrides),
       },
       rules,
-      options.protectedTerms ?? [],
     );
 
   it('Negieren: genug Klicks, kein Kauf, genug Spend (Grenzen zählen mit)', () => {
@@ -186,14 +204,14 @@ describe('classifySearchTerm', () => {
     ).toBe('harvest');
   });
 
-  it('Beobachten bei ACoS über dem Ziel oder Käufen ohne Umsatz', () => {
+  it('Beobachten bei ACoS über dem Ziel; Käufe ohne Umsatz haben einen eigenen Grund', () => {
     expect(classify({ purchases: '3', cost: '25.01', sales: '100' })).toEqual({
       classification: 'watch',
       reason: 'acosAboveTarget',
     });
     expect(classify({ purchases: '3', cost: '5', sales: '0' })).toEqual({
       classification: 'watch',
-      reason: 'acosAboveTarget',
+      reason: 'noSales',
     });
   });
 

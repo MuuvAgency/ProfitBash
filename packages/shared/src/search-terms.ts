@@ -121,6 +121,7 @@ export const SEARCH_TERM_WATCH_REASON_KEYS = [
   'protected',
   'alreadyTargeted',
   'acosAboveTarget',
+  'noSales',
   'tooFewData',
 ] as const;
 

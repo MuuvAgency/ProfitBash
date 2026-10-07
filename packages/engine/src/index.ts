@@ -31,6 +31,7 @@ export { convertAmount, type DailyRates } from './fx';
 export {
   buildNgrams,
   classifySearchTerm,
+  createProtectedTermMatcher,
   isProtectedSearchTerm,
   NGRAM_SIZES,
   SEARCH_TERM_CLASSES,
