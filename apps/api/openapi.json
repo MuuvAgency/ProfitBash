@@ -930,6 +930,9 @@
           "sha256": {
             "type": "string"
           },
+          "complete": {
+            "type": "boolean"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -984,6 +987,7 @@
           "fileName",
           "byteSize",
           "sha256",
+          "complete",
           "status",
           "error",
           "counters",
@@ -4072,6 +4076,13 @@
                   "file": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "complete": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
                   }
                 },
                 "required": [

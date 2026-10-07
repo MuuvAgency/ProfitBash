@@ -1123,6 +1123,8 @@ export interface paths {
                         kind: "bulk" | "daily_report";
                         /** Format: binary */
                         file: string;
+                        /** @enum {string} */
+                        complete?: "true" | "false";
                     };
                 };
             };
@@ -2574,6 +2576,7 @@ export interface components {
             fileName: string;
             byteSize: number;
             sha256: string;
+            complete: boolean;
             /** @enum {string} */
             status: "pending" | "running" | "imported" | "failed";
             error: string | null;
