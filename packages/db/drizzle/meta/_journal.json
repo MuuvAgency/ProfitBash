@@ -155,6 +155,13 @@
       "when": 1791406025487,
       "tag": "0021_search_term_period_metrics",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791406737855,
+      "tag": "0022_search_term_rules",
+      "breakpoints": true
     }
   ]
 }

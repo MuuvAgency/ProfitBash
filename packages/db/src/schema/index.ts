@@ -5,3 +5,4 @@ export * from './fx-rates';
 export * from './saved-views';
 export * from './members';
 export * from './file-imports';
+export * from './search-terms';
