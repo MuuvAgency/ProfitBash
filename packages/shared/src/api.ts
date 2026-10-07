@@ -370,9 +370,14 @@ export const SHARED_PLATFORM_JOB_NAMES = [
   'fx-rates-sync',
 ] as const satisfies readonly PlatformJobName[];
 
-/** Jobs im Sync-Status (und im Filter): die der Connections und die geteilten plattformweiten. */
+/** Jobs je Profil (Scope = Profil-ID): Datei-Import aus der Werbekonsole (`phase-1.md` 1.11c). */
+export const PROFILE_JOB_NAMES = ['file-import'] as const;
+export type ProfileJobName = (typeof PROFILE_JOB_NAMES)[number];
+
+/** Jobs im Sync-Status (und im Filter): die der Connections und Profile und die geteilten plattformweiten. */
 export const SYNC_STATUS_JOB_NAMES = [
   ...CONNECTION_JOB_NAMES,
+  ...PROFILE_JOB_NAMES,
   ...SHARED_PLATFORM_JOB_NAMES,
 ] as const;
 export type SyncStatusJobName = (typeof SYNC_STATUS_JOB_NAMES)[number];
@@ -397,6 +402,10 @@ export const jobRunSchema = z
     job: z.string(),
     /** Worauf sich der Lauf bezieht, bei Connection-Jobs die Connection-ID. */
     scope: z.string().nullable(),
+    /** Profil der Organisation, auf das `scope` zeigt (Jobs je Profil), sonst `null`. */
+    profile: z
+      .object({ id: z.uuid(), accountName: z.string(), countryCode: z.string() })
+      .nullable(),
     /** Connection der Organisation, auf die `scope` zeigt, sonst `null`. */
     connection: z
       .object({

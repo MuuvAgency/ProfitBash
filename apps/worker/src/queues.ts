@@ -24,6 +24,12 @@ export const DISPATCH_QUEUES = {
 } as const satisfies Record<string, ConnectionQueue>;
 
 export const CLEANUP_QUEUE = 'job-runs-cleanup';
+/**
+ * Datei-Import je Profil (1.11c), `singletonKey` = Profil-ID: höchstens ein wartender und ein laufender
+ * Job je Profil. Ein Lauf arbeitet alle offenen Dateien des Profils ab; fällt ein Einplanen weg, weil schon
+ * einer wartet, holt der wartende die neue Datei mit ab.
+ */
+export const FILE_IMPORT_QUEUE = 'file-import';
 /** EZB-Kurse, plattformweit (2.2). Die EZB veröffentlicht gegen 16:00; der Lauf holt den Vortag. */
 export const FX_RATES_QUEUE = 'fx-rates-sync';
 /** Nach einem Fehlschlag neuer Versuch nach einer Stunde, höchstens so oft (danach am nächsten Morgen). */
@@ -60,6 +66,7 @@ const ALL_QUEUES = [
   ...Object.keys(DISPATCH_QUEUES),
   CLEANUP_QUEUE,
   FX_RATES_QUEUE,
+  FILE_IMPORT_QUEUE,
 ];
 
 /**
@@ -90,9 +97,15 @@ export interface EnqueueOptions {
   tx?: DbOrTx;
 }
 
+export interface FileImportJob {
+  organizationId: string;
+  profileId: string;
+}
+
 /** Hintergrundjobs, die die API anstößt. */
 export interface JobQueue {
   enqueueProfilesSync(job: ProfilesSyncJob, options?: EnqueueOptions): Promise<void>;
+  enqueueFileImport(job: FileImportJob, options?: EnqueueOptions): Promise<void>;
 }
 
 export interface ConnectionJobQueue extends JobQueue {
@@ -119,6 +132,16 @@ export function createJobQueue(boss: PgBoss): ConnectionJobQueue {
   };
   return {
     enqueueConnectionJob,
+    async enqueueFileImport(job, options = {}) {
+      await boss.send(
+        FILE_IMPORT_QUEUE,
+        { organizationId: job.organizationId, profileId: job.profileId },
+        {
+          singletonKey: job.profileId,
+          ...(options.tx && { db: fromDrizzle(options.tx, sql) }),
+        },
+      );
+    },
     async enqueueProfilesSync(job, options) {
       await enqueueConnectionJob(
         'profiles-sync',

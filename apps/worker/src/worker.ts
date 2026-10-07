@@ -11,6 +11,8 @@ import {
   type ConnectionQueue,
 } from './jobs/connection-job';
 import { pollAmazonRequests } from './jobs/amazon-requests-poll';
+import { fileImportJobDataSchema, importProfileFiles } from './jobs/file-import';
+import { FILE_IMPORTERS } from './file-import/importers';
 import { dispatchConnectionJobs } from './jobs/dispatch';
 import { syncConnectionEntities } from './jobs/entities-sync';
 import { syncFxRates } from './jobs/fx-rates-sync';
@@ -22,6 +24,7 @@ import { refreshConnectionToken } from './jobs/token-refresh';
 import {
   CLEANUP_QUEUE,
   createJobQueue,
+  FILE_IMPORT_QUEUE,
   createQueues,
   DISPATCH_QUEUES,
   FX_RATES_MAX_RETRIES,
@@ -138,6 +141,27 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
       );
     });
   }
+
+  const fileImportDeps = {
+    db,
+    logger,
+    importers: FILE_IMPORTERS,
+    now: () => new Date(),
+    enqueueFollowUp: (job: { organizationId: string; profileId: string }) =>
+      jobs.enqueueFileImport(job),
+  };
+  await boss.work<unknown>(FILE_IMPORT_QUEUE, workOptions, async (batch: Job<unknown>[]) => {
+    for (const job of batch) {
+      const parsed = fileImportJobDataSchema.safeParse(job.data);
+      if (!parsed.success) {
+        await runJob(FILE_IMPORT_QUEUE, { organizationId: null, scope: null }, () =>
+          Promise.reject(new JobFailure('Ungültige Jobdaten.')),
+        );
+        continue;
+      }
+      await importProfileFiles(runJob, fileImportDeps, parsed.data);
+    }
+  });
 
   await boss.work(CLEANUP_QUEUE, workOptions, async () => {
     await runJob(CLEANUP_QUEUE, { organizationId: null, scope: null }, () =>
