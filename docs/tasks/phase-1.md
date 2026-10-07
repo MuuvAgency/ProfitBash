@@ -1074,9 +1074,67 @@ Teilaufgaben (Reihenfolge):
 
 
 #### 1.11d Bulk-Datei → Entities
-- [ ] Kopfzeilen über Aliasse (DE/EN, alte und neue Schreibweisen), Blätter SP, SB, SD, Portfolios auf die normalisierten Datensätze
+- [x] Kopfzeilen über Aliasse (DE/EN, alte und neue Schreibweisen), Blätter SP, SB, SD, Portfolios auf die normalisierten Datensätze
       (1.5) und dieselben Upserts. `removed_at` nur aus vollständigen Dateien (keine Teilmenge, keine ungültigen Zeilen). Zeitraumsummen
       nicht als Tageswerte speichern.
+- [x] Umsetzung (Stand für 1.11e und später):
+  - **Dateien:** `apps/worker/src/file-import/bulk.ts` (Importer `importBulkFile`, in `importers.ts` für `bulk` registriert),
+    `bulk-columns.ts` (Aliasse, Blätter, Werte, Zellen, Ausdrücke), Tests daneben (`bulk-columns.test.ts` rein, `bulk.test.ts` mit DB
+    samt Ende-zu-Ende über `createFileImport` → `importProfileFiles`). `findProfileCurrency` in `packages/db/src/system-access.ts`.
+    `@profitbash/sheets`: `forEachRow` liefert je Zeile zusätzlich `info.numericColumns` (Spalten mit Zahlzellen). Der Worker hängt
+    jetzt an `@profitbash/engine` (Workspace, für `Dec`).
+  - **Ablauf:** sichtbare Blätter nach Namen erkennen (`classifySheet`: „Portfolios“, „Sponsored Products…“, „Sponsored Display…“,
+    „Sponsored Brands…“ bzw. „SB … Kampagnen/Campaigns“ für beide SB-Blätter; „Bericht“/„Report“/„Suchbegriff“/„Search Term“,
+    versteckte und andere Blätter werden übergangen). Ohne SP-, SB- oder SD-Blatt → `FileImportRejectedError` („keine Bulk-Datei“).
+    Kopfzeile = erste nicht leere Zeile; Pflichtspalten Entität, Kampagnen-ID, Zustand (Portfolios: Portfolio-ID, Portfolioname,
+    Zustand), sonst Ablehnung mit Blatt und Spalte. Erst alle Blätter lesen, dann **eine** Transaktion: Kampagne fehlender Eltern
+    über die Ad Groups der Datei, sonst `findAdGroupCampaignIds` (wie 1.7), dann Upserts Portfolios → Kampagnen → Ad Groups →
+    Targets → Negatives → Product Ads. Fehlende Eltern legen die Upserts als Platzhalter an.
+  - **Kopfzeilen:** Vergleich klein, geschützte Leerzeichen und Bindestriche als Leerzeichen, Klammer-Zusätze am Ende entfernt
+    („(Informational only)“, „(Read only)“, „(Nur zu Informationszwecken)“), bei doppelten gilt die erste. Aliasse je Spalte in
+    `COLUMN_ALIASES` (englisch laut Doku, deutsch laut Befund). Kennzahlen-Spalten haben keinen Alias und werden ignoriert.
+  - **Werte → Schreibweise des Exports:** Zustand `ENABLED`/`PAUSED`/`ARCHIVED`; Targeting `MANUAL`/`AUTO` (SP), SD-Taktik
+    (`T00030` …) als `targetingType`, SB `null`; Match-Typ `EXACT`/`PHRASE`/`BROAD`, Negatives ohne Präfix (wie im Mock: Negation
+    über die Tabelle); Gebotsstrategie `SALES_DOWN_ONLY`/`SALES_UP_AND_DOWN`/`NONE` (fest)/`RULE_BASED` (wie die Explorer-Labels);
+    Budget-Typ `DAILY`/`LIFETIME` (SP ohne Spalte: `DAILY`); Kostenart `CPC`/`VCPM` in `extra.costType`; Gebotsanpassungen
+    (`Gebotsanpassung`/`Bidding Adjustment`) als `extra.placementBidAdjustments` der Kampagne (`[{ placement, percentage }]`, nach
+    Platzierung sortiert, `percentage` als Decimal-String; `PLACEMENT_TOP`, `PLACEMENT_REST_OF_SEARCH`, `PLACEMENT_PRODUCT_PAGE`,
+    `SITE_AMAZON_BUSINESS`); Budget-Linie `NO_CAP`/`MONTHLY_RECURRING`/`DATE_RANGE`. Unbekannte Werte unverändert gespeichert und je
+    Spalte und Wert einmal als `bulk_import.unknown_value` geloggt (Blatt, Zeile, Spalte, **ohne** Wert: Zellinhalt).
+  - **Entity-Typen:** Kampagne, Ad Group, Product Ad, Keyword, (Kampagnen-)Negatives Keyword, (Negatives) Produkt-Targeting,
+    Kampagnen-Negatives Produkt-Targeting, SD Audience/Contextual Targeting, Gebotsanpassung. Negatives ohne Ad-Group-ID gelten für die
+    Kampagne. SB-Ads (Video, Kollektion, Store Spotlight), Themen und SD-Negatives auf Zielgruppen werden übergangen
+    (`bulk_import.entity_skipped`, nicht ungültig; mit 1.9 entscheiden), unbekannte Typen ebenso (`bulk_import.unknown_entity`).
+  - **Ausdrücke** (`parseTargetExpression`, Form wie `targetDetails` des Exports, `targetLabel` zeigt sie): `asin="…"` → `product`
+    `{ matchType: 'PRODUCT_EXACT', asin }`; `close-match`/`loose-match`/`substitutes`/`complements` → `auto` mit
+    `SEARCH_CLOSE_MATCH`/`SEARCH_LOOSE_MATCH`/`ASIN_SUBSTITUTE_RELATED`/`ASIN_ACCESSORY_RELATED`; Keywords `{ matchType, keyword }`.
+    **Nicht sicher wie der Export (offen für 1.10):** `category="…"` → `category` mit `productCategoryId`, Namen aus dem aufgelösten
+    Ausdruck (`productCategoryResolved`, `productBrandResolved`) und Verfeinerungen als `product<Name>` (`price-less-than` →
+    `productPriceLessThan`); `brand="…"` allein ebenso; `asin-expanded` → `PRODUCT_SIMILAR`; SD `views=(…)`/`purchases=(…)` →
+    `audience` `{ event, lookback, bulkExpression }`, `audience="…"` → `{ audienceId }`; Unbekanntes → `product`
+    `{ bulkExpression: Text }`. Weicht die Form vom Export ab, zählt der erste API-Sync diese Targets als „geändert“ (kein Schaden).
+  - **Zellen:** Beträge (Budgets, Gebote, Prozentsätze) mit `Dec` auf 15 signifikante Stellen (`123.45000000000002` → `123.45`),
+    nie über `number`; Exponent höchstens 40. Tage `YYYYMMDD` → `YYYY-MM-DD` (andere Formen ungültig, z. B. Excel-Datumszahlen nach
+    Bearbeitung). IDs nur als Ziffern-Text; eine **Zahlzelle** als ID macht die Zeile ungültig (Excel hält sie als Gleitkommazahl,
+    ab 16 Stellen wären Ziffern verloren und eine falsche ID träfe still eine andere Entity). Währung von Budgets und Geboten = Währung
+    des Profils; weicht `Budgetwährungscode` der Portfolios davon ab → Ablehnung („vermutlich ein anderes Profil“).
+  - **Ungültige Zeilen** (Pflicht-ID, Name, Zustand, Keyword-Text/Match-Typ bzw. Ausdruck fehlt, Betrag/Tag/ID unlesbar, Kampagne nicht
+    auflösbar, Gebotsanpassung ohne Kampagne in der Datei) werden übersprungen und gezählt; die ersten 20 als
+    `bulk_import.invalid_row` (Blatt, Zeile, deutscher Spaltenname, Grund), dann `bulk_import.invalid_rows` mit der Summe. Ohne eine
+    gültige Entity → Ablehnung (mit Zahl der ungültigen Zeilen bzw. „enthält keine …“).
+  - **Zähler:** `portfolios`, `campaigns`, `adGroups`, `targets`, `negatives`, `productAds` (eindeutige IDs), `created`, `updated`,
+    `placeholdersFilled`, `placeholdersCreated`, `invalidRows`; Texte unter `sync.counter.*`, Reihenfolge in `COUNTER_ORDER`. Ein
+    zweiter Import derselben Datei ergibt `created: 0, updated: 0` (getestet).
+  - **Kein `removed_at`:** Die Konsole exportiert auch Teilmengen („nur bestimmte Kampagnen“, ohne archivierte); ob eine Datei
+    vollständig ist, steht nicht darin. Offen: später nur für Dateien, die nachweislich vollständig sind (z. B. Option beim Upload).
+  - **Ungeprüfte Schreibweisen** (mit einer echten Datei abgleichen, Dominik): deutsch `Archiviert`, `Weitgehend`,
+    `Dynamische Gebote – erhöhen und senken`, `Regelbasierte Gebote`, `Täglich`/`Laufzeit` (Budget-Typ), `Monatlich wiederkehrend`/
+    `Datumsbereich` (Budget-Linie), Entity `Negatives Keyword auf Kampagnenebene`, `Negatives Produkt-Targeting auf Kampagnenebene`,
+    `Zielgruppen-Targeting`, `Kontextbezogenes Targeting`, Spalten `Aufgelöster Ausdruck für Produkt-Targeting`,
+    `Aufgelöster Targeting-Ausdruck`, `Budget-Typ`; englisch die SB/SD-Entity-Namen und `Negative Exact`/`Negative Phrase` mit
+    Leerzeichen. API-Seite: `NONE` für feste Gebote, `SITE_AMAZON_BUSINESS`, `LIFETIME`, Form der Kategorie- und Zielgruppen-Ausdrücke.
+  - **Offen für 1.10/1.11g:** Abgleich der Ausdrücke und Enum-Werte mit einem echten Export; `extra` aus der Datei enthält nur
+    `costType`/`placementBidAdjustments` (Lieferstatus, Tags usw. kommen erst mit der API). Portfolios: `inBudget` bleibt leer.
 
 #### 1.11e Tagesbericht → Kennzahlen
 - [ ] Neue Berichte (Tag, Kampagne/Ad Group/Target mit IDs) auf `replaceDailyMetrics` (Ebenen `campaign`, `adGroup`, `target`),
