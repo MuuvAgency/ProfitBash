@@ -19,6 +19,7 @@ import {
   amazonAdsProfileMetricsImportedThrough,
   amazonAdsProfiles,
   amazonAdsSearchTermDailyMetrics,
+  amazonAdsSearchTermPeriodMetrics,
   amazonAdsTargetDailyMetrics,
 } from './schema';
 
@@ -609,4 +610,79 @@ async function hasRows(db: DbOrTx, view: MetricsTableView, where: SQL | undefine
 
 function* chunks<T>(items: readonly T[]): Generator<T[]> {
   for (let i = 0; i < items.length; i += CHUNK_SIZE) yield items.slice(i, i + CHUNK_SIZE);
+}
+
+// ---------------------------------------------------------------------------
+// Suchbegriffe als Zeitraumsummen (Suchbegriff-Blätter der Bulk-Datei, `phase-2b.md` 2b.1)
+// ---------------------------------------------------------------------------
+
+export interface SearchTermPeriodMetric {
+  amazonCampaignId: string;
+  amazonAdGroupId: string;
+  /** Keyword-ID bzw. Produkt-Targeting-ID. */
+  amazonTargetId: string;
+  searchTerm: string;
+  impressions: number;
+  clicks: number;
+  /** Decimal-Strings in der Währung des Profils. */
+  cost: string;
+  sales: string;
+  purchases: number;
+  units: number;
+}
+
+export interface ReplaceSearchTermPeriodMetricsInput {
+  organizationId: string;
+  profileId: string;
+  adProduct: string;
+  /** Download-Zeitraum der Datei, beide Tage eingeschlossen (`YYYY-MM-DD`). */
+  period: MetricsDateRange;
+  currencyCode: string;
+  /** Höchstens eine Zeile je Target und Suchbegriff; nicht leer. */
+  rows: readonly SearchTermPeriodMetric[];
+  now: Date;
+}
+
+/**
+ * Ersetzt die Suchbegriff-Summen eines Profils für genau diesen Ad-Typ und Zeitraum (ein erneuter Upload
+ * desselben Zeitraums gilt, andere Zeiträume bleiben daneben stehen). Systemzugriff des Datei-Imports, an
+ * Organisation und Profil gebunden; läuft in der Transaktion des Aufrufers. Ohne Zeilen geschieht nichts:
+ * Eine Datei ohne Leistungsdaten löscht keine vorhandenen Summen.
+ */
+export async function replaceSearchTermPeriodMetrics(
+  db: DbOrTx,
+  input: ReplaceSearchTermPeriodMetricsInput,
+): Promise<{ rows: number; deleted: number }> {
+  if (input.rows.length === 0) return { rows: 0, deleted: 0 };
+  return db.transaction(async (tx) => {
+    await assertProfileInOrganization(tx, input);
+    const table = amazonAdsSearchTermPeriodMetrics;
+    const deleted = await tx
+      .delete(table)
+      .where(
+        and(
+          eq(table.profileId, input.profileId),
+          eq(table.organizationId, input.organizationId),
+          eq(table.adProduct, input.adProduct),
+          eq(table.periodStart, input.period.startDate),
+          eq(table.periodEnd, input.period.endDate),
+        ),
+      )
+      .returning({ id: table.id });
+    for (const chunk of chunks(input.rows)) {
+      await tx.insert(table).values(
+        chunk.map((row) => ({
+          ...row,
+          organizationId: input.organizationId,
+          profileId: input.profileId,
+          adProduct: input.adProduct,
+          periodStart: input.period.startDate,
+          periodEnd: input.period.endDate,
+          currencyCode: input.currencyCode,
+          importedAt: input.now,
+        })),
+      );
+    }
+    return { rows: input.rows.length, deleted: deleted.length };
+  });
 }

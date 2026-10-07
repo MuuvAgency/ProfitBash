@@ -33,7 +33,11 @@ const COUNTER_ORDER = [
   'targets',
   'negatives',
   'productAds',
+  // Suchbegriff-Blätter der Bulk-Datei (2b.1): Summen je Download-Zeitraum.
+  'searchTerms',
+  'searchTermsWithoutPeriod',
   'invalidRows',
+  'invalidSearchTermRows',
   // Wechselkurse (2.2): geladen, davon neu, geändert, unverändert.
   'fetched',
   'currencies',
