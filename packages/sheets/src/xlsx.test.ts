@@ -60,6 +60,23 @@ describe('openXlsx', () => {
     ]);
   });
 
+  it('nennt je Zeile die Spalten mit Zahlzellen (IDs als Zahl verlören Stellen)', () => {
+    const file = buildXlsx([
+      {
+        name: 'Typen',
+        rows: [
+          ['Text', 12, { raw: '1.5' }, { shared: '7' }, { raw: '1', type: 'b' }, null, 3],
+          ['nur Text'],
+        ],
+      },
+    ]);
+    const numeric: number[][] = [];
+    openXlsx(file).forEachRow('Typen', (_row, _rowNumber, info) => {
+      numeric.push([...info.numericColumns].sort((a, b) => a - b));
+    });
+    expect(numeric).toEqual([[1, 2, 6], []]);
+  });
+
   it('setzt Zellen nach ihrer Adresse und füllt Lücken mit leeren Texten', () => {
     const file = buildXlsx([{ name: 'Lücken', rows: [['A', null, null, 'D'], [null, 'B'], []] }]);
     expect(rowsOf(file, 'Lücken')).toEqual([['A', '', '', 'D'], ['', 'B'], []]);

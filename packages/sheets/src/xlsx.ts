@@ -26,7 +26,19 @@ export interface XlsxOptions {
   maxCells?: number;
 }
 
-export type RowCallback = (row: string[], rowNumber: number) => void;
+/** Zusatzangaben je Zeile. */
+export interface RowInfo {
+  /**
+   * Spalten mit Zahlzellen (Typ `n` bzw. ohne Typ). Excel hält Zahlen als Gleitkommazahl: Kommt eine ID als
+   * Zahl, können Stellen jenseits der 15. schon verloren sein. Aufrufer erkennen solche Zellen hier.
+   */
+  numericColumns: ReadonlySet<number>;
+}
+
+export type RowCallback = (row: string[], rowNumber: number, info: RowInfo) => void;
+
+const NO_NUMERIC_COLUMNS: ReadonlySet<number> = new Set();
+const EMPTY_ROW_INFO: RowInfo = { numericColumns: NO_NUMERIC_COLUMNS };
 
 export interface XlsxWorkbook {
   sheets: SheetInfo[];
@@ -341,6 +353,7 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
       };
 
       let row: string[] = [];
+      let numericColumns: Set<number> | null = null;
       let rowNumber = 0;
       let emitted = 0;
       let column = -1;
@@ -365,6 +378,7 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
             }
             if (rowNumber > MAX_ROWS) fail('Zu viele Zeilen');
             row = [];
+            numericColumns = null;
             column = -1;
           } else if (name === 'c') {
             const index = attributes.r ? columnIndex(attributes.r) : null;
@@ -400,14 +414,21 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
             countCells(column + 1 - row.length);
             while (row.length < column) row.push('');
             row[column] = text;
+            if (cellType === undefined || cellType === 'n') {
+              (numericColumns ??= new Set()).add(column);
+            }
           } else if (name === 'row') {
             countCells(Math.max(0, rowNumber - 1 - emitted));
             while (emitted < rowNumber - 1) {
               emitted++;
-              callback([], emitted);
+              callback([], emitted, EMPTY_ROW_INFO);
             }
             emitted = rowNumber;
-            callback(row, rowNumber);
+            callback(
+              row,
+              rowNumber,
+              numericColumns ? { numericColumns } : EMPTY_ROW_INFO,
+            );
           }
         },
         text(text) {
