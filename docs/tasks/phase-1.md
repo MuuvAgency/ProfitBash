@@ -1190,9 +1190,11 @@ Teilaufgaben (Reihenfolge):
     sinngemäß in 1.7, `as EntityKind` aus der Werte-Tabelle).
 
 #### 1.11e Tagesbericht → Kennzahlen
-> **Zurückgestellt (2026-10-07):** Es liegt noch kein echter neuer Tagesbericht vor (nur Bulk-Dateien). 1.11f wurde vorgezogen;
-> 1.11e folgt, sobald Dominik einen Bericht („Berichte“, Zeitdimension Tag, Kampagnen-/Anzeigengruppen-/Target-ID) als Datei
-> ablegt. Danach `daily_report` im Upload-Dialog freischalten (`FileImportsDialog.vue`, heute sichtbar, aber gesperrt).
+> **Entfällt bis auf Weiteres (Dominik, 2026-10-07): Es wird keine Tagesberichte geben.** Datei-Profile bekommen damit keine
+> Tageskennzahlen: Dashboard und Explorer zeigen für sie Struktur, Gebote und Budgets, aber keine Kennzahlen und keinen
+> Datenstand („Daten bis“). Kennzahlen kommen nur als Zeitraumsummen der Suchbegriff-Blätter (`phase-2b.md` 2b.1, F1) und
+> später über die API (1.10). Folgen: Die Art `daily_report` bleibt in Schema und Job (kein Importer), wird im Upload-Dialog
+> aber nicht mehr angeboten; der Hinweis `metricsStale` greift für Datei-Profile nie. Wieder aufnehmen nur auf Dominiks Wunsch.
 - [ ] Neue Berichte (Tag, Kampagne/Ad Group/Target mit IDs) auf `replaceDailyMetrics` (Ebenen `campaign`, `adGroup`, `target`),
       Zeitraum der Datei ersetzen, Attribution je Ad-Typ und Kontotyp, Währung prüfen, „Daten bis“. Product Ads (keine Ad-ID) und
       Suchbegriffe erst nach Sichtung der echten Spalten entscheiden.
