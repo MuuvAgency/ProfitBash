@@ -366,10 +366,14 @@ describe('startWorker', () => {
     });
     // Der Tagesbericht hat bis 1.11e keinen Importer: Der Weg bis zum Job ist trotzdem belegt.
     expect(done.status).toBe('failed');
-    const [run] = await testDb.db
-      .select()
-      .from(jobRuns)
-      .where(and(eq(jobRuns.job, 'file-import'), eq(jobRuns.scope, profileId)));
+    // runJob schließt den Lauf erst, nachdem die Datei ihren Status hat, daher auf das Ende des Laufs warten.
+    const run = await waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(jobRuns)
+        .where(and(eq(jobRuns.job, 'file-import'), eq(jobRuns.scope, profileId)));
+      return row && row.status !== 'running' ? row : undefined;
+    });
     expect(run).toMatchObject({ organizationId, status: 'failed', counters: { files: 1 } });
 
     // Ohne eingeplanten Job (verloren nach Absturz oder Deploy) holt der Auslöser alle 10 Min. die Datei.
@@ -397,10 +401,13 @@ describe('startWorker', () => {
       return row && ['imported', 'failed'].includes(row.status) ? row : undefined;
     });
     expect(swept.status).toBe('failed');
-    const [dispatch] = await testDb.db
-      .select()
-      .from(jobRuns)
-      .where(and(eq(jobRuns.job, 'file-import'), isNull(jobRuns.scope)));
+    const dispatch = await waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(jobRuns)
+        .where(and(eq(jobRuns.job, 'file-import'), isNull(jobRuns.scope)));
+      return row && row.status !== 'running' ? row : undefined;
+    });
     expect(dispatch).toMatchObject({ status: 'success', counters: { profiles: 1, queued: 1 } });
   });
 });
