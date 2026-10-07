@@ -1176,6 +1176,16 @@ Teilaufgaben (Reihenfolge):
     gespeicherte Datei jede Zeile ab), Gebotsanpassung ohne Prozentsatz nicht mehr ungültig, Ad Group in SP/SD Pflicht. Als offene
     Punkte notiert: Überschreiben von API-Feldern nach dem Zusammenführen, Datei eines anderen Kontos (inzwischen entschieden und
     umgesetzt, siehe oben), Marken-Ausdrücke im Label.
+  - Review der Entscheidungen (unabhängig, 2026-10-07): keine kritischen Befunde. Übernommen: kein Entfernen bei fremd wirkender
+    Datei (`reason: 'unmatched'`), Abdeckung je Ad-Typ und Ebene erst ab einer Zeile in der Datei (leere Blätter, siehe oben), Eltern,
+    auf die Zeilen verweisen, gelten als gesehen (Ad Group eines Targets, Portfolio einer Kampagne), entfernte Profile blockieren die
+    Konto-Prüfung nicht, ausgeblendete Profile werden in der Meldung nicht genannt (ADR 002), Kampagnen-IDs aus allen Zeilen, Hinweis
+    nur gegen echte, nicht entfernte Kampagnen, Tests für alle Ebenen, Portfolios, `partiallyRead`, Wiederauftauchen und
+    referenzierte Eltern. **Offen:** ob Platzhalter-Kampagnen (aus Tagesberichten) eines anderen Profils als Besitz zählen sollen
+    (heute ja, also Ablehnung; Dominik bei Bedarf); `existedBefore` = Upload-Zeitpunkt (der Export kann älter sein, eine danach
+    entstandene Kampagne gilt dann bis zur nächsten Datei als entfernt); kein Index auf (`organization_id`, `amazon_campaign_id`)
+    (Prüfung scannt die Kampagnen der Organisation, bei Wachstum ergänzen); zwei gleichzeitige Importe verschiedener Profile
+    können beide die Prüfung bestehen (theoretisch).
     Bewusst so: Blattnamen in Logs und Meldungen (feste Amazon-Namen), zwei Typ-Zusicherungen (`as T` beim Ergänzen der Kampagne wie
     sinngemäß in 1.7, `as EntityKind` aus der Werte-Tabelle).
 
