@@ -16,6 +16,7 @@
     "@profitbash/db": "workspace:*",
     "@profitbash/ecb": "workspace:*",
     "@profitbash/shared": "workspace:*",
+    "@profitbash/sheets": "workspace:*",
     "drizzle-orm": "^0.45.3",
     "pg-boss": "^12.34.0",
     "postgres": "^3.4.9",

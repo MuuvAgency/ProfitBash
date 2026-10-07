@@ -1,12 +1,17 @@
 import { errorLogFields, isDbQueryError, schema, type Db } from '@profitbash/db';
-import type { ConnectionJobName, Logger, PlatformJobName } from '@profitbash/shared';
+import type {
+  ConnectionJobName,
+  Logger,
+  PlatformJobName,
+  ProfileJobName,
+} from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import { pingHealthcheck } from './healthchecks';
 
 const { jobRuns } = schema;
 
 /** Namen in `job_runs.job` (und in der Sync-Status-Ansicht). */
-export type JobName = ConnectionJobName | PlatformJobName;
+export type JobName = ConnectionJobName | ProfileJobName | PlatformJobName;
 
 export interface JobScope {
   /** Eigentümer-Organisation; `null` für plattformweite Läufe. */

@@ -51,7 +51,7 @@ const summaryColumns = {
   finishedAt: fileImports.finishedAt,
 };
 
-type SummaryRow = { [K in keyof typeof summaryColumns]: (typeof summaryColumns)[K]['_']['data'] };
+type SummaryRow = Pick<typeof fileImports.$inferSelect, keyof typeof summaryColumns>;
 
 function toFileImport(row: SummaryRow): FileImport {
   return {

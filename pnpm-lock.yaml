@@ -351,6 +351,9 @@ importers:
       '@profitbash/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@profitbash/sheets':
+        specifier: workspace:*
+        version: link:../../packages/sheets
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(kysely@0.29.6)(pg@8.23.0)(postgres@3.4.9)
