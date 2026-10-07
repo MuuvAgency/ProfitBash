@@ -866,7 +866,7 @@ describe('importBulkFile', () => {
       sp({
         Entität: 'Anzeigengruppe',
         'Kampagnen-ID': C1,
-        'Anzeigengruppen-ID': 400000000000009,
+        'Anzeigengruppen-ID': 4000000000000009,
         'Name der Anzeigengruppe': 'Geheim Gruppe',
         Zustand: 'Aktiviert',
       }),
@@ -892,12 +892,36 @@ describe('importBulkFile', () => {
       'viel',
       'geheim',
       'Geheim',
-      '400000000000009',
+      '4000000000000009',
       'Waldkauz',
       '2026-02-01',
     ]) {
       expect(logged).not.toContain(secret);
     }
+  });
+
+  it('übergeht Gebotsanpassungen ohne Prozentsatz still und verlangt Ad Groups außerhalb von SB', async () => {
+    const rows = [
+      DE_SP_ROWS[0]!,
+      DE_SP_ROWS[1]!,
+      sp({
+        Entität: 'Gebotsanpassung',
+        'Kampagnen-ID': C1,
+        Platzierung: 'Platzierung Rest der Suche',
+      }),
+      DE_SP_ROWS[3]!,
+      // SP-Keyword ohne Ad Group: nicht still zum Kampagnen-Target machen.
+      sp({ ...DE_SP_ROWS[5]!, 'Anzeigengruppen-ID': null }),
+    ];
+    const counters = await run(germanFile({ spRows: rows }));
+    expect(counters).toMatchObject({ campaigns: 1, targets: 0, invalidRows: 1 });
+    const [campaign] = await db.select().from(amazonAdsCampaigns);
+    expect(campaign!.extra).toEqual({
+      placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: '25' }],
+    });
+    expect(logs.filter((entry) => entry.msg === 'bulk_import.invalid_row')).toEqual([
+      expect.objectContaining({ row: 6, column: 'Anzeigengruppen-ID' }),
+    ]);
   });
 
   it('reicht unbekannte Werte unverändert durch und loggt sie einmal ohne Inhalt', async () => {
@@ -943,7 +967,7 @@ describe('importBulkFile', () => {
   it('lehnt eine Datei ab, deren Entity-Zeilen alle ungültig sind', async () => {
     const rows = [
       { ...DE_SP_ROWS[0]!, Tagesbudget: 'viel' },
-      { ...DE_SP_ROWS[11]!, 'Kampagnen-ID': 300000000000002 },
+      { ...DE_SP_ROWS[11]!, 'Kampagnen-ID': 3000000000000002 },
     ];
     const file = buildXlsx([sheet('Sponsored Products-Kampagnen', DE_SP_HEADER, rows)]);
     await expect(run(file)).rejects.toThrow(/2 ungültig/);

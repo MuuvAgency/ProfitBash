@@ -269,11 +269,14 @@ describe('Zellen', () => {
     expect(parseBulkDate('46000')).toBe('invalid');
   });
 
-  it('nimmt IDs nur als Ziffern-Text, nie aus Zahlzellen', () => {
+  it('nimmt IDs als Ziffern-Text, aus Zahlzellen nur bis 15 Stellen', () => {
     expect(parseBulkId('123456789012345', false)).toBe('123456789012345');
     expect(parseBulkId(' 123456789012 ', false)).toBe('123456789012');
     expect(parseBulkId('', false)).toBeNull();
-    expect(parseBulkId('123456789012345', true)).toBe('invalid');
+    // Zahlzellen: bis 15 Stellen exakt (Excel hält 15 signifikante Stellen), darüber womöglich gerundet.
+    expect(parseBulkId('123456789012345', true)).toBe('123456789012345');
+    expect(parseBulkId('1234567890123456', true)).toBe('invalid');
+    expect(parseBulkId('1.23456789012345E+14', true)).toBe('invalid');
     expect(parseBulkId('1.23456789012345E+14', false)).toBe('invalid');
   });
 });

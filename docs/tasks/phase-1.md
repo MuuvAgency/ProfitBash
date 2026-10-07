@@ -1102,8 +1102,9 @@ Teilaufgaben (Reihenfolge):
     `SITE_AMAZON_BUSINESS`); Budget-Linie `NO_CAP`/`MONTHLY_RECURRING`/`DATE_RANGE`. Unbekannte Werte unverändert gespeichert und je
     Spalte und Wert einmal als `bulk_import.unknown_value` geloggt (Blatt, Zeile, Spalte, **ohne** Wert: Zellinhalt).
   - **Entity-Typen:** Kampagne, Ad Group, Product Ad, Keyword, (Kampagnen-)Negatives Keyword, (Negatives) Produkt-Targeting,
-    Kampagnen-Negatives Produkt-Targeting, SD Audience/Contextual Targeting, Gebotsanpassung. Negatives ohne Ad-Group-ID gelten für die
-    Kampagne. SB-Ads (Video, Kollektion, Store Spotlight), Themen und SD-Negatives auf Zielgruppen werden übergangen
+    Kampagnen-Negatives Produkt-Targeting, SD Audience/Contextual Targeting, Gebotsanpassung. Negatives ohne Ad-Group-ID gelten im SB-Blatt für die
+    Kampagne; in SP und SD ist ein Target oder Negative (außer „auf Kampagnenebene“) ohne Ad-Group-ID ungültig. Gebotsanpassungen
+    ohne Prozentsatz werden still übergangen (keine Anpassung). SB-Ads (Video, Kollektion, Store Spotlight), Themen und SD-Negatives auf Zielgruppen werden übergangen
     (`bulk_import.entity_skipped`, nicht ungültig; mit 1.9 entscheiden), unbekannte Typen ebenso (`bulk_import.unknown_entity`).
   - **Ausdrücke** (`parseTargetExpression`, Form wie `targetDetails` des Exports, `targetLabel` zeigt sie): `asin="…"` → `product`
     `{ matchType: 'PRODUCT_EXACT', asin }`; `close-match`/`loose-match`/`substitutes`/`complements` → `auto` mit
@@ -1115,8 +1116,9 @@ Teilaufgaben (Reihenfolge):
     `{ bulkExpression: Text }`. Weicht die Form vom Export ab, zählt der erste API-Sync diese Targets als „geändert“ (kein Schaden).
   - **Zellen:** Beträge (Budgets, Gebote, Prozentsätze) mit `Dec` auf 15 signifikante Stellen (`123.45000000000002` → `123.45`),
     nie über `number`; Exponent höchstens 40. Tage `YYYYMMDD` → `YYYY-MM-DD` (andere Formen ungültig, z. B. Excel-Datumszahlen nach
-    Bearbeitung). IDs nur als Ziffern-Text; eine **Zahlzelle** als ID macht die Zeile ungültig (Excel hält sie als Gleitkommazahl,
-    ab 16 Stellen wären Ziffern verloren und eine falsche ID träfe still eine andere Entity). Währung von Budgets und Geboten = Währung
+    Bearbeitung). IDs als Ziffern-Text; als **Zahlzelle** (Datei neu gespeichert, z. B. in LibreOffice) nur bis 15 Stellen, sonst
+    ist die Zeile ungültig (Gleitkommazahl: ab 16 Stellen bzw. mit Exponent können Ziffern verloren sein, und eine falsche ID träfe
+    still eine andere Entity). Währung von Budgets und Geboten = Währung
     des Profils; weicht `Budgetwährungscode` der Portfolios davon ab → Ablehnung („vermutlich ein anderes Profil“).
   - **Ungültige Zeilen** (Pflicht-ID, Name, Zustand, Keyword-Text/Match-Typ bzw. Ausdruck fehlt, Betrag/Tag/ID unlesbar, Kampagne nicht
     auflösbar, Gebotsanpassung ohne Kampagne in der Datei) werden übersprungen und gezählt; die ersten 20 als
@@ -1125,7 +1127,7 @@ Teilaufgaben (Reihenfolge):
   - **Zähler:** `portfolios`, `campaigns`, `adGroups`, `targets`, `negatives`, `productAds` (eindeutige IDs), `created`, `updated`,
     `placeholdersFilled`, `placeholdersCreated`, `invalidRows`; Texte unter `sync.counter.*`, Reihenfolge in `COUNTER_ORDER`. Ein
     zweiter Import derselben Datei ergibt `created: 0, updated: 0` (getestet).
-  - **Kein `removed_at`:** Die Konsole exportiert auch Teilmengen („nur bestimmte Kampagnen“, ohne archivierte); ob eine Datei
+  - **Kein `removed_at` (Abweichung vom Punkt oben):** Die Konsole exportiert auch Teilmengen („nur bestimmte Kampagnen“, ohne archivierte); ob eine Datei
     vollständig ist, steht nicht darin. Offen: später nur für Dateien, die nachweislich vollständig sind (z. B. Option beim Upload).
   - **Ungeprüfte Schreibweisen** (mit einer echten Datei abgleichen, Dominik): deutsch `Archiviert`, `Weitgehend`,
     `Dynamische Gebote – erhöhen und senken`, `Regelbasierte Gebote`, `Täglich`/`Laufzeit` (Budget-Typ), `Monatlich wiederkehrend`/
@@ -1135,6 +1137,20 @@ Teilaufgaben (Reihenfolge):
     Leerzeichen. API-Seite: `NONE` für feste Gebote, `SITE_AMAZON_BUSINESS`, `LIFETIME`, Form der Kategorie- und Zielgruppen-Ausdrücke.
   - **Offen für 1.10/1.11g:** Abgleich der Ausdrücke und Enum-Werte mit einem echten Export; `extra` aus der Datei enthält nur
     `costType`/`placementBidAdjustments` (Lieferstatus, Tags usw. kommen erst mit der API). Portfolios: `inBudget` bleibt leer.
+    Die Upserts schreiben alle Spalten: Ein Bulk-Import über Entities des API-Syncs löschte `extra` (Lieferstatus, Tags …),
+    `amazon_updated_at` und `in_budget`, der nächste API-Sync zählte alles als geändert. Heute ausgeschlossen (Uploads für Profile
+    mit Connection lehnt `createFileImport` ab); falls 1.11g Datei-Importe nach dem Zusammenführen zulässt, vorher eine
+    Upsert-Option für Teilquellen (`extra` zusammenführen, fehlende Spalten behalten). Reine Marken-Ausdrücke (`brand="…"`)
+    zeigt `targetLabel` als Feldliste.
+  - **Offen (Dominik):** Eine Datei eines anderen Kontos landet ohne Warnung im gewählten Profil (geprüft wird nur die
+    Portfolio-Währung; ohne `removed_at` nicht rückgängig zu machen). Vorschlag: vor dem Schreiben die Kampagnen-IDs der Datei in
+    anderen Profilen der Organisation suchen und bei Treffern ablehnen; ggf. auch ablehnen, wenn das Profil schon Kampagnen hat und
+    keine ID der Datei passt.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: Zahlzellen-IDs bis 15 Stellen erlaubt (vorher lehnte eine neu
+    gespeicherte Datei jede Zeile ab), Gebotsanpassung ohne Prozentsatz nicht mehr ungültig, Ad Group in SP/SD Pflicht. Als offene
+    Punkte notiert: Überschreiben von API-Feldern nach dem Zusammenführen, Datei eines anderen Kontos, Marken-Ausdrücke im Label.
+    Bewusst so: Blattnamen in Logs und Meldungen (feste Amazon-Namen), zwei Typ-Zusicherungen (`as T` beim Ergänzen der Kampagne wie
+    sinngemäß in 1.7, `as EntityKind` aus der Werte-Tabelle).
 
 #### 1.11e Tagesbericht → Kennzahlen
 - [ ] Neue Berichte (Tag, Kampagne/Ad Group/Target mit IDs) auf `replaceDailyMetrics` (Ebenen `campaign`, `adGroup`, `target`),

@@ -399,7 +399,8 @@ class BulkCollector {
         const campaignId = cells.requiredId('campaignId');
         const placement = cells.requiredValue('placement', PLACEMENTS);
         const percentage = cells.amount('percentage');
-        if (percentage === null) throw new InvalidCell('percentage', 'fehlt');
+        // Leerer Prozentsatz: keine Anpassung für diese Platzierung (nicht ungültig).
+        if (percentage === null) return;
         const forCampaign = this.adjustments.get(campaignId) ?? new Map();
         forCampaign.set(placement, { placement, percentage, position });
         this.adjustments.set(campaignId, forCampaign);
@@ -466,6 +467,11 @@ class BulkCollector {
     const campaignLevel =
       kind === 'campaignNegativeKeyword' || kind === 'campaignNegativeProductTargeting';
     const amazonAdGroupId = campaignLevel ? null : cells.id('adGroupId');
+    // Targets ohne Ad Group gibt es nur im älteren SB-Blatt (Kampagnen ohne Ad Groups). In SP und SD hieße
+    // eine fehlende Ad Group sonst still „gilt für die Kampagne“.
+    if (amazonAdGroupId === null && !campaignLevel && adProduct !== AD_PRODUCT_OF_SHEET.sb) {
+      throw new InvalidCell('adGroupId', 'fehlt');
+    }
     const amazonCampaignId = cells.id('campaignId');
     // Ohne Kampagne und Ad Group gehört die Zeile nirgends hin.
     if (amazonCampaignId === null && amazonAdGroupId === null) {
