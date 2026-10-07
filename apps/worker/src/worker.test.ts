@@ -170,7 +170,7 @@ describe('startWorker', () => {
       organizationId,
       job: 'profiles-sync',
       status: 'success',
-      // Anfragezähler aus dem Amazon-Client (1.3); die Lease ist danach wieder frei.
+      // Anfragezähler aus dem Amazon-Client (1.3).
       counters: expect.objectContaining({
         profiles: 4,
         created: 4,
@@ -180,7 +180,11 @@ describe('startWorker', () => {
         deferred: 0,
       }) as unknown,
     });
-    expect(await testDb.db.select().from(connectionJobLeases)).toEqual([]);
+    // Die Lease ist danach wieder frei. runConnectionJob gibt sie erst nach dem Abschluss des Laufs
+    // frei (finally, auch wenn runJob selbst scheitert), daher kurz darauf warten.
+    await waitFor(async () =>
+      (await testDb.db.select().from(connectionJobLeases)).length === 0 ? true : undefined,
+    );
     const [big] = await testDb.db
       .select()
       .from(amazonAdsProfiles)
