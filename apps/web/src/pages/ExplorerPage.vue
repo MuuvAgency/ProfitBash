@@ -6,7 +6,13 @@ import InputText from 'primevue/inputtext';
 import MultiSelect from 'primevue/multiselect';
 import { computed, onScopeDispose, ref, shallowRef, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
+import {
+  RouterLink,
+  useRoute,
+  useRouter,
+  type LocationQueryRaw,
+  type RouteLocationRaw,
+} from 'vue-router';
 import { api } from '../api';
 import FilterBar from '../analytics/FilterBar.vue';
 import type { MetricKey } from '../analytics/metrics';
@@ -25,6 +31,7 @@ import {
 } from '../explorer/columns';
 import ExplorerChart from '../explorer/ExplorerChart.vue';
 import ExplorerGrid from '../explorer/ExplorerGrid.vue';
+import ExplorerTabs from '../explorer/ExplorerTabs.vue';
 import { useExplorerRows, useExplorerSeries } from '../explorer/queries';
 import {
   childLevel,
@@ -32,6 +39,8 @@ import {
   EXPLORER_TABS,
   explorerStateFromRoute,
   pathForLevel,
+  SEARCH_TERM_ANALYSIS_PATH,
+  SEARCH_TERM_ANALYSIS_TAB,
   type DrillDown,
   parseProductTerms,
   type GridSort,
@@ -82,14 +91,20 @@ function withoutSearch(query: LocationQueryRaw, level: ExplorerLevel): LocationQ
   return rest;
 }
 
-const tabs = computed(() =>
-  EXPLORER_TABS.map((tab) => ({
-    ...tab,
+const tabs = computed(() => [
+  ...EXPLORER_TABS.map((tab) => ({
+    key: tab.level as string,
     label: t(`explorer.tab.${tab.level}`),
     // Die Suche nach ASIN/SKU gehört zum Reiter Product Ads; andere Reiter nehmen sie nicht mit.
-    to: link(pathForLevel(tab.level), withoutSearch(route.query, tab.level)),
+    to: link(pathForLevel(tab.level), withoutSearch(route.query, tab.level)) as RouteLocationRaw,
   })),
-);
+  // Eigene Seite mit eigener Auswahl (Profil und Datei-Zeitraum statt Filterleiste).
+  {
+    key: SEARCH_TERM_ANALYSIS_TAB,
+    label: t('searchTerms.tab'),
+    to: SEARCH_TERM_ANALYSIS_PATH as RouteLocationRaw,
+  },
+]);
 
 const historyVersion = ref(0);
 onScopeDispose(router.afterEach(() => historyVersion.value++));
@@ -415,23 +430,7 @@ const truncatedText = computed(() => {
     />
 
     <template v-else-if="!filters.options.isError.value">
-      <nav :aria-label="t('explorer.tabs')" class="-mx-space-xs overflow-x-auto px-space-xs">
-        <ul class="flex gap-space-xs">
-          <li v-for="tab in tabs" :key="tab.level">
-            <RouterLink
-              :to="tab.to"
-              :aria-current="tab.level === level ? 'page' : undefined"
-              :class="[
-                'block whitespace-nowrap rounded-control px-space-md py-space-sm text-body-md transition-colors',
-                tab.level === level
-                  ? 'bg-violet text-on-violet shadow-active'
-                  : 'text-ink-secondary hover:bg-violet-wash hover:text-ink',
-              ]"
-              >{{ tab.label }}</RouterLink
-            >
-          </li>
-        </ul>
-      </nav>
+      <ExplorerTabs :tabs="tabs" :active="level" />
 
       <nav :aria-label="t('explorer.breadcrumbs')">
         <ol class="flex flex-wrap items-center gap-x-space-xs text-body-sm text-ink-secondary">

@@ -239,7 +239,9 @@ describe('ExplorerPage', () => {
       'Product Ads',
       'Suchbegriffe',
       'Negatives',
+      'Suchbegriff-Analyse',
     ]);
+    expect(tabs[7]!.attributes('href')).toBe('/ads/explorer/search-term-analysis');
     expect(tabs[1]!.attributes('aria-current')).toBe('page');
     expect(tabs[3]!.attributes('href')).toBe('/ads/explorer/targets');
     expect(router.currentRoute.value.path).toBe('/ads/explorer/campaigns');
