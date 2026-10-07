@@ -1259,7 +1259,10 @@ describe('Konto-Prüfung und vollständige Dateien (Dominik, 2026-10-07)', () =>
     );
 
     const unsupported = [...DE_SP_ROWS, sp({ Entität: 'Portfolio', 'Kampagnen-ID': C1 })];
-    expect(await completeRun(germanFile({ spRows: unsupported }))).toMatchObject({ removed: 0 });
+    // SP wurde nicht ganz gelesen: der SP-Baum bleibt; das Portfolio-Blatt ist vollständig, das alte Portfolio geht.
+    expect(await completeRun(germanFile({ spRows: unsupported }))).toMatchObject({ removed: 1 });
+    expect(await removedCount(amazonAdsAdGroups)).toBe(0);
+    expect(await removedCount(amazonAdsPortfolios)).toBe(1);
     expect(logs).toContainEqual(
       expect.objectContaining({ msg: 'bulk_import.removal_skipped', reason: 'partially_read' }),
     );

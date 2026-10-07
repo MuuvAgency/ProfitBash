@@ -1152,6 +1152,22 @@ Teilaufgaben (Reihenfolge):
     (`packages/db/src/file-imports.ts`) prüft vor dem Schreiben. Liegt eine Kampagnen-ID der Datei schon in einem anderen Profil der
     Organisation, wird die Datei abgelehnt (Meldung nennt das Profil). Hat das Profil Kampagnen, aber keine der Datei passt, wird
     importiert, mit Zähler `unmatchedCampaigns` und Log `bulk_import.no_matching_campaigns` (1.11f zeigt den Hinweis).
+  - **Drei weitere echte Dateien** (Dominik, 2026-10-07, nur Kopfzeilen, Werte-Listen und Zähler ausgewertet, nicht im Repo):
+    - Die Konsole schreibt **leere SB- und SD-Blätter immer mit** (nur Kopfzeile), auch ohne Kampagnen dieser Ad-Typen. Deshalb
+      entfernt der Import je Ad-Typ und Ebene nur, wenn die Datei mindestens eine Zeile davon enthält.
+    - Neue Blätter „Marken-Asset-Data (Schreiben)“/„Brand Assets Data (Read-only)“, „Budgetregeln“/„Budget Rules“ und
+      versteckt „Sheet10“; neue Spalte „Anzeigenschaltung außerhalb von Amazon“/„Off-Amazon ad serving“. Werden übergangen.
+    - **Englische Datei bestätigt:** Blätter „Portfolios“, „Sponsored Products Campaigns“, „Sponsored Brands Campaigns“, „SB Multi Ad
+      Group Campaigns“, „Sponsored Display Campaigns“, „SP Search Term Report“; Werte `enabled`/`paused`, `Auto`/`Manual`, `Exact`,
+      `Phrase`, `Negative Exact`, `Negative Phrase`, `Fixed bid`, `Dynamic bids - down only`, `Placement Top`/`Placement Rest Of
+      Search`/`Placement Product Page`/`Placement Amazon Business`, Budget Policy `No Cap`. Deutsch zusätzlich bestätigt:
+      `Angehalten`.
+    - Dieselbe Datei auf Deutsch und Englisch nacheinander importiert: der zweite Import ändert nichts (0 neu, 0 geändert).
+    - **Achtung für 1.11f:** Eine dritte Datei desselben Tages enthielt nur 63 statt 112 Targets (die 49 pausierten fehlten,
+      vermutlich die Download-Option ohne Elemente ohne Impressionen). Mit Häkchen „vollständig“ würden sie als entfernt markiert. Die
+      Oberfläche muss beim Häkchen sagen, dass es nur für Downloads mit allen Optionen gilt (pausierte und archivierte Elemente, Elemente
+      ohne Impressionen); ein Fehlgriff heilt erst mit der nächsten vollständigen Datei.
+    - Weiter ungeprüft (keine Daten im Konto): `Archiviert`/`archived`, SB- und SD-Zeilen.
   - **Echte Datei gegengeprüft** (lokal, 2026-10-07, Dominiks SP-Datei, nicht im Repo): alle 131 Entities (1 Portfolio, 10 Kampagnen,
     10 Ad Groups, 85 Targets, 15 Negatives, 10 Product Ads) wie die unabhängige Auswertung, Werte in API-Schreibweise, Platzierungen
     an den Kampagnen, Gebote ohne Gleitkomma-Reste, keine ungültigen Zeilen oder unbekannten Werte, zweiter Import ohne Änderung,
