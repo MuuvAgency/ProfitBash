@@ -1018,9 +1018,9 @@ describe('Bulk-Import über den Job', () => {
       );
 
     await upload();
-    expect((await importOnce()).status).toBe('success');
+    expect((await importOnce())?.status).toBe('success');
     await upload();
-    expect((await importOnce()).status).toBe('success');
+    expect((await importOnce())?.status).toBe('success');
 
     const imports = await db
       .select({ status: fileImports.status, counters: fileImports.counters })
