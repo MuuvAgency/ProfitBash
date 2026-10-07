@@ -3,6 +3,7 @@ import { REPORT_AD_PRODUCT_SELECTION } from '@profitbash/amazon-ads';
 import {
   canSeeProfile,
   createFileProfile,
+  lastBulkImportAtSql,
   metricsImportedThroughSql,
   recordAuditEvent,
   schema,
@@ -102,15 +103,22 @@ const profileColumns = {
   syncedAt: amazonAdsProfiles.syncedAt,
   // „Daten bis“: Minimum über die Ad-Typen, die der Sync für das Profil anfordert (SB und SD nur mit Kampagnen).
   metricsImportedThrough: metricsImportedThroughSql(REPORT_AD_PRODUCT_SELECTION),
+  // Stand der Entities aus Dateien (1.11f); bei Profilen mit Connection leer.
+  lastBulkImportAt: lastBulkImportAtSql(),
 };
 
 type ProfileRow = Pick<
   typeof amazonAdsProfiles.$inferSelect,
-  Exclude<keyof typeof profileColumns, 'metricsImportedThrough'>
-> & { metricsImportedThrough: string | null };
+  Exclude<keyof typeof profileColumns, 'metricsImportedThrough' | 'lastBulkImportAt'>
+> & { metricsImportedThrough: string | null; lastBulkImportAt: Date | null };
 
 function toProfile(row: ProfileRow): Profile {
-  return { ...row, removedAt: toIso(row.removedAt), syncedAt: toIso(row.syncedAt) };
+  return {
+    ...row,
+    removedAt: toIso(row.removedAt),
+    syncedAt: toIso(row.syncedAt),
+    lastBulkImportAt: toIso(row.lastBulkImportAt),
+  };
 }
 
 const listConnectionsRoute = createRoute({

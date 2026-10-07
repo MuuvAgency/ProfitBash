@@ -8,6 +8,8 @@ export interface ProfileGridContext {
   clientsReady: boolean;
   patch: (profile: Profile, patch: ProfilePatch) => void;
   createClient: (profile: Profile) => void;
+  /** Dialog „Dateien“ öffnen (nur Profile ohne Connection, 1.11f). */
+  openFiles: (profile: Profile) => void;
 }
 
 export type ProfileCellParams = ICellRendererParams<Profile, unknown, ProfileGridContext>;

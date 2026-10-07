@@ -631,6 +631,13 @@
               "null"
             ],
             "format": "date"
+          },
+          "lastBulkImportAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         },
         "required": [
@@ -648,7 +655,8 @@
           "isHidden",
           "removedAt",
           "syncedAt",
-          "metricsImportedThrough"
+          "metricsImportedThrough",
+          "lastBulkImportAt"
         ]
       },
       "FileProfileCreate": {

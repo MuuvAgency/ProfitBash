@@ -18,6 +18,7 @@ const {
   auditEvents,
   clients,
   connections,
+  fileImports,
   organizations,
 } = schema;
 
@@ -317,6 +318,7 @@ describe('GET /api/connections/:id/profiles', () => {
       removedAt: null,
       syncedAt: null,
       metricsImportedThrough: null,
+      lastBulkImportAt: null,
     });
     expect(profiles.find((p) => p.id === ids.removed)?.removedAt).toMatch(/Z$/);
     // „Daten bis“ (1.8): Tag im Format YYYY-MM-DD, kein Zeitstempel; aus den Ad-Typen des Syncs.
@@ -592,6 +594,7 @@ describe('Profile ohne Connection (1.11a)', () => {
       removedAt: null,
       syncedAt: null,
       metricsImportedThrough: null,
+      lastBulkImportAt: null,
     });
 
     const [event] = await ctx.testDb.db
@@ -630,6 +633,42 @@ describe('Profile ohne Connection (1.11a)', () => {
       clientId: ids.client,
       isHidden: true,
     });
+  });
+
+  it('GET /api/profiles/file liefert den Upload-Zeitpunkt der letzten importierten Bulk-Datei (1.11f)', async () => {
+    const res = await request(ctx, '/api/profiles', {
+      method: 'POST',
+      json: { ...fileProfileInput, accountName: 'Mit Importen' },
+      cookie: admin,
+    });
+    const created = await readJson<Profile>(res);
+    const lastBulkImportAt = async () =>
+      (
+        await readJson<{ profiles: Profile[] }>(
+          await request(ctx, '/api/profiles/file', { cookie: admin }),
+        )
+      ).profiles.find((p) => p.id === created.id)?.lastBulkImportAt;
+    expect(await lastBulkImportAt()).toBeNull();
+
+    const row = (kind: 'bulk' | 'daily_report', status: string, createdAt: string) => ({
+      organizationId: orgId,
+      profileId: created.id,
+      kind,
+      fileName: 'bulk.xlsx',
+      byteSize: 1,
+      sha256: 'x',
+      status,
+      createdAt: new Date(createdAt),
+    });
+    await ctx.testDb.db.insert(fileImports).values([
+      row('bulk', 'imported', '2026-10-01T08:00:00Z'),
+      row('bulk', 'imported', '2026-10-03T08:00:00Z'),
+      // Zählt nicht: fehlgeschlagen, wartend, anderer Art.
+      row('bulk', 'failed', '2026-10-05T08:00:00Z'),
+      row('bulk', 'pending', '2026-10-06T08:00:00Z'),
+      row('daily_report', 'imported', '2026-10-06T08:00:00Z'),
+    ]);
+    expect(await lastBulkImportAt()).toBe('2026-10-03T08:00:00.000Z');
   });
 
   it('lehnt ungültige Eingaben mit 400 ab', async () => {

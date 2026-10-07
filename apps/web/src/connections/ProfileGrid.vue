@@ -16,14 +16,23 @@ import { countryName } from './country';
 import AccountCell from './cells/AccountCell.vue';
 import ClientCell from './cells/ClientCell.vue';
 import CountryCell from './cells/CountryCell.vue';
+import FilesCell from './cells/FilesCell.vue';
 import HiddenCell from './cells/HiddenCell.vue';
+import LastImportCell from './cells/LastImportCell.vue';
 import TimezoneCell from './cells/TimezoneCell.vue';
 import type { ProfileGridContext } from './cells/types';
 
-const props = defineProps<{ profiles: Profile[]; clients: Client[]; clientsReady: boolean }>();
+const props = defineProps<{
+  profiles: Profile[];
+  clients: Client[];
+  clientsReady: boolean;
+  /** Profile ohne Connection: Spalten „Letzter Import“ und „Dateien“ (1.11f). */
+  fileImports?: boolean;
+}>();
 const emit = defineEmits<{
   patch: [profile: Profile, patch: ProfilePatch];
   createClient: [profile: Profile];
+  openFiles: [profile: Profile];
 }>();
 
 const { t, te } = useI18n();
@@ -34,6 +43,7 @@ const context = reactive<ProfileGridContext>({
   clientsReady: false,
   patch: (profile, patch) => emit('patch', profile, patch),
   createClient: (profile) => emit('createClient', profile),
+  openFiles: (profile) => emit('openFiles', profile),
 });
 watchEffect(() => {
   context.clients = props.clients;
@@ -68,7 +78,7 @@ const WRAPPED = { cellClass: AUTO_HEIGHT_CELL, autoHeight: true } as const;
 
 const columnDefs = computed<ColDef<Profile>[]>(() => {
   const { locale } = session.preferences;
-  return [
+  const columns: ColDef<Profile>[] = [
     {
       colId: 'country',
       headerName: t('connections.profiles.column.country'),
@@ -120,6 +130,18 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       cellClass: DATA_CELL,
       width: 115,
     },
+    ...(props.fileImports
+      ? [
+          {
+            colId: 'lastImport',
+            headerName: t('connections.fileProfiles.column.lastImport'),
+            field: 'lastBulkImportAt',
+            cellRenderer: markRaw(LastImportCell),
+            ...WRAPPED,
+            minWidth: 170,
+          } satisfies ColDef<Profile>,
+        ]
+      : []),
     {
       colId: 'client',
       headerName: t('connections.profiles.column.client'),
@@ -139,6 +161,16 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       width: 110,
     },
   ];
+  if (props.fileImports) {
+    columns.push({
+      colId: 'files',
+      headerName: t('connections.fileProfiles.column.files'),
+      cellRenderer: markRaw(FilesCell),
+      sortable: false,
+      width: 130,
+    });
+  }
+  return columns;
 });
 
 /** Konstant: Ein neues Objekt je Render setzte die Spalten zurück (z. B. geänderte Breiten). */

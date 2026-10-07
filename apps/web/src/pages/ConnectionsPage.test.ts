@@ -1,4 +1,4 @@
-import type { Profile } from '@profitbash/shared';
+import type { FileImport, Profile } from '@profitbash/shared';
 import { DOMWrapper, flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { browserNavigation } from '../connections/browser-navigation';
@@ -852,4 +852,242 @@ describe('Profile ohne Connection (Datei-Import, 1.11a)', () => {
       ),
     );
   });
+});
+
+describe('Datei-Importe (1.11f)', () => {
+  const kranich = profileFixture({
+    accountName: 'Kranich Datei',
+    connectionId: null,
+    amazonProfileId: null,
+    amazonAccountId: null,
+    syncedAt: null,
+    metricsImportedThrough: null,
+    lastBulkImportAt: '2026-10-06T09:00:00.000Z',
+  });
+  const importsPath = `/api/profiles/${kranich.id}/file-imports`;
+
+  function fileImport(overrides: Partial<FileImport> = {}): FileImport {
+    return {
+      id: '0b7d3c1e-2a4f-4b6c-8d9e-0f1a2b3c4d5e',
+      profileId: kranich.id,
+      kind: 'bulk',
+      fileName: 'bulk-de.xlsx',
+      byteSize: 80_000,
+      sha256: 'abc',
+      complete: false,
+      status: 'imported',
+      error: null,
+      counters: { campaigns: 10, targets: 85, created: 3 },
+      uploadedBy: null,
+      createdAt: '2026-10-06T09:00:00.000Z',
+      startedAt: '2026-10-06T09:00:01.000Z',
+      finishedAt: '2026-10-06T09:00:02.000Z',
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    // Nur das Datum festhalten: AG Grid und vue-query brauchen echte Timer.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-07T10:00:00.000Z'));
+  });
+
+  async function openFiles(wrapper: Wrapper) {
+    const fileRow = await waitForRow(wrapper, 'Kranich Datei');
+    await fileRow.get('button[aria-label="Dateien von Kranich Datei (DE)"]').trigger('click');
+    await flushPromises();
+    await vi.waitFor(() => expect(dialog()?.text()).toContain('Dateien: Kranich Datei (DE)'));
+    return dialog()!;
+  }
+
+  function chooseFile(form: DOMWrapper<Element>, file: File) {
+    const input = form.get<HTMLInputElement>('input#file-import-file');
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true });
+    return input.trigger('change');
+  }
+
+  it('zeigt den letzten Import und Hinweise auf veraltete Daten je Profil', async () => {
+    const stale = profileFixture({
+      ...kranich,
+      id: '7c3f2a10-1b2c-4d5e-8f90-aaaaaaaaaaaa',
+      accountName: 'Reiher Datei',
+      lastBulkImportAt: '2026-09-20T09:00:00.000Z',
+      metricsImportedThrough: '2026-09-30',
+    });
+    const never = profileFixture({
+      ...kranich,
+      id: '7c3f2a10-1b2c-4d5e-8f90-bbbbbbbbbbbb',
+      accountName: 'Storch Datei',
+      lastBulkImportAt: null,
+    });
+    stubFetch(routes({ 'GET /api/profiles/file': json({ profiles: [kranich, stale, never] }) }));
+    const { wrapper } = await mountPage();
+    const fresh = await waitForRow(wrapper, 'Kranich Datei');
+    expect(fresh.text()).toContain('06.10.2026');
+    expect(fresh.text()).not.toContain('älter als');
+    const old = await waitForRow(wrapper, 'Reiher Datei');
+    expect(old.text()).toContain('Bulk-Datei älter als 7 Tage');
+    expect(old.text()).toContain('Kennzahlen älter als 3 Tage');
+    expect((await waitForRow(wrapper, 'Storch Datei')).text()).toContain('Noch keine Bulk-Datei');
+  });
+
+  it('zeigt den Verlauf mit Ergebnis, Fehlern und dem Hinweis auf eine fremde Datei', async () => {
+    stubFetch(
+      routes({
+        'GET /api/profiles/file': json({ profiles: [kranich] }),
+        [`GET ${importsPath}`]: json({
+          fileImports: [
+            fileImport({
+              id: '0b7d3c1e-2a4f-4b6c-8d9e-000000000003',
+              fileName: 'fremd.xlsx',
+              counters: { campaigns: 4, unmatchedCampaigns: 4 },
+            }),
+            fileImport({
+              id: '0b7d3c1e-2a4f-4b6c-8d9e-000000000002',
+              fileName: 'kaputt.xlsx',
+              status: 'failed',
+              error: 'Die Datei ist keine Bulk-Datei.',
+              counters: {},
+            }),
+            fileImport({ complete: true, counters: { campaigns: 10, removed: 2 } }),
+          ],
+        }),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    const files = await openFiles(wrapper);
+    await vi.waitFor(() => expect(files.text()).toContain('kaputt.xlsx'));
+    const text = files.text();
+    expect(text).toContain('Fehlgeschlagen');
+    expect(text).toContain('Die Datei ist keine Bulk-Datei.');
+    expect(text).toContain('Importiert');
+    expect(text).toContain('10 Kampagnen');
+    expect(text).toContain('2 entfernt');
+    expect(text).toContain('vollständig');
+    expect(text).toContain('Keine Kampagne der Datei passt zu den bisherigen Kampagnen');
+  });
+
+  it('erklärt einen leeren Verlauf und einen Ladefehler', async () => {
+    stubFetch(
+      routes({
+        'GET /api/profiles/file': json({ profiles: [kranich] }),
+        [`GET ${importsPath}`]: json({ fileImports: [] }),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    const files = await openFiles(wrapper);
+    await vi.waitFor(() => expect(files.text()).toContain('Noch keine Dateien hochgeladen.'));
+    cleanupMounted();
+
+    stubFetch(
+      routes({
+        'GET /api/profiles/file': json({ profiles: [kranich] }),
+        [`GET ${importsPath}`]: serverError(),
+      }),
+    );
+    const second = await mountPage();
+    const failed = await openFiles(second.wrapper);
+    await vi.waitFor(() =>
+      expect(failed.text()).toContain('Der Verlauf konnte nicht geladen werden.'),
+    );
+  });
+
+  it('lädt eine Bulk-Datei hoch, „vollständig“ nur mit Häkchen und Hinweis', async () => {
+    let imports: FileImport[] = [];
+    const { requests } = stubFetch(
+      routes({
+        'GET /api/profiles/file': json({ profiles: [kranich] }),
+        [`GET ${importsPath}`]: () => json({ fileImports: imports }),
+        [`POST ${importsPath}`]: () => {
+          imports = [fileImport({ status: 'pending', complete: true, counters: {} })];
+          return json(imports[0], 201);
+        },
+      }),
+    );
+    const { wrapper } = await mountPage();
+    const files = await openFiles(wrapper);
+    for (const label of ['Art', 'Datei', 'Datei ist vollständig']) {
+      expect(files.text()).toContain(label);
+    }
+    // Der Hinweis nennt die Download-Optionen (Befund 1.11d).
+    expect(files.text()).toContain('pausierte und archivierte Elemente');
+    expect(files.text()).toContain('ohne Impressionen');
+
+    await files.get('form').trigger('submit');
+    expect(files.text()).toContain('Bitte eine Datei auswählen.');
+
+    await chooseFile(files, new File(['xlsx'], 'bulk-de.xlsx'));
+    await files.get('input#file-import-complete').setValue(true);
+    await files.get('form').trigger('submit');
+    await flushPromises();
+
+    const posts = requests.filter((r) => r.method === 'POST');
+    expect(posts.map((r) => [r.path, r.body])).toEqual([
+      [importsPath, { kind: 'bulk', complete: 'true', file: { name: 'bulk-de.xlsx', size: 4 } }],
+    ]);
+    await vi.waitFor(() => expect(files.text()).toContain('Wartet'));
+    expect(files.text()).toContain('Datei angenommen');
+  });
+
+  it('zeigt Fehler beim Hochladen im Dialog', async () => {
+    stubFetch(
+      routes({
+        'GET /api/profiles/file': json({ profiles: [kranich] }),
+        [`GET ${importsPath}`]: json({ fileImports: [] }),
+        [`POST ${importsPath}`]: json({ error: { code: 'FILE_TOO_LARGE', message: 'x' } }, 413),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    const files = await openFiles(wrapper);
+    await chooseFile(files, new File(['x'], 'gross.xlsx'));
+    await files.get('form').trigger('submit');
+    await flushPromises();
+    await vi.waitFor(() => expect(files.text()).toContain('Die Datei ist größer als 50 MB.'));
+  });
+});
+
+describe('Datei-Importe: Abschluss (1.11f)', () => {
+  it('lädt „Letzter Import“ neu, sobald eine laufende Datei fertig ist', async () => {
+    const profile = profileFixture({
+      accountName: 'Kranich Datei',
+      connectionId: null,
+      amazonProfileId: null,
+      lastBulkImportAt: null,
+    });
+    const base = {
+      id: '0b7d3c1e-2a4f-4b6c-8d9e-0f1a2b3c4d5e',
+      profileId: profile.id,
+      kind: 'bulk',
+      fileName: 'bulk.xlsx',
+      byteSize: 1,
+      sha256: 'x',
+      complete: false,
+      error: null,
+      counters: {},
+      uploadedBy: null,
+      createdAt: '2026-10-07T09:00:00.000Z',
+      startedAt: null,
+      finishedAt: null,
+    } satisfies Omit<FileImport, 'status'>;
+    let status: FileImport['status'] = 'running';
+    const { requests } = stubFetch(
+      routes({
+        'GET /api/profiles/file': json({ profiles: [profile] }),
+        [`GET /api/profiles/${profile.id}/file-imports`]: () => {
+          const response = json({ fileImports: [{ ...base, status }] });
+          status = 'imported';
+          return response;
+        },
+      }),
+    );
+    const { wrapper } = await mountPage();
+    const fileRow = await waitForRow(wrapper, 'Kranich Datei');
+    await fileRow.get('button[aria-label="Dateien von Kranich Datei (DE)"]').trigger('click');
+    await vi.waitFor(() => expect(dialog()?.text()).toContain('Läuft'));
+    const profileLoads = () => requests.filter((r) => r.path === '/api/profiles/file').length;
+    const before = profileLoads();
+    // Der Verlauf fragt alle 3 s nach, solange eine Datei läuft.
+    await vi.waitFor(() => expect(dialog()?.text()).toContain('Importiert'), { timeout: 5_000 });
+    await vi.waitFor(() => expect(profileLoads()).toBeGreaterThan(before));
+  }, 10_000);
 });

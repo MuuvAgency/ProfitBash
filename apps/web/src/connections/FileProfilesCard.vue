@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { Client, Profile, ProfilePatch } from '@profitbash/shared';
 import Button from 'primevue/button';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
+import FileImportsDialog from './FileImportsDialog.vue';
 import ProfileGrid from './ProfileGrid.vue';
 import { useFileProfilesQuery } from './queries';
 
@@ -22,6 +23,12 @@ const allProfiles = computed(() => profilesQuery.data.value ?? []);
 // Heute setzt nichts `removedAt` an Datei-Profilen; der Filter gilt wie bei den Connections für später (1.11d).
 const profiles = computed(() =>
   props.showRemoved ? allProfiles.value : allProfiles.value.filter((p) => !p.removedAt),
+);
+
+/** Profil des Dialogs „Dateien“; aus der Liste gelesen, damit „Letzter Import“ nach dem Neuladen stimmt. */
+const filesProfileId = ref<string | null>(null);
+const filesProfile = computed(
+  () => allProfiles.value.find((p) => p.id === filesProfileId.value) ?? null,
 );
 </script>
 
@@ -82,9 +89,12 @@ const profiles = computed(() =>
         :profiles="profiles"
         :clients="clients"
         :clients-ready="clientsReady"
+        file-imports
+        @open-files="(profile) => (filesProfileId = profile.id)"
         @patch="(profile, patch) => emit('patch', profile, patch)"
         @create-client="(profile) => emit('createClient', profile)"
       />
     </div>
+    <FileImportsDialog :profile="filesProfile" @close="filesProfileId = null" />
   </section>
 </template>
