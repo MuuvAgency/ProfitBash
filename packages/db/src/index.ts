@@ -19,3 +19,4 @@ export { runMigrations } from './migrate';
 export * from './fx-rates';
 export * from './saved-views';
 export * from './members';
+export * from './search-terms';

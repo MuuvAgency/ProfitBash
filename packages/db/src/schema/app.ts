@@ -64,6 +64,14 @@ export const clients = pgTable(
     organizationId: organizationId(),
     name: text('name').notNull(),
     slug: text('slug').notNull(),
+    /**
+     * Geschützte Begriffe (Marke, Hero-Begriffe), normalisiert (`normalizeProtectedTerms`): Suchbegriffe, die einen
+     * davon enthalten, bekommen nie einen Negativ-Vorschlag (`phase-2b.md` 2b.2).
+     */
+    protectedTerms: text('protected_terms')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

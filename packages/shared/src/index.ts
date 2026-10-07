@@ -16,3 +16,4 @@ export * from './members';
 export * from './roles';
 export * from './saved-views';
 export * from './slug';
+export * from './search-terms';
