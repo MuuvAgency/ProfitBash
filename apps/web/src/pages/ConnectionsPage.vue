@@ -12,6 +12,7 @@ import PageHeader from '../components/common/PageHeader.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { browserNavigation } from '../connections/browser-navigation';
 import ConnectionCard from '../connections/ConnectionCard.vue';
+import ClientsCard from '../connections/ClientsCard.vue';
 import CreateClientDialog from '../connections/CreateClientDialog.vue';
 import CreateFileProfileDialog from '../connections/CreateFileProfileDialog.vue';
 import FileProfilesCard from '../connections/FileProfilesCard.vue';
@@ -247,6 +248,8 @@ function onClientCreated(client: Client) {
       @patch="patchProfile"
       @create-client="(profile) => (clientDialogProfile = profile)"
     />
+
+    <ClientsCard v-if="clients.length > 0" :clients="clients" />
 
     <CreateClientDialog
       :account-name="clientDialogProfile?.accountName ?? null"
