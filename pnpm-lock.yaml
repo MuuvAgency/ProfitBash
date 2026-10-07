@@ -348,6 +348,9 @@ importers:
       '@profitbash/ecb':
         specifier: workspace:*
         version: link:../../packages/ecb
+      '@profitbash/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@profitbash/shared':
         specifier: workspace:*
         version: link:../../packages/shared
