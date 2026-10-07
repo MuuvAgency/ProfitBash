@@ -97,6 +97,7 @@ export function clientFixture(overrides: Partial<Client> = {}): Client {
     id: '5d1e8a2b-3c4f-4a6b-9d7e-1f2a3b4c5d6e',
     name: 'Nordwind',
     slug: 'nordwind',
+    protectedTerms: [],
     createdAt: '2026-09-21T09:00:00.000Z',
     updatedAt: '2026-09-21T09:00:00.000Z',
     ...overrides,

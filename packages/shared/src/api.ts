@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { FEATURE_KEYS, type FeatureKey } from './features';
 import { ORG_ROLES, PLATFORM_ROLES } from './roles';
+import { protectedTermsSchema } from './search-terms';
 import { isSlug, SLUG_MAX_LENGTH } from './slug';
 
 /**
@@ -321,6 +322,8 @@ export const clientSchema = z
     id: z.uuid(),
     name: z.string(),
     slug: z.string(),
+    /** Geschützte Begriffe (Marke, Hero-Begriffe): nie ein Negativ-Vorschlag in der Suchbegriff-Analyse. */
+    protectedTerms: z.array(z.string()),
     createdAt: timestamp,
     updatedAt: timestamp,
   })
@@ -340,10 +343,17 @@ export const clientCreateSchema = z
   .meta({ id: 'ClientCreate' });
 
 export const clientPatchSchema = z
-  .strictObject({ name: clientName.optional(), slug: clientSlug.optional() })
-  .refine((patch) => patch.name !== undefined || patch.slug !== undefined, {
-    message: 'mindestens name oder slug angeben',
+  .strictObject({
+    name: clientName.optional(),
+    slug: clientSlug.optional(),
+    /** Ersetzt die Liste; gespeichert wird normalisiert (`normalizeProtectedTerms`). */
+    protectedTerms: protectedTermsSchema.optional(),
   })
+  .refine(
+    (patch) =>
+      patch.name !== undefined || patch.slug !== undefined || patch.protectedTerms !== undefined,
+    { message: 'mindestens name, slug oder protectedTerms angeben' },
+  )
   .meta({ id: 'ClientPatch' });
 
 // ---------------------------------------------------------------------------

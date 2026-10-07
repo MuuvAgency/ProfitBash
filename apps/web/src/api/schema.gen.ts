@@ -899,7 +899,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Client umbenennen (nur Admin) */
+        /** Client umbenennen oder geschützte Begriffe setzen (nur Admin) */
         patch: {
             parameters: {
                 query?: never;
@@ -1861,6 +1861,254 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/ads/search-terms/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Datei-Zeiträume mit Suchbegriffen je sichtbarem Profil */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SearchTermPeriodsRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SearchTermPeriodsResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/search-terms/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suchbegriffe eines Profils für einen Datei-Zeitraum: Einstufung, N-Gramme, Summen (höchstens 10 000 Zeilen) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SearchTermAnalysisRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SearchTermAnalysisResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/search-terms/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Regeln der Einstufung (Organisation) oder die Startwerte */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Regeln. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SearchTermRulesResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /** Regeln der Einstufung speichern (Recht „write“) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SearchTermRules"];
+                };
+            };
+            responses: {
+                /** @description Gespeicherte Regeln. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SearchTermRulesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/members": {
         parameters: {
             query?: never;
@@ -2524,6 +2772,7 @@ export interface components {
             id: string;
             name: string;
             slug: string;
+            protectedTerms: string[];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2536,6 +2785,7 @@ export interface components {
         ClientPatch: {
             name?: string;
             slug?: string;
+            protectedTerms?: string[];
         };
         JobRunList: {
             jobRuns: components["schemas"]["JobRun"][];
@@ -2944,6 +3194,145 @@ export interface components {
             name?: string;
             shared?: boolean;
             state?: components["schemas"]["SavedViewState"];
+        };
+        SearchTermPeriodsResponse: {
+            periods: components["schemas"]["SearchTermPeriod"][];
+        };
+        SearchTermPeriod: {
+            /** Format: uuid */
+            profileId: string;
+            accountName: string;
+            countryCode: string;
+            currencyCode: string;
+            /** Format: uuid */
+            clientId: string | null;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            adProducts: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            rows: number;
+            importedAt: string;
+        };
+        SearchTermPeriodsRequest: Record<string, never>;
+        SearchTermAnalysisResponse: {
+            meta: {
+                /** Format: uuid */
+                profileId: string;
+                accountName: string;
+                countryCode: string;
+                currency: string;
+                /** Format: uuid */
+                clientId: string | null;
+                /** Format: date */
+                periodStart: string;
+                /** Format: date */
+                periodEnd: string;
+                importedAt: string | null;
+                rules: components["schemas"]["SearchTermRules"];
+                rulesAreDefault: boolean;
+                protectedTerms: string[];
+                totalRows: number;
+                truncated: boolean;
+                maxRows: number;
+                totalNgrams: number;
+                ngramsTruncated: boolean;
+                maxNgrams: number;
+            };
+            total: {
+                impressions: string;
+                clicks: string;
+                cost: string;
+                sales: string;
+                purchases: string;
+                units: string;
+                ctr: string | null;
+                cpc: string | null;
+                cvr: string | null;
+                acos: string | null;
+                roas: string | null;
+            };
+            counts: {
+                harvest: number;
+                negate: number;
+                watch: number;
+            };
+            rows: components["schemas"]["SearchTermRow"][];
+            ngrams: components["schemas"]["SearchTermNgram"][];
+        };
+        SearchTermRules: {
+            harvestMinPurchases: number;
+            harvestMaxAcos: string;
+            negateMinClicks: number;
+            negateMinCost: string;
+        };
+        SearchTermRow: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            adProduct: "SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY";
+            searchTerm: string;
+            amazonCampaignId: string;
+            amazonAdGroupId: string;
+            amazonTargetId: string;
+            /** Format: uuid */
+            campaignId: string | null;
+            campaignName: string | null;
+            /** Format: uuid */
+            adGroupId: string | null;
+            adGroupName: string | null;
+            /** Format: uuid */
+            targetId: string | null;
+            keywordText: string | null;
+            matchType: string | null;
+            expression?: unknown;
+            impressions: string;
+            clicks: string;
+            cost: string;
+            sales: string;
+            purchases: string;
+            units: string;
+            ctr: string | null;
+            cpc: string | null;
+            cvr: string | null;
+            acos: string | null;
+            roas: string | null;
+            /** @enum {string} */
+            classification: "harvest" | "negate" | "watch";
+            /** @enum {string|null} */
+            reason: "protected" | "alreadyTargeted" | "acosAboveTarget" | "tooFewData" | null;
+            protected: boolean;
+            alreadyTargeted: boolean;
+        };
+        SearchTermNgram: {
+            size: number;
+            gram: string;
+            searchTerms: number;
+            impressions: string;
+            clicks: string;
+            cost: string;
+            sales: string;
+            purchases: string;
+            units: string;
+            ctr: string | null;
+            cpc: string | null;
+            cvr: string | null;
+            acos: string | null;
+            roas: string | null;
+        };
+        SearchTermAnalysisRequest: {
+            /** Format: uuid */
+            profileId: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+        };
+        SearchTermRulesResponse: {
+            rules: components["schemas"]["SearchTermRules"];
+            isDefault: boolean;
+            updatedAt: string | null;
         };
         MemberList: {
             members: components["schemas"]["Member"][];

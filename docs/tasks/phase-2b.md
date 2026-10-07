@@ -125,9 +125,71 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     geprüft (Spalten wie SP ohne Portfolioname).
 
 ### 2b.2 Suchbegriff-Analyse (`packages/engine`, `apps/api`, `apps/web`)
-- [ ] N-Gramme (1–3) über Suchbegriffe mit Spend, Sales, ACoS, CVR je Datei-Zeitraum (F1); Grid im Explorer (`sp-explorer`).
-- [ ] Einstufung je Suchbegriff mit editierbaren Regeln je Organisation: Harvest, Negieren, Beobachten; geschützte Begriffe je
+Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
+
+**Entschieden (Dominik, 2026-10-07):**
+- **Startwerte der Regeln „vorsichtig“:** Harvest ab 3 Käufen und ACoS ≤ 25 %; Negieren ab 25 Klicks ohne Kauf und
+  mindestens 20 Spend (Betrag in der Währung des Profils); sonst Beobachten. Im UI änderbar.
+- **Geschützte Begriffe** je Client werden bei **Clients & Connections** gepflegt (nicht im Explorer).
+- **Zeitraum im Upload-Dialog:** ja, als Ausweich-Feld (zwei Datumsfelder nur, wenn der Dateiname keinen Zeitraum trägt);
+  eigene kleine Aufgabe **2b.2c** nach 2b.2b.
+- **Impression-Share-Bericht und SQP-CSVs:** liegen heute nicht vor. Der dritte Punkt unten bleibt offen, 2b.3 wartet auf
+  echte SQP-Dateien (Spaltennamen werden nicht geraten).
+
+#### 2b.2a Engine, Leseschicht, API
+- [x] N-Gramme (1–3) über Suchbegriffe mit Spend, Sales, ACoS, CVR je Datei-Zeitraum (F1), Engine ohne I/O.
+- [x] Einstufung je Suchbegriff mit editierbaren Regeln je Organisation: Harvest, Negieren, Beobachten; geschützte Begriffe je
       Client. Nur Anzeige, Aktionen in Phase 3 (Warenkorb).
+- [x] Lesen über den Access-Layer je Profil und Datei-Zeitraum; Endpunkte mit Tests (fremde Organisation, ausgeblendetes
+      Profil, Entitlement).
+- [x] Umsetzung (Stand für 2b.2b und später):
+  - **Engine** (`packages/engine/src/search-terms.ts`): `tokenizeSearchTerm` (klein, an Leerraum getrennt, Satzzeichen bleiben
+    im Wort), `buildNgrams(rows, sizes = [1, 2, 3])` (je Zeile zählt ein Baustein einmal; `searchTerms` = verschiedene
+    Suchbegriffe; sortiert nach Spend, Länge, Text), `isProtectedSearchTerm` (geschützter Begriff als ganze, zusammenhängende
+    Wortfolge, keine Wortteile), `classifySearchTerm(row, rules, protectedTerms)` → `harvest` | `negate` | `watch` mit Grund
+    bei `watch` (`protected`, `alreadyTargeted`, `acosAboveTarget`, `tooFewData`). Grenzwerte zählen mit; ACoS-Vergleich ohne
+    Division (Spend ≤ Ziel × Umsatz); Käufe ohne Umsatz sind kein Harvest. Geschützte Begriffe werden nie negiert, dürfen aber
+    geerntet werden. Negieren gilt auch für schon exakt gebuchte Begriffe.
+  - **Einstufung je Zeile** (Suchbegriff je Target, wie das Blatt): Negativ-Vorschläge gehören in die Quellkampagne. Folge:
+    Ein Begriff, dessen Käufe sich auf mehrere Targets verteilen, erreicht die Harvest-Grenze später. Bei Bedarf in 2b.2b
+    bzw. Phase 3 zusätzlich je Suchbegriff über das Profil einstufen (offen).
+  - **Schema** (Migration `0022_search_term_rules`): `search_term_rules` (eine Zeile je Organisation: `harvest_min_purchases`,
+    `harvest_max_acos` als Bruch, `negate_min_clicks`, `negate_min_cost`, `updated_by`, `updated_at`) und
+    `clients.protected_terms` (`text[]`, normalisiert gespeichert). Ohne Zeile gelten die Startwerte
+    `DEFAULT_SEARCH_TERM_RULES` (`packages/shared/src/search-terms.ts`), die Antwort kennzeichnet das (`isDefault`,
+    `rulesAreDefault`). **Offen:** Overrides je Client/Marktplatz (DoD): Die Spend-Grenze ist ein Betrag in der Währung des
+    Profils, dieselbe Zahl bedeutet in SEK oder PLN viel weniger als in EUR.
+  - **Leseschicht** (`packages/db/src/search-terms.ts`, nur über `visibleProfilesScope()`): `listSearchTermPeriods` (je
+    sichtbarem Profil die Datei-Zeiträume mit Ad-Typen, Zeilenzahl, letztem Import; neuester zuerst),
+    `querySearchTermPeriod` (Profil + **ein** Zeitraum, optional Ad-Typen; `null`, wenn das Profil nicht sichtbar ist; Zeilen
+    nach Spend, über (Profil, Amazon-ID) mit Kampagne, Ad Group und Target verbunden, fehlende Entities `null`;
+    `alreadyTargeted` = im Profil gibt es ein exaktes Keyword bzw. ein exaktes Produkt-Target (ASIN) mit dem Begriff, ohne
+    archivierte und entfernte, pausierte zählen; geschützte Begriffe des Clients). `getSearchTermRules`/`saveSearchTermRules`
+    (Mitglieder lesen, Audit `search_term_rules.update` mit `before`/`after`).
+  - **API** (`routes/search-terms.ts`, Tag „Suchbegriffe“, Feature `sp-explorer`): `POST /api/ads/search-terms/periods`,
+    `POST /api/ads/search-terms/analysis` (`profileId`, `periodStart`, `periodEnd`, `adProducts?` → `meta` mit Regeln,
+    geschützten Begriffen, Währung, `total`, `counts` je Einstufung, `rows`, `ngrams`; nicht sichtbares Profil `404
+    PROFILE_NOT_FOUND`), `GET`/`PUT /api/ads/search-terms/rules` (Schreiben mit Recht `write`, also Admins und Editoren).
+    Einstufung, Zähler, Summe und N-Gramme rechnen über **alle** Zeilen des Zeitraums; die Antwort kürzt auf
+    `MAX_SEARCH_TERM_ROWS` (10 000) Zeilen und `MAX_SEARCH_TERM_NGRAMS` (5 000) Bausteine mit dem höchsten Spend
+    (`truncated`, `ngramsTruncated`). Beträge in der Währung des Profils, keine Umrechnung (ein Profil je Anfrage).
+  - **Geschützte Begriffe:** `PATCH /api/clients/{id}` nimmt `protectedTerms` (höchstens 200, je 80 Zeichen; gespeichert
+    klein, Leerraum zusammengefasst, ohne Doppelte, sortiert), `Client.protectedTerms` in allen Antworten, Audit
+    `client.update` mit den Listen. Profile ohne Client haben keine geschützten Begriffe.
+  - **Nicht enthalten:** Oberfläche (2b.2b), Zeitraum-Feld im Upload (2b.2c), Hinweis „schon negiert“ (vorhandene Negatives
+    werden nicht gegen die Vorschläge geprüft), Obergrenze beim Lesen sehr großer Zeiträume (alle Zeilen eines Zeitraums
+    werden geladen; echte Dateien haben einige hundert Zeilen).
+
+#### 2b.2b Oberfläche
+- [ ] Reiter bzw. Ansicht im Explorer (`sp-explorer`): Auswahl Profil und Datei-Zeitraum (kein freier Zeitraum, Hinweis im
+      UI), Grid der Suchbegriffe mit Einstufung und Grund, Grid der N-Gramme, Summen; Regeln ändern (Dialog, Recht `write`);
+      geschützte Begriffe je Client bei Clients & Connections. Skeleton, Empty- und Error-Zustand, Browser-Pane.
+
+#### 2b.2c Zeitraum im Upload-Dialog (Ausweich-Feld)
+- [ ] Trägt der Dateiname keinen Zeitraum, erscheinen zwei Datumsfelder (von/bis); der Import nutzt sie für die
+      Suchbegriffe. Sonst gilt weiter der Dateiname.
+
+#### Später (nur mit Datei)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt
       (eigene Datei-Art, optional).
 

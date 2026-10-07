@@ -450,6 +450,7 @@ describe('Clients', () => {
       id: ids.client,
       name: 'Nordwind',
       slug: 'nordwind',
+      protectedTerms: [],
       createdAt: expect.stringMatching(/Z$/),
       updatedAt: expect.stringMatching(/Z$/),
     });

@@ -737,6 +737,12 @@
           "slug": {
             "type": "string"
           },
+          "protectedTerms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -750,6 +756,7 @@
           "id",
           "name",
           "slug",
+          "protectedTerms",
           "createdAt",
           "updatedAt"
         ]
@@ -783,6 +790,15 @@
           "slug": {
             "type": "string",
             "maxLength": 64
+          },
+          "protectedTerms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "maxItems": 200
           }
         },
         "additionalProperties": false
@@ -2853,6 +2869,630 @@
           }
         }
       },
+      "SearchTermPeriodsResponse": {
+        "type": "object",
+        "properties": {
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchTermPeriod"
+            }
+          }
+        },
+        "required": [
+          "periods"
+        ]
+      },
+      "SearchTermPeriod": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SPONSORED_PRODUCTS",
+                "SPONSORED_BRANDS",
+                "SPONSORED_DISPLAY"
+              ]
+            }
+          },
+          "rows": {
+            "type": "integer"
+          },
+          "importedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "profileId",
+          "accountName",
+          "countryCode",
+          "currencyCode",
+          "clientId",
+          "periodStart",
+          "periodEnd",
+          "adProducts",
+          "rows",
+          "importedAt"
+        ]
+      },
+      "SearchTermPeriodsRequest": {
+        "type": "object",
+        "properties": {}
+      },
+      "SearchTermAnalysisResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "accountName": {
+                "type": "string"
+              },
+              "countryCode": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "clientId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "periodStart": {
+                "type": "string",
+                "format": "date"
+              },
+              "periodEnd": {
+                "type": "string",
+                "format": "date"
+              },
+              "importedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rules": {
+                "$ref": "#/components/schemas/SearchTermRules"
+              },
+              "rulesAreDefault": {
+                "type": "boolean"
+              },
+              "protectedTerms": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "totalRows": {
+                "type": "integer"
+              },
+              "truncated": {
+                "type": "boolean"
+              },
+              "maxRows": {
+                "type": "integer"
+              },
+              "totalNgrams": {
+                "type": "integer"
+              },
+              "ngramsTruncated": {
+                "type": "boolean"
+              },
+              "maxNgrams": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "profileId",
+              "accountName",
+              "countryCode",
+              "currency",
+              "clientId",
+              "periodStart",
+              "periodEnd",
+              "importedAt",
+              "rules",
+              "rulesAreDefault",
+              "protectedTerms",
+              "totalRows",
+              "truncated",
+              "maxRows",
+              "totalNgrams",
+              "ngramsTruncated",
+              "maxNgrams"
+            ]
+          },
+          "total": {
+            "type": "object",
+            "properties": {
+              "impressions": {
+                "type": "string"
+              },
+              "clicks": {
+                "type": "string"
+              },
+              "cost": {
+                "type": "string"
+              },
+              "sales": {
+                "type": "string"
+              },
+              "purchases": {
+                "type": "string"
+              },
+              "units": {
+                "type": "string"
+              },
+              "ctr": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cpc": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cvr": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "acos": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "roas": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "impressions",
+              "clicks",
+              "cost",
+              "sales",
+              "purchases",
+              "units",
+              "ctr",
+              "cpc",
+              "cvr",
+              "acos",
+              "roas"
+            ]
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "harvest": {
+                "type": "integer"
+              },
+              "negate": {
+                "type": "integer"
+              },
+              "watch": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "harvest",
+              "negate",
+              "watch"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchTermRow"
+            }
+          },
+          "ngrams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchTermNgram"
+            }
+          }
+        },
+        "required": [
+          "meta",
+          "total",
+          "counts",
+          "rows",
+          "ngrams"
+        ]
+      },
+      "SearchTermRules": {
+        "type": "object",
+        "properties": {
+          "harvestMinPurchases": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "harvestMaxAcos": {
+            "type": "string",
+            "pattern": "^\\d{1,2}(\\.\\d{1,4})?$"
+          },
+          "negateMinClicks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "negateMinCost": {
+            "type": "string",
+            "pattern": "^\\d{1,9}(\\.\\d{1,2})?$"
+          }
+        },
+        "required": [
+          "harvestMinPurchases",
+          "harvestMaxAcos",
+          "negateMinClicks",
+          "negateMinCost"
+        ],
+        "additionalProperties": false
+      },
+      "SearchTermRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adProduct": {
+            "type": "string",
+            "enum": [
+              "SPONSORED_PRODUCTS",
+              "SPONSORED_BRANDS",
+              "SPONSORED_DISPLAY"
+            ]
+          },
+          "searchTerm": {
+            "type": "string"
+          },
+          "amazonCampaignId": {
+            "type": "string"
+          },
+          "amazonAdGroupId": {
+            "type": "string"
+          },
+          "amazonTargetId": {
+            "type": "string"
+          },
+          "campaignId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "campaignName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adGroupId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "adGroupName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "keywordText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matchType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expression": {},
+          "impressions": {
+            "type": "string"
+          },
+          "clicks": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string"
+          },
+          "sales": {
+            "type": "string"
+          },
+          "purchases": {
+            "type": "string"
+          },
+          "units": {
+            "type": "string"
+          },
+          "ctr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cpc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roas": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "harvest",
+              "negate",
+              "watch"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "protected",
+              "alreadyTargeted",
+              "acosAboveTarget",
+              "tooFewData",
+              null
+            ]
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "alreadyTargeted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "adProduct",
+          "searchTerm",
+          "amazonCampaignId",
+          "amazonAdGroupId",
+          "amazonTargetId",
+          "campaignId",
+          "campaignName",
+          "adGroupId",
+          "adGroupName",
+          "targetId",
+          "keywordText",
+          "matchType",
+          "impressions",
+          "clicks",
+          "cost",
+          "sales",
+          "purchases",
+          "units",
+          "ctr",
+          "cpc",
+          "cvr",
+          "acos",
+          "roas",
+          "classification",
+          "reason",
+          "protected",
+          "alreadyTargeted"
+        ]
+      },
+      "SearchTermNgram": {
+        "type": "object",
+        "properties": {
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "gram": {
+            "type": "string"
+          },
+          "searchTerms": {
+            "type": "integer"
+          },
+          "impressions": {
+            "type": "string"
+          },
+          "clicks": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string"
+          },
+          "sales": {
+            "type": "string"
+          },
+          "purchases": {
+            "type": "string"
+          },
+          "units": {
+            "type": "string"
+          },
+          "ctr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cpc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roas": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "size",
+          "gram",
+          "searchTerms",
+          "impressions",
+          "clicks",
+          "cost",
+          "sales",
+          "purchases",
+          "units",
+          "ctr",
+          "cpc",
+          "cvr",
+          "acos",
+          "roas"
+        ]
+      },
+      "SearchTermAnalysisRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "adProducts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SPONSORED_PRODUCTS",
+                "SPONSORED_BRANDS",
+                "SPONSORED_DISPLAY"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          }
+        },
+        "required": [
+          "profileId",
+          "periodStart",
+          "periodEnd"
+        ]
+      },
+      "SearchTermRulesResponse": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "$ref": "#/components/schemas/SearchTermRules"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "rules",
+          "isDefault",
+          "updatedAt"
+        ]
+      },
       "MemberList": {
         "type": "object",
         "properties": {
@@ -3882,7 +4522,7 @@
         "tags": [
           "Clients"
         ],
-        "summary": "Client umbenennen (nur Admin)",
+        "summary": "Client umbenennen oder geschützte Begriffe setzen (nur Admin)",
         "parameters": [
           {
             "schema": {
@@ -4887,6 +5527,234 @@
           },
           "404": {
             "description": "Ansicht nicht gefunden (oder persönliche Ansicht eines anderen).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/periods": {
+      "post": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Datei-Zeiträume mit Suchbegriffen je sichtbarem Profil",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchTermPeriodsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTermPeriodsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/analysis": {
+      "post": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Suchbegriffe eines Profils für einen Datei-Zeitraum: Einstufung, N-Gramme, Summen (höchstens 10 000 Zeilen)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchTermAnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTermAnalysisResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/rules": {
+      "get": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Regeln der Einstufung (Organisation) oder die Startwerte",
+        "responses": {
+          "200": {
+            "description": "Regeln.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTermRulesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Regeln der Einstufung speichern (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchTermRules"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeicherte Regeln.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTermRulesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
             "content": {
               "application/json": {
                 "schema": {

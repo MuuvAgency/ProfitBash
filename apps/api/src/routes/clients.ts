@@ -7,6 +7,7 @@ import {
   clientSchema,
   errorResponseSchema,
   idParamSchema,
+  normalizeProtectedTerms,
   slugify,
   type Client,
 } from '@profitbash/shared';
@@ -36,6 +37,7 @@ const clientColumns = {
   id: clients.id,
   name: clients.name,
   slug: clients.slug,
+  protectedTerms: clients.protectedTerms,
   createdAt: clients.createdAt,
   updatedAt: clients.updatedAt,
 };
@@ -44,6 +46,7 @@ function toClient(row: {
   id: string;
   name: string;
   slug: string;
+  protectedTerms: string[];
   createdAt: Date;
   updatedAt: Date;
 }): Client {
@@ -82,7 +85,7 @@ const patchClientRoute = createRoute({
   method: 'patch',
   path: '/clients/{id}',
   tags: ['Clients'],
-  summary: 'Client umbenennen (nur Admin)',
+  summary: 'Client umbenennen oder geschützte Begriffe setzen (nur Admin)',
   request: { params: idParamSchema, body: { required: true, content: json(clientPatchSchema) } },
   responses: {
     200: { description: 'Geänderter Client.', content: json(clientSchema) },
@@ -143,6 +146,10 @@ export function registerClientRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
     const organizationId = orgOf(auth);
     const { id } = c.req.valid('param');
     const patch = c.req.valid('json');
+    const protectedTerms =
+      patch.protectedTerms === undefined
+        ? undefined
+        : normalizeProtectedTerms(patch.protectedTerms);
 
     try {
       const updated = await db.transaction(async (tx) => {
@@ -157,6 +164,7 @@ export function registerClientRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
           .set({
             ...(patch.name !== undefined && { name: patch.name }),
             ...(patch.slug !== undefined && { slug: patch.slug }),
+            ...(protectedTerms !== undefined && { protectedTerms }),
           })
           .where(eq(clients.id, id))
           .returning(clientColumns);
@@ -168,8 +176,16 @@ export function registerClientRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
           target: {
             type: 'client',
             id,
-            before: { name: before.name, slug: before.slug },
-            after: { name: after.name, slug: after.slug },
+            before: {
+              name: before.name,
+              slug: before.slug,
+              ...(protectedTerms !== undefined && { protectedTerms: before.protectedTerms }),
+            },
+            after: {
+              name: after.name,
+              slug: after.slug,
+              ...(protectedTerms !== undefined && { protectedTerms: after.protectedTerms }),
+            },
           },
         });
         return after;

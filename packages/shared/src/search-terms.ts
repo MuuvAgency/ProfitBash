@@ -75,6 +75,10 @@ export function normalizeProtectedTerms(terms: readonly string[]): string[] {
 // Anfragen und Antworten (`/api/ads/search-terms/*`)
 // ---------------------------------------------------------------------------
 
+/** Höchstzahl Zeilen bzw. N-Gramme je Antwort (jeweils die mit dem höchsten Spend); Summen gelten für alle. */
+export const MAX_SEARCH_TERM_ROWS = 10_000;
+export const MAX_SEARCH_TERM_NGRAMS = 5_000;
+
 export const searchTermPeriodsRequestSchema = z.object({}).meta({ id: 'SearchTermPeriodsRequest' });
 
 export const searchTermPeriodSchema = z
