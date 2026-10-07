@@ -44,7 +44,10 @@ function createRecordingJobQueue(): RecordingJobQueue {
     failNext: false,
     enqueueProfilesSync: (job, options) =>
       record(queue.profilesSync, job, options?.tx !== undefined),
-    enqueueFileImport: (job, options) => record(queue.fileImports, job, options?.tx !== undefined),
+    enqueueFileImport: async (job, options) => {
+      await record(queue.fileImports, job, options?.tx !== undefined);
+      return true;
+    },
   };
   return queue;
 }

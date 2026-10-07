@@ -92,6 +92,7 @@ describe('startWorker', () => {
     expect([...rows]).toEqual([
       { name: 'amazon-requests-poll-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'entities-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
+      { name: 'file-import-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'fx-rates-sync', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'job-runs-cleanup', cron: '30 3 * * *', timezone: 'Europe/Berlin' },
       { name: 'profiles-sync-all', cron: '0 5 * * *', timezone: 'Europe/Berlin' },
@@ -366,6 +367,37 @@ describe('startWorker', () => {
       .from(jobRuns)
       .where(and(eq(jobRuns.job, 'file-import'), eq(jobRuns.scope, profileId)));
     expect(run).toMatchObject({ organizationId, status: 'failed', counters: { files: 1 } });
+
+    // Ohne eingeplanten Job (verloren nach Absturz oder Deploy) holt der Auslöser alle 10 Min. die Datei.
+    const orphan = await createFileImport(testDb.db, {
+      userId: admin!.id,
+      orgId: organizationId,
+      profileId,
+      kind: 'daily_report',
+      fileName: 'verwaist.csv',
+      content: new TextEncoder().encode('x'),
+      enqueue: async () => {},
+    });
+    const boss = new PgBoss({ connectionString: testDb.url, supervise: false, schedule: false });
+    await boss.start();
+    try {
+      await boss.send('file-import-all', {});
+    } finally {
+      await boss.stop();
+    }
+    const swept = await waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(schema.fileImports)
+        .where(eq(schema.fileImports.id, orphan.id));
+      return row && ['imported', 'failed'].includes(row.status) ? row : undefined;
+    });
+    expect(swept.status).toBe('failed');
+    const [dispatch] = await testDb.db
+      .select()
+      .from(jobRuns)
+      .where(and(eq(jobRuns.job, 'file-import'), isNull(jobRuns.scope)));
+    expect(dispatch).toMatchObject({ status: 'success', counters: { profiles: 1, queued: 1 } });
   });
 });
 

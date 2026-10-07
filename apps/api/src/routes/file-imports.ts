@@ -90,9 +90,15 @@ function toApiError(error: unknown): unknown {
   return error;
 }
 
-/** Nur der Dateiname, ohne Pfad (Browser unter Windows schicken ihn teils mit). */
+/** Nur der Dateiname, ohne Pfad (Browser unter Windows schicken ihn teils mit) und ohne Steuerzeichen. */
 function baseName(name: string): string {
-  const base = name.split(/[\\/]/).pop()?.trim() ?? '';
+  // Steuer- und Formatzeichen (z. B. Richtungswechsel, die einen Namen anders aussehen lassen) entfernen.
+  const base =
+    name
+      .replace(/[\p{Cc}\p{Cf}]/gu, '')
+      .split(/[\\/]/)
+      .pop()
+      ?.trim() ?? '';
   return (base || 'datei').slice(0, 255);
 }
 

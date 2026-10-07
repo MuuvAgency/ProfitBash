@@ -1,5 +1,5 @@
 import type { AmazonAdsClient } from '@profitbash/amazon-ads';
-import { latestFxRateDate, type Db } from '@profitbash/db';
+import { latestFxRateDate, listProfilesWithOpenFileImports, type Db } from '@profitbash/db';
 import type { EcbRate, FetchEcbRatesOptions } from '@profitbash/ecb';
 import type { Logger } from '@profitbash/shared';
 import { PgBoss, type Job } from 'pg-boss';
@@ -25,6 +25,7 @@ import {
   CLEANUP_QUEUE,
   createJobQueue,
   FILE_IMPORT_QUEUE,
+  FILE_IMPORT_SWEEP_QUEUE,
   createQueues,
   DISPATCH_QUEUES,
   FX_RATES_MAX_RETRIES,
@@ -147,8 +148,9 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
     logger,
     importers: FILE_IMPORTERS,
     now: () => new Date(),
-    enqueueFollowUp: (job: { organizationId: string; profileId: string }) =>
-      jobs.enqueueFileImport(job),
+    enqueueFollowUp: async (job: { organizationId: string; profileId: string }) => {
+      await jobs.enqueueFileImport(job);
+    },
   };
   await boss.work<unknown>(FILE_IMPORT_QUEUE, workOptions, async (batch: Job<unknown>[]) => {
     for (const job of batch) {
@@ -161,6 +163,18 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
       }
       await importProfileFiles(runJob, fileImportDeps, parsed.data);
     }
+  });
+
+  // Plattformweiter Lauf wie die Auslöser der Connection-Jobs (`organization_id` leer, nicht im Sync-Status).
+  await boss.work(FILE_IMPORT_SWEEP_QUEUE, workOptions, async () => {
+    await runJob(FILE_IMPORT_QUEUE, { organizationId: null, scope: null }, async () => {
+      const profiles = await listProfilesWithOpenFileImports(db, { now: new Date() });
+      let queued = 0;
+      for (const profile of profiles) {
+        if (await jobs.enqueueFileImport(profile)) queued += 1;
+      }
+      return { counters: { profiles: profiles.length, queued } };
+    });
   });
 
   await boss.work(CLEANUP_QUEUE, workOptions, async () => {

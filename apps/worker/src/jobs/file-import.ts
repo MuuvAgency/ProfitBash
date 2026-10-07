@@ -1,4 +1,10 @@
-import { claimNextFileImport, errorLogFields, finishFileImport, type Db } from '@profitbash/db';
+import {
+  claimNextFileImport,
+  errorLogFields,
+  finishFileImport,
+  hasClaimableFileImport,
+  type Db,
+} from '@profitbash/db';
 import type { FileImportKind, Logger } from '@profitbash/shared';
 import { SheetReadError } from '@profitbash/sheets';
 import { z } from 'zod';
@@ -64,7 +70,9 @@ export async function importProfileFiles(
   runJob: RunJob,
   deps: FileImportJobDeps,
   job: FileImportJobData,
-): Promise<JobRunResult> {
+): Promise<JobRunResult | null> {
+  // Nichts abzuholen (doppelt eingeplant, Datei läuft schon): kein Lauf, sonst rückte „Letzter Sync“ vor.
+  if (!(await hasClaimableFileImport(deps.db, { ...job, now: deps.now() }))) return null;
   return runJob(
     'file-import',
     { organizationId: job.organizationId, scope: job.profileId },
@@ -78,14 +86,20 @@ export async function importProfileFiles(
 
       for (;;) {
         if (deps.now().getTime() - started >= FILE_IMPORT_TIME_BUDGET_MS) {
-          await deps.enqueueFollowUp(job);
+          if (await hasClaimableFileImport(deps.db, { ...job, now: deps.now() })) {
+            await deps.enqueueFollowUp(job);
+          }
           break;
         }
-        const claimed = await claimNextFileImport(deps.db, {
+        const claim = await claimNextFileImport(deps.db, {
           ...job,
           jobRunId: runId,
           now: deps.now(),
         });
+        // Unterwegs aufgegebene Dateien (Versuche erschöpft, Inhalt fehlt) zählen als gescheitert.
+        counters.files! += claim.abandoned;
+        counters.filesFailed! += claim.abandoned;
+        const claimed = claim.file;
         if (!claimed) break;
         counters.files! += 1;
 
@@ -125,12 +139,19 @@ export async function importProfileFiles(
             };
           }
         }
-        await finishFileImport(deps.db, {
+        const finished = await finishFileImport(deps.db, {
           organizationId: job.organizationId,
           id: claimed.id,
+          jobRunId: runId,
           ...result,
           now: deps.now(),
         });
+        if (!finished) {
+          // Ein neuerer Lauf hat die Datei übernommen (dieser hing länger als erlaubt); sein Ergebnis gilt.
+          deps.logger({ level: 'warn', msg: 'file_import.superseded', fileImportId: claimed.id });
+          counters.files! -= 1;
+          continue;
+        }
         counters[result.status === 'imported' ? 'imported' : 'filesFailed']! += 1;
         add(result.counters);
       }
