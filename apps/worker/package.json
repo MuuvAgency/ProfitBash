@@ -15,6 +15,7 @@
     "@profitbash/amazon-ads": "workspace:*",
     "@profitbash/db": "workspace:*",
     "@profitbash/ecb": "workspace:*",
+    "@profitbash/engine": "workspace:*",
     "@profitbash/shared": "workspace:*",
     "@profitbash/sheets": "workspace:*",
     "drizzle-orm": "^0.45.3",
