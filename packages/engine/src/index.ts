@@ -28,3 +28,19 @@ export {
   type SelectAttributionInput,
 } from './attribution';
 export { convertAmount, type DailyRates } from './fx';
+export {
+  buildNgrams,
+  classifySearchTerm,
+  isProtectedSearchTerm,
+  NGRAM_SIZES,
+  SEARCH_TERM_CLASSES,
+  SEARCH_TERM_WATCH_REASONS,
+  tokenizeSearchTerm,
+  type Ngram,
+  type NgramSize,
+  type SearchTermClass,
+  type SearchTermClassification,
+  type SearchTermRules,
+  type SearchTermSums,
+  type SearchTermWatchReason,
+} from './search-terms';
