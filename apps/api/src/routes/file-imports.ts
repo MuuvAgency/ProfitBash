@@ -38,6 +38,8 @@ const uploadSchema = z.object({
   kind: z.enum(FILE_IMPORT_KINDS),
   // Für OpenAPI als Binärfeld beschreiben (der Generator kennt `z.file()` nicht).
   file: z.file().meta({ type: 'string', format: 'binary' }),
+  /** Datei enthält alle Entities (Bulk-Datei aller Kampagnen): der Import markiert Fehlendes als entfernt. */
+  complete: z.enum(['true', 'false']).optional(),
 });
 
 const errors = {
@@ -117,7 +119,7 @@ export function registerFileImportRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     const auth = c.get('auth');
     const organizationId = orgOf(auth);
     const profileId = c.req.valid('param').id;
-    const { kind, file } = c.req.valid('form');
+    const { kind, file, complete } = c.req.valid('form');
     if (file.size > FILE_IMPORT_MAX_BYTES) tooLarge();
     try {
       const created = await createFileImport(db, {
@@ -125,6 +127,7 @@ export function registerFileImportRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
         orgId: organizationId,
         profileId,
         kind,
+        complete: complete === 'true',
         fileName: baseName(file.name),
         content: new Uint8Array(await file.arrayBuffer()),
         enqueue: (tx) => deps.jobs.enqueueFileImport({ organizationId, profileId }, { tx }),

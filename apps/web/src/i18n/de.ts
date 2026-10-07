@@ -317,6 +317,8 @@ export const de = {
       files: 'Datei | Dateien',
       imported: 'Datei importiert | Dateien importiert',
       filesFailed: 'Datei nicht importiert | Dateien nicht importiert',
+      unmatchedCampaigns:
+        'Kampagne passt zu keiner des Profils | Kampagnen passen zu keiner des Profils',
       superseded: 'überholt | überholt',
       rows: 'Zeile | Zeilen',
       portfolios: 'Portfolio | Portfolios',

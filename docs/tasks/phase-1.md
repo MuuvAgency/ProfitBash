@@ -1127,8 +1127,14 @@ Teilaufgaben (Reihenfolge):
   - **Zähler:** `portfolios`, `campaigns`, `adGroups`, `targets`, `negatives`, `productAds` (eindeutige IDs), `created`, `updated`,
     `placeholdersFilled`, `placeholdersCreated`, `invalidRows`; Texte unter `sync.counter.*`, Reihenfolge in `COUNTER_ORDER`. Ein
     zweiter Import derselben Datei ergibt `created: 0, updated: 0` (getestet).
-  - **Kein `removed_at` (Abweichung vom Punkt oben):** Die Konsole exportiert auch Teilmengen („nur bestimmte Kampagnen“, ohne archivierte); ob eine Datei
-    vollständig ist, steht nicht darin. Offen: später nur für Dateien, die nachweislich vollständig sind (z. B. Option beim Upload).
+  - **`removed_at` nur mit Häkchen** (**Entschieden, Dominik 2026-10-07:** nur, wenn der Upload die Datei als vollständig
+    kennzeichnet). Spalte `file_imports.complete` (Migration `0020_file_imports_complete`), Upload-Feld `complete=true`,
+    `FileImporterInput.complete`/`uploadedAt`. `markMissingAsRemoved` (`bulk.ts`) markiert je Ad-Typ, dessen Blatt in der Datei steht,
+    Kampagnen, Ad Groups, Targets, Negatives und Product Ads, die **vor dem Upload** existierten und fehlen (wie `markEntitiesRemoved`
+    beim API-Export); Portfolios nur mit Portfolio-Blatt. Nichts bei ungültigen Zeilen (Log `bulk_import.removal_skipped`) und nichts
+    für Ad-Typen mit nicht abgebildeten Zeilen (unbekannte oder nicht unterstützte Entities wie SB-Anzeigen,
+    `partiallyRead`). Zähler `removed`. Ob die Konsole archivierte Kampagnen mit exportiert, ist offen (sonst würden sie mit Häkchen
+    als entfernt markiert; im Explorer sind beide ausgeblendet).
   - **Ungeprüfte Schreibweisen** (mit einer echten Datei abgleichen, Dominik): deutsch `Archiviert`, `Weitgehend`,
     `Dynamische Gebote – erhöhen und senken`, `Regelbasierte Gebote`, `Täglich`/`Laufzeit` (Budget-Typ), `Monatlich wiederkehrend`/
     `Datumsbereich` (Budget-Linie), Entity `Negatives Keyword auf Kampagnenebene`, `Negatives Produkt-Targeting auf Kampagnenebene`,
@@ -1142,13 +1148,18 @@ Teilaufgaben (Reihenfolge):
     mit Connection lehnt `createFileImport` ab); falls 1.11g Datei-Importe nach dem Zusammenführen zulässt, vorher eine
     Upsert-Option für Teilquellen (`extra` zusammenführen, fehlende Spalten behalten). Reine Marken-Ausdrücke (`brand="…"`)
     zeigt `targetLabel` als Feldliste.
-  - **Offen (Dominik):** Eine Datei eines anderen Kontos landet ohne Warnung im gewählten Profil (geprüft wird nur die
-    Portfolio-Währung; ohne `removed_at` nicht rückgängig zu machen). Vorschlag: vor dem Schreiben die Kampagnen-IDs der Datei in
-    anderen Profilen der Organisation suchen und bei Treffern ablehnen; ggf. auch ablehnen, wenn das Profil schon Kampagnen hat und
-    keine ID der Datei passt.
+  - **Datei eines anderen Kontos** (**Entschieden, Dominik 2026-10-07:** eindeutig → ablehnen, sonst Hinweis): `campaignOwnership`
+    (`packages/db/src/file-imports.ts`) prüft vor dem Schreiben. Liegt eine Kampagnen-ID der Datei schon in einem anderen Profil der
+    Organisation, wird die Datei abgelehnt (Meldung nennt das Profil). Hat das Profil Kampagnen, aber keine der Datei passt, wird
+    importiert, mit Zähler `unmatchedCampaigns` und Log `bulk_import.no_matching_campaigns` (1.11f zeigt den Hinweis).
+  - **Echte Datei gegengeprüft** (lokal, 2026-10-07, Dominiks SP-Datei, nicht im Repo): alle 131 Entities (1 Portfolio, 10 Kampagnen,
+    10 Ad Groups, 85 Targets, 15 Negatives, 10 Product Ads) wie die unabhängige Auswertung, Werte in API-Schreibweise, Platzierungen
+    an den Kampagnen, Gebote ohne Gleitkomma-Reste, keine ungültigen Zeilen oder unbekannten Werte, zweiter Import ohne Änderung,
+    0,1 s.
   - Review (unabhängig): keine kritischen Befunde. Übernommen: Zahlzellen-IDs bis 15 Stellen erlaubt (vorher lehnte eine neu
     gespeicherte Datei jede Zeile ab), Gebotsanpassung ohne Prozentsatz nicht mehr ungültig, Ad Group in SP/SD Pflicht. Als offene
-    Punkte notiert: Überschreiben von API-Feldern nach dem Zusammenführen, Datei eines anderen Kontos, Marken-Ausdrücke im Label.
+    Punkte notiert: Überschreiben von API-Feldern nach dem Zusammenführen, Datei eines anderen Kontos (inzwischen entschieden und
+    umgesetzt, siehe oben), Marken-Ausdrücke im Label.
     Bewusst so: Blattnamen in Logs und Meldungen (feste Amazon-Namen), zwei Typ-Zusicherungen (`as T` beim Ergänzen der Kampagne wie
     sinngemäß in 1.7, `as EntityKind` aus der Werte-Tabelle).
 

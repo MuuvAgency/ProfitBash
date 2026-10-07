@@ -1,0 +1,1 @@
+ALTER TABLE "file_imports" ADD COLUMN "complete" boolean DEFAULT false NOT NULL;

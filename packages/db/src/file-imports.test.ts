@@ -9,10 +9,12 @@ import {
   FileImportError,
   finishFileImport,
   listFileImports,
+  campaignOwnership,
   hasClaimableFileImport,
   listProfilesWithOpenFileImports,
 } from './file-imports';
 import {
+  amazonAdsCampaigns,
   amazonAdsProfiles,
   auditEvents,
   fileImportContents,
@@ -110,6 +112,11 @@ beforeEach(async () => {
 });
 
 describe('createFileImport', () => {
+  it('merkt sich, ob die Datei laut Upload vollständig ist (Standard: nein)', async () => {
+    expect((await upload()).complete).toBe(false);
+    expect((await upload({ complete: true })).complete).toBe(true);
+  });
+
   it('speichert Metadaten, Inhalt und Audit und plant den Job in derselben Transaktion ein', async () => {
     const enqueued: unknown[] = [];
     const created = await upload({
@@ -229,7 +236,15 @@ describe('claimNextFileImport und finishFileImport', () => {
 
     const claimed = await claimAt(now, runId);
     expect(claimed).toEqual({
-      file: { id: first.id, kind: 'daily_report', fileName: 'eins.csv', content, attempts: 1 },
+      file: {
+        id: first.id,
+        kind: 'daily_report',
+        fileName: 'eins.csv',
+        content,
+        attempts: 1,
+        complete: false,
+        uploadedAt: new Date(first.createdAt),
+      },
       abandoned: 0,
     });
     const [row] = await testDb.db.select().from(fileImports).where(eq(fileImports.id, first.id));
@@ -385,5 +400,43 @@ describe('listProfilesWithOpenFileImports', () => {
         now: new Date(now.getTime() + 30 * 60_000),
       }),
     ).toEqual([{ organizationId: ids.org, profileId: ids.profile }]);
+  });
+});
+
+describe('campaignOwnership', () => {
+  it('nennt Profile, denen Kampagnen-IDs schon gehören, und wie viele zum eigenen Profil passen', async () => {
+    const { db } = testDb;
+    const campaign = (profileId: string, amazonCampaignId: string) => ({
+      organizationId: ids.org,
+      profileId,
+      amazonCampaignId,
+      adProduct: 'SPONSORED_PRODUCTS',
+      name: amazonCampaignId,
+      state: 'ENABLED',
+    });
+    await db
+      .insert(amazonAdsCampaigns)
+      .values([campaign(ids.profile, '111'), campaign(ids.hiddenProfile, '222')]);
+    const scope = { organizationId: ids.org, profileId: ids.profile };
+
+    expect(await campaignOwnership(db, { ...scope, amazonCampaignIds: ['111', '333'] })).toEqual({
+      existing: 1,
+      matched: 1,
+      otherProfiles: [],
+    });
+    expect(await campaignOwnership(db, { ...scope, amazonCampaignIds: ['222', '333'] })).toEqual({
+      existing: 1,
+      matched: 0,
+      otherProfiles: [{ id: ids.hiddenProfile, accountName: 'Datei' }],
+    });
+    // Andere Organisationen zählen nie.
+    expect(
+      await campaignOwnership(db, {
+        organizationId: ids.otherOrg,
+        profileId: ids.foreignProfile,
+        amazonCampaignIds: ['111'],
+      }),
+    ).toEqual({ existing: 0, matched: 0, otherProfiles: [] });
+    await db.delete(amazonAdsCampaigns);
   });
 });

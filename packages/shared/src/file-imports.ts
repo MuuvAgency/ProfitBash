@@ -28,6 +28,8 @@ export const fileImportSchema = z
     fileName: z.string(),
     byteSize: z.number().int(),
     sha256: z.string(),
+    /** Laut Upload vollständig: der Import darf Fehlendes als entfernt markieren. */
+    complete: z.boolean(),
     status: z.enum(FILE_IMPORT_STATUSES),
     /** Grund eines Fehlschlags, für die Anzeige (ohne Inhalte der Datei). */
     error: z.string().nullable(),

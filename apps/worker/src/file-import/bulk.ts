@@ -1,5 +1,7 @@
 import {
+  campaignOwnership,
   findAdGroupCampaignIds,
+  markEntitiesRemoved,
   findProfileCurrency,
   upsertAdGroups,
   upsertCampaigns,
@@ -9,11 +11,13 @@ import {
   upsertTargets,
   type AdGroupRecord,
   type CampaignRecord,
+  type DbOrTx,
   type EntityUpsertCounts,
   type EntityWriteScope,
   type NegativeTargetRecord,
   type PortfolioRecord,
   type ProductAdRecord,
+  type RemovableEntity,
   type TargetRecord,
 } from '@profitbash/db';
 import type { Logger } from '@profitbash/shared';
@@ -53,8 +57,10 @@ import {
  *
  * - Kennzahlen der Datei (Summen über den gewählten Zeitraum) werden nicht übernommen, Tageswerte kommen
  *   aus den Tagesberichten (1.11e).
- * - Kein `removed_at`: Die Konsole exportiert auch Teilmengen („nur bestimmte Kampagnen“), eine fehlende
- *   Entity heißt hier nicht, dass es sie nicht mehr gibt.
+ * - `removed_at` nur bei einer laut Upload vollständigen Datei (`markMissingAsRemoved`): Die Konsole
+ *   exportiert auch Teilmengen („nur bestimmte Kampagnen“), sonst hieße eine fehlende Entity nichts.
+ * - Kampagnen eines anderen Profils derselben Organisation → Ablehnung; passt keine Kampagne zum Profil,
+ *   ein Hinweis (`unmatchedCampaigns`).
  * - Ungültige Zeilen werden gezählt (`invalidRows`) und übersprungen; sind alle ungültig, wird die Datei
  *   abgelehnt. Logs und Meldungen nennen nur Blatt, Zeile und Spalte, nie Zellinhalte (Kundendaten).
  */
@@ -95,6 +101,28 @@ export const importBulkFile: FileImporter = async (input) => {
     const records = await collector.finish(async (adGroupIds) =>
       findAdGroupCampaignIds(tx, scope, adGroupIds),
     );
+
+    // Bulk-Datei eines anderen Kontos? (Dominik, 2026-10-07: eindeutig → ablehnen, sonst Hinweis.)
+    const fileCampaignIds = [...new Set(records.campaigns.map((c) => c.amazonCampaignId))];
+    const ownership = await campaignOwnership(tx, { ...scope, amazonCampaignIds: fileCampaignIds });
+    if (ownership.otherProfiles.length > 0) {
+      const names = ownership.otherProfiles.map((p) => `„${p.accountName}“`).join(', ');
+      throw new FileImportRejectedError(
+        `Die Kampagnen dieser Datei gehören schon zu einem anderen Profil (${names}). ` +
+          'Bitte die Datei beim passenden Profil hochladen.',
+      );
+    }
+    const unmatched =
+      ownership.existing > 0 && ownership.matched === 0 && fileCampaignIds.length > 0;
+    if (unmatched) {
+      input.logger({
+        level: 'warn',
+        msg: 'bulk_import.no_matching_campaigns',
+        existing: ownership.existing,
+        inFile: fileCampaignIds.length,
+      });
+    }
+
     const counts: EntityUpsertCounts[] = [
       await upsertPortfolios(tx, scope, records.portfolios),
       await upsertCampaigns(tx, scope, records.campaigns),
@@ -115,9 +143,97 @@ export const importBulkFile: FileImporter = async (input) => {
       placeholdersFilled: sum(counts, 'placeholdersFilled'),
       placeholdersCreated: sum(counts, 'placeholdersCreated'),
       invalidRows: collector.invalidRows,
+      removed: await markMissingAsRemoved(tx, input, scope, sheets, records, collector),
+      ...(unmatched && { unmatchedCampaigns: fileCampaignIds.length }),
     };
   });
 };
+
+/**
+ * Nur bei einer laut Upload vollständigen Datei (Dominik, 2026-10-07): Entities, die vor dem Upload schon
+ * existierten und in der Datei fehlen, gelten als entfernt. Je Ad-Typ nur, wenn sein Blatt in der Datei
+ * steht und ganz gelesen wurde; nichts bei ungültigen Zeilen (eine ungültige Zeile ist eine Entity, die es
+ * gibt). Portfolios nur mit Portfolio-Blatt.
+ */
+async function markMissingAsRemoved(
+  tx: DbOrTx,
+  input: { complete: boolean; uploadedAt: Date; logger: Logger },
+  scope: EntityWriteScope,
+  sheets: ReadonlyArray<{ kind: BulkSheetKind }>,
+  records: BulkRecords,
+  collector: BulkCollector,
+): Promise<number> {
+  if (!input.complete) return 0;
+  if (collector.invalidRows > 0) {
+    input.logger({
+      level: 'warn',
+      msg: 'bulk_import.removal_skipped',
+      reason: 'invalid_rows',
+      invalidRows: collector.invalidRows,
+    });
+    return 0;
+  }
+  const mark = (entity: RemovableEntity, adProduct: string | null, seenAmazonIds: string[]) =>
+    markEntitiesRemoved(tx, {
+      ...scope,
+      entity,
+      adProduct,
+      existedBefore: input.uploadedAt,
+      seenAmazonIds,
+    });
+  let removed = 0;
+  if (sheets.some((sheet) => sheet.kind === 'portfolios')) {
+    removed += await mark(
+      'portfolio',
+      null,
+      records.portfolios.map((r) => r.amazonPortfolioId),
+    );
+  }
+  const adProducts = new Set(
+    sheets.flatMap((sheet) =>
+      sheet.kind === 'portfolios' ? [] : [AD_PRODUCT_OF_SHEET[sheet.kind]],
+    ),
+  );
+  for (const adProduct of adProducts) {
+    if (collector.partiallyRead.has(adProduct)) {
+      input.logger({
+        level: 'info',
+        msg: 'bulk_import.removal_skipped',
+        reason: 'partially_read',
+        adProduct,
+      });
+      continue;
+    }
+    const of = <T extends { adProduct: string }>(rows: T[], id: (row: T) => string) =>
+      rows.filter((row) => row.adProduct === adProduct).map(id);
+    removed += await mark(
+      'campaign',
+      adProduct,
+      of(records.campaigns, (r) => r.amazonCampaignId),
+    );
+    removed += await mark(
+      'adGroup',
+      adProduct,
+      of(records.adGroups, (r) => r.amazonAdGroupId),
+    );
+    removed += await mark(
+      'target',
+      adProduct,
+      of(records.targets, (r) => r.amazonTargetId),
+    );
+    removed += await mark(
+      'negativeTarget',
+      adProduct,
+      of(records.negatives, (r) => r.amazonTargetId),
+    );
+    removed += await mark(
+      'productAd',
+      adProduct,
+      of(records.productAds, (r) => r.amazonAdId),
+    );
+  }
+  return removed;
+}
 
 // ---------------------------------------------------------------------------
 // Blätter lesen
@@ -275,6 +391,11 @@ const BASE = { amazonUpdatedAt: null, extra: {} } as const;
 
 class BulkCollector {
   invalidRows = 0;
+  /**
+   * Ad-Typen mit Zeilen, die der Import nicht abbildet (unbekannte oder nicht unterstützte Entities, z. B.
+   * SB-Anzeigen): Für sie gilt auch eine vollständige Datei nicht als vollständig gelesen (kein `removed_at`).
+   */
+  readonly partiallyRead = new Set<string>();
   private loggedInvalid = 0;
   private readonly seen = new Set<string>();
 
@@ -302,6 +423,7 @@ class BulkCollector {
       const adProduct = AD_PRODUCT_OF_SHEET[row.kind];
       const kind = entityKind(cells.requiredText('entity'));
       if (kind === null) {
+        this.partiallyRead.add(adProduct);
         this.once(`entity\u0000${row.sheet}\u0000${cells.text('entity').toLowerCase()}`, () =>
           this.logger({ level: 'warn', msg: 'bulk_import.unknown_entity', ...position }),
         );
@@ -408,6 +530,7 @@ class BulkCollector {
       }
       case 'portfolio':
       case 'unsupported':
+        this.partiallyRead.add(adProduct);
         this.once(`skipped\u0000${position.sheet}\u0000${kind}`, () =>
           this.logger({
             level: 'info',

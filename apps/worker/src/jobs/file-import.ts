@@ -44,6 +44,10 @@ export interface FileImporterInput {
   fileName: string;
   content: Uint8Array;
   now: Date;
+  /** Laut Upload enthält die Datei alle Entities (siehe `file_imports.complete`). */
+  complete: boolean;
+  /** Zeitpunkt des Uploads. */
+  uploadedAt: Date;
 }
 
 /** Importiert eine Datei und liefert ihre Zähler; wirft `FileImportRejectedError` bei ungeeigneten Dateien. */
@@ -121,6 +125,8 @@ export async function importProfileFiles(
               fileName: claimed.fileName,
               content: claimed.content,
               now: deps.now(),
+              complete: claimed.complete,
+              uploadedAt: claimed.uploadedAt,
             });
             result = { status: 'imported', error: null, counters: fileCounters };
           } catch (error) {
