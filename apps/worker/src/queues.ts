@@ -30,6 +30,8 @@ export const CLEANUP_QUEUE = 'job-runs-cleanup';
  * einer wartet, holt der wartende die neue Datei mit ab.
  */
 export const FILE_IMPORT_QUEUE = 'file-import';
+/** Auslöser alle 10 Min.: plant `file-import` für Profile mit wartenden oder hängenden Dateien ein (nach Absturz, Deploy). */
+export const FILE_IMPORT_SWEEP_QUEUE = 'file-import-all';
 /** EZB-Kurse, plattformweit (2.2). Die EZB veröffentlicht gegen 16:00; der Lauf holt den Vortag. */
 export const FX_RATES_QUEUE = 'fx-rates-sync';
 /** Nach einem Fehlschlag neuer Versuch nach einer Stunde, höchstens so oft (danach am nächsten Morgen). */
@@ -49,6 +51,7 @@ export const SCHEDULES = [
   { queue: 'amazon-requests-poll-all', cron: '*/10 * * * *' },
   { queue: CLEANUP_QUEUE, cron: '30 3 * * *', tz: 'Europe/Berlin' },
   { queue: FX_RATES_QUEUE, cron: '0 6 * * *', tz: 'Europe/Berlin' },
+  { queue: FILE_IMPORT_SWEEP_QUEUE, cron: '*/10 * * * *' },
 ] as const;
 
 /** So lange darf ein Job laufen, bevor pg-boss ihn als abgelaufen führt. */
@@ -67,6 +70,7 @@ const ALL_QUEUES = [
   CLEANUP_QUEUE,
   FX_RATES_QUEUE,
   FILE_IMPORT_QUEUE,
+  FILE_IMPORT_SWEEP_QUEUE,
 ];
 
 /**
@@ -105,7 +109,8 @@ export interface FileImportJob {
 /** Hintergrundjobs, die die API anstößt. */
 export interface JobQueue {
   enqueueProfilesSync(job: ProfilesSyncJob, options?: EnqueueOptions): Promise<void>;
-  enqueueFileImport(job: FileImportJob, options?: EnqueueOptions): Promise<void>;
+  /** Liefert `false`, wenn für das Profil schon ein Job wartet (der holt die Datei mit ab). */
+  enqueueFileImport(job: FileImportJob, options?: EnqueueOptions): Promise<boolean>;
 }
 
 export interface ConnectionJobQueue extends JobQueue {
@@ -133,7 +138,7 @@ export function createJobQueue(boss: PgBoss): ConnectionJobQueue {
   return {
     enqueueConnectionJob,
     async enqueueFileImport(job, options = {}) {
-      await boss.send(
+      const id = await boss.send(
         FILE_IMPORT_QUEUE,
         { organizationId: job.organizationId, profileId: job.profileId },
         {
@@ -141,6 +146,7 @@ export function createJobQueue(boss: PgBoss): ConnectionJobQueue {
           ...(options.tx && { db: fromDrizzle(options.tx, sql) }),
         },
       );
+      return id !== null;
     },
     async enqueueProfilesSync(job, options) {
       await enqueueConnectionJob(

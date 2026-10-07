@@ -9,6 +9,8 @@ import {
   FileImportError,
   finishFileImport,
   listFileImports,
+  hasClaimableFileImport,
+  listProfilesWithOpenFileImports,
 } from './file-imports';
 import {
   amazonAdsProfiles,
@@ -216,6 +218,8 @@ describe('listFileImports', () => {
 
 describe('claimNextFileImport und finishFileImport', () => {
   const scope = () => ({ organizationId: ids.org, profileId: ids.profile });
+  const claimAt = (now: Date, jobRunId: string = crypto.randomUUID()) =>
+    claimNextFileImport(testDb.db, { ...scope(), jobRunId, now });
 
   it('holt die älteste offene Datei mit Inhalt ab und setzt sie auf running', async () => {
     const first = await upload({ fileName: 'eins.csv' });
@@ -223,13 +227,10 @@ describe('claimNextFileImport und finishFileImport', () => {
     const now = new Date('2026-09-29T10:00:00Z');
     const runId = crypto.randomUUID();
 
-    const claimed = await claimNextFileImport(testDb.db, { ...scope(), jobRunId: runId, now });
-    expect(claimed).toMatchObject({
-      id: first.id,
-      kind: 'daily_report',
-      fileName: 'eins.csv',
-      content,
-      attempts: 1,
+    const claimed = await claimAt(now, runId);
+    expect(claimed).toEqual({
+      file: { id: first.id, kind: 'daily_report', fileName: 'eins.csv', content, attempts: 1 },
+      abandoned: 0,
     });
     const [row] = await testDb.db.select().from(fileImports).where(eq(fileImports.id, first.id));
     expect(row).toMatchObject({ status: 'running', startedAt: now, jobRunId: runId });
@@ -238,15 +239,19 @@ describe('claimNextFileImport und finishFileImport', () => {
   it('schließt ab: Status, Zähler, Fehler, Ende, und löscht den Inhalt', async () => {
     const created = await upload();
     const now = new Date('2026-09-29T10:00:00Z');
-    await claimNextFileImport(testDb.db, { ...scope(), jobRunId: crypto.randomUUID(), now });
-    await finishFileImport(testDb.db, {
-      organizationId: ids.org,
-      id: created.id,
-      status: 'failed',
-      error: 'Spalte „Datum“ fehlt.',
-      counters: { rows: 0 },
-      now,
-    });
+    const runId = crypto.randomUUID();
+    await claimAt(now, runId);
+    expect(
+      await finishFileImport(testDb.db, {
+        organizationId: ids.org,
+        id: created.id,
+        jobRunId: runId,
+        status: 'failed',
+        error: 'Spalte „Datum“ fehlt.',
+        counters: { rows: 0 },
+        now,
+      }),
+    ).toBe(true);
     const [row] = await testDb.db.select().from(fileImports).where(eq(fileImports.id, created.id));
     expect(row).toMatchObject({
       status: 'failed',
@@ -257,53 +262,128 @@ describe('claimNextFileImport und finishFileImport', () => {
     expect(await testDb.db.select().from(fileImportContents)).toEqual([]);
   });
 
-  it('liefert nichts, wenn nichts offen ist oder eine Datei gerade läuft', async () => {
-    const now = new Date('2026-09-29T10:00:00Z');
-    expect(
-      await claimNextFileImport(testDb.db, { ...scope(), jobRunId: crypto.randomUUID(), now }),
-    ).toBeNull();
-    await upload();
-    await upload();
-    await claimNextFileImport(testDb.db, { ...scope(), jobRunId: crypto.randomUUID(), now });
-    // Die zweite wartet, bis die erste fertig ist (Reihenfolge der Uploads).
-    expect(
-      await claimNextFileImport(testDb.db, { ...scope(), jobRunId: crypto.randomUUID(), now }),
-    ).toBeNull();
+  it('überschreibt beim Abschließen nie das Ergebnis eines neueren Laufs', async () => {
+    const created = await upload();
+    const start = new Date('2026-09-29T10:00:00Z');
+    const oldRun = crypto.randomUUID();
+    const newRun = crypto.randomUUID();
+    await claimAt(start, oldRun);
+    // Der alte Lauf hängt, nach 30 Min. holt ein neuer die Datei erneut ab und schließt sie ab.
+    const later = new Date(start.getTime() + 31 * 60_000);
+    await claimAt(later, newRun);
+    const finish = (jobRunId: string, status: 'imported' | 'failed') =>
+      finishFileImport(testDb.db, {
+        organizationId: ids.org,
+        id: created.id,
+        jobRunId,
+        status,
+        error: null,
+        counters: {},
+        now: later,
+      });
+    expect(await finish(newRun, 'imported')).toBe(true);
+    expect(await finish(oldRun, 'failed')).toBe(false);
+    const [row] = await testDb.db.select().from(fileImports).where(eq(fileImports.id, created.id));
+    expect(row).toMatchObject({ status: 'imported', jobRunId: newRun });
   });
 
-  it('holt eine hängende Datei nach 30 Minuten erneut ab und gibt nach drei Versuchen auf', async () => {
+  it('liefert nichts, wenn nichts offen ist oder eine Datei gerade läuft', async () => {
+    const now = new Date('2026-09-29T10:00:00Z');
+    expect(await claimAt(now)).toEqual({ file: null, abandoned: 0 });
+    await upload();
+    await upload();
+    await claimAt(now);
+    // Die zweite wartet, bis die erste fertig ist (Reihenfolge der Uploads).
+    expect(await claimAt(now)).toEqual({ file: null, abandoned: 0 });
+  });
+
+  it('holt eine hängende Datei nach 30 Minuten erneut ab und gibt nach drei Versuchen auf (gezählt)', async () => {
     const created = await upload();
+    const next = await upload({ fileName: 'danach.csv' });
     let now = new Date('2026-09-29T10:00:00Z');
-    const claim = () =>
-      claimNextFileImport(testDb.db, { ...scope(), jobRunId: crypto.randomUUID(), now });
-    expect((await claim())?.attempts).toBe(1);
+    expect((await claimAt(now)).file?.attempts).toBe(1);
     now = new Date(now.getTime() + 29 * 60_000);
-    expect(await claim()).toBeNull();
+    expect((await claimAt(now)).file).toBeNull();
     now = new Date(now.getTime() + 2 * 60_000);
-    expect((await claim())?.attempts).toBe(2);
+    expect((await claimAt(now)).file?.attempts).toBe(2);
     now = new Date(now.getTime() + 31 * 60_000);
-    expect((await claim())?.attempts).toBe(3);
+    expect((await claimAt(now)).file?.attempts).toBe(3);
     now = new Date(now.getTime() + 31 * 60_000);
-    expect(await claim()).toBeNull();
+    // Aufgegeben und gezählt; die nächste Datei kommt sofort dran.
+    expect(await claimAt(now)).toMatchObject({ file: { id: next.id }, abandoned: 1 });
     const [row] = await testDb.db.select().from(fileImports).where(eq(fileImports.id, created.id));
     expect(row).toMatchObject({ status: 'failed', finishedAt: now });
     expect(row?.error).toContain('abgebrochen');
-    expect(await testDb.db.select().from(fileImportContents)).toEqual([]);
+  });
+
+  it('übergeht eine Datei ohne Inhalt (gezählt) und holt die nächste ab', async () => {
+    const broken = await upload({ fileName: 'ohne-inhalt.csv' });
+    const next = await upload({ fileName: 'gut.csv' });
+    await testDb.db
+      .delete(fileImportContents)
+      .where(eq(fileImportContents.fileImportId, broken.id));
+    const now = new Date('2026-09-29T10:00:00Z');
+    expect(await claimAt(now)).toMatchObject({ file: { id: next.id }, abandoned: 1 });
+    const [row] = await testDb.db.select().from(fileImports).where(eq(fileImports.id, broken.id));
+    expect(row).toMatchObject({ status: 'failed', error: 'Der Inhalt der Datei fehlt.' });
   });
 
   it('holt keine Dateien anderer Profile oder Organisationen', async () => {
     await upload({ profileId: ids.hiddenProfile });
     const now = new Date('2026-09-29T10:00:00Z');
+    expect((await claimAt(now)).file).toBeNull();
     expect(
-      await claimNextFileImport(testDb.db, { ...scope(), jobRunId: crypto.randomUUID(), now }),
+      (
+        await claimNextFileImport(testDb.db, {
+          organizationId: ids.otherOrg,
+          profileId: ids.hiddenProfile,
+          jobRunId: crypto.randomUUID(),
+          now,
+        })
+      ).file,
     ).toBeNull();
+  });
+});
+
+describe('hasClaimableFileImport', () => {
+  it('ist wahr bei wartenden oder hängenden Dateien, solange keine andere gerade läuft', async () => {
+    const scope = { organizationId: ids.org, profileId: ids.profile };
+    const now = new Date('2026-09-29T10:00:00Z');
+    expect(await hasClaimableFileImport(testDb.db, { ...scope, now })).toBe(false);
+    await upload();
+    await upload();
+    expect(await hasClaimableFileImport(testDb.db, { ...scope, now })).toBe(true);
+    await claimNextFileImport(testDb.db, { ...scope, jobRunId: crypto.randomUUID(), now });
+    expect(await hasClaimableFileImport(testDb.db, { ...scope, now })).toBe(false);
     expect(
-      await claimNextFileImport(testDb.db, {
-        organizationId: ids.otherOrg,
-        profileId: ids.hiddenProfile,
-        jobRunId: crypto.randomUUID(),
-        now,
+      await hasClaimableFileImport(testDb.db, {
+        ...scope,
+        now: new Date(now.getTime() + 30 * 60_000),
       }),
-    ).toBeNull();
+    ).toBe(true);
+  });
+});
+
+describe('listProfilesWithOpenFileImports', () => {
+  it('nennt Profile mit wartenden oder hängenden Dateien, nicht mit laufenden oder fertigen', async () => {
+    const now = new Date('2026-09-29T10:00:00Z');
+    await upload({ profileId: ids.profile });
+    expect(await listProfilesWithOpenFileImports(testDb.db, { now })).toEqual([
+      { organizationId: ids.org, profileId: ids.profile },
+    ]);
+    // Läuft gerade (noch nicht hängend): kein neuer Lauf nötig.
+    await claimNextFileImport(testDb.db, {
+      organizationId: ids.org,
+      profileId: ids.profile,
+      jobRunId: crypto.randomUUID(),
+      now,
+    });
+    expect(await listProfilesWithOpenFileImports(testDb.db, { now })).toEqual([]);
+    // Nach 30 Min. gilt sie als hängend (Absturz, Deploy).
+    expect(
+      await listProfilesWithOpenFileImports(testDb.db, {
+        now: new Date(now.getTime() + 30 * 60_000),
+      }),
+    ).toEqual([{ organizationId: ids.org, profileId: ids.profile }]);
   });
 });

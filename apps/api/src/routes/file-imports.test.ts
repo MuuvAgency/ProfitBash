@@ -129,9 +129,27 @@ describe('POST /api/profiles/:id/file-imports', () => {
     expect(event).toMatchObject({ action: 'file_import.create' });
   });
 
-  it('kürzt Pfadangaben im Dateinamen auf den Namen', async () => {
+  it('kürzt Pfadangaben im Dateinamen auf den Namen und entfernt Steuerzeichen', async () => {
     const res = await upload(ids.profile, form('bulk', 'x', 'C:\\Downloads\\..\\bulk.xlsx'));
     expect((await readJson<FileImport>(res)).fileName).toBe('bulk.xlsx');
+    const tricky = await upload(ids.profile, form('bulk', 'x', 'bulk\u202Excod.exe\u0007.xlsx'));
+    expect((await readJson<FileImport>(tricky)).fileName).toBe('bulkxcod.exe.xlsx');
+  });
+
+  it('nimmt keine Uploads für entfernte Profile an', async () => {
+    await ctx.testDb.db
+      .update(amazonAdsProfiles)
+      .set({ removedAt: new Date() })
+      .where(eq(amazonAdsProfiles.id, ids.profile));
+    try {
+      const res = await upload(ids.profile, form('bulk', 'x'));
+      expect(res.status).toBe(404);
+    } finally {
+      await ctx.testDb.db
+        .update(amazonAdsProfiles)
+        .set({ removedAt: null })
+        .where(eq(amazonAdsProfiles.id, ids.profile));
+    }
   });
 
   it('legt nichts an, wenn das Einplanen scheitert', async () => {
@@ -160,6 +178,15 @@ describe('POST /api/profiles/:id/file-imports', () => {
       (await request(ctx, `/api/profiles/${ids.profile}/file-imports`, { method: 'POST' })).status,
     ).toBe(401);
     expect(await ctx.testDb.db.select().from(fileImports)).toEqual([]);
+  });
+
+  it('bricht zu große Requests schon beim Lesen ab (Limit der Route)', async () => {
+    const res = await upload(
+      ids.profile,
+      form('bulk', new Uint8Array(FILE_IMPORT_MAX_BYTES + 128 * 1024)),
+    );
+    expect(res.status).toBe(413);
+    expect(await errorCode(res)).toBe('FILE_TOO_LARGE');
   });
 
   it('lehnt Dateien über der Grenze mit 413 ab', async () => {

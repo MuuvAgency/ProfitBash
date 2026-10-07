@@ -1056,6 +1056,21 @@ Teilaufgaben (Reihenfolge):
     der letzte erfolgreiche `file-import` (wie `reports-sync` je Connection; ohne Import „noch nie“).
   - **ESLint** ignoriert `.claude/` (Worktrees paralleler Sessions; sonst lief `eslint .` mit deren `node_modules` aus dem
     Speicher).
+  - **Wiederaufnahme:** Auslöser `file-import-all` alle 10 Min. (plattformweiter Lauf wie die anderen Auslöser) plant `file-import`
+    für jedes Profil mit wartenden oder hängenden Dateien ein (`listProfilesWithOpenFileImports`). So läuft ein Import nach Absturz
+    oder Deploy weiter, auch ohne neuen Upload. Ein Lauf ohne abholbare Datei (`hasClaimableFileImport`) schreibt keinen
+    `job_runs`-Eintrag; die Fortsetzung nach dem Zeitbudget nur, wenn noch Dateien warten. `claimNextFileImport` liefert
+    `{ file, abandoned }`: aufgegebene Dateien (3 Versuche, Inhalt fehlt) enden `failed`, zählen als `filesFailed` (Alarm), und die
+    Suche geht mit der nächsten weiter. `finishFileImport` schließt nur ab, solange der eigene Lauf die Datei hält (`job_run_id`,
+    `running`): Ein hängender alter Lauf überschreibt nie das Ergebnis des neueren. Importer müssen deutlich unter 30 Min. bleiben
+    (sonst holt ein zweiter Lauf die Datei parallel ab; die Upserts sind idempotent, das Ergebnis gilt vom neueren).
+  - **„Letzter Sync“** zählt nur `file-import`-Läufe mit `imported > 0`.
+  - **Speicher:** Ein Upload belegt in der API kurzzeitig ein Mehrfaches der Datei (Formular, Kopie, `bytea` als Hex-Text), bei
+    50 MB grob 250–300 MB; für seltene Uploads durch Admins vertretbar, bei Bedarf gleichzeitige Uploads begrenzen.
+  - Review (unabhängig): keine kritischen Befunde; Mandanten, Body-Limit-Ausnahme und Atomarität bestätigt. Übernommen:
+    Wiederaufnahme nach Absturz (vorher blieb eine unterbrochene Datei liegen und hielt spätere Uploads auf), keine leeren Läufe,
+    „Letzter Sync“ nur mit Import, aufgegebene Dateien als Fehlschlag, Weitersuchen bei fehlendem Inhalt, Abschließen nur durch
+    den haltenden Lauf, Test des Routen-Limits, kein Upload auf entfernte Profile, Steuerzeichen aus Dateinamen.
 
 
 #### 1.11d Bulk-Datei → Entities

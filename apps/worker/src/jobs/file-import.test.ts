@@ -77,7 +77,7 @@ function run(importers: FileImporters, overrides: Partial<FileImportJobDeps> = {
     },
     ...overrides,
   };
-  const result: Promise<JobRunResult> = importProfileFiles(runJob, deps, {
+  const result: Promise<JobRunResult | null> = importProfileFiles(runJob, deps, {
     organizationId: ids.org,
     profileId: ids.profile,
   });
@@ -113,7 +113,7 @@ describe('importProfileFiles', () => {
       },
     });
 
-    const outcome = await result;
+    const outcome = (await result)!;
     expect(outcome.status).toBe('success');
     expect(seen).toEqual(['bulk.xlsx:bulk-inhalt', 'bericht.csv:bericht-inhalt']);
     expect(await rows()).toEqual([
@@ -203,11 +203,37 @@ describe('importProfileFiles', () => {
     expect(row?.error).toContain('noch nicht');
   });
 
-  it('endet ohne offene Dateien erfolgreich mit Nullen', async () => {
-    const outcome = await run({}).result;
-    expect(outcome.status).toBe('success');
+  it('schreibt ohne abzuholende Datei keinen Lauf (sonst rückte „Letzter Sync“ ohne Import vor)', async () => {
+    expect(await run({}).result).toBeNull();
+    expect(await testDb.db.select().from(jobRuns)).toEqual([]);
+  });
+
+  it('meldet unterwegs aufgegebene Dateien als gescheitert (Alarm)', async () => {
+    const broken = await upload('daily_report', 'ohne-inhalt.csv');
+    await upload('daily_report', 'gut.csv');
+    await testDb.db
+      .delete(fileImportContents)
+      .where(eq(fileImportContents.fileImportId, broken.id));
+    const outcome = await run({ daily_report: async () => ({ rows: 1 }) }).result;
+    expect(outcome).toMatchObject({ status: 'failed' });
     const [jobRun] = await testDb.db.select().from(jobRuns);
-    expect(jobRun?.counters).toEqual({ files: 0, imported: 0, filesFailed: 0 });
+    expect(jobRun?.counters).toEqual({ files: 2, imported: 1, filesFailed: 1, rows: 1 });
+  });
+
+  it('plant nach dem Zeitbudget nur neu ein, wenn noch Dateien warten', async () => {
+    await upload('daily_report', 'einzige.csv');
+    let clock = new Date('2026-09-29T10:00:00Z').getTime();
+    const { result, followUps } = run(
+      {
+        daily_report: async () => {
+          clock += 6 * 60_000;
+          return { rows: 1 };
+        },
+      },
+      { now: () => new Date(clock) },
+    );
+    await result;
+    expect(followUps).toEqual([]);
   });
 
   it('plant sich nach dem Zeitbudget neu ein, statt weiterzuarbeiten', async () => {

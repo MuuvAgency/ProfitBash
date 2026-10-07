@@ -1400,6 +1400,7 @@ export async function queryDashboardStatus(
       from amazon_ads_profiles p
       left join job_runs j
         on j.organization_id = ${selection.orgId} and j.job = 'file-import' and j.status = 'success'
+          and coalesce((j.counters->>'imported')::int, 0) > 0
           and j.scope = p.id::text
       where p.id in (select id from sel) and p.connection_id is null
       group by p.id

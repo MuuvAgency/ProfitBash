@@ -201,6 +201,17 @@ describe('queryDashboardStatus', () => {
           status: 'success',
           startedAt: new Date('2026-09-11T02:00:00Z'),
           finishedAt: new Date('2026-09-11T02:00:00Z'),
+          counters: { files: 1, imported: 1, filesFailed: 0 },
+        },
+        // Erfolgreich, aber nichts importiert (z. B. von einem neueren Lauf übernommen): zählt nicht.
+        {
+          organizationId: ids.org,
+          job: 'file-import',
+          scope: file!.id,
+          status: 'success',
+          startedAt: new Date('2026-09-11T08:00:00Z'),
+          finishedAt: new Date('2026-09-11T08:00:00Z'),
+          counters: { files: 0, imported: 0, filesFailed: 0 },
         },
         {
           organizationId: ids.org,
