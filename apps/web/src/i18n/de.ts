@@ -225,6 +225,20 @@ export const de = {
       hideFor: '{account} ({country}) ausblenden',
       updateFailed: 'Das Profil konnte nicht gespeichert werden.',
     },
+    clients: {
+      title: 'Clients',
+      description:
+        'Geschützte Begriffe je Client (Marke, Hero-Begriffe): Suchbegriffe, die einen davon enthalten, werden in der Suchbegriff-Analyse nie zum Negieren vorgeschlagen.',
+      noProtectedTerms: 'Keine geschützten Begriffe',
+      editProtectedTerms: 'Geschützte Begriffe',
+      editProtectedTermsFor: 'Geschützte Begriffe von {client} bearbeiten',
+    },
+    protectedTerms: {
+      title: 'Geschützte Begriffe: {client}',
+      label: 'Ein Begriff je Zeile',
+      hint: 'Zum Beispiel der Markenname oder der wichtigste Suchbegriff. Geschützt ist jeder Suchbegriff, der den Begriff als ganzes Wort bzw. ganze Wortfolge enthält. Groß- und Kleinschreibung spielen keine Rolle.',
+      invalid: 'Höchstens {max} Begriffe mit je höchstens 80 Zeichen.',
+    },
     clientDialog: {
       title: 'Neuen Client anlegen',
       name: 'Name',

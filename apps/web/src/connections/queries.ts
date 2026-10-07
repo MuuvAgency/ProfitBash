@@ -174,6 +174,22 @@ export function useCreateClient() {
   });
 }
 
+/** Geschützte Begriffe eines Clients ersetzen; die Liste und die Suchbegriff-Analyse übernehmen den neuen Stand. */
+export function useUpdateProtectedTerms() {
+  const orgId = useActiveOrgId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; protectedTerms: string[] }) =>
+      api.updateClient(input.id, { protectedTerms: input.protectedTerms }),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData<Client[]>(connectionKeys.clients(orgId.value), (list) =>
+        (list ?? []).map((client) => (client.id === updated.id ? updated : client)),
+      );
+      await queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value] });
+    },
+  });
+}
+
 export const isOpenFileImport = (fileImport: FileImport) =>
   fileImport.status === 'pending' || fileImport.status === 'running';
 

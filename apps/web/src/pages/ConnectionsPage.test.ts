@@ -1215,3 +1215,84 @@ describe('Datei-Importe: Abschluss (1.11f)', () => {
     await vi.waitFor(() => expect(profileLoads()).toBeGreaterThan(before), { timeout: 5_000 });
   }, 10_000);
 });
+
+describe('Clients: geschützte Begriffe (2b.2)', () => {
+  const clientsSection = (wrapper: Wrapper) => wrapper.get('section[aria-label="Clients"]');
+
+  it('listet die Clients mit ihren geschützten Begriffen', async () => {
+    stubFetch(
+      routes({
+        'GET /api/clients': json({
+          clients: [
+            clientFixture({ protectedTerms: ['hero lampe', 'nordwind'] }),
+            clientFixture({ id: '5d1e8a2b-3c4f-4a6b-9d7e-000000000002', name: 'Lindenhof' }),
+          ],
+        }),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    const text = clientsSection(wrapper).text();
+    expect(text).toContain('Nordwind');
+    expect(text).toContain('hero lampe, nordwind');
+    expect(text).toContain('Lindenhof');
+    expect(text).toContain('Keine geschützten Begriffe');
+  });
+
+  it('speichert die Begriffe je Zeile und zeigt die gespeicherte Liste', async () => {
+    const { requests } = stubFetch(
+      routes({
+        'GET /api/clients': json({ clients: [clientFixture({ protectedTerms: ['nordwind'] })] }),
+        [`PATCH /api/clients/${nordwind.id}`]: json(
+          clientFixture({ protectedTerms: ['hero lampe', 'nordwind'] }),
+        ),
+      }),
+    );
+    const { wrapper } = await mountPage();
+    await clientsSection(wrapper).get('button').trigger('click');
+    await flushPromises();
+
+    const textarea = document.querySelector<HTMLTextAreaElement>('#protected-terms')!;
+    expect(textarea.value).toBe('nordwind');
+    textarea.value = ' Nordwind \n\nHero  Lampe\n';
+    textarea.dispatchEvent(new Event('input'));
+    await flushPromises();
+    [...document.querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Speichern')!
+      .click();
+    await flushPromises();
+
+    const patch = requests.find((r) => r.method === 'PATCH');
+    expect(patch?.body).toEqual({ protectedTerms: ['Nordwind', 'Hero  Lampe'] });
+    expect(document.querySelector('#protected-terms')).toBeNull();
+    expect(clientsSection(wrapper).text()).toContain('hero lampe, nordwind');
+  });
+
+  it('zeigt einen Fehler im Dialog, wenn das Speichern scheitert, und lehnt zu viele Begriffe vorher ab', async () => {
+    const { requests } = stubFetch(
+      routes({ [`PATCH /api/clients/${nordwind.id}`]: serverError() }),
+    );
+    const { wrapper } = await mountPage();
+    await clientsSection(wrapper).get('button').trigger('click');
+    await flushPromises();
+    const textarea = document.querySelector<HTMLTextAreaElement>('#protected-terms')!;
+    const save = () =>
+      [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Speichern')!;
+
+    textarea.value = Array.from({ length: 201 }, (_, i) => `t${i}`).join('\n');
+    textarea.dispatchEvent(new Event('input'));
+    await flushPromises();
+    save().click();
+    await flushPromises();
+    expect(requests.some((r) => r.method === 'PATCH')).toBe(false);
+    expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toContain('200');
+
+    textarea.value = 'nordwind';
+    textarea.dispatchEvent(new Event('input'));
+    await flushPromises();
+    save().click();
+    await flushPromises();
+    expect(requests.filter((r) => r.method === 'PATCH')).toHaveLength(1);
+    expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
+    expect(document.querySelector('#protected-terms')).not.toBeNull();
+  });
+});
