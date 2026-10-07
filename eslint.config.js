@@ -6,7 +6,8 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['**/dist/**', '**/coverage/**', 'design/**']),
+  // `.claude/`: Worktrees paralleler Sessions (eigene Kopien des Repos samt node_modules).
+  globalIgnores(['**/dist/**', '**/coverage/**', 'design/**', '.claude/**']),
   js.configs.recommended,
   tseslint.configs.recommended,
   pluginVue.configs['flat/recommended'],

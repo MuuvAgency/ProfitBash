@@ -286,6 +286,7 @@ export const de = {
       'entities-sync': 'Entity-Sync',
       'reports-sync': 'Report-Anforderung',
       'amazon-requests-poll': 'Aufträge abholen',
+      'file-import': 'Datei-Import',
       'fx-rates-sync': 'Wechselkurse (EZB)',
     },
     /** Statt des Amazon-Kontos beim plattformweiten Kursabruf. */
@@ -313,7 +314,9 @@ export const de = {
       removalDeferred: 'Entfernen zurückgestellt | Entfernen zurückgestellt',
       requested: 'angefordert | angefordert',
       reused: 'übernommen (lief schon) | übernommen (liefen schon)',
+      files: 'Datei | Dateien',
       imported: 'Datei importiert | Dateien importiert',
+      filesFailed: 'Datei nicht importiert | Dateien nicht importiert',
       superseded: 'überholt | überholt',
       rows: 'Zeile | Zeilen',
       updated: 'geändert | geändert',

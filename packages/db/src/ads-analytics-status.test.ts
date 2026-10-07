@@ -173,7 +173,8 @@ describe('queryDashboardStatus', () => {
     expect((await queryDashboardStatus(testDb.db, viewer(), SELECTION)).lastSyncAt).toBeNull();
   });
 
-  it('„Letzter Sync“ übergeht Profile ohne Connection (Datei-Import, 1.11a)', async () => {
+  it('„Letzter Sync“ zählt bei Profilen ohne Connection den letzten erfolgreichen Datei-Import (1.11c)', async () => {
+    const { eq } = await import('drizzle-orm');
     const [file] = await testDb.db
       .insert(amazonAdsProfiles)
       .values({
@@ -187,18 +188,33 @@ describe('queryDashboardStatus', () => {
         accountType: 'seller',
       })
       .returning({ id: amazonAdsProfiles.id });
+    const status = () =>
+      queryDashboardStatus(testDb.db, { ...viewer(), profileIds: [ids.de, file!.id] }, SELECTION);
     try {
-      expect(
-        (
-          await queryDashboardStatus(
-            testDb.db,
-            { ...viewer(), profileIds: [ids.de, file!.id] },
-            SELECTION,
-          )
-        ).lastSyncAt,
-      ).toBe('2026-09-11T04:00:00.000Z');
+      // Noch kein Import: „noch nie“, wie eine neue Connection.
+      expect((await status()).lastSyncAt).toBeNull();
+      await testDb.db.insert(jobRuns).values([
+        {
+          organizationId: ids.org,
+          job: 'file-import',
+          scope: file!.id,
+          status: 'success',
+          startedAt: new Date('2026-09-11T02:00:00Z'),
+          finishedAt: new Date('2026-09-11T02:00:00Z'),
+        },
+        {
+          organizationId: ids.org,
+          job: 'file-import',
+          scope: file!.id,
+          status: 'failed',
+          startedAt: new Date('2026-09-11T09:00:00Z'),
+          finishedAt: new Date('2026-09-11T09:00:00Z'),
+        },
+      ]);
+      // Ältester letzter Erfolg: Datei 02:00 vor Connection A 04:00; der gescheiterte zählt nicht.
+      expect((await status()).lastSyncAt).toBe('2026-09-11T02:00:00.000Z');
     } finally {
-      const { eq } = await import('drizzle-orm');
+      await testDb.db.delete(jobRuns).where(eq(jobRuns.scope, file!.id));
       await testDb.db.delete(amazonAdsProfiles).where(eq(amazonAdsProfiles.id, file!.id));
     }
   });

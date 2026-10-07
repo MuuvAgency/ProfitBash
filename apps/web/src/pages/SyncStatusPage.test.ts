@@ -314,6 +314,32 @@ describe('SyncStatusPage', () => {
     await vi.waitFor(() => expect(parseFloat(header.style.width)).toBeGreaterThanOrEqual(160));
   });
 
+  it('zeigt Datei-Importe (1.11c) mit dem Profil statt eines Amazon-Kontos', async () => {
+    const fileImport = jobRunFixture({
+      id: '88888888-8888-4888-8888-888888888888',
+      job: 'file-import',
+      scope: '66666666-6666-4666-8666-666666666666',
+      connection: null,
+      profile: {
+        id: '66666666-6666-4666-8666-666666666666',
+        accountName: 'Waldkauz Datei',
+        countryCode: 'DE',
+      },
+      status: 'failed',
+      error: '1 von 3 Dateien nicht importiert.',
+      counters: { files: 3, imported: 2, filesFailed: 1 },
+    });
+    stubFetch(routes([fileImport]));
+    const { wrapper } = await mountPage();
+    const fileRow = await waitForRow(wrapper, fileImport);
+
+    expect(fileRow.get('[col-id="job"]').text()).toBe('Datei-Import');
+    expect(fileRow.get('[col-id="connection"]').text()).toBe('Waldkauz Datei (DE)');
+    expect(fileRow.get('[col-id="result"]').text()).toContain(
+      '3 Dateien · 2 Dateien importiert · 1 Datei nicht importiert',
+    );
+  });
+
   it('zeigt statt einer fehlenden Connection den Platzhalter', async () => {
     const orphan = jobRunFixture({ connection: null });
     stubFetch(routes([orphan]));

@@ -318,6 +318,55 @@ describe('startWorker', () => {
       );
     }
   });
+
+  it('arbeitet hochgeladene Dateien über die Queue file-import ab (1.11c)', async () => {
+    const { createFileImport, createFileProfile } = await import('@profitbash/db');
+    const [admin] = await testDb.db
+      .insert(schema.users)
+      .values({ name: 'Ada', email: 'ada-worker@muuv.test' })
+      .returning({ id: schema.users.id });
+    await testDb.db.insert(schema.members).values({
+      organizationId,
+      userId: admin!.id,
+      role: 'admin',
+      createdAt: new Date(),
+    });
+    const { id: profileId } = await createFileProfile(testDb.db, {
+      userId: admin!.id,
+      orgId: organizationId,
+      input: {
+        accountName: 'Datei',
+        countryCode: 'DE',
+        currencyCode: 'EUR',
+        timezone: 'Europe/Berlin',
+        accountType: 'seller',
+      },
+    });
+    const created = await createFileImport(testDb.db, {
+      userId: admin!.id,
+      orgId: organizationId,
+      profileId,
+      kind: 'daily_report',
+      fileName: 'bericht.csv',
+      content: new TextEncoder().encode('x'),
+      enqueue: (tx) => worker.jobs.enqueueFileImport({ organizationId, profileId }, { tx }),
+    });
+
+    const done = await waitFor(async () => {
+      const [row] = await testDb.db
+        .select()
+        .from(schema.fileImports)
+        .where(eq(schema.fileImports.id, created.id));
+      return row && ['imported', 'failed'].includes(row.status) ? row : undefined;
+    });
+    // Der Tagesbericht hat bis 1.11e keinen Importer: Der Weg bis zum Job ist trotzdem belegt.
+    expect(done.status).toBe('failed');
+    const [run] = await testDb.db
+      .select()
+      .from(jobRuns)
+      .where(and(eq(jobRuns.job, 'file-import'), eq(jobRuns.scope, profileId)));
+    expect(run).toMatchObject({ organizationId, status: 'failed', counters: { files: 1 } });
+  });
 });
 
 describe('startJobQueue', () => {

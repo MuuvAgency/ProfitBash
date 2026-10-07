@@ -9,7 +9,7 @@ import { createApp } from './app';
 import { createAuth, type Auth } from './auth';
 import type { AppDeps } from './context';
 import { AMAZON_OAUTH_CALLBACK_PATH } from './env';
-import type { JobQueue, ProfilesSyncJob } from '@profitbash/worker';
+import type { FileImportJob, JobQueue, ProfilesSyncJob } from '@profitbash/worker';
 import type { LogEntry } from './logger';
 import { seed, type SeedResult } from './seed';
 
@@ -21,25 +21,30 @@ export const TEST_REDIRECT_URI = `${TEST_APP_URL}${AMAZON_OAUTH_CALLBACK_PATH}`;
 /** Job-Queue für Tests: merkt sich eingeplante Jobs; `failNext` lässt den nächsten Aufruf scheitern. */
 export interface RecordingJobQueue extends JobQueue {
   profilesSync: ProfilesSyncJob[];
+  fileImports: FileImportJob[];
   /** Je eingeplantem Job: lief das Einplanen in der Transaktion des Aufrufers? */
   enqueuedInTransaction: boolean[];
   failNext: boolean;
 }
 
 function createRecordingJobQueue(): RecordingJobQueue {
+  const record = <T>(list: T[], job: T, inTransaction: boolean) => {
+    if (queue.failNext) {
+      queue.failNext = false;
+      return Promise.reject(new Error('Queue nicht erreichbar'));
+    }
+    list.push(job);
+    queue.enqueuedInTransaction.push(inTransaction);
+    return Promise.resolve();
+  };
   const queue: RecordingJobQueue = {
     profilesSync: [],
+    fileImports: [],
     enqueuedInTransaction: [],
     failNext: false,
-    enqueueProfilesSync(job, options) {
-      if (queue.failNext) {
-        queue.failNext = false;
-        return Promise.reject(new Error('Queue nicht erreichbar'));
-      }
-      queue.profilesSync.push(job);
-      queue.enqueuedInTransaction.push(options?.tx !== undefined);
-      return Promise.resolve();
-    },
+    enqueueProfilesSync: (job, options) =>
+      record(queue.profilesSync, job, options?.tx !== undefined),
+    enqueueFileImport: (job, options) => record(queue.fileImports, job, options?.tx !== undefined),
   };
   return queue;
 }
@@ -132,6 +137,8 @@ export interface RequestOptions {
   method?: string;
   cookie?: string;
   json?: unknown;
+  /** Multipart-Body (Upload). */
+  form?: FormData;
   headers?: Record<string, string>;
 }
 
@@ -139,8 +146,11 @@ export interface RequestOptions {
 export function request(ctx: TestContext, path: string, options: RequestOptions = {}) {
   const headers = new Headers({ origin: TEST_APP_URL, ...options.headers });
   if (options.cookie) headers.set('cookie', options.cookie);
-  let body: string | undefined;
-  if (options.json !== undefined) {
+  let body: string | FormData | undefined;
+  if (options.form !== undefined) {
+    // Content-Type mit Boundary setzt `Request` selbst.
+    body = options.form;
+  } else if (options.json !== undefined) {
     if (!headers.has('content-type')) headers.set('content-type', 'application/json');
     body = JSON.stringify(options.json);
   }

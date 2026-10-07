@@ -1026,10 +1026,37 @@ Teilaufgaben (Reihenfolge):
     Archiv-Kommentar (Amazon erzeugt nichts davon).
 
 #### 1.11c Upload und Import-Job
-- [ ] Tabelle `file_imports` (Organisation, Profil, Art `bulk` | `daily_report`, Dateiname, Größe, SHA-256, Status, Zähler, Fehler,
+- [x] Tabelle `file_imports` (Organisation, Profil, Art `bulk` | `daily_report`, Dateiname, Größe, SHA-256, Status, Zähler, Fehler,
       hochgeladen von/am); Inhalt nur bis zum Import (danach gelöscht, F5: keine Rohdateien).
-- [ ] `POST /api/profiles/:id/file-imports` (Multipart, Größendeckel, Org-Admin bzw. `write`), Audit, Job `file-import` über `runJob`
+- [x] `POST /api/profiles/:id/file-imports` (Multipart, Größendeckel, Org-Admin bzw. `write`), Audit, Job `file-import` über `runJob`
       (eine Datei je Profil gleichzeitig), sichtbar im Sync-Status.
+- [x] Umsetzung (Stand für 1.11d und später):
+  - **Schema** (Migration `0019_file_imports`): `file_imports` (Organisation, Profil mit zusammengesetztem FK und `ON DELETE
+    CASCADE` wie die Amazon-Aufträge, `kind` `bulk` | `daily_report`, Dateiname, Größe, SHA-256, `status` `pending` →
+    `running` → `imported` | `failed`, `attempts`, `error`, `counters`, `job_run_id`, `uploaded_by`, Zeitpunkte) und
+    `file_import_contents` (Inhalt als `bytea`, eigene Tabelle, damit Listen ihn nie lesen; wird am Ende jedes Imports gelöscht,
+    auch nach Fehlschlag, F5). Konstanten und Schemas in `packages/shared/src/file-imports.ts` (`FILE_IMPORT_MAX_BYTES` 50 MB).
+  - **DB** (`packages/db/src/file-imports.ts`): `createFileImport` (Admin, `canSeeProfile` mit ausgeblendeten, nur Profile **ohne**
+    Connection, sonst `PROFILE_HAS_CONNECTION`; leere Datei `EMPTY_FILE`; Import, Inhalt, Audit `file_import.create` und das
+    Einplanen in **einer** Transaktion), `listFileImports` (neueste 50), `claimNextFileImport` (älteste offene Datei des Profils,
+    eine zur Zeit; hängt eine länger als 30 Min. in `running`, wird sie erneut abgeholt, nach 3 Versuchen `failed`),
+    `finishFileImport`.
+  - **API** (`routes/file-imports.ts`): `POST /api/profiles/:id/file-imports` (Multipart `kind` + `file`, Org-Admin, eigenes
+    Body-Limit 50 MB + Hülle, das allgemeine 64-KB-Limit nimmt den Pfad aus; zu groß → 413 `FILE_TOO_LARGE`; Dateiname ohne
+    Pfad) und `GET` (Liste). Fehler: 404 `PROFILE_NOT_FOUND`, 409 `PROFILE_HAS_CONNECTION`, 400 `EMPTY_FILE`.
+  - **Worker:** Queue `file-import` (`stately`, `singletonKey` = Profil-ID; ein Lauf arbeitet alle offenen Dateien des Profils in
+    Upload-Reihenfolge ab, ein weggefallenes Einplanen holt der wartende Lauf mit ab), Job `importProfileFiles`
+    (`jobs/file-import.ts`) über `runJob` mit Scope = Profil-ID; Importer je Art in `file-import/importers.ts` (1.11d/e), ohne
+    Importer „noch nicht unterstützt“. Erwartete Ablehnungen (`FileImportRejectedError`, `SheetReadError`) erscheinen mit ihrem
+    Text, andere Fehler nur als „Unerwarteter Fehler … Details im Log“. Zähler `files`, `imported`, `filesFailed` plus die Summen
+    der Importer; scheitert eine Datei, endet der Lauf als Fehlschlag (Alarm im Sync-Status), die übrigen werden trotzdem
+    importiert. Zeitbudget 5 Min., danach neu eingeplant. Kein Healthcheck (nutzergesteuert).
+  - **Sync-Status:** `PROFILE_JOB_NAMES` (`file-import`) gehören zu den Jobs der Org-Sicht; `JobRun.profile` (Name, Land) über
+    `visibleProfilesScope`, die Spalte „Amazon-Konto“ zeigt dann „Name (Land)“. **„Letzter Sync“** im Dashboard: je Datei-Profil
+    der letzte erfolgreiche `file-import` (wie `reports-sync` je Connection; ohne Import „noch nie“).
+  - **ESLint** ignoriert `.claude/` (Worktrees paralleler Sessions; sonst lief `eslint .` mit deren `node_modules` aus dem
+    Speicher).
+
 
 #### 1.11d Bulk-Datei → Entities
 - [ ] Kopfzeilen über Aliasse (DE/EN, alte und neue Schreibweisen), Blätter SP, SB, SD, Portfolios auf die normalisierten Datensätze

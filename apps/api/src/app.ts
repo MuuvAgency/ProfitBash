@@ -10,6 +10,7 @@ import { registerAmazonOAuthRoutes } from './routes/amazon-oauth';
 import { registerAnalyticsRoutes } from './routes/analytics';
 import { registerClientRoutes } from './routes/clients';
 import { registerConnectionRoutes } from './routes/connections';
+import { isFileUpload, registerFileImportRoutes } from './routes/file-imports';
 import { registerHealthRoutes } from './routes/health';
 import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMemberRoutes } from './routes/members';
@@ -63,13 +64,15 @@ export function createApp(options: CreateAppOptions) {
   app.notFound(notFoundHandler);
   app.use(requestId({ limitLength: 128 }));
   app.use(requestLogger(deps.logger));
-  app.use(
-    bodyLimit({
-      maxSize: MAX_BODY_BYTES,
-      onError: () => {
-        throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Der Request-Body ist zu groß.');
-      },
-    }),
+  const defaultBodyLimit = bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: () => {
+      throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Der Request-Body ist zu groß.');
+    },
+  });
+  // Der Datei-Upload hat ein eigenes, größeres Limit an seiner Route (1.11c).
+  app.use((c, next) =>
+    isFileUpload(c.req.method, c.req.path) ? next() : defaultBodyLimit(c, next),
   );
   app.use(csrfProtection(deps.appUrl));
   // Auswertungen liefern bis zu 10 000 Zeilen mit Vergleich (mehrere MB JSON): komprimieren (F7).
@@ -88,6 +91,7 @@ export function createApp(options: CreateAppOptions) {
   registerConnectionRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerJobRunRoutes(app, deps);
+  registerFileImportRoutes(app, deps);
   registerAnalyticsRoutes(app, deps);
   registerSavedViewRoutes(app, deps);
   registerMemberRoutes(app, deps);
