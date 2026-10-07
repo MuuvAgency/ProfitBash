@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { amazonAdsProfiles } from './app';
 import { createdAt, id, organizationId, updatedAt } from './columns';
+import { fileImports } from './file-imports';
 
 /**
  * Werbe-Entities und Tageskennzahlen je Amazon-Ads-Profil (Phase 1, 1.5). Zugriffe nur über
@@ -428,7 +429,8 @@ export const amazonAdsSearchTermDailyMetrics = pgTable(
  * Suchbegriffe aus den Suchbegriff-Blättern der Bulk-Datei (`phase-2b.md` 2b.1, F1): **Summen über den
  * Download-Zeitraum** der Datei, keine Tageswerte. Deshalb eine eigene Tabelle neben
  * `amazon_ads_search_term_daily_metrics` (API-Weg): Zeiträume verschiedener Dateien überlappen sich und lassen sich
- * nicht addieren, Auswertungen rechnen je Zeitraum. Ein Upload ersetzt die Zeilen desselben Zeitraums.
+ * nicht addieren, Auswertungen rechnen je Zeitraum. Ein Upload ersetzt im selben Zeitraum die Zeilen der Kampagnen,
+ * die er enthält (eine laut Upload vollständige Datei den ganzen Zeitraum).
  *
  * Kampagne, Ad Group und Target als Amazon-IDs ohne Fremdschlüssel: Die Datei kann eine Teilmenge sein
  * (z. B. ohne pausierte Targets), Suchbegriffe fehlender Entities sollen weder verloren gehen noch Platzhalter
@@ -458,6 +460,8 @@ export const amazonAdsSearchTermPeriodMetrics = pgTable(
     purchases: count('purchases').notNull(),
     units: count('units').notNull(),
     importedAt: timestamp('imported_at', { withTimezone: true, mode: 'date' }).notNull(),
+    /** Datei, aus der die Zeile stammt (Anzeige „aus welchem Upload“); leer, sobald der Verlauf gelöscht ist. */
+    fileImportId: uuid('file_import_id').references(() => fileImports.id, { onDelete: 'set null' }),
   },
   (t) => [
     profileFk('amazon_ads_search_term_period_metrics', t.profileId, t.organizationId),

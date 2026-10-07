@@ -36,7 +36,7 @@ function isoDay(text: string): string | null {
  * Tage `YYYYMMDD`); `null`, wenn die Datei umbenannt wurde oder der Zeitraum unmöglich ist.
  */
 export function parseBulkPeriod(fileName: string): BulkPeriod | null {
-  const match = /^bulk-[^-]+-(\d{8})-(\d{8})-\d+/i.exec(fileName.trim());
+  const match = /^bulk-.+?-(\d{8})-(\d{8})-\d+/i.exec(fileName.trim());
   if (!match) return null;
   const startDate = isoDay(match[1]!);
   const endDate = isoDay(match[2]!);
@@ -46,20 +46,28 @@ export function parseBulkPeriod(fileName: string): BulkPeriod | null {
 
 export type SearchTermSheetKind = 'sp' | 'sb';
 
-/** Suchbegriff-Blatt nach seinem Namen (deutsch und englisch), sonst `null`. */
+/** Blatt mit Suchbegriffen laut Namen (deutsch und englisch), egal welcher Ad-Typ. */
+export function isSearchTermSheet(name: string): boolean {
+  return /suchbegriff|search term/.test(normalizeHeader(name));
+}
+
+/** Ad-Typ eines Suchbegriff-Blatts nach seinem Namen („SP …“, „SB …“), sonst `null`. */
 export function searchTermSheetKind(name: string): SearchTermSheetKind | null {
+  if (!isSearchTermSheet(name)) return null;
   const text = normalizeHeader(name);
-  if (!/suchbegriff|search term/.test(text)) return null;
   if (/^sp\b/.test(text)) return 'sp';
   if (/^sb\b/.test(text)) return 'sb';
   return null;
 }
 
-/** Zähler (Impressions, Klicks, Bestellungen, Einheiten) als ganze Zahl ≥ 0, nie über Gleitkomma-Reste. */
+/**
+ * Zähler (Impressions, Klicks, Bestellungen, Einheiten) als ganze Zahl ≥ 0. Ohne Runden auf 15 Stellen: Ganze
+ * Zahlen haben in der Datei keine Gleitkomma-Reste, `0.9999999999999999` ist kein Zähler.
+ */
 export function parseBulkCount(text: string): CellResult<number> {
   const amount = parseBulkAmount(text);
   if (amount === null || amount === 'invalid') return amount;
-  const value = new Dec(amount);
+  const value = new Dec(text.trim());
   if (value.isNegative() || !value.isInteger() || value.greaterThan(Number.MAX_SAFE_INTEGER)) {
     return 'invalid';
   }
@@ -206,6 +214,15 @@ export class SearchTermCollector {
     return [...this.bySheet].map(([kind, rows]) => ({ kind, rows: [...rows.values()] }));
   }
 
+  /** Kampagnen aller gelesenen Zeilen (für die Konto-Prüfung der Datei). */
+  get amazonCampaignIds(): string[] {
+    const result = new Set<string>();
+    for (const rows of this.bySheet.values()) {
+      for (const row of rows.values()) result.add(row.amazonCampaignId);
+    }
+    return [...result];
+  }
+
   get rowCount(): number {
     let total = 0;
     for (const rows of this.bySheet.values()) total += rows.size;
@@ -264,6 +281,8 @@ export class SearchTermCollector {
   private add(kind: SearchTermSheetKind, row: SearchTermPeriodMetric): void {
     let rows = this.bySheet.get(kind);
     if (!rows) this.bySheet.set(kind, (rows = new Map()));
+    // Keyword- und Produkt-Targeting-IDs teilen sich den Nummernkreis der Targets (wie `amazon_ads_targets`).
+    // Bei doppelten Zeilen gelten Kampagne und Ad Group der ersten.
     const key = `${row.amazonTargetId}\u0000${row.searchTerm}`;
     const existing = rows.get(key);
     if (!existing) {

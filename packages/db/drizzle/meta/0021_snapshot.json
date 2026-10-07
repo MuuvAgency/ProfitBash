@@ -1,5 +1,5 @@
 {
-  "id": "c0e946c4-8379-4855-8876-d4d3c275773b",
+  "id": "b82fe044-8361-492b-952c-1542a49bd3d7",
   "prevId": "db7ef892-3360-4dd4-9d52-a3ae7da311f9",
   "version": "7",
   "dialect": "postgresql",
@@ -4477,6 +4477,12 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "file_import_id": {
+          "name": "file_import_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -4492,6 +4498,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "amazon_ads_search_term_period_metrics_file_import_id_file_imports_id_fk": {
+          "name": "amazon_ads_search_term_period_metrics_file_import_id_file_imports_id_fk",
+          "tableFrom": "amazon_ads_search_term_period_metrics",
+          "tableTo": "file_imports",
+          "columnsFrom": [
+            "file_import_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "amazon_ads_search_term_period_metrics_profile_org_fk": {

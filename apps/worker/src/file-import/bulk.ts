@@ -49,7 +49,12 @@ import {
   type EntityKind,
   type ValueMap,
 } from './bulk-columns';
-import { parseBulkPeriod, SearchTermCollector, searchTermSheetKind } from './bulk-search-terms';
+import {
+  isSearchTermSheet,
+  parseBulkPeriod,
+  SearchTermCollector,
+  searchTermSheetKind,
+} from './bulk-search-terms';
 
 /**
  * Bulk-Datei der Werbekonsole → Entities (`phase-1.md` 1.11d). Liest die Blätter Portfolios, SP, SB und SD
@@ -103,8 +108,17 @@ export const importBulkFile: FileImporter = async (input) => {
 
   const searchTerms = new SearchTermCollector(input.logger);
   for (const sheet of workbook.sheets) {
-    const kind = sheet.state === 'visible' ? searchTermSheetKind(sheet.name) : null;
+    if (sheet.state !== 'visible' || !isSearchTermSheet(sheet.name)) continue;
+    const kind = searchTermSheetKind(sheet.name);
     if (kind) searchTerms.readSheet(sheet.name, kind, workbook.forEachRow);
+    else {
+      input.logger({
+        level: 'warn',
+        msg: 'bulk_import.search_term_sheet_skipped',
+        sheet: sheet.name,
+        reason: 'unknown_ad_product',
+      });
+    }
   }
   const period = parseBulkPeriod(input.fileName);
 
@@ -114,17 +128,18 @@ export const importBulkFile: FileImporter = async (input) => {
     );
 
     // Bulk-Datei eines anderen Kontos? (Dominik, 2026-10-07: eindeutig → ablehnen, sonst Hinweis.)
-    // Auch Kampagnen, die nur über Ad Groups, Targets oder Anzeigen in der Datei stehen.
+    // Auch Kampagnen, die nur über Ad Groups, Targets, Anzeigen oder Suchbegriffe in der Datei stehen.
     const fileCampaignIds = [
-      ...new Set(
-        [
+      ...new Set([
+        ...[
           ...records.campaigns,
           ...records.adGroups,
           ...records.targets,
           ...records.negatives,
           ...records.productAds,
         ].map((r) => r.amazonCampaignId),
-      ),
+        ...searchTerms.amazonCampaignIds,
+      ]),
     ];
     const ownership = await campaignOwnership(tx, { ...scope, amazonCampaignIds: fileCampaignIds });
     if (ownership.otherProfiles.length > 0) {
@@ -152,7 +167,16 @@ export const importBulkFile: FileImporter = async (input) => {
 
     const searchTermSheets = searchTerms.finish();
     let searchTermRows = 0;
-    if (period) {
+    if (unmatched) {
+      // Fremd wirkende Datei: wie beim Entfernen nichts ersetzen (die Summen des Profils blieben sonst falsch).
+      if (searchTerms.rowCount > 0) {
+        input.logger({
+          level: 'warn',
+          msg: 'bulk_import.search_terms_skipped_unmatched',
+          rows: searchTerms.rowCount,
+        });
+      }
+    } else if (period) {
       for (const sheet of searchTermSheets) {
         const written = await replaceSearchTermPeriodMetrics(tx, {
           ...scope,
@@ -160,6 +184,8 @@ export const importBulkFile: FileImporter = async (input) => {
           period,
           currencyCode,
           rows: sheet.rows,
+          replace: input.complete ? 'period' : { amazonCampaignIds: fileCampaignIds },
+          fileImportId: input.fileImportId,
         });
         searchTermRows += written.rows;
       }
@@ -196,7 +222,8 @@ export const importBulkFile: FileImporter = async (input) => {
       ...(unmatched && { unmatchedCampaigns: fileCampaignIds.length }),
       // Nur genannt, wenn die Datei Suchbegriffe enthält (Downloads ohne Leistungsdaten haben keine).
       ...(searchTermRows > 0 && { searchTerms: searchTermRows }),
-      ...(!period &&
+      ...(!unmatched &&
+        !period &&
         searchTerms.rowCount > 0 && { searchTermsWithoutPeriod: searchTerms.rowCount }),
       ...(searchTerms.invalidRows > 0 && { invalidSearchTermRows: searchTerms.invalidRows }),
     };

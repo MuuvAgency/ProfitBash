@@ -1,4 +1,14 @@
-import { and, between, eq, getTableColumns, getTableName, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  between,
+  eq,
+  getTableColumns,
+  getTableName,
+  inArray,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import {
   assertProfileInOrganization,
@@ -638,14 +648,22 @@ export interface ReplaceSearchTermPeriodMetricsInput {
   /** Download-Zeitraum der Datei, beide Tage eingeschlossen (`YYYY-MM-DD`). */
   period: MetricsDateRange;
   currencyCode: string;
-  /** Höchstens eine Zeile je Target und Suchbegriff; nicht leer. */
+  /** Höchstens eine Zeile je Target und Suchbegriff. */
   rows: readonly SearchTermPeriodMetric[];
+  /**
+   * Was der Upload im Zeitraum ersetzt: `'period'` alles (laut Upload vollständige Datei), sonst nur die Zeilen
+   * dieser Kampagnen. Die Konsole exportiert auch Teilmengen („nur bestimmte Kampagnen“); die Suchbegriffe der
+   * übrigen Kampagnen bleiben dann stehen.
+   */
+  replace: 'period' | { amazonCampaignIds: readonly string[] };
+  /** Datei, aus der die Zeilen stammen. */
+  fileImportId?: string | null;
   now: Date;
 }
 
 /**
- * Ersetzt die Suchbegriff-Summen eines Profils für genau diesen Ad-Typ und Zeitraum (ein erneuter Upload
- * desselben Zeitraums gilt, andere Zeiträume bleiben daneben stehen). Systemzugriff des Datei-Imports, an
+ * Ersetzt Suchbegriff-Summen eines Profils für genau diesen Ad-Typ und Zeitraum (`replace`: alles oder nur die
+ * genannten Kampagnen); andere Zeiträume bleiben daneben stehen. Systemzugriff des Datei-Imports, an
  * Organisation und Profil gebunden; läuft in der Transaktion des Aufrufers. Ohne Zeilen geschieht nichts:
  * Eine Datei ohne Leistungsdaten löscht keine vorhandenen Summen.
  */
@@ -666,6 +684,14 @@ export async function replaceSearchTermPeriodMetrics(
           eq(table.adProduct, input.adProduct),
           eq(table.periodStart, input.period.startDate),
           eq(table.periodEnd, input.period.endDate),
+          input.replace === 'period'
+            ? undefined
+            : inArray(table.amazonCampaignId, [
+                ...new Set([
+                  ...input.replace.amazonCampaignIds,
+                  ...input.rows.map((row) => row.amazonCampaignId),
+                ]),
+              ]),
         ),
       )
       .returning({ id: table.id });
@@ -679,6 +705,7 @@ export async function replaceSearchTermPeriodMetrics(
           periodStart: input.period.startDate,
           periodEnd: input.period.endDate,
           currencyCode: input.currencyCode,
+          fileImportId: input.fileImportId ?? null,
           importedAt: input.now,
         })),
       );
