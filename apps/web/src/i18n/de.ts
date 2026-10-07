@@ -378,6 +378,10 @@ export const de = {
       negatives: 'Negative | Negatives',
       productAds: 'Anzeige | Anzeigen',
       invalidRows: 'ungültige Zeile | ungültige Zeilen',
+      searchTerms: 'Suchbegriff | Suchbegriffe',
+      searchTermsWithoutPeriod:
+        'Suchbegriff ohne Zeitraum (Dateiname geändert) | Suchbegriffe ohne Zeitraum (Dateiname geändert)',
+      invalidSearchTermRows: 'ungültige Suchbegriff-Zeile | ungültige Suchbegriff-Zeilen',
       updated: 'geändert | geändert',
       fetched: 'Kurs geladen | Kurse geladen',
       currencies: 'Währung | Währungen',

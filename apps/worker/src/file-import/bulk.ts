@@ -3,6 +3,7 @@ import {
   findAdGroupCampaignIds,
   markEntitiesRemoved,
   findProfileCurrency,
+  replaceSearchTermPeriodMetrics,
   upsertAdGroups,
   upsertCampaigns,
   upsertNegativeTargets,
@@ -48,6 +49,7 @@ import {
   type EntityKind,
   type ValueMap,
 } from './bulk-columns';
+import { parseBulkPeriod, SearchTermCollector, searchTermSheetKind } from './bulk-search-terms';
 
 /**
  * Bulk-Datei der Werbekonsole → Entities (`phase-1.md` 1.11d). Liest die Blätter Portfolios, SP, SB und SD
@@ -55,8 +57,10 @@ import {
  * Transaktion in Hierarchie-Reihenfolge: Portfolios → Kampagnen → Ad Groups → Targets, Negatives,
  * Product Ads. Gleiche Amazon-IDs und Schreibweisen wie der Export: Ein späterer API-Sync setzt nahtlos fort.
  *
- * - Kennzahlen der Datei (Summen über den gewählten Zeitraum) werden nicht übernommen, Tageswerte kommen
- *   aus den Tagesberichten (1.11e).
+ * - Kennzahlen der Entity-Blätter (Summen über den gewählten Zeitraum) werden nicht übernommen.
+ * - Die Suchbegriff-Blätter (SP, SB) werden als Summen je Download-Zeitraum gespeichert (`phase-2b.md` 2b.1,
+ *   `bulk-search-terms.ts`), in derselben Transaktion wie die Entities. Der Zeitraum steht nur im Dateinamen;
+ *   fehlt er (Datei umbenannt), bleiben die Suchbegriffe weg (`searchTermsWithoutPeriod`).
  * - `removed_at` nur bei einer laut Upload vollständigen Datei (`markMissingAsRemoved`): Die Konsole
  *   exportiert auch Teilmengen („nur bestimmte Kampagnen“), sonst hieße eine fehlende Entity nichts.
  * - Kampagnen eines anderen Profils derselben Organisation → Ablehnung; passt keine Kampagne zum Profil,
@@ -96,6 +100,13 @@ export const importBulkFile: FileImporter = async (input) => {
   for (const sheet of sheets) {
     readSheet(sheet.name, sheet.kind, (row) => collector.add(row), workbook.forEachRow);
   }
+
+  const searchTerms = new SearchTermCollector(input.logger);
+  for (const sheet of workbook.sheets) {
+    const kind = sheet.state === 'visible' ? searchTermSheetKind(sheet.name) : null;
+    if (kind) searchTerms.readSheet(sheet.name, kind, workbook.forEachRow);
+  }
+  const period = parseBulkPeriod(input.fileName);
 
   return input.db.transaction(async (tx) => {
     const records = await collector.finish(async (adGroupIds) =>
@@ -139,6 +150,28 @@ export const importBulkFile: FileImporter = async (input) => {
       });
     }
 
+    const searchTermSheets = searchTerms.finish();
+    let searchTermRows = 0;
+    if (period) {
+      for (const sheet of searchTermSheets) {
+        const written = await replaceSearchTermPeriodMetrics(tx, {
+          ...scope,
+          adProduct: AD_PRODUCT_OF_SHEET[sheet.kind],
+          period,
+          currencyCode,
+          rows: sheet.rows,
+        });
+        searchTermRows += written.rows;
+      }
+    } else if (searchTerms.rowCount > 0) {
+      // Ohne Zeitraum wären die Summen nicht einzuordnen (Datei umbenannt).
+      input.logger({
+        level: 'warn',
+        msg: 'bulk_import.search_terms_without_period',
+        rows: searchTerms.rowCount,
+      });
+    }
+
     const counts: EntityUpsertCounts[] = [
       await upsertPortfolios(tx, scope, records.portfolios),
       await upsertCampaigns(tx, scope, records.campaigns),
@@ -161,6 +194,11 @@ export const importBulkFile: FileImporter = async (input) => {
       invalidRows: collector.invalidRows,
       removed: await markMissingAsRemoved(tx, { ...input, unmatched }, scope, records, collector),
       ...(unmatched && { unmatchedCampaigns: fileCampaignIds.length }),
+      // Nur genannt, wenn die Datei Suchbegriffe enthält (Downloads ohne Leistungsdaten haben keine).
+      ...(searchTermRows > 0 && { searchTerms: searchTermRows }),
+      ...(!period &&
+        searchTerms.rowCount > 0 && { searchTermsWithoutPeriod: searchTerms.rowCount }),
+      ...(searchTerms.invalidRows > 0 && { invalidSearchTermRows: searchTerms.invalidRows }),
     };
   });
 };

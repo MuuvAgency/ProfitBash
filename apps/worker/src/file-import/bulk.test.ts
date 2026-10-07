@@ -25,6 +25,7 @@ const {
   amazonAdsPortfolios,
   amazonAdsProductAds,
   amazonAdsProfiles,
+  amazonAdsSearchTermPeriodMetrics,
   amazonAdsTargets,
   fileImports,
   jobRuns,
@@ -88,6 +89,7 @@ afterAll(() => testDb?.close());
 
 beforeEach(async () => {
   for (const table of [
+    amazonAdsSearchTermPeriodMetrics,
     amazonAdsProductAds,
     amazonAdsNegativeTargets,
     amazonAdsTargets,
@@ -104,14 +106,14 @@ beforeEach(async () => {
 
 const run = (
   content: Uint8Array,
-  options: { complete?: boolean; uploadedAt?: Date; profileId?: string } = {},
+  options: { complete?: boolean; uploadedAt?: Date; profileId?: string; fileName?: string } = {},
 ) =>
   importBulkFile({
     db,
     logger: (entry) => logs.push(entry),
     organizationId: ids.org,
     profileId: options.profileId ?? ids.profile,
-    fileName: 'bulk-test.xlsx',
+    fileName: options.fileName ?? 'bulk-test.xlsx',
     content,
     now: NOW,
     complete: options.complete ?? false,
@@ -1276,6 +1278,262 @@ describe('Konto-Prüfung und vollständige Dateien (Dominik, 2026-10-07)', () =>
       expect.objectContaining({ msg: 'bulk_import.removal_skipped', reason: 'unmatched' }),
     );
     expect((await removedIds()).get(X)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suchbegriff-Blätter (`phase-2b.md` 2b.1): Summen über den Zeitraum der Datei
+// ---------------------------------------------------------------------------
+
+const DE_SEARCH_TERM_HEADER = [
+  'Produkt',
+  'Kampagnen-ID',
+  'Anzeigengruppen-ID',
+  'Keyword-ID',
+  'Produkt-Targeting-ID',
+  'Kampagnenname (Nur zu Informationszwecken)',
+  'Name der Anzeigengruppe (Nur zu Informationszwecken)',
+  'Portfolioname (Nur zu Informationszwecken)',
+  'Zustand',
+  'Kampagnenstatus (Nur zu Informationszwecken)',
+  'Gebot',
+  'Keyword-Text',
+  'Übereinstimmungstyp',
+  'Ausdruck für Produkt-Targeting',
+  'Suchbegriff eines Kunden',
+  'Impressions',
+  'Klicks',
+  'Klickrate',
+  'Ausgaben',
+  'Verkäufe',
+  'Bestellungen',
+  'Einheiten',
+  'Conversion-Rate',
+  'ACOS',
+  'CPC',
+  'ROAS',
+];
+
+const EN_SEARCH_TERM_HEADER = [
+  'Product',
+  'Campaign ID',
+  'Ad Group ID',
+  'Keyword ID',
+  'Product Targeting ID',
+  'Campaign Name (Informational only)',
+  'State',
+  'Keyword Text',
+  'Match Type',
+  'Customer Search Term',
+  'Impressions',
+  'Clicks',
+  'Click-through Rate',
+  'Spend',
+  'Sales',
+  'Orders',
+  'Units',
+  'ACOS',
+];
+
+const DE_SEARCH_TERM_ROWS: Array<Record<string, TestCell>> = [
+  {
+    Produkt: 'Sponsored Products',
+    'Kampagnen-ID': C1,
+    'Anzeigengruppen-ID': AG1,
+    'Keyword-ID': KW1,
+    'Suchbegriff eines Kunden': 'eulen nistkasten',
+    Impressions: 1200,
+    Klicks: 34,
+    Klickrate: 0.028333333333333332,
+    Ausgaben: 12.340000000000002,
+    Verkäufe: 89.9,
+    Bestellungen: 3,
+    Einheiten: 4,
+    ACOS: 0.13726362625139044,
+  },
+  {
+    Produkt: 'Sponsored Products',
+    'Kampagnen-ID': C2,
+    'Anzeigengruppen-ID': AG2,
+    'Produkt-Targeting-ID': PT2,
+    'Suchbegriff eines Kunden': 'b0erfunden01',
+    Impressions: 50,
+    Klicks: 0,
+    Ausgaben: 0,
+    Verkäufe: 0,
+    Bestellungen: 0,
+    Einheiten: 0,
+  },
+];
+
+function searchTermFile(
+  rows: Array<Record<string, TestCell>> = DE_SEARCH_TERM_ROWS,
+  options: { header?: string[]; sheetName?: string } = {},
+) {
+  return buildXlsx([
+    sheet('Sponsored Products-Kampagnen', DE_SP_HEADER, DE_SP_ROWS),
+    sheet(
+      options.sheetName ?? 'SP Bericht „Suchbegriff“',
+      options.header ?? DE_SEARCH_TERM_HEADER,
+      rows,
+    ),
+    sheet('SB Bericht „Suchbegriff“', DE_SEARCH_TERM_HEADER, []),
+  ]);
+}
+
+const SEPTEMBER = 'bulk-a1b2c3-20260901-20260930-1.xlsx';
+
+const searchTerms = () =>
+  db
+    .select()
+    .from(amazonAdsSearchTermPeriodMetrics)
+    .orderBy(
+      asc(amazonAdsSearchTermPeriodMetrics.periodStart),
+      asc(amazonAdsSearchTermPeriodMetrics.searchTerm),
+    );
+
+describe('Suchbegriff-Blätter der Bulk-Datei (2b.1)', () => {
+  it('speichert die Suchbegriffe als Summen über den Zeitraum der Datei, nicht als Tageswerte', async () => {
+    const counters = await run(searchTermFile(), { fileName: SEPTEMBER });
+    expect(counters).toMatchObject({ campaigns: 2, searchTerms: 2 });
+
+    const rows = await searchTerms();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      organizationId: ids.org,
+      profileId: ids.profile,
+      adProduct: SP,
+      periodStart: '2026-09-01',
+      periodEnd: '2026-09-30',
+      amazonCampaignId: C2,
+      amazonAdGroupId: AG2,
+      amazonTargetId: PT2,
+      searchTerm: 'b0erfunden01',
+      currencyCode: 'EUR',
+      impressions: 50,
+      clicks: 0,
+      cost: '0',
+      sales: '0',
+      purchases: 0,
+      units: 0,
+      importedAt: NOW,
+    });
+    // Beträge ohne Gleitkomma-Reste, Keyword-ID als Target.
+    expect(rows[1]).toMatchObject({
+      amazonCampaignId: C1,
+      amazonAdGroupId: AG1,
+      amazonTargetId: KW1,
+      searchTerm: 'eulen nistkasten',
+      impressions: 1200,
+      clicks: 34,
+      cost: '12.34',
+      sales: '89.9',
+      purchases: 3,
+      units: 4,
+    });
+    expect(await db.select().from(amazonAdsCampaignDailyMetrics)).toEqual([]);
+  });
+
+  it('liest das englische Blatt', async () => {
+    const file = searchTermFile(
+      [
+        {
+          Product: 'Sponsored Products',
+          'Campaign ID': C1,
+          'Ad Group ID': AG1,
+          'Keyword ID': KW1,
+          'Customer Search Term': 'owl nest box',
+          Impressions: 10,
+          Clicks: 2,
+          Spend: 1.5,
+          Sales: 20,
+          Orders: 1,
+          Units: 1,
+        },
+      ],
+      { header: EN_SEARCH_TERM_HEADER, sheetName: 'SP Search Term Report' },
+    );
+    expect(await run(file, { fileName: SEPTEMBER })).toMatchObject({ searchTerms: 1 });
+    expect(await searchTerms()).toMatchObject([
+      { searchTerm: 'owl nest box', clicks: 2, cost: '1.5', sales: '20', purchases: 1 },
+    ]);
+  });
+
+  it('ersetzt denselben Zeitraum beim erneuten Upload und lässt andere Zeiträume stehen', async () => {
+    await run(searchTermFile(), { fileName: SEPTEMBER });
+    await run(searchTermFile([{ ...DE_SEARCH_TERM_ROWS[0]!, Klicks: 40 }]), {
+      fileName: 'bulk-a1b2c3-20260901-20260930-2.xlsx',
+    });
+    await run(searchTermFile([DE_SEARCH_TERM_ROWS[1]!]), {
+      fileName: 'bulk-a1b2c3-20260915-20261007-3.xlsx',
+    });
+
+    expect(
+      (await searchTerms()).map((r) => [r.periodStart, r.periodEnd, r.searchTerm, r.clicks]),
+    ).toEqual([
+      ['2026-09-01', '2026-09-30', 'eulen nistkasten', 40],
+      ['2026-09-15', '2026-10-07', 'b0erfunden01', 0],
+    ]);
+  });
+
+  it('behält vorhandene Suchbegriffe, wenn die neue Datei desselben Zeitraums keine enthält', async () => {
+    await run(searchTermFile(), { fileName: SEPTEMBER });
+    // Download ohne Leistungsdaten: leeres Blatt.
+    expect(await run(searchTermFile([]), { fileName: SEPTEMBER })).not.toHaveProperty(
+      'searchTerms',
+    );
+    expect(await searchTerms()).toHaveLength(2);
+  });
+
+  it('importiert ohne Zeitraum im Dateinamen die Entities, aber keine Suchbegriffe, und zählt das', async () => {
+    const counters = await run(searchTermFile(), { fileName: 'kunde-oktober.xlsx' });
+    expect(counters).toMatchObject({ campaigns: 2, searchTermsWithoutPeriod: 2 });
+    expect(counters).not.toHaveProperty('searchTerms');
+    expect(await searchTerms()).toEqual([]);
+    expect(logs).toContainEqual(
+      expect.objectContaining({ level: 'warn', msg: 'bulk_import.search_terms_without_period' }),
+    );
+  });
+
+  it('überspringt ungültige Zeilen, zählt sie getrennt und fasst doppelte zusammen', async () => {
+    const [first] = DE_SEARCH_TERM_ROWS;
+    const counters = await run(
+      searchTermFile([
+        first!,
+        { ...first!, Klicks: 6, Ausgaben: 0.66, Impressions: 100 },
+        { ...first!, 'Keyword-ID': null, 'Suchbegriff eines Kunden': 'geheim ohne target' },
+        { ...first!, 'Suchbegriff eines Kunden': 'geheim kaputt', Klicks: 'viele' },
+        { ...first!, 'Suchbegriff eines Kunden': null },
+      ]),
+      { fileName: SEPTEMBER, complete: true },
+    );
+    expect(counters).toMatchObject({ searchTerms: 1, invalidSearchTermRows: 3, invalidRows: 0 });
+    expect(await searchTerms()).toMatchObject([
+      { searchTerm: 'eulen nistkasten', impressions: 1300, clicks: 40, cost: '13' },
+    ]);
+    // Logs nennen Blatt, Zeile und Spalte, nie Zellinhalte (Kundendaten).
+    expect(JSON.stringify(logs)).not.toContain('geheim');
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.invalid_search_term_row', row: 4 }),
+    );
+  });
+
+  it('übergeht ein Suchbegriff-Blatt ohne die nötigen Spalten, ohne die Datei abzulehnen', async () => {
+    const counters = await run(germanFile(), { fileName: SEPTEMBER });
+    expect(counters).not.toHaveProperty('searchTerms');
+    expect(await searchTerms()).toEqual([]);
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.search_term_sheet_skipped' }),
+    );
+  });
+
+  it('schreibt keine Suchbegriffe, wenn die Datei abgelehnt wird', async () => {
+    const file = buildXlsx([
+      sheet('Sponsored Products-Kampagnen', DE_SP_HEADER, []),
+      sheet('SP Bericht „Suchbegriff“', DE_SEARCH_TERM_HEADER, DE_SEARCH_TERM_ROWS),
+    ]);
+    await expect(run(file, { fileName: SEPTEMBER })).rejects.toThrow(FileImportRejectedError);
+    expect(await searchTerms()).toEqual([]);
   });
 });
 

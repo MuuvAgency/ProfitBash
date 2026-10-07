@@ -949,7 +949,16 @@ describe('Datei-Importe (1.11f)', () => {
               error: 'Die Datei ist keine Bulk-Datei.',
               counters: {},
             }),
-            fileImport({ complete: true, counters: { campaigns: 10, removed: 2 } }),
+            fileImport({
+              complete: true,
+              counters: {
+                campaigns: 10,
+                removed: 2,
+                searchTerms: 359,
+                searchTermsWithoutPeriod: 1,
+                invalidSearchTermRows: 2,
+              },
+            }),
           ],
         }),
       }),
@@ -963,6 +972,10 @@ describe('Datei-Importe (1.11f)', () => {
     expect(text).toContain('Importiert');
     expect(text).toContain('10 Kampagnen');
     expect(text).toContain('2 entfernt');
+    // Suchbegriff-Blätter der Bulk-Datei (2b.1).
+    expect(text).toContain('359 Suchbegriffe');
+    expect(text).toContain('1 Suchbegriff ohne Zeitraum (Dateiname geändert)');
+    expect(text).toContain('2 ungültige Suchbegriff-Zeilen');
     expect(text).toContain('vollständig');
     expect(text).toContain('Keine Kampagne der Datei passt zu den bisherigen Kampagnen');
   });
