@@ -1006,9 +1006,12 @@ describe('Datei-Importe (1.11f)', () => {
     );
     const { wrapper } = await mountPage();
     const files = await openFiles(wrapper);
-    for (const label of ['Art', 'Datei', 'Datei ist vollständig']) {
+    for (const label of ['Datei', 'Datei ist vollständig']) {
       expect(files.text()).toContain(label);
     }
+    // Es gibt nur Bulk-Dateien (1.11e entfällt): keine Auswahl der Art, kein Tagesbericht.
+    expect(files.find('[role="combobox"]').exists()).toBe(false);
+    expect(files.text()).not.toContain('Tagesbericht');
     // Der Hinweis nennt die Download-Optionen (Befund 1.11d).
     expect(files.text()).toContain('pausierte und archivierte Elemente');
     expect(files.text()).toContain('ohne Impressionen');
@@ -1026,7 +1029,37 @@ describe('Datei-Importe (1.11f)', () => {
       [importsPath, { kind: 'bulk', complete: 'true', file: { name: 'bulk-de.xlsx', size: 4 } }],
     ]);
     await vi.waitFor(() => expect(files.text()).toContain('Wartet'));
-    expect(files.text()).toContain('Datei angenommen');
+    expect(files.text()).toContain('Datei angenommen. Der Import läuft im Hintergrund.');
+
+    // Ist der Import fertig, läuft nichts mehr im Hintergrund: Der Hinweis verschwindet.
+    imports = [fileImport({ complete: true })];
+    await vi.waitFor(() => expect(files.text()).toContain('Importiert'), { timeout: 8000 });
+    expect(files.text()).not.toContain('Datei angenommen');
+  }, 15_000);
+
+  it('zeigt die Datei-Profile bei 1440 px ohne waagerechtes Scrollen: ohne Zeitzone und „Daten bis“', async () => {
+    stubFetch(routes({ 'GET /api/profiles/file': json({ profiles: [kranich] }) }));
+    const { wrapper } = await mountPage();
+    const fileRow = await waitForRow(wrapper, 'Kranich Datei');
+    const grid = fileRow.element.closest<HTMLElement>('[style*="min-width"]');
+    const headers = [...grid!.querySelectorAll('[role="columnheader"]')].map((h) =>
+      h.textContent?.trim(),
+    );
+    // Ohne Tagesberichte gibt es für Datei-Profile keinen Datenstand, die Zeitzone zählt keine Tage.
+    expect(headers).toEqual([
+      'Land',
+      'Account-Name',
+      'Typ',
+      'Währung',
+      'Letzter Import',
+      'Client',
+      'Ausblenden',
+      'Dateien',
+    ]);
+    await vi.waitFor(() =>
+      expect(parseFloat(grid!.style.minWidth)).toBeLessThanOrEqual(FIT_WIDTH_AT_1440),
+    );
+    expect(wrapper.text()).not.toContain('Tagesbericht');
   });
 
   it('zeigt Fehler beim Hochladen im Dialog', async () => {

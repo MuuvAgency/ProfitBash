@@ -1227,8 +1227,15 @@ Teilaufgaben (Reihenfolge):
     schnellen Importen (vorher blieb „Noch keine Bulk-Datei“ bis zum Neuladen stehen), Zahlen in `font-data`, Fehlertext beim
     Wählen einer Datei zurückgesetzt, Dateiauswahl nur XLSX für Bulk-Dateien, Größe in Hinweis und Fehlertext aus
     `FILE_IMPORT_MAX_BYTES`, Hinweis-Texte in einem Composable (`connections/staleness.ts`), ungenutzte Texte entfernt.
-  - **Offen:** Prüfung im Browser-Pane (1440 px, Tablet, Handy, Hell/Dunkel, Konsole) mit einer echten Bulk-Datei ist noch nicht
-    gemacht (die Session konnte sich lokal nicht anmelden). In der nächsten Session nachholen, Befunde als eigener kleiner PR.
+  - **Browser-Pane geprüft (2026-10-07):** echte Bulk-Datei (Dominik, nicht im Repo) gegen die lokale Dev-DB hochgeladen und
+    importiert, 1440 px, Tablet, Handy, Hell/Dunkel, Konsole ohne Fehler. Befunde behoben: Der Verlauf stapelt unter `sm` die
+    Angaben je Datei (vorher 40 rem Mindestbreite, Status und Ergebnis auf dem Handy außerhalb des Sichtbereichs); die Tabelle der
+    Datei-Profile zeigt Zeitzone und „Daten bis“ nicht mehr (ohne Tagesberichte kein Datenstand) und passt damit bei 1440 px ohne
+    waagerechtes Scrollen (1075 px ≤ `FIT_WIDTH_AT_1440`, vorher lag „Dateien“ außerhalb); die Auswahl „Art“ und alle Texte zu
+    Tagesberichten sind entfernt (1.11e entfällt, der Dialog lädt immer `bulk` hoch); „Datei angenommen. Der Import läuft im
+    Hintergrund.“ verschwindet, sobald der Import fertig ist. Bewusst so: Auf dem Handy scrollt die Profiltabelle in ihrer Kachel
+    (wie die der Connections). Hinweis zum Prüfen: Klicks greifen im Browser-Pane nur in der natürlichen Fenstergröße, nicht bei
+    emuliertem Viewport (dort nur ansehen und messen).
 
 #### 1.11g Zusammenführen mit der API (nach der Freigabe, mit 1.10)
 - [ ] Datei-Profil mit dem API-Profil zusammenführen, danach übernimmt der API-Sync dieselben Zeilen.

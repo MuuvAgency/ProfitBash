@@ -237,7 +237,7 @@ export const de = {
     fileProfiles: {
       title: 'Profile ohne Connection',
       description:
-        'Für Werbekonten ohne API-Zugang. Die Daten kommen per Datei-Import aus der Amazon-Werbekonsole (Bulk-Datei und Tagesberichte).',
+        'Für Werbekonten ohne API-Zugang. Die Daten kommen per Datei-Import aus der Amazon-Werbekonsole (Bulk-Datei).',
       create: 'Profil anlegen',
       empty:
         'Noch keine Profile ohne Connection. Lege eines an, um Dateien aus der Werbekonsole zu importieren.',
@@ -275,7 +275,6 @@ export const de = {
       title: 'Dateien: {account} ({country})',
       upload: {
         title: 'Datei hochladen',
-        kind: 'Art',
         file: 'Datei',
         /** `{size}` aus `FILE_IMPORT_MAX_BYTES`. */
         fileHint: 'Bulk-Datei aus der Werbekonsole (XLSX), höchstens {size}.',
@@ -290,7 +289,6 @@ export const de = {
       kind: {
         bulk: 'Bulk-Datei',
         daily_report: 'Tagesbericht',
-        daily_reportPending: 'Tagesbericht (folgt)',
       },
       history: {
         title: 'Verlauf',
