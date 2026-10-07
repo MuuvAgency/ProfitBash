@@ -174,17 +174,28 @@ export function useCreateClient() {
   });
 }
 
-const isOpen = (fileImport: FileImport) =>
+export const isOpenFileImport = (fileImport: FileImport) =>
   fileImport.status === 'pending' || fileImport.status === 'running';
 
-/** Verlauf der Datei-Importe eines Profils (1.11f); fragt nach, solange eine Datei wartet oder läuft. */
-export function useFileImportsQuery(profileId: MaybeRefOrGetter<string | null>) {
+/**
+ * Verlauf der Datei-Importe eines Profils (1.11f); fragt nach, solange eine Datei wartet oder läuft, und mit
+ * `awaitImportId`, bis diese Datei im Verlauf steht (ein Neuladen direkt nach dem Upload kann sie noch verpassen).
+ */
+export function useFileImportsQuery(
+  profileId: MaybeRefOrGetter<string | null>,
+  options: { awaitImportId?: MaybeRefOrGetter<string | null> } = {},
+) {
   const orgId = useActiveOrgId();
   return useQuery({
     queryKey: computed(() => connectionKeys.fileImports(orgId.value, toValue(profileId) ?? '')),
     queryFn: () => api.listFileImports(toValue(profileId)!),
     enabled: computed(() => orgId.value !== null && toValue(profileId) !== null),
-    refetchInterval: (query) => (query.state.data?.some(isOpen) ? SYNC_POLL_INTERVAL_MS : false),
+    refetchInterval: (query) => {
+      const data = query.state.data ?? [];
+      const awaited = toValue(options.awaitImportId);
+      const missing = awaited != null && !data.some((i) => i.id === awaited);
+      return missing || data.some(isOpenFileImport) ? SYNC_POLL_INTERVAL_MS : false;
+    },
   });
 }
 

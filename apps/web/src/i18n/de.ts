@@ -277,12 +277,12 @@ export const de = {
         title: 'Datei hochladen',
         kind: 'Art',
         file: 'Datei',
-        fileHint: 'Bulk-Datei aus der Werbekonsole (XLSX), höchstens 50 MB.',
+        /** `{size}` aus `FILE_IMPORT_MAX_BYTES`. */
+        fileHint: 'Bulk-Datei aus der Werbekonsole (XLSX), höchstens {size}.',
         complete: 'Datei ist vollständig',
         completeHint:
           'Nur ankreuzen, wenn du die Bulk-Datei mit allen Optionen heruntergeladen hast: pausierte und archivierte Elemente sowie Elemente ohne Impressionen. Dann markiert der Import alles, was in der Datei fehlt, als entfernt. Ein Fehlgriff lässt sich erst mit der nächsten vollständigen Datei beheben.',
         submit: 'Hochladen',
-        close: 'Schließen',
         required: 'Bitte eine Datei auswählen.',
         accepted: 'Datei angenommen. Der Import läuft im Hintergrund.',
         removedProfile: 'Das Profil ist entfernt; es nimmt keine neuen Dateien an.',
@@ -296,7 +296,6 @@ export const de = {
         title: 'Verlauf',
         uploadedAt: 'Hochgeladen',
         file: 'Datei',
-        kind: 'Art',
         status: 'Status',
         result: 'Ergebnis',
         complete: 'vollständig',
@@ -896,7 +895,8 @@ export const de = {
     SAVED_VIEW_NOT_FOUND: 'Die Ansicht gibt es nicht mehr.',
     CLIENT_SLUG_TAKEN:
       'Einen Client mit diesem Namen gibt es schon. Bitte wähle ihn aus der Liste.',
-    FILE_TOO_LARGE: 'Die Datei ist größer als 50 MB.',
+    /** `{size}` = größte erlaubte Datei; ohne Parameter (Fehler aus anderen Stellen) bleibt der Satz verständlich. */
+    FILE_TOO_LARGE: 'Die Datei ist größer als erlaubt ({size}).',
     EMPTY_FILE: 'Die Datei ist leer.',
     PROFILE_HAS_CONNECTION:
       'Dieses Profil hat eine Connection; seine Daten kommen über die API, nicht per Datei.',

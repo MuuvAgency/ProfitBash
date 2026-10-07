@@ -1042,7 +1042,9 @@ describe('Datei-Importe (1.11f)', () => {
     await chooseFile(files, new File(['x'], 'gross.xlsx'));
     await files.get('form').trigger('submit');
     await flushPromises();
-    await vi.waitFor(() => expect(files.text()).toContain('Die Datei ist größer als 50 MB.'));
+    await vi.waitFor(() =>
+      expect(files.text()).toContain('Die Datei ist größer als erlaubt (50 MB).'),
+    );
   });
 });
 
@@ -1089,5 +1091,74 @@ describe('Datei-Importe: Abschluss (1.11f)', () => {
     // Der Verlauf fragt alle 3 s nach, solange eine Datei läuft.
     await vi.waitFor(() => expect(dialog()?.text()).toContain('Importiert'), { timeout: 5_000 });
     await vi.waitFor(() => expect(profileLoads()).toBeGreaterThan(before));
+  }, 10_000);
+
+  it('verfolgt eine hochgeladene Datei auch nach dem Schließen des Dialogs', async () => {
+    const profile = profileFixture({
+      accountName: 'Kranich Datei',
+      connectionId: null,
+      amazonProfileId: null,
+      lastBulkImportAt: null,
+    });
+    const path = `/api/profiles/${profile.id}/file-imports`;
+    const created = {
+      id: '0b7d3c1e-2a4f-4b6c-8d9e-0f1a2b3c4d5f',
+      profileId: profile.id,
+      kind: 'bulk',
+      fileName: 'bulk.xlsx',
+      byteSize: 4,
+      sha256: 'x',
+      complete: false,
+      status: 'pending',
+      error: null,
+      counters: {},
+      uploadedBy: null,
+      createdAt: '2026-10-07T09:00:00.000Z',
+      startedAt: null,
+      finishedAt: null,
+    } satisfies FileImport;
+    // Vor dem Upload leer, danach wartend, bis der Test den Import nach dem Schließen enden lässt.
+    let uploaded = false;
+    let finished = false;
+    const { requests } = stubFetch(
+      routes({
+        'GET /api/profiles/file': json({ profiles: [profile] }),
+        [`GET ${path}`]: () => {
+          if (!uploaded) return json({ fileImports: [] });
+          return json({ fileImports: [{ ...created, status: finished ? 'imported' : 'pending' }] });
+        },
+        [`POST ${path}`]: () => {
+          uploaded = true;
+          return json(created, 201);
+        },
+      }),
+    );
+    const { wrapper } = await mountPage();
+    const fileRow = await waitForRow(wrapper, 'Kranich Datei');
+    await fileRow.get('button[aria-label="Dateien von Kranich Datei (DE)"]').trigger('click');
+    await vi.waitFor(() => expect(dialog()?.text()).toContain('Noch keine Dateien hochgeladen.'));
+    const files = dialog()!;
+    const input = files.get<HTMLInputElement>('input#file-import-file');
+    Object.defineProperty(input.element, 'files', {
+      value: [new File(['xlsx'], 'bulk.xlsx')],
+      configurable: true,
+    });
+    await input.trigger('change');
+    await files.get('form').trigger('submit');
+    await vi.waitFor(() => expect(files.text()).toContain('Datei angenommen'));
+
+    // Dialog schließen, solange die Datei noch wartet.
+    const profileLoads = () => requests.filter((r) => r.path === '/api/profiles/file').length;
+    const before = profileLoads();
+    document.body
+      .querySelector<HTMLElement>(
+        '[role="dialog"] button[aria-label="Close"], [role="dialog"] .p-dialog-close-button',
+      )!
+      .click();
+    await vi.waitFor(() => expect(dialog()).toBeNull());
+    expect(profileLoads()).toBe(before);
+    finished = true;
+
+    await vi.waitFor(() => expect(profileLoads()).toBeGreaterThan(before), { timeout: 5_000 });
   }, 10_000);
 });

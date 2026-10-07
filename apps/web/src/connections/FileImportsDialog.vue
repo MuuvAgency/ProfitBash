@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import {
-  FILE_BULK_STALE_AFTER_DAYS,
   FILE_IMPORT_MAX_BYTES,
-  FILE_METRICS_STALE_AFTER_DAYS,
-  fileDataStaleness,
   formatDateTime,
+  formatNumber,
   type FileImport,
   type FileImportKind,
   type Profile,
@@ -21,14 +19,21 @@ import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { errorMessageKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 import { useJobRunLabels } from '../sync/labels';
-import { useFileImportsQuery, useRefreshFileProfiles, useUploadFileImport } from './queries';
+import { isOpenFileImport, useFileImportsQuery, useUploadFileImport } from './queries';
+import { useFileStalenessHints } from './staleness';
 
 /**
  * Upload und Verlauf der Datei-Importe eines Profils ohne Connection (`phase-1.md` 1.11f). Den Import macht der
  * Job `file-import` im Hintergrund; der Verlauf fragt nach, solange eine Datei wartet oder läuft.
  */
 const props = defineProps<{ profile: Profile | null }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{
+  close: [];
+  /** Datei angenommen; die Karte verfolgt den Import weiter, auch wenn der Dialog schließt. */
+  uploaded: [profileId: string, importId: string];
+  /** Eine im Verlauf laufende Datei ist fertig: Profile neu laden. */
+  finished: [];
+}>();
 
 const { t } = useI18n();
 const session = useSessionStore();
@@ -71,32 +76,32 @@ const title = computed(() =>
     : '',
 );
 
-const staleHints = computed(() => {
-  if (!props.profile) return [];
-  return fileDataStaleness(props.profile, new Date()).map((hint) =>
-    hint === 'noBulk'
-      ? t('connections.fileProfiles.noBulk')
-      : hint === 'bulkStale'
-        ? t('connections.fileProfiles.bulkStale', { days: FILE_BULK_STALE_AFTER_DAYS })
-        : t('connections.fileProfiles.metricsStale', { days: FILE_METRICS_STALE_AFTER_DAYS }),
-  );
-});
+const staleHints = useFileStalenessHints(() => props.profile);
+
+/** Größte Datei für Hinweis und Fehlertext (aus `FILE_IMPORT_MAX_BYTES`). */
+const maxSize = computed(
+  () => `${formatNumber(FILE_IMPORT_MAX_BYTES / (1024 * 1024), session.preferences.locale)} MB`,
+);
 
 const removed = computed(() => Boolean(props.profile?.removedAt));
 const imports = computed(() => importsQuery.data.value ?? []);
 
-// Ist die letzte wartende oder laufende Datei fertig, ändern sich „Letzter Import“ und die Hinweise am Profil.
-const refreshFileProfiles = useRefreshFileProfiles();
-const openCount = computed(
-  () => imports.value.filter((i) => i.status === 'pending' || i.status === 'running').length,
-);
-watch(openCount, (now, before) => {
-  if (before > 0 && now === 0) void refreshFileProfiles();
+// Dateien, die im Verlauf als wartend oder laufend zu sehen waren; endet eine, ändern sich „Letzter Import“ und die
+// Hinweise am Profil. Je ID, damit ein leerer Verlauf (Dialog geschlossen) nichts auslöst.
+const seenOpen = new Set<string>();
+watch(imports, (list) => {
+  let finished = false;
+  for (const fileImport of list) {
+    if (isOpenFileImport(fileImport)) seenOpen.add(fileImport.id);
+    else if (seenOpen.delete(fileImport.id)) finished = true;
+  }
+  if (finished) emit('finished');
 });
 
 function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
   file.value = target.files?.[0] ?? null;
+  errorKey.value = null;
   upload.reset();
 }
 
@@ -112,12 +117,13 @@ async function submit() {
   }
   errorKey.value = null;
   try {
-    await upload.mutateAsync({
+    const created = await upload.mutateAsync({
       profileId: props.profile.id,
       kind: kind.value,
       file: file.value,
       complete: kind.value === 'bulk' && complete.value,
     });
+    emit('uploaded', created.profileId, created.id);
     file.value = null;
     complete.value = false;
     if (fileInput.value) fileInput.value.value = '';
@@ -134,7 +140,7 @@ const STATUS_DOT = {
 } as const;
 
 function result(fileImport: FileImport) {
-  return labels.counters(fileImport);
+  return labels.counterParts(fileImport);
 }
 </script>
 
@@ -167,7 +173,7 @@ function result(fileImport: FileImport) {
           {{ t('connections.fileImports.upload.removedProfile') }}
         </p>
         <form v-else class="flex flex-col gap-space-md" novalidate @submit.prevent="submit">
-          <InlineError v-if="errorKey" :message="t(errorKey)" />
+          <InlineError v-if="errorKey" :message="t(errorKey, { size: maxSize })" />
           <p
             v-if="upload.isSuccess.value"
             role="status"
@@ -198,13 +204,13 @@ function result(fileImport: FileImport) {
                 id="file-import-file"
                 ref="fileInput"
                 type="file"
-                accept=".xlsx,.csv"
+                :accept="kind === 'bulk' ? '.xlsx' : '.xlsx,.csv'"
                 aria-describedby="file-import-file-hint"
                 class="rounded-control border border-outline bg-tile px-space-sm py-space-xs text-body-sm text-ink file:mr-space-sm file:rounded-control file:border-0 file:bg-well file:px-space-sm file:py-space-xs file:text-ink"
                 @change="onFileChange"
               />
               <p id="file-import-file-hint" class="text-body-sm text-ink-secondary">
-                {{ t('connections.fileImports.upload.fileHint') }}
+                {{ t('connections.fileImports.upload.fileHint', { size: maxSize }) }}
               </p>
             </div>
           </div>
@@ -306,7 +312,12 @@ function result(fileImport: FileImport) {
                   </span>
                 </td>
                 <td class="py-space-sm text-ink">
-                  <span v-if="fileImport.status === 'imported'">{{ result(fileImport) }}</span>
+                  <span v-if="fileImport.status === 'imported'">
+                    <template v-for="(part, index) in result(fileImport)" :key="part.key">
+                      <template v-if="index > 0"> · </template>
+                      <span class="font-data">{{ part.value }}</span> {{ part.label }}
+                    </template>
+                  </span>
                   <span v-if="fileImport.error" class="block text-loss">
                     {{ fileImport.error }}
                   </span>

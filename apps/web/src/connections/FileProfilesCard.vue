@@ -6,8 +6,9 @@ import { useI18n } from 'vue-i18n';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import FileImportsDialog from './FileImportsDialog.vue';
+import FileImportWatcher from './FileImportWatcher.vue';
 import ProfileGrid from './ProfileGrid.vue';
-import { useFileProfilesQuery } from './queries';
+import { useFileProfilesQuery, useRefreshFileProfiles } from './queries';
 
 /** Profile ohne Connection (`phase-1.md` 1.11a); ihre Daten kommen per Datei-Import. */
 const props = defineProps<{ clients: Client[]; clientsReady: boolean; showRemoved: boolean }>();
@@ -30,6 +31,17 @@ const filesProfileId = ref<string | null>(null);
 const filesProfile = computed(
   () => allProfiles.value.find((p) => p.id === filesProfileId.value) ?? null,
 );
+
+/** Hochgeladene Dateien bis zum Ende ihres Imports verfolgen, auch nach dem Schließen des Dialogs. */
+const refreshFileProfiles = useRefreshFileProfiles();
+const uploads = ref<{ profileId: string; importId: string }[]>([]);
+function onUploaded(profileId: string, importId: string) {
+  uploads.value = [...uploads.value, { profileId, importId }];
+}
+function onImportDone(importId: string) {
+  uploads.value = uploads.value.filter((u) => u.importId !== importId);
+  void refreshFileProfiles();
+}
 </script>
 
 <template>
@@ -95,6 +107,18 @@ const filesProfile = computed(
         @create-client="(profile) => emit('createClient', profile)"
       />
     </div>
-    <FileImportsDialog :profile="filesProfile" @close="filesProfileId = null" />
+    <FileImportsDialog
+      :profile="filesProfile"
+      @close="filesProfileId = null"
+      @uploaded="onUploaded"
+      @finished="refreshFileProfiles"
+    />
+    <FileImportWatcher
+      v-for="upload in uploads"
+      :key="upload.importId"
+      :profile-id="upload.profileId"
+      :import-id="upload.importId"
+      @done="onImportDone(upload.importId)"
+    />
   </section>
 </template>
