@@ -1,12 +1,14 @@
 # Erweiterungen: SQP-Organic-Indikator, Kampagnenaufbau, Tools, Wettbewerb
 
-> **Status: Ideen-Entwurf (2026-10-02), nicht eingeplant.** Grundlage: SYNQ-Studie zu SQP und organischem Rang, SYNQ-Seiten
+> **Status: eingeplant (2026-10-07).** Entwurf vom 2026-10-02, Fragen F-S1–F-S9 entschieden (Abschnitt 6). Übernommen in
+> `docs/plan.md` (§2 Phase 2b, §3, §7) und `docs/tasks/phase-2b.md`; Bausteine für Phase 3–7 stehen dort als Verweise auf dieses
+> Dokument. Grundlage: SYNQ-Studie zu SQP und organischem Rang, SYNQ-Seiten
 > „Pulsar“, „Free Tools“ und „Beta“ (Wettbewerber-App), Webinar-Folien „Mastering Sponsored Product Campaigns“ (A. Swade) und
 > „How to Stop Burning Money on Amazon Ads“ (SYNQ × myrealprofit).
 > Vor der Umsetzung gilt `CLAUDE.md`: **kein Scope vorziehen**, und nach „Eigenständigkeit“ werden Texte, Kataloge, Schwellen-
 > Tabellen oder Code aus Drittprodukten **nicht 1:1 übernommen**. Die Zahlen unten sind Recherche-Befunde, keine Vorgaben;
-> eigene Werte werden aus Muuv-Daten kalibriert. Die Fragen an Dominik (Abschnitt 6) erst klären, dann in `plan.md` bzw.
-> eine Phasen-Datei übernehmen.
+> eigene Werte werden aus Muuv-Daten kalibriert. Maßgeblich für die Umsetzung sind `plan.md` und die Phasen-Dateien; dieses
+> Dokument bleibt die Begründung und Materialsammlung.
 
 ## 0. Kurzfassung
 
@@ -295,20 +297,32 @@ eigene DE-Kalibrierung des Organic-Indikators, Profit-Sicht (Phase 7), Betriebsk
 
 - **F-S1 – Wo kommt SQP hin?** Empfehlung: als eigener Block **direkt nach 1.11** (Datei-Import ist dann gebaut, SQP-CSV nutzt
   denselben Weg) und **vor Phase 3**. Oder: Phase 3 zuerst, SQP danach. Oder: erst mit SP-API (Phase 7).
+  **Entschieden (Dominik, 2026-10-07): nach 1.11, vor Phase 3, als Phase 2b (`docs/tasks/phase-2b.md`).**
 - **F-S2 – Neuer Feature-Key?** Empfehlung: `organic` (SQP-Tracker, Funnel, Branded-Check) als eigener Key, damit er separat
   buchbar ist. Suchbegriff-Analyse (B) unter `sp-explorer`.
+  **Entschieden (Dominik, 2026-10-07): eigener Key `organic`; Suchbegriff-Analyse unter `sp-explorer`.**
 - **F-S3 – Welche Kunden haben Brand Registry und Zugriff auf Brand Analytics?** Ohne Brand-Analytics-Zugriff kein SQP. Wie oft
   kannst du die CSVs ziehen (wöchentlich je Marktplatz)?
+  **Antwort (Dominik, 2026-10-07): wenige Kunden, Downloads unregelmäßig.** Folge: Wochen-Lücken sichtbar machen, Trends nur
+  über vorhandene Wochen, Hinweis bei veralteten Daten (wie 1.11f).
 - **F-S4 – Gibt es Rank-Tracker-Exporte** (Helium 10, DataDive …) für mind. einen Kunden, um DE zu kalibrieren (A.5)?
+  **Antwort (Dominik, 2026-10-07): derzeit keine Exporte.** Kalibrierung bleibt ein optionaler Aufgabenpunkt am Ende von
+  Phase 2b; bis dahin vorläufige, je Organisation änderbare Schwellen.
 - **F-S5 – Suchbegriffe lesen schon vor Phase 3?** Empfehlung: ja, N-Gramme und Klassifizierung read-only direkt nach 1.11.
   Aktionen (Negativ, Harvest) erst mit dem Warenkorb.
+  **Entschieden (Dominik, 2026-10-07): ja, read-only in Phase 2b; Aktionen mit dem Warenkorb in Phase 3.**
 - **F-S6 – Optimizer-Grenzen:** Wöchentliche Maximaländerung (Vorschlag 30–35 %) und Gebotsboden (Vorschlag 60 % CPC) als
   Default je Organisation, überschreibbar je Client?
+  **Entschieden (Dominik, 2026-10-07): Defaults je Organisation, je Client überschreibbar (Phase 5).**
 - **F-S7 – vCPM und Off-Amazon im Setup:** standardmäßig blocken (Empfehlung) oder nur warnen?
+  **Entschieden (Dominik, 2026-10-07): standardmäßig blocken, bewusst je Kampagne freischaltbar (Phase 4).**
 - **F-S8 – Struktur-Katalog (C.2b):** Presets je Client und ASIN (Empfehlung) oder nur je Client? Welche Presets zum Start
   (Empfehlung: Muuv-Standard, Kontrolle, Funnel-Hub; Launch, Profit/Defend und Verbrauchsgut danach)? Phrase weiter anbieten?
+  **Entschieden (Dominik, 2026-10-07): Presets je Client und ASIN, alle sechs Presets in Phase 4; Phrase optional, Default
+  Breit-Cluster.**
 - **F-S9 – Conquesting-Kriterien** (Sterne, Reviews, Preis) brauchen Katalogdaten der Wettbewerber (Keepa/SP-API). Bis dahin:
   Conquesting-Liste von Hand pflegen (Empfehlung)?
+  **Entschieden (Dominik, 2026-10-07): Liste von Hand je Client; automatische Kriterien erst mit Katalogdaten (Phase 7).**
 
 ## 7. Quellen
 
@@ -321,15 +335,7 @@ eigene DE-Kalibrierung des Organic-Indikators, Profit-Sicht (Phase 7), Betriebsk
 - Folien (nicht im Repo, von Dominik): „Mastering Sponsored Product Campaigns on Amazon“ (A. Swade, Quartile),
   „How to Stop Burning Money On Amazon Ads“ (SYNQ × myrealprofit), „Der Amazon PPC Funnel“ (Fox Performance, Funnel-Edition 2026)
 
-## 8. Prompt für die nächste Claude-Code-Session
+## 8. Umsetzung
 
-```
-Lies CLAUDE.md, docs/plan.md, docs/tasks/phase-1.md (1.11), docs/tasks/phase-3.md und
-docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md.
-Ziel dieser Session: die Ideen aus dem Ideen-Dokument in die Planung übernehmen, noch kein Code.
-1. Stelle mir die Fragen F-S1 bis F-S9 gesammelt zu Beginn (mit deinen Empfehlungen).
-2. Trage meine Antworten mit Datum ein und übernimm die Bausteine in docs/plan.md (Roadmap, Navigation,
-   Feature-Keys) und als Aufgabenpunkte in die passende Phasen-Datei (ggf. neue Datei für den SQP-Block).
-3. Halte Eigenständigkeit ein: keine Texte/Tabellen/Schwellen aus SYNQ 1:1, Schwellen als konfigurierbare Daten.
-4. Kleiner Commit auf eigenem Branch, PR, dann Übergabe-Prompt für die Umsetzung.
-```
+Die Planung ist übernommen (2026-10-07). Den nächsten Schritt nennt die Reihenfolge in `docs/tasks/phase-1.md` (1.11) und
+`docs/tasks/phase-2b.md`.

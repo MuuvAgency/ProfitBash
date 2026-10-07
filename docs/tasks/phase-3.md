@@ -5,7 +5,9 @@
 > 1.10, 1.11, F12), `docs/decisions/` (001–004), `design/DESIGN.md`.
 >
 > **Status: Entwurf (2026-09-29).** Entschieden: F1, F2. Offen: **F3–F8** unter „Fragen an Dominik“ (die Nummern gelten nur
-> in dieser Datei); vor 3.1 mit Dominik klären und hier mit Datum eintragen. Zuerst kommt `phase-1.md` 1.11 (F1).
+> in dieser Datei); vor 3.1 mit Dominik klären und hier mit Datum eintragen. Zuerst kommen `phase-1.md` 1.11 (F1) und
+> `phase-2b.md` (Suchbegriffe & Organic, entschieden 2026-10-07). Zusätzlich in Phase 3: Suchbegriff-Aktionen aus 2b (Negativ
+> anlegen, Harvest vormerken) über den Warenkorb, siehe `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` Abschnitt B.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang (`phase-1.md` F12: das Partner Network nimmt keine
 > Einzelunternehmen an). Mit dem Abschluss von Phase 2 ist der Auslöser für den Datei-Import (`phase-1.md` 1.11) erreicht.

@@ -19,16 +19,32 @@ dass sie später ohne Umbau dazukommen (siehe §5).
 | **0 – Fundament** | Monorepo, Auth, App-Shell mit kompletter Sidebar, Amazon-Ads-OAuth, Profil-Sync, Jobs, Sync-Status, Settings, Deployment | Ads-API (Mocks bis Freigabe) |
 | **1 – Daten** | Entity-Sync (Kampagnen, Ad Groups, Targets, Negatives, Portfolios, Product Ads) und täglicher Report-Import je Ebene in `*_daily_metrics` | Ads-API |
 | **2 – Sehen** | Dashboard (Ads-KPIs), Explorer read-only mit Drill-Down, Chart, Grid, Zeitraum/Vergleich, gespeicherte Filter, Mitgliederverwaltung, ASIN-Quick-Tool | – |
-| **3 – Ändern** | Pending-Changes-Warenkorb → Submit an Amazon, Submissions, History und Revert, Bulk-Dialoge, Tags | Ads-API (Write) |
-| **4 – Tools** | Produktgruppen, Kampagnen-Setup nach **eigenem, konfigurierbarem** Katalog und Namensschema, Portfolio anlegen | – |
-| **5 – Automatisieren** | Budget-Caps mit Enforcer und Pacing, Notifications (SSE), Regeln und Bid-Optimizer als tägliche Pipeline, **Dayparting** (Tagesbudget über den Tag verteilen) | – |
-| **6 – Steuern** | Ziele (TACoS/ACoS/ROAS/Wachstum) je Client, Kundenzugang (Client-Orgs, Profil-Freigaben), Audit-Log-UI, Plattform-Admin, Impersonation | – |
+| **2b – Suchbegriffe & Organic** | Suchbegriffe aus dem Datei-Import: N-Gramme, Einstufung Harvest/Negieren/Beobachten (read-only), Impression-Share je Suchbegriff; SQP-CSV-Import (Brand Analytics) mit Organic-Indikator als Band, Funnel-Lücken, Branded-Check | – (Datei-Import aus 1.11) |
+| **3 – Ändern** | Pending-Changes-Warenkorb → Submit an Amazon, Submissions, History und Revert, Bulk-Dialoge, Tags, Suchbegriff-Aktionen aus 2b (Negativ, Harvest) | Ads-API (Write), bis dahin Bulk-Datei |
+| **4 – Tools** | Produktgruppen, Kampagnen-Setup nach **eigenem, konfigurierbarem** Struktur-Katalog (Bausteine, Graduation-Kanten, sechs Presets je Client und ASIN) und Namensschema, Bulk-Datei-Export, Gebots-Stack-Simulator, Portfolio anlegen | – |
+| **5 – Automatisieren** | Budget-Caps mit Enforcer und Pacing, Notifications (SSE), Regeln und Bid-Optimizer als tägliche Pipeline mit Leitplanken und Schattenmodus, Graduation- und Preset-Vorschläge, Prüfungen „kein Geld verbrennen“, **Dayparting** (Tagesbudget über den Tag verteilen) | – |
+| **6 – Steuern** | Ziele (TACoS/ACoS/ROAS/Wachstum) je Client mit Target-ACoS-Rechner, Kundenzugang (Client-Orgs, Profil-Freigaben), Audit-Log-UI, Plattform-Admin, Impersonation | – |
 | **7 – Profit** | Bestellungen, Gebühren, Retouren, Einkaufspreise (COGS), Versand, OPEX, P&L, organische Umsätze → echtes TACoS und Netto-Profit | **Amazon SP-API** |
 | später | Otto, eBay, Shopify, DSP, KI-Assistent/MCP-Schnittstelle | jeweilige APIs |
 
 **Hinweis TACoS:** Echtes TACoS braucht organische Umsätze aus der SP-API. Bis Phase 7 zeigt das
 Dashboard Ads-Kennzahlen. Die **SP-API-Registrierung sollte parallel jetzt starten**, weil die Freigabe dauert.
 Falls sie früh kommt, kann ein schmaler „Sales-Import" vor Phase 7 gezogen werden.
+
+**Erweiterungen aus dem Ideen-Dokument** (`docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md`, entschieden 2026-10-07, F-S1–F-S9):
+Phase 2b ist neu (`docs/tasks/phase-2b.md`). Für die späteren Phasen gilt das Dokument als Input, die Details werden beim
+Verfeinern der jeweiligen Phasen-Datei übernommen:
+- **Phase 3:** Suchbegriff-Aktionen aus 2b über den Warenkorb (Abschnitt B).
+- **Phase 4:** Struktur-Katalog mit Bausteinen, Graduation-Kanten und allen sechs Presets, je Client und ASIN (C.2b, F-S8); Phrase
+  optional, Default Breit-Cluster; vCPM und Off-Amazon standardmäßig gesperrt, je Kampagne bewusst freischaltbar (E, F-S7);
+  Conquesting-Liste von Hand je Client (F-S9); Bulk-Erzeugung mit zentraler Locale-Abbildung (C.3); Gebots-Stack-Simulator (D).
+- **Phase 5:** Optimizer-Leitplanken (max. Änderung je Woche, Gebotsboden, Mindestdaten) als Defaults je Organisation, je Client
+  überschreibbar (F, F-S6); Schattenmodus je Client; Graduation- und Preset-Wechsel als Vorschläge im Warenkorb; Organic-
+  Benachrichtigungen erst nach zwei Wochen in Folge; Prüfungen aus E (Off-Amazon-Spend, Placements, Reserved Share of Voice).
+- **Phase 6/7:** Rechner (Target-ACoS, Deal & Coupon, LTV), B2B-Inkrementalität, Preisverlauf im Organic-Tracker, SQP per SP-API,
+  automatische Conquesting-Kriterien, Absatzprognose mit Bestand als Gebots-Leitplanke (G, A.2).
+- **Eigenständigkeit:** Schwellen, Kataloge und Bezeichnungen sind eigene, konfigurierbare Daten; keine Werte, Texte oder Tabellen
+  aus den Quellen 1:1.
 
 ## 3. Navigation (Sidebar) und Feature-Keys
 
@@ -40,6 +56,7 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 | Übersicht | Dashboard | `/dashboard` | `dashboard` | 2 | `dashboard_home` |
 | Amazon Ads | Explorer | `/ads/explorer/*` | `sp-explorer` | 2 | – |
 | | Änderungen (Ausstehend · Übermittlungen) | `/ads/changes` | `changes` | 3 | – |
+| | Organic (SQP) | `/ads/organic` | `organic` | 2b | – |
 | | Tags | `/ads/tags/*` | `tags` | 3 | – |
 | | Tools (Produktgruppen · Kampagnen-Setup · Portfolio) | `/ads/tools/*` | `tools` | 4 | `amazon_ads` (Builder) |
 | | Budgets | `/ads/budgets` | `budgets` | 5 | `werbekosten_ppc` |
@@ -64,13 +81,15 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 
 ### Feature-Keys (Entitlements)
 
-`dashboard` · `sp-explorer` · `changes` · `tags` · `tools` · `budgets` · `automations` · `goals` · `profit` · `dsp-explorer` (pausiert)
+`dashboard` · `sp-explorer` · `organic` · `changes` · `tags` · `tools` · `budgets` · `automations` · `goals` · `profit` · `dsp-explorer` (pausiert)
 
 - `entitled` = die Organisation hat das Feature gebucht (`org_entitlements`).
 - `view` / `write` = Rechte des Users, abgeleitet aus seiner Rolle (admin/editor = write, viewer = nur view).
 - Neue Features = neuer Key in `packages/shared/src/features.ts`. Keine DB-Enum-Migration nötig (Key als Text).
 - `sp-explorer` meint **Sponsored Ads** (SP, SB und SD in einem Explorer, im Gegensatz zu `dsp-explorer`); der Name bleibt, um die
-  Entitlements nicht zu migrieren (`phase-2.md` F1). Das ASIN-Quick-Tool hängt am selben Key.
+  Entitlements nicht zu migrieren (`phase-2.md` F1). Das ASIN-Quick-Tool hängt am selben Key, ebenso die Suchbegriff-Analyse
+  (Phase 2b).
+- `organic` (Phase 2b, F-S2): SQP-Import, Organic-Indikator, Funnel-Lücken und Branded-Check, separat buchbar.
 
 ## 4. Rollen
 
@@ -137,3 +156,4 @@ Siehe `docs/decisions/001-stack.md` §Kosten. Kurzfassung: **Bauen = 0 €**, Pi
 - Budget-Pacing-Chart mit Ist-, Soll- und Prognosekurve
 - Freie Tastenkürzel (Grid-Filter, Chart ein/aus, Drill-Down)
 - KI-Assistent über MCP (Fragen an die eigenen Daten, Vorschläge für Regeln)
+- Aus dem Ideen-Dokument (Abschnitte G/H), noch ohne Phase: Multi-Channel mit Google Ads, stündliche Daten (braucht AMS/API)
