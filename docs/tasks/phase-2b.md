@@ -72,7 +72,19 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 - [ ] Suchbegriff-Blätter (SP, SB) der Bulk-Datei im Bulk-Import mitlesen (F1): Kopfzeilen über Aliasse (DE/EN), Zuordnung zu
       Target bzw. Ad Group und Kampagne über die IDs aus 1.11d, Speicherung als Zeitraumsummen je Import (Zeitraum aus der
       Datei bzw. dem Dateinamen; neue Tabelle, nicht `amazon_ads_search_term_daily_metrics`); Test mit nachgebauter Datei.
-      Echte Kopfzeilen der Blätter vorher lokal sichten (nur Kopfzeilen und Werte-Listen).
+      Echte Kopfzeilen: siehe Befund unten.
+- **Befund aus drei echten Bulk-Dateien** (Dominik, 2026-10-07, nur Kopfzeilen und Zeilenzahlen, nicht im Repo): Blätter
+  „SP Bericht „Suchbegriff““/„SP Search Term Report“ und „SB Bericht „Suchbegriff““/„SB Search Term Report“ (SB leer, nur
+  Kopfzeile). Spalten deutsch: `Produkt`, `Kampagnen-ID`, `Anzeigengruppen-ID`, `Keyword-ID`, `Produkt-Targeting-ID`,
+  `Kampagnenname`, `Name der Anzeigengruppe`, `Portfolioname` (nur SP; alle drei „(Nur zu Informationszwecken)“), `Zustand`,
+  `Kampagnenstatus`, `Gebot`, `Keyword-Text`, `Übereinstimmungstyp`, `Ausdruck für Produkt-Targeting`, `Suchbegriff eines
+  Kunden`, `Impressions`, `Klicks`, `Klickrate`, `Ausgaben`, `Verkäufe`, `Bestellungen`, `Einheiten`, `Conversion-Rate`, `ACOS`,
+  `CPC`, `ROAS`. Englisch: `Product`, `Campaign ID`, `Ad Group ID`, `Keyword ID`, `Product Targeting ID`, `Campaign Name`,
+  `Ad Group Name`, `Portfolio Name`, `State`, `Campaign State`, `Bid`, `Keyword Text`, `Match Type`, `Product Targeting
+  Expression`, `Customer Search Term`, `Impressions`, `Clicks`, `Click-through Rate`, `Spend`, `Sales`, `Orders`, `Units`,
+  `Conversion Rate`, `ACOS`, `CPC`, `ROAS`. Kein Datum und keine Währung in den Zeilen (Zeitraum nur im Dateinamen, Währung =
+  Profil). Abgeleitete Spalten (Klickrate, Conversion-Rate, ACOS, CPC, ROAS) nicht speichern, sondern berechnen. Die deutsche
+  Datei hat eine falsch übersetzte Spalte für den aufgelösten Ausdruck („Problem mit dem Ausdruck … Behoben“).
 
 ### 2b.2 Suchbegriff-Analyse (`packages/engine`, `apps/api`, `apps/web`)
 - [ ] N-Gramme (1–3) über Suchbegriffe mit Spend, Sales, ACoS, CVR je Datei-Zeitraum (F1); Grid im Explorer (`sp-explorer`).
