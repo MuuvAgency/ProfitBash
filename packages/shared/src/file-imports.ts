@@ -5,7 +5,10 @@ import { z } from 'zod';
  * API, Worker und Web.
  */
 
-/** `bulk` = Bulk-Datei (Entities, 1.11d), `daily_report` = Tagesbericht (Kennzahlen, 1.11e). */
+/**
+ * `bulk` = Bulk-Datei (Entities, 1.11d). `daily_report` = Tagesbericht (Kennzahlen, 1.11e): entfällt bis auf Weiteres
+ * (kein Importer, die Oberfläche bietet die Art nicht an), bleibt aber in Schema und API.
+ */
 export const FILE_IMPORT_KINDS = ['bulk', 'daily_report'] as const;
 export type FileImportKind = (typeof FILE_IMPORT_KINDS)[number];
 

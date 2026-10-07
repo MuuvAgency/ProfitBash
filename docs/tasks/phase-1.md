@@ -1236,6 +1236,10 @@ Teilaufgaben (Reihenfolge):
     Hintergrund.“ verschwindet, sobald der Import fertig ist. Bewusst so: Auf dem Handy scrollt die Profiltabelle in ihrer Kachel
     (wie die der Connections). Hinweis zum Prüfen: Klicks greifen im Browser-Pane nur in der natürlichen Fenstergröße, nicht bei
     emuliertem Viewport (dort nur ansehen und messen).
+  - Review der Befunde (unabhängig): keine kritischen. Übernommen: Der Hinweis hängt nicht mehr, wenn der Verlauf nach dem
+    Upload nicht lädt (`awaitImportId`, kein Hinweis bei Ladefehler); ausdrückliche Tabellen-Rollen im Verlauf (gestapelte
+    Zeilen verlieren in Safari sonst die Semantik); Test mit vorgestellter Uhr statt 3 s Wartezeit; ungenutztes
+    `upload.reset()` entfernt.
 
 #### 1.11g Zusammenführen mit der API (nach der Freigabe, mit 1.10)
 - [ ] Datei-Profil mit dem API-Profil zusammenführen, danach übernimmt der API-Sync dieselben Zeilen.
