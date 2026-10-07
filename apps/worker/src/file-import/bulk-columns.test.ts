@@ -27,7 +27,7 @@ describe('Kopfzeilen', () => {
       normalizeHeader('Campaign Name'),
     );
     expect(normalizeHeader('State (Read only)')).toBe(normalizeHeader('state'));
-    expect(normalizeHeader('Name der  Anzeigengruppe')).toBe(
+    expect(normalizeHeader('Name\u00a0der  Anzeigengruppe')).toBe(
       normalizeHeader('Name der Anzeigengruppe'),
     );
   });
@@ -184,12 +184,10 @@ describe('Werte', () => {
   });
 
   it('erkennt Gebotsstrategien auch mit geschütztem Leerzeichen und Gedankenstrich', () => {
-    expect(mapValue(BIDDING_STRATEGIES, 'Dynamische Gebote – nur senken').value).toBe(
+    expect(mapValue(BIDDING_STRATEGIES, 'Dynamische Gebote\u00a0– nur senken').value).toBe(
       'SALES_DOWN_ONLY',
     );
-    expect(mapValue(BIDDING_STRATEGIES, 'Dynamic bids - down only').value).toBe(
-      'SALES_DOWN_ONLY',
-    );
+    expect(mapValue(BIDDING_STRATEGIES, 'Dynamic bids - down only').value).toBe('SALES_DOWN_ONLY');
     expect(mapValue(BIDDING_STRATEGIES, 'Dynamic bids - up and down').value).toBe(
       'SALES_UP_AND_DOWN',
     );
@@ -321,7 +319,11 @@ describe('Ausdrücke für Produkt-Targeting', () => {
       known: true,
       targetType: 'audience',
       matchType: null,
-      expression: { event: 'VIEWS', lookback: 30, bulkExpression: 'views=(exactProduct lookback=30)' },
+      expression: {
+        event: 'VIEWS',
+        lookback: 30,
+        bulkExpression: 'views=(exactProduct lookback=30)',
+      },
     });
     expect(parseTargetExpression('audience="424242"', '')).toEqual({
       known: true,

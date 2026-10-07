@@ -116,7 +116,7 @@ export function columnLabel(column: BulkColumn): string {
  * „(Nur zu Informationszwecken)“).
  */
 export function normalizeHeader(text: string): string {
-  let result = text.replace(/[   ]/g, ' ').trim();
+  let result = text.replace(/[\u00a0\u2007\u202f]/g, ' ').trim();
   for (;;) {
     const stripped = result.replace(/\s*\([^()]*\)\s*$/, '');
     if (stripped === result) break;
@@ -124,7 +124,7 @@ export function normalizeHeader(text: string): string {
   }
   return result
     .toLowerCase()
-    .replace(/[-_‐-―]/g, ' ')
+    .replace(/[-_\u2010-\u2015]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -151,12 +151,11 @@ export function mapHeader(header: readonly string[]): Map<BulkColumn, number> {
 
 export type BulkSheetKind = 'portfolios' | 'sp' | 'sb' | 'sd';
 
-export const AD_PRODUCT_OF_SHEET: Readonly<Record<Exclude<BulkSheetKind, 'portfolios'>, string>> =
-  {
-    sp: 'SPONSORED_PRODUCTS',
-    sb: 'SPONSORED_BRANDS',
-    sd: 'SPONSORED_DISPLAY',
-  };
+export const AD_PRODUCT_OF_SHEET: Readonly<Record<Exclude<BulkSheetKind, 'portfolios'>, string>> = {
+  sp: 'SPONSORED_PRODUCTS',
+  sb: 'SPONSORED_BRANDS',
+  sd: 'SPONSORED_DISPLAY',
+};
 
 /**
  * Art eines Blatts nach seinem Namen, `null` für alle anderen (Suchbegriff-Berichte, „Config“, Hilfsblätter).
@@ -180,8 +179,8 @@ export function classifySheet(name: string): BulkSheetKind | null {
 /** Vergleichsform eines Enum-Werts: klein, Leerraum zusammengefasst, Gedankenstriche als `-`. */
 export function normalizeValue(text: string): string {
   return text
-    .replace(/[   ]/g, ' ')
-    .replace(/[‐-―]/g, '-')
+    .replace(/[\u00a0\u2007\u202f]/g, ' ')
+    .replace(/[\u2010-\u2015]/g, '-')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
