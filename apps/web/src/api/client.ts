@@ -30,6 +30,11 @@ export type TimeSeriesData = Schemas['TimeSeriesResponse'];
 export type ExplorerRowsInput = Schemas['ExplorerRowsRequest'];
 export type ExplorerRowsData = Schemas['ExplorerRowsResponse'];
 export type AsinSearchInput = Schemas['AsinSearchRequest'];
+export type SearchTermPeriodData = Schemas['SearchTermPeriod'];
+export type SearchTermAnalysisData = Schemas['SearchTermAnalysisResponse'];
+export type SearchTermRowData = Schemas['SearchTermRow'];
+export type SearchTermNgramData = Schemas['SearchTermNgram'];
+export type SearchTermRulesData = Schemas['SearchTermRules'];
 
 export interface ApiOptions {
   /**
@@ -206,6 +211,24 @@ export function createApi(options: ApiOptions = {}) {
 
     createClient: (input: { name: string }): Promise<Client> =>
       unwrap(client.POST('/api/clients', { body: input })),
+
+    /** Geschützte Begriffe ersetzen (Suchbegriff-Analyse: nie ein Negativ-Vorschlag). */
+    updateClient: (id: string, patch: { protectedTerms: string[] }): Promise<Client> =>
+      unwrap(client.PATCH('/api/clients/{id}', { params: { path: { id } }, body: patch })),
+
+    /** Suchbegriff-Analyse (2b.2): je Profil und **einem** Datei-Zeitraum, Regeln je Organisation. */
+    searchTerms: {
+      periods: async (): Promise<SearchTermPeriodData[]> =>
+        (await unwrap(client.POST('/api/ads/search-terms/periods', { body: {} }))).periods,
+      analysis: (input: {
+        profileId: string;
+        periodStart: string;
+        periodEnd: string;
+      }): Promise<SearchTermAnalysisData> =>
+        unwrap(client.POST('/api/ads/search-terms/analysis', { body: input })),
+      saveRules: (rules: SearchTermRulesData) =>
+        unwrap(client.PUT('/api/ads/search-terms/rules', { body: rules })),
+    },
 
     /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */
     listJobRuns: async (query: JobRunListQuery = {}): Promise<JobRun[]> =>

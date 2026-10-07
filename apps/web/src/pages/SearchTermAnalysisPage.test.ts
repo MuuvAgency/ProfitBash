@@ -286,7 +286,10 @@ describe('Suchbegriff-Analyse', () => {
 
   it('zeigt einen Fehler, wenn die Zeiträume nicht laden', async () => {
     await mountPage(PATH, {
-      'POST /api/ads/search-terms/periods': json({ error: { code: 'INTERNAL', message: 'x' } }, 500),
+      'POST /api/ads/search-terms/periods': json(
+        { error: { code: 'INTERNAL', message: 'x' } },
+        500,
+      ),
     });
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
   });
@@ -300,7 +303,7 @@ describe('Regeln ändern', () => {
   });
 
   it('speichert Regeln (ACoS als Prozent eingegeben, als Bruch gesendet) und lädt die Analyse neu', async () => {
-    const saved = { ...rules, harvestMaxAcos: '0.305', negateMinCost: '12.5' };
+    const saved = { ...rules, harvestMaxAcos: '0.305', negateMinCost: '12.50' };
     const { requests } = await mountPage(PATH, {
       'PUT /api/ads/search-terms/rules': json({
         rules: saved,

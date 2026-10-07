@@ -80,6 +80,13 @@ const routes: RouteRecordRaw[] = [
         path: 'ads/explorer',
         redirect: (to) => ({ path: '/ads/explorer/campaigns', query: to.query, hash: to.hash }),
       },
+      // Suchbegriff-Analyse (2b.2): eigene Seite unter dem Explorer, vor dessen Unterpfaden.
+      {
+        path: 'ads/explorer/search-term-analysis',
+        name: 'search-term-analysis',
+        component: () => import('../pages/SearchTermAnalysisPage.vue'),
+        meta: { feature: 'sp-explorer', navItemId: 'explorer', titleKey: 'searchTerms.title' },
+      },
       ...NAVIGATION.flatMap((group) => group.items.map(navRoute)),
       {
         path: SETTINGS_PATH.slice(1),

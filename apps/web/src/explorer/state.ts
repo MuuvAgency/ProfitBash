@@ -20,6 +20,10 @@ export const EXPLORER_TABS: { level: ExplorerLevel; segment: string }[] = [
   { level: 'negative', segment: 'negatives' },
 ];
 
+/** Suchbegriff-Analyse (2b.2): eigene Seite unter dem Explorer, als weiterer Reiter verlinkt. */
+export const SEARCH_TERM_ANALYSIS_PATH = `${EXPLORER_BASE_PATH}/search-term-analysis`;
+export const SEARCH_TERM_ANALYSIS_TAB = 'searchTermAnalysis';
+
 export const DEFAULT_EXPLORER_LEVEL: ExplorerLevel = 'campaign';
 
 export function levelFromPath(path: string): ExplorerLevel {

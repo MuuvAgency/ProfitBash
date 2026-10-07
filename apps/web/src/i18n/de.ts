@@ -702,6 +702,90 @@ export const de = {
       beforeEarliest: 'Der Zeitraum beginnt vor dem ersten Tag mit Daten ({date}).',
     },
   },
+  searchTerms: {
+    title: 'Suchbegriff-Analyse',
+    tab: 'Suchbegriff-Analyse',
+    description:
+      'Welche Suchbegriffe und Wortbausteine tragen, welche verbrennen Geld? Aus den Suchbegriff-Blättern der Bulk-Datei, nur zum Lesen.',
+    profile: 'Profil',
+    period: 'Zeitraum der Datei',
+    periodOption: '{range} · {rows} Zeilen',
+    periodLine: 'Zeitraum der Datei:',
+    importedAt: 'importiert am',
+    periodHint:
+      'Die Kennzahlen sind Summen über den Download-Zeitraum einer Bulk-Datei. Zeiträume verschiedener Dateien werden nie addiert: Wähle einen Zeitraum, ein freier Zeitraum ist hier nicht möglich.',
+    periodsError: 'Die Datei-Zeiträume konnten nicht geladen werden.',
+    analysisError: 'Die Suchbegriffe konnten nicht geladen werden.',
+    empty: {
+      title: 'Noch keine Suchbegriffe',
+      text: 'Lade unter „Clients & Connections“ eine Bulk-Datei der Werbekonsole mit Leistungsdaten hoch. Der Dateiname muss den Zeitraum tragen (bulk-…-von-bis-….xlsx).',
+    },
+    classification: 'Einstufung',
+    class: {
+      harvest: 'Ernten',
+      negate: 'Negieren',
+      watch: 'Beobachten',
+    },
+    reason: {
+      protected: 'Geschützter Begriff',
+      alreadyTargeted: 'Schon exakt gebucht',
+      acosAboveTarget: 'ACoS über dem Ziel',
+      noSales: 'Käufe ohne Umsatz',
+      tooFewData: 'Zu wenig Daten',
+    },
+    rules: {
+      title: 'Regeln',
+      edit: 'Regeln ändern',
+      harvest:
+        'Ernten {purchases} und einem ACoS bis {acos}, wenn es noch kein exaktes Target gibt.',
+      negate: 'Negieren {clicks} ohne Kauf und mindestens {cost} Spend.',
+      purchases: 'ab {n} Kauf | ab {n} Käufen',
+      clicks: 'ab {n} Klick | ab {n} Klicks',
+      defaults: 'Das sind die vorläufigen Startwerte. Du kannst sie für die Organisation ändern.',
+    },
+    rulesDialog: {
+      title: 'Regeln der Einstufung',
+      intro:
+        'Die Regeln gelten für alle Profile der Organisation. Alles, was weder geerntet noch negiert wird, bleibt bei „Beobachten“.',
+      harvestMinPurchases: 'Käufe mindestens',
+      harvestMaxAcos: 'ACoS höchstens (in %)',
+      negateMinClicks: 'Klicks ohne Kauf mindestens',
+      negateMinCost: 'Spend mindestens',
+      costHint:
+        'Der Betrag gilt in der Währung des jeweiligen Profils (hier {currency}), ohne Umrechnung.',
+      invalid:
+        'Bitte ganze Zahlen ab 1 für Käufe und Klicks, einen ACoS über 0 % und einen Betrag ab 0 angeben.',
+    },
+    protected: {
+      some: 'Geschützter Begriff des Clients (nie negieren): | Geschützte Begriffe des Clients (nie negieren):',
+      none: 'Keine geschützten Begriffe. Marke und Hero-Begriffe pflegst du je Client unter „Clients & Connections“.',
+    },
+    view: {
+      label: 'Ansicht',
+      terms: 'Suchbegriffe',
+      ngrams: 'Wortbausteine',
+    },
+    ngramSize: {
+      label: 'Länge der Wortbausteine',
+      all: 'Alle',
+      n: '{n} Wort | {n} Wörter',
+    },
+    ngramHint:
+      'Wortbausteine sind einzelne Wörter und Folgen aus zwei oder drei Wörtern der Suchbegriffe. Die Kennzahlen eines Bausteins summieren alle Suchbegriffe, die ihn enthalten; Bausteine überschneiden sich also.',
+    truncated:
+      'Es werden die {max} Zeilen mit dem höchsten Spend gezeigt (von {total}). Summe und Einstufungs-Zähler gelten für alle.',
+    ngramsTruncated:
+      'Es werden die {max} Wortbausteine mit dem höchsten Spend gezeigt (von {total}).',
+    noRows: 'Keine Suchbegriffe in diesem Zeitraum.',
+    noRowsInClass: 'Keine Suchbegriffe mit dieser Einstufung.',
+    column: {
+      searchTerm: 'Suchbegriff',
+      classification: 'Einstufung',
+      gram: 'Wortbaustein',
+      size: 'Wörter',
+      searchTerms: 'Suchbegriffe',
+    },
+  },
   explorer: {
     productSearch: {
       empty: 'Keine Product Ads zu dieser Suche.',
