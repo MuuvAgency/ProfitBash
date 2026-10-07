@@ -24,6 +24,7 @@ const {
   amazonAdsNegativeTargets,
   amazonAdsPortfolios,
   amazonAdsProductAds,
+  amazonAdsProfiles,
   amazonAdsTargets,
   fileImports,
   jobRuns,
@@ -999,91 +1000,279 @@ describe('importBulkFile', () => {
 
 describe('Konto-Prüfung und vollständige Dateien (Dominik, 2026-10-07)', () => {
   const BEFORE_UPLOAD = new Date('2026-10-01T00:00:00Z');
+  const UPLOADED_AT = new Date('2026-10-05T07:00:00Z');
+  const X = '399999999999991';
   const campaign = (
     profileId: string,
     amazonCampaignId: string,
-    adProduct = SP,
-    createdAt = BEFORE_UPLOAD,
+    options: {
+      adProduct?: string;
+      createdAt?: Date;
+      placeholder?: boolean;
+      removed?: boolean;
+    } = {},
   ) => ({
     organizationId: ids.org,
     profileId,
     amazonCampaignId,
-    adProduct,
+    adProduct: options.adProduct ?? SP,
     name: amazonCampaignId,
     state: 'ENABLED',
-    createdAt,
+    createdAt: options.createdAt ?? BEFORE_UPLOAD,
+    syncedAt: options.placeholder ? null : BEFORE_UPLOAD,
+    removedAt: options.removed ? BEFORE_UPLOAD : null,
   });
-
-  it('lehnt eine Datei ab, deren Kampagnen schon zu einem anderen Profil gehören', async () => {
-    const other = await createFileProfile(db, {
+  const otherProfile = async (
+    accountName: string,
+    patch: { isHidden?: boolean; removedAt?: Date } = {},
+  ) => {
+    const created = await createFileProfile(db, {
       userId: ids.admin,
       orgId: ids.org,
       input: {
-        accountName: 'Lumen FR',
+        accountName,
         countryCode: 'FR',
         currencyCode: 'EUR',
         timezone: 'Europe/Paris',
         accountType: 'seller',
       },
     });
-    await db.insert(amazonAdsCampaigns).values(campaign(other.id, C1));
+    if (patch.isHidden !== undefined || patch.removedAt !== undefined) {
+      await db.update(amazonAdsProfiles).set(patch).where(eq(amazonAdsProfiles.id, created.id));
+    }
+    return created.id;
+  };
+  const removedIds = async () =>
+    new Map(
+      (
+        await db
+          .select({
+            id: amazonAdsCampaigns.amazonCampaignId,
+            removedAt: amazonAdsCampaigns.removedAt,
+          })
+          .from(amazonAdsCampaigns)
+      ).map((row) => [row.id, row.removedAt !== null]),
+    );
+  const completeRun = (file: Uint8Array) => run(file, { complete: true, uploadedAt: UPLOADED_AT });
+
+  /** Vorhandener Baum unter Kampagne X (vor dem Upload angelegt), den die Datei nicht mehr enthält. */
+  async function seedMissingTree() {
+    const [x] = await db
+      .insert(amazonAdsCampaigns)
+      .values([campaign(ids.profile, C1), campaign(ids.profile, X)])
+      .returning({ id: amazonAdsCampaigns.id });
+    const [xCampaign] = await db
+      .select({ id: amazonAdsCampaigns.id })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.amazonCampaignId, X));
+    void x;
+    const base = {
+      organizationId: ids.org,
+      profileId: ids.profile,
+      adProduct: SP,
+      createdAt: BEFORE_UPLOAD,
+    };
+    const [group] = await db
+      .insert(amazonAdsAdGroups)
+      .values({
+        ...base,
+        campaignId: xCampaign!.id,
+        amazonAdGroupId: '499999999999991',
+        name: 'g',
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsAdGroups.id });
+    await db.insert(amazonAdsTargets).values({
+      ...base,
+      campaignId: xCampaign!.id,
+      adGroupId: group!.id,
+      amazonTargetId: '699999999999991',
+      targetType: 'keyword',
+      state: 'ENABLED',
+      expression: {},
+    });
+    await db.insert(amazonAdsProductAds).values({
+      ...base,
+      campaignId: xCampaign!.id,
+      adGroupId: group!.id,
+      amazonAdId: '599999999999991',
+      state: 'ENABLED',
+    });
+    await db.insert(amazonAdsNegativeTargets).values({
+      ...base,
+      campaignId: xCampaign!.id,
+      adGroupId: group!.id,
+      amazonTargetId: '699999999999992',
+      level: 'ad_group',
+      targetType: 'keyword',
+      state: 'ENABLED',
+      expression: {},
+    });
+    await db.insert(amazonAdsPortfolios).values({
+      organizationId: ids.org,
+      profileId: ids.profile,
+      amazonPortfolioId: '299999999999991',
+      name: 'alt',
+      createdAt: BEFORE_UPLOAD,
+    });
+  }
+
+  const removedCount = async (
+    table:
+      | typeof amazonAdsAdGroups
+      | typeof amazonAdsTargets
+      | typeof amazonAdsProductAds
+      | typeof amazonAdsNegativeTargets
+      | typeof amazonAdsPortfolios,
+  ) =>
+    (await db.select({ removedAt: table.removedAt }).from(table)).filter(
+      (r) => r.removedAt !== null,
+    ).length;
+
+  it('lehnt eine Datei ab, deren Kampagnen schon zu einem anderen Profil gehören', async () => {
+    const other = await otherProfile('Lumen FR');
+    await db.insert(amazonAdsCampaigns).values(campaign(other, C1));
     await expect(run(germanFile())).rejects.toThrow(/anderen Profil.*Lumen FR/);
-    expect((await db.select().from(amazonAdsCampaigns)).map((c) => c.profileId)).toEqual([
-      other.id,
-    ]);
+    expect((await db.select().from(amazonAdsCampaigns)).map((c) => c.profileId)).toEqual([other]);
   });
 
-  it('weist darauf hin, wenn keine Kampagne der Datei zu den Kampagnen des Profils passt', async () => {
-    await db.insert(amazonAdsCampaigns).values(campaign(ids.profile, '399999999999999'));
+  it('erkennt fremde Kampagnen auch nur über Ad Groups und Targets der Datei', async () => {
+    const other = await otherProfile('Lumen FR');
+    await db.insert(amazonAdsCampaigns).values(campaign(other, C1));
+    // Nur Ad Group und Keyword, keine Kampagnen-Zeile.
+    await expect(run(germanFile({ spRows: [DE_SP_ROWS[3]!, DE_SP_ROWS[5]!] }))).rejects.toThrow(
+      /anderen Profil/,
+    );
+  });
+
+  it('nennt ausgeblendete Profile nicht beim Namen und übergeht entfernte Profile', async () => {
+    const hidden = await otherProfile('Versteckt FR', { isHidden: true });
+    await db.insert(amazonAdsCampaigns).values(campaign(hidden, C1));
+    await expect(run(germanFile())).rejects.toThrow(/einem anderen Profil der Organisation/);
+    await expect(run(germanFile())).rejects.not.toThrow(/Versteckt/);
+    await db.delete(amazonAdsCampaigns);
+
+    const removed = await otherProfile('Alt FR', { removedAt: BEFORE_UPLOAD });
+    await db.insert(amazonAdsCampaigns).values(campaign(removed, C1));
+    await expect(run(germanFile())).resolves.toMatchObject({ campaigns: 2 });
+  });
+
+  it('weist darauf hin, wenn keine Kampagne der Datei zu den echten Kampagnen des Profils passt', async () => {
+    await db.insert(amazonAdsCampaigns).values(campaign(ids.profile, X));
     const counters = await run(germanFile());
     expect(counters).toMatchObject({ campaigns: 2, unmatchedCampaigns: 2 });
     expect(logs).toContainEqual(
       expect.objectContaining({ level: 'warn', msg: 'bulk_import.no_matching_campaigns' }),
     );
-    // Passt mindestens eine, kein Hinweis.
     logs.length = 0;
     expect(await run(germanFile())).not.toHaveProperty('unmatchedCampaigns');
   });
 
-  it('markiert bei vollständiger Datei fehlende Entities der enthaltenen Ad-Typen als entfernt', async () => {
-    await db.insert(amazonAdsCampaigns).values([
-      campaign(ids.profile, '399999999999991'),
-      // SB-Blatt ist in der Datei (leer): Auch SB-Kampagnen fehlen also wirklich.
-      campaign(ids.profile, '399999999999992', SB),
-      // SD-Blatt fehlt in der Datei: nichts zu SD sagen.
-      campaign(ids.profile, '399999999999993', SD),
-      // Erst nach dem Upload entstanden (z. B. Platzhalter aus einem Bericht): bleibt.
-      campaign(ids.profile, '399999999999994', SP, new Date('2026-10-05T07:59:00Z')),
-    ]);
-    const counters = await run(germanFile(), {
-      complete: true,
-      uploadedAt: new Date('2026-10-05T07:00:00Z'),
-    });
-    expect(counters).toMatchObject({ removed: 2 });
-    const rows = await db
-      .select({ id: amazonAdsCampaigns.amazonCampaignId, removedAt: amazonAdsCampaigns.removedAt })
-      .from(amazonAdsCampaigns)
-      .orderBy(asc(amazonAdsCampaigns.amazonCampaignId));
-    expect(rows.filter((r) => r.removedAt !== null).map((r) => r.id)).toEqual([
-      '399999999999991',
-      '399999999999992',
-    ]);
+  it('gibt keinen Hinweis bei Platzhaltern oder entfernten Kampagnen des Profils', async () => {
+    await db
+      .insert(amazonAdsCampaigns)
+      .values([
+        campaign(ids.profile, X, { placeholder: true }),
+        campaign(ids.profile, '399999999999992', { removed: true }),
+      ]);
+    expect(await run(germanFile())).not.toHaveProperty('unmatchedCampaigns');
   });
 
-  it('markiert nichts ohne Häkchen „vollständig“ oder bei ungültigen Zeilen', async () => {
-    await db.insert(amazonAdsCampaigns).values(campaign(ids.profile, '399999999999991'));
+  it('markiert bei vollständiger Datei fehlende Entities aller Ebenen als entfernt', async () => {
+    await seedMissingTree();
+    const counters = await completeRun(germanFile());
+    expect(counters).toMatchObject({ removed: 6 });
+    expect((await removedIds()).get(X)).toBe(true);
+    expect((await removedIds()).get(C1)).toBe(false);
+    for (const table of [
+      amazonAdsAdGroups,
+      amazonAdsTargets,
+      amazonAdsProductAds,
+      amazonAdsNegativeTargets,
+      amazonAdsPortfolios,
+    ]) {
+      expect(await removedCount(table)).toBe(1);
+    }
+  });
+
+  it('holt eine entfernte Entity zurück, sobald eine Datei sie wieder enthält', async () => {
+    await db
+      .insert(amazonAdsCampaigns)
+      .values([campaign(ids.profile, C1), campaign(ids.profile, C2)]);
+    // Datei ohne die Zeilen von C2.
+    await completeRun(germanFile({ spRows: DE_SP_ROWS.slice(0, 11) }));
+    expect((await removedIds()).get(C2)).toBe(true);
+    await completeRun(germanFile());
+    expect((await removedIds()).get(C2)).toBe(false);
+  });
+
+  it('entfernt nichts von Typen ohne Zeile in der Datei (leeres Blatt, fehlendes Blatt) oder nach Upload Entstandenes', async () => {
+    await db.insert(amazonAdsCampaigns).values([
+      campaign(ids.profile, C1),
+      // SB-Blatt steht leer in der Datei: sagt nichts über SB.
+      campaign(ids.profile, '399999999999992', { adProduct: SB }),
+      // SD-Blatt fehlt.
+      campaign(ids.profile, '399999999999993', { adProduct: SD }),
+      // Erst nach dem Upload entstanden (z. B. Platzhalter aus einem Bericht).
+      campaign(ids.profile, '399999999999994', { createdAt: new Date('2026-10-05T07:59:00Z') }),
+    ]);
+    expect(await completeRun(germanFile())).toMatchObject({ removed: 0 });
+    expect([...(await removedIds()).values()].every((removed) => !removed)).toBe(true);
+  });
+
+  it('entfernt keine Eltern, auf die Zeilen der Datei verweisen', async () => {
+    // AG1 fehlt als eigene Zeile, Product Ad und Keyword darunter stehen in der Datei.
+    const [c1] = await db
+      .insert(amazonAdsCampaigns)
+      .values(campaign(ids.profile, C1))
+      .returning({ id: amazonAdsCampaigns.id });
+    await db.insert(amazonAdsAdGroups).values({
+      organizationId: ids.org,
+      profileId: ids.profile,
+      campaignId: c1!.id,
+      amazonAdGroupId: AG1,
+      adProduct: SP,
+      name: 'g',
+      state: 'ENABLED',
+      createdAt: BEFORE_UPLOAD,
+    });
+    const rows = DE_SP_ROWS.filter((_, index) => index !== 3);
+    await completeRun(germanFile({ spRows: rows }));
+    const [group] = await db
+      .select({ removedAt: amazonAdsAdGroups.removedAt })
+      .from(amazonAdsAdGroups)
+      .where(eq(amazonAdsAdGroups.amazonAdGroupId, AG1));
+    expect(group?.removedAt).toBeNull();
+  });
+
+  it('markiert nichts ohne Häkchen, bei ungültigen Zeilen, bei nicht abgebildeten Zeilen oder fremd wirkender Datei', async () => {
+    await seedMissingTree();
     expect(await run(germanFile())).toMatchObject({ removed: 0 });
-    const rows = [...DE_SP_ROWS, sp({ ...DE_SP_ROWS[5]!, Gebot: 'viel' })];
-    expect(await run(germanFile({ spRows: rows }), { complete: true })).toMatchObject({
+
+    const invalid = [...DE_SP_ROWS, sp({ ...DE_SP_ROWS[5]!, Gebot: 'viel' })];
+    expect(await completeRun(germanFile({ spRows: invalid }))).toMatchObject({
       removed: 0,
       invalidRows: 1,
     });
-    expect(logs).toContainEqual(expect.objectContaining({ msg: 'bulk_import.removal_skipped' }));
-    const [kept] = await db
-      .select({ removedAt: amazonAdsCampaigns.removedAt })
-      .from(amazonAdsCampaigns)
-      .where(eq(amazonAdsCampaigns.amazonCampaignId, '399999999999991'));
-    expect(kept?.removedAt).toBeNull();
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.removal_skipped', reason: 'invalid_rows' }),
+    );
+
+    const unsupported = [...DE_SP_ROWS, sp({ Entität: 'Portfolio', 'Kampagnen-ID': C1 })];
+    expect(await completeRun(germanFile({ spRows: unsupported }))).toMatchObject({ removed: 0 });
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.removal_skipped', reason: 'partially_read' }),
+    );
+    expect((await removedIds()).get(X)).toBe(false);
+  });
+
+  it('markiert nichts, wenn keine Kampagne der Datei zum Profil passt (fremd wirkende Datei)', async () => {
+    await db.insert(amazonAdsCampaigns).values(campaign(ids.profile, X));
+    expect(await completeRun(germanFile())).toMatchObject({ removed: 0, unmatchedCampaigns: 2 });
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.removal_skipped', reason: 'unmatched' }),
+    );
+    expect((await removedIds()).get(X)).toBe(false);
   });
 });
 

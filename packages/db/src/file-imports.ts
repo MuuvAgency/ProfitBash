@@ -5,7 +5,7 @@ import {
   type FileImportKind,
   type FileImportStatus,
 } from '@profitbash/shared';
-import { and, asc, desc, eq, inArray, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { AccessDeniedError, canSeeProfile, getOrgRole } from './access';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
@@ -387,8 +387,9 @@ export async function hasClaimableFileImport(
 
 /**
  * Wem gehören die Kampagnen einer Datei? Schutz gegen die Bulk-Datei eines anderen Kontos (1.11d, Dominik
- * 2026-10-07): `otherProfiles` = Profile derselben Organisation, die schon eine dieser Kampagnen-IDs haben;
- * `existing` = Kampagnen des Profils, `matched` = davon in der Datei.
+ * 2026-10-07). `otherProfiles` = nicht entfernte Profile derselben Organisation, die schon eine dieser
+ * Kampagnen-IDs haben (mit `isHidden`: Meldungen nennen nur sichtbare beim Namen); `existing` = echte,
+ * nicht entfernte Kampagnen des Profils (ohne Platzhalter aus Berichten), `matched` = davon in der Datei.
  */
 export async function campaignOwnership(
   db: DbOrTx,
@@ -396,7 +397,7 @@ export async function campaignOwnership(
 ): Promise<{
   existing: number;
   matched: number;
-  otherProfiles: Array<{ id: string; accountName: string }>;
+  otherProfiles: Array<{ id: string; accountName: string; isHidden: boolean }>;
 }> {
   const ids = sql.param([...new Set(input.amazonCampaignIds)]);
   const [counts] = await db.execute<{ existing: number; matched: number }>(sql`
@@ -404,15 +405,22 @@ export async function campaignOwnership(
       (count(*) filter (where ${amazonAdsCampaigns.amazonCampaignId} = any(${ids}::text[])))::int as matched
     from ${amazonAdsCampaigns}
     where ${amazonAdsCampaigns.organizationId} = ${input.organizationId}
-      and ${amazonAdsCampaigns.profileId} = ${input.profileId}`);
+      and ${amazonAdsCampaigns.profileId} = ${input.profileId}
+      and ${amazonAdsCampaigns.removedAt} is null
+      and ${amazonAdsCampaigns.syncedAt} is not null`);
   const otherProfiles = await db
-    .selectDistinct({ id: amazonAdsProfiles.id, accountName: amazonAdsProfiles.accountName })
+    .selectDistinct({
+      id: amazonAdsProfiles.id,
+      accountName: amazonAdsProfiles.accountName,
+      isHidden: amazonAdsProfiles.isHidden,
+    })
     .from(amazonAdsCampaigns)
     .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, amazonAdsCampaigns.profileId))
     .where(
       and(
         eq(amazonAdsCampaigns.organizationId, input.organizationId),
         ne(amazonAdsCampaigns.profileId, input.profileId),
+        isNull(amazonAdsProfiles.removedAt),
         sql`${amazonAdsCampaigns.amazonCampaignId} = any(${ids}::text[])`,
       ),
     )
