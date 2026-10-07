@@ -19,6 +19,21 @@ export function json(body: unknown, status = 200): Response {
   });
 }
 
+/** JSON wie gesendet; Multipart als Objekt der Felder, Dateien als `{ name, size }`. */
+async function readBody(request: Request): Promise<unknown> {
+  if (request.headers.get('content-type')?.startsWith('multipart/form-data')) {
+    const form = await request.formData();
+    return Object.fromEntries(
+      [...form.entries()].map(([key, value]) => [
+        key,
+        typeof value === 'string' ? value : { name: value.name, size: value.size },
+      ]),
+    );
+  }
+  const text = await request.text();
+  return text ? (JSON.parse(text) as unknown) : undefined;
+}
+
 /**
  * Ersetzt `fetch` durch eine Routing-Tabelle (`'GET /api/me'` → Antwort) und zeichnet alle Requests auf.
  * Unbekannte Routen antworten mit 404.
@@ -27,14 +42,13 @@ export function stubFetch(routes: Record<string, Responder | Response>) {
   const requests: RecordedRequest[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
-    const text = await request.text();
     const url = new URL(request.url);
     const recorded: RecordedRequest = {
       method: request.method,
       path: url.pathname,
       search: url.search,
       headers: request.headers,
-      body: text ? (JSON.parse(text) as unknown) : undefined,
+      body: await readBody(request),
       credentials: request.credentials,
     };
     requests.push(recorded);

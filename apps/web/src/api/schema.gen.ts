@@ -2500,6 +2500,8 @@ export interface components {
             syncedAt: string | null;
             /** Format: date */
             metricsImportedThrough: string | null;
+            /** Format: date-time */
+            lastBulkImportAt: string | null;
         };
         FileProfileCreate: {
             accountName: string;

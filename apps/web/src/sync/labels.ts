@@ -121,7 +121,7 @@ export function useJobRunLabels() {
   }
 
   /** Zähler als Zahl (formatiert) und Bezeichnung, z. B. `{ value: '4', label: 'Profile' }`. */
-  function counterParts(run: JobRun) {
+  function counterParts(run: Pick<JobRun, 'counters'>) {
     return Object.entries(run.counters)
       .filter(([key, value]) => value !== 0 || ALWAYS_SHOWN.has(key))
       .sort(([a], [b]) => counterRank(a) - counterRank(b) || a.localeCompare(b))
@@ -136,7 +136,7 @@ export function useJobRunLabels() {
   }
 
   /** z. B. „4 Profile · 1 neu“. */
-  function counters(run: JobRun) {
+  function counters(run: Pick<JobRun, 'counters'>) {
     return counterParts(run)
       .map(({ value, label }) => `${value} ${label}`)
       .join(' · ');

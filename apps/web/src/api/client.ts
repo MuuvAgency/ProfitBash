@@ -2,6 +2,8 @@ import type {
   AmazonOAuthStart,
   Client,
   Connection,
+  FileImport,
+  FileImportKind,
   FileProfileCreate,
   JobRun,
   JobRunListQuery,
@@ -168,6 +170,37 @@ export function createApi(options: ApiOptions = {}) {
       unwrap(
         client.PATCH('/api/profiles/{id}', { params: { path: { id: profileId } }, body: patch }),
       ),
+
+    /** Verlauf der Datei-Importe eines Profils ohne Connection (1.11c), neueste zuerst. */
+    listFileImports: async (profileId: string): Promise<FileImport[]> =>
+      (
+        await unwrap(
+          client.GET('/api/profiles/{id}/file-imports', { params: { path: { id: profileId } } }),
+        )
+      ).fileImports,
+
+    /** Datei hochladen (Multipart); `complete` nur für Downloads mit allen Elementen (1.11d). */
+    uploadFileImport: (
+      profileId: string,
+      input: { kind: FileImportKind; file: File; complete: boolean },
+    ): Promise<FileImport> => {
+      const form = new FormData();
+      form.append('kind', input.kind);
+      form.append('complete', String(input.complete));
+      form.append('file', input.file, input.file.name);
+      return unwrap(
+        client.POST('/api/profiles/{id}/file-imports', {
+          params: { path: { id: profileId } },
+          // Der Typ beschreibt die Felder; gesendet wird das FormData (Content-Type samt Boundary setzt der Browser).
+          body: {
+            kind: input.kind,
+            file: input.file.name,
+            complete: input.complete ? 'true' : 'false',
+          },
+          bodySerializer: () => form,
+        }),
+      );
+    },
 
     listClients: async (): Promise<Client[]> => (await unwrap(client.GET('/api/clients'))).clients,
 

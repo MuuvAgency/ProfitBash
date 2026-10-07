@@ -5,7 +5,20 @@ import {
   type FileImportKind,
   type FileImportStatus,
 } from '@profitbash/shared';
-import { and, asc, desc, eq, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableName,
+  inArray,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { AccessDeniedError, canSeeProfile, getOrgRole } from './access';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
@@ -426,4 +439,19 @@ export async function campaignOwnership(
     )
     .orderBy(amazonAdsProfiles.accountName, amazonAdsProfiles.id);
   return { existing: counts?.existing ?? 0, matched: counts?.matched ?? 0, otherProfiles };
+}
+
+/**
+ * Upload-Zeitpunkt der letzten erfolgreich importierten Bulk-Datei eines Profils, für ein `select` über
+ * `amazon_ads_profiles` (`phase-1.md` 1.11f, Hinweis auf veraltete Daten). Der Upload liegt nah am Download in der
+ * Konsole; das Ende des Imports kann bei Wiederholungen deutlich später sein.
+ */
+export function lastBulkImportAtSql(): SQL<Date | null> {
+  // Ausdrücklich qualifiziert: `"id"` träfe in der Unterabfrage sonst die Zeile von `file_imports`.
+  const profileId = sql`${sql.identifier(getTableName(amazonAdsProfiles))}.${sql.identifier(amazonAdsProfiles.id.name)}`;
+  return sql<Date | null>`(
+    select max(${fileImports.createdAt}) from ${fileImports}
+    where ${fileImports.profileId} = ${profileId}
+      and ${fileImports.kind} = 'bulk' and ${fileImports.status} = 'imported'
+  )`.mapWith((value: string | Date | null) => (value === null ? null : new Date(value)));
 }

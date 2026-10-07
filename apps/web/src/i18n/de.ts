@@ -258,6 +258,59 @@ export const de = {
         cancel: 'Abbrechen',
         required: 'Bitte einen Namen eingeben.',
       },
+      /** Spalten der Profiltabelle (nur Profile ohne Connection, 1.11f). */
+      column: {
+        lastImport: 'Letzter Import',
+        files: 'Dateien',
+      },
+      noBulk: 'Noch keine Bulk-Datei',
+      /** `{days}` = `FILE_BULK_STALE_AFTER_DAYS` bzw. `FILE_METRICS_STALE_AFTER_DAYS`. */
+      bulkStale: 'Bulk-Datei älter als {days} Tage',
+      metricsStale: 'Kennzahlen älter als {days} Tage',
+      openFiles: 'Dateien',
+      openFilesFor: 'Dateien von {account} ({country})',
+    },
+    /** Upload und Verlauf der Datei-Importe eines Profils (1.11f). */
+    fileImports: {
+      title: 'Dateien: {account} ({country})',
+      upload: {
+        title: 'Datei hochladen',
+        kind: 'Art',
+        file: 'Datei',
+        fileHint: 'Bulk-Datei aus der Werbekonsole (XLSX), höchstens 50 MB.',
+        complete: 'Datei ist vollständig',
+        completeHint:
+          'Nur ankreuzen, wenn du die Bulk-Datei mit allen Optionen heruntergeladen hast: pausierte und archivierte Elemente sowie Elemente ohne Impressionen. Dann markiert der Import alles, was in der Datei fehlt, als entfernt. Ein Fehlgriff lässt sich erst mit der nächsten vollständigen Datei beheben.',
+        submit: 'Hochladen',
+        close: 'Schließen',
+        required: 'Bitte eine Datei auswählen.',
+        accepted: 'Datei angenommen. Der Import läuft im Hintergrund.',
+        removedProfile: 'Das Profil ist entfernt; es nimmt keine neuen Dateien an.',
+      },
+      kind: {
+        bulk: 'Bulk-Datei',
+        daily_report: 'Tagesbericht',
+        daily_reportPending: 'Tagesbericht (folgt)',
+      },
+      history: {
+        title: 'Verlauf',
+        uploadedAt: 'Hochgeladen',
+        file: 'Datei',
+        kind: 'Art',
+        status: 'Status',
+        result: 'Ergebnis',
+        complete: 'vollständig',
+        empty: 'Noch keine Dateien hochgeladen.',
+        loadError: 'Der Verlauf konnte nicht geladen werden.',
+        unmatched:
+          'Keine Kampagne der Datei passt zu den bisherigen Kampagnen dieses Profils. Stammt die Datei aus dem richtigen Werbekonto?',
+      },
+      status: {
+        pending: 'Wartet',
+        running: 'Läuft',
+        imported: 'Importiert',
+        failed: 'Fehlgeschlagen',
+      },
     },
   },
   sync: {
@@ -843,6 +896,10 @@ export const de = {
     SAVED_VIEW_NOT_FOUND: 'Die Ansicht gibt es nicht mehr.',
     CLIENT_SLUG_TAKEN:
       'Einen Client mit diesem Namen gibt es schon. Bitte wähle ihn aus der Liste.',
+    FILE_TOO_LARGE: 'Die Datei ist größer als 50 MB.',
+    EMPTY_FILE: 'Die Datei ist leer.',
+    PROFILE_HAS_CONNECTION:
+      'Dieses Profil hat eine Connection; seine Daten kommen über die API, nicht per Datei.',
     CURRENCY_NOT_SELECTABLE:
       'Diese Anzeigewährung ist nicht wählbar. Es gilt wieder „Automatisch“.',
     FEATURE_FORBIDDEN:

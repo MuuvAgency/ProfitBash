@@ -282,6 +282,11 @@ export const profileSchema = z
      * Kampagnen-Reports; leer, solange noch keiner importiert ist.
      */
     metricsImportedThrough: z.iso.date().nullable(),
+    /**
+     * Upload der letzten erfolgreich importierten Bulk-Datei (Profile ohne Connection, `phase-1.md` 1.11f);
+     * sonst leer.
+     */
+    lastBulkImportAt: timestamp.nullable(),
   })
   .meta({ id: 'Profile' });
 export type Profile = z.infer<typeof profileSchema>;

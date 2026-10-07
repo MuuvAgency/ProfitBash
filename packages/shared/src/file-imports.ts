@@ -45,3 +45,52 @@ export type FileImport = z.infer<typeof fileImportSchema>;
 export const fileImportListSchema = z
   .object({ fileImports: z.array(fileImportSchema) })
   .meta({ id: 'FileImportList' });
+
+/** Hinweis „Bulk-Datei veraltet“, wenn der letzte erfolgreiche Bulk-Import mehr als so viele Tage zurückliegt. */
+export const FILE_BULK_STALE_AFTER_DAYS = 7;
+/** Hinweis „Kennzahlen veraltet“, wenn „Daten bis“ mehr als so viele Kalendertage (Zeitzone des Profils) zurückliegt. */
+export const FILE_METRICS_STALE_AFTER_DAYS = 3;
+
+/** `noBulk` = noch keine Bulk-Datei importiert, `bulkStale` / `metricsStale` siehe Konstanten oben. */
+export type FileDataStaleness = 'noBulk' | 'bulkStale' | 'metricsStale';
+
+const DAY_MS = 86_400_000;
+
+function todayIn(timezone: string, now: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+/**
+ * Hinweise auf veraltete Daten eines Profils ohne Connection (`phase-1.md` 1.11f). Fehlende Kennzahlen sind kein
+ * Hinweis: Viele Datei-Profile haben (noch) keine Tagesberichte.
+ */
+export function fileDataStaleness(
+  input: {
+    lastBulkImportAt: string | null;
+    metricsImportedThrough: string | null;
+    timezone: string;
+  },
+  now: Date,
+): FileDataStaleness[] {
+  const result: FileDataStaleness[] = [];
+  if (input.lastBulkImportAt === null) result.push('noBulk');
+  else if (
+    now.getTime() - Date.parse(input.lastBulkImportAt) >
+    FILE_BULK_STALE_AFTER_DAYS * DAY_MS
+  ) {
+    result.push('bulkStale');
+  }
+  if (input.metricsImportedThrough !== null) {
+    const today = todayIn(input.timezone, now);
+    const days =
+      (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${input.metricsImportedThrough}T00:00:00Z`)) /
+      DAY_MS;
+    if (days > FILE_METRICS_STALE_AFTER_DAYS) result.push('metricsStale');
+  }
+  return result;
+}

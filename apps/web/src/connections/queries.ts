@@ -1,4 +1,11 @@
-import type { Client, FileProfileCreate, Profile, ProfilePatch } from '@profitbash/shared';
+import type {
+  Client,
+  FileImport,
+  FileImportKind,
+  FileProfileCreate,
+  Profile,
+  ProfilePatch,
+} from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onBeforeUnmount, readonly, ref, toValue, type MaybeRefOrGetter } from 'vue';
 import { api } from '../api';
@@ -16,6 +23,8 @@ export const connectionKeys = {
   /** Profile ohne Connection (Datei-Import); unter `allProfiles`, damit Profil-Änderungen sie mit erfassen. */
   fileProfiles: (orgId: string | null) => ['profiles', orgId, 'file'] as const,
   clients: (orgId: string | null) => ['clients', orgId] as const,
+  fileImports: (orgId: string | null, profileId: string) =>
+    ['file-imports', orgId, profileId] as const,
 };
 
 /** Abstand der Abfragen, solange ein Sync läuft (siehe `useSyncPolling`). */
@@ -163,4 +172,47 @@ export function useCreateClient() {
       await queryClient.invalidateQueries({ queryKey: connectionKeys.clients(orgId.value) });
     },
   });
+}
+
+const isOpen = (fileImport: FileImport) =>
+  fileImport.status === 'pending' || fileImport.status === 'running';
+
+/** Verlauf der Datei-Importe eines Profils (1.11f); fragt nach, solange eine Datei wartet oder läuft. */
+export function useFileImportsQuery(profileId: MaybeRefOrGetter<string | null>) {
+  const orgId = useActiveOrgId();
+  return useQuery({
+    queryKey: computed(() => connectionKeys.fileImports(orgId.value, toValue(profileId) ?? '')),
+    queryFn: () => api.listFileImports(toValue(profileId)!),
+    enabled: computed(() => orgId.value !== null && toValue(profileId) !== null),
+    refetchInterval: (query) => (query.state.data?.some(isOpen) ? SYNC_POLL_INTERVAL_MS : false),
+  });
+}
+
+/** Datei hochladen; danach Verlauf und „Letzter Import“ der Datei-Profile neu laden. */
+export function useUploadFileImport() {
+  const orgId = useActiveOrgId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      profileId,
+      ...input
+    }: {
+      profileId: string;
+      kind: FileImportKind;
+      file: File;
+      complete: boolean;
+    }) => api.uploadFileImport(profileId, input),
+    onSuccess: (_created, { profileId }) =>
+      queryClient.invalidateQueries({
+        queryKey: connectionKeys.fileImports(orgId.value, profileId),
+      }),
+  });
+}
+
+/** Profile ohne Connection neu laden (z. B. „Letzter Import“ nach einem fertigen Import). */
+export function useRefreshFileProfiles() {
+  const orgId = useActiveOrgId();
+  const queryClient = useQueryClient();
+  return () =>
+    queryClient.invalidateQueries({ queryKey: connectionKeys.fileProfiles(orgId.value) });
 }
