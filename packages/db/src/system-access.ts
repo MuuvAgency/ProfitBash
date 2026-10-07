@@ -125,6 +125,26 @@ function withAmazonProfileId<T extends { amazonProfileId: string | null }>(
   return row as T & { amazonProfileId: string };
 }
 
+/**
+ * Währung eines Profils der Organisation (Datei-Import, `phase-1.md` 1.11d: Bulk-Dateien nennen keine
+ * Währung, Beträge gelten in der des Profils). `null`, wenn das Profil nicht zur Organisation gehört.
+ */
+export async function findProfileCurrency(
+  db: DbOrTx,
+  input: { organizationId: string; profileId: string },
+): Promise<string | null> {
+  const [row] = await db
+    .select({ currencyCode: amazonAdsProfiles.currencyCode })
+    .from(amazonAdsProfiles)
+    .where(
+      and(
+        eq(amazonAdsProfiles.id, input.profileId),
+        eq(amazonAdsProfiles.organizationId, input.organizationId),
+      ),
+    );
+  return row?.currencyCode ?? null;
+}
+
 export interface JobProfile {
   id: string;
   amazonProfileId: string;

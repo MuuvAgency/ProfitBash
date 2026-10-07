@@ -424,11 +424,7 @@ export function openXlsx(file: Uint8Array, options: XlsxOptions = {}): XlsxWorkb
               callback([], emitted, EMPTY_ROW_INFO);
             }
             emitted = rowNumber;
-            callback(
-              row,
-              rowNumber,
-              numericColumns ? { numericColumns } : EMPTY_ROW_INFO,
-            );
+            callback(row, rowNumber, numericColumns ? { numericColumns } : EMPTY_ROW_INFO);
           }
         },
         text(text) {
