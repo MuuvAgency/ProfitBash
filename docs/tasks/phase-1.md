@@ -1190,12 +1190,43 @@ Teilaufgaben (Reihenfolge):
     sinngemäß in 1.7, `as EntityKind` aus der Werte-Tabelle).
 
 #### 1.11e Tagesbericht → Kennzahlen
+> **Zurückgestellt (2026-10-07):** Es liegt noch kein echter neuer Tagesbericht vor (nur Bulk-Dateien). 1.11f wurde vorgezogen;
+> 1.11e folgt, sobald Dominik einen Bericht („Berichte“, Zeitdimension Tag, Kampagnen-/Anzeigengruppen-/Target-ID) als Datei
+> ablegt. Danach `daily_report` im Upload-Dialog freischalten (`FileImportsDialog.vue`, heute sichtbar, aber gesperrt).
 - [ ] Neue Berichte (Tag, Kampagne/Ad Group/Target mit IDs) auf `replaceDailyMetrics` (Ebenen `campaign`, `adGroup`, `target`),
       Zeitraum der Datei ersetzen, Attribution je Ad-Typ und Kontotyp, Währung prüfen, „Daten bis“. Product Ads (keine Ad-ID) und
       Suchbegriffe erst nach Sichtung der echten Spalten entscheiden.
 
-#### 1.11f Oberfläche
-- [ ] Hochladen je Profil (welche Datei, welcher Zeitraum), Verlauf der Importe mit Ergebnis und Fehlern, Hinweis bei veralteten Daten.
+#### 1.11f Oberfläche (vor 1.11e umgesetzt)
+- [x] Hochladen je Profil (welche Datei, welcher Zeitraum), Verlauf der Importe mit Ergebnis und Fehlern, Hinweis bei veralteten Daten.
+- [x] Umsetzung (Stand für 1.11e und später):
+  - **Connections-Seite, Abschnitt „Profile ohne Connection“:** `ProfileGrid` mit `file-imports` zeigt zusätzlich „Letzter Import“
+    (`LastImportCell`: Datum und Hinweise) und „Dateien“ (`FilesCell`, öffnet `FileImportsDialog`). Der Dialog liest das Profil aus
+    der Liste (nach dem Neuladen aktuell).
+  - **Dialog** (`FileImportsDialog.vue`): Art (Bulk-Datei; Tagesbericht sichtbar, gesperrt bis 1.11e), Datei (XLSX/CSV, 50 MB
+    werden schon im Browser geprüft), Häkchen **„Datei ist vollständig“** nur bei Bulk-Dateien, mit Hinweis: nur für Downloads mit
+    allen Optionen (pausierte und archivierte Elemente, Elemente ohne Impressionen), sonst werden fehlende Elemente als entfernt
+    markiert (Befund 1.11d). Entfernte Profile nehmen keine Dateien an (Hinweis statt Formular). Fehler über `errors.*`
+    (`FILE_TOO_LARGE`, `EMPTY_FILE`, `PROFILE_HAS_CONNECTION`).
+  - **Verlauf:** Hochgeladen, Datei mit Art und „vollständig“, Status (Wartet, Läuft, Importiert, Fehlgeschlagen), Ergebnis über die
+    Zähler-Texte des Sync-Status (`useJobRunLabels().counters`), Fehlertext, Hinweis bei `unmatchedCampaigns` („stammt die Datei
+    aus dem richtigen Werbekonto?“), Zahlen in `font-data`. Fragt alle 3 s nach, solange eine Datei wartet oder läuft.
+  - **Profilliste nach dem Import:** Eine hochgeladene Datei verfolgt `FileImportWatcher` (in `FileProfilesCard`, ohne Ausgabe) bis
+    zum Ende ihres Imports, auch nach dem Schließen des Dialogs und auch, wenn der Import schon vor dem ersten Abruf fertig ist
+    (`awaitImportId` fragt nach, bis die Datei im Verlauf steht); danach lädt die Profilliste neu („Letzter Import“, Hinweise).
+    Endet eine im Verlauf als offen gesehene Datei (je ID), lädt der Dialog die Liste ebenfalls neu.
+  - **Veraltete Daten:** `fileDataStaleness` (`packages/shared/src/file-imports.ts`): `noBulk` (noch keine Bulk-Datei),
+    `bulkStale` (letzter erfolgreicher Bulk-Upload älter als `FILE_BULK_STALE_AFTER_DAYS` = 7 Tage), `metricsStale` („Daten bis“
+    mehr als `FILE_METRICS_STALE_AFTER_DAYS` = 3 Kalendertage zurück, Zeitzone des Profils). Fehlende Kennzahlen sind kein Hinweis
+    (bis 1.11e haben Datei-Profile keine). Grundlage: neues Feld `Profile.lastBulkImportAt` (Upload-Zeitpunkt der letzten Bulk-Datei
+    mit Status `imported`, `lastBulkImportAtSql` in `packages/db/src/file-imports.ts`; bei API-Profilen leer).
+  - **„Welcher Zeitraum“:** Bulk-Dateien haben keinen Kennzahlen-Zeitraum, der importiert wird (1.11d); der Zeitraum der
+    Tagesberichte kommt mit 1.11e in den Verlauf.
+  - **Tests:** `fetch-stub.ts` liest Multipart-Bodies (Felder, Dateien als `{ name, size }`).
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: Profilliste nach dem Import auch bei geschlossenem Dialog und
+    schnellen Importen (vorher blieb „Noch keine Bulk-Datei“ bis zum Neuladen stehen), Zahlen in `font-data`, Fehlertext beim
+    Wählen einer Datei zurückgesetzt, Dateiauswahl nur XLSX für Bulk-Dateien, Größe in Hinweis und Fehlertext aus
+    `FILE_IMPORT_MAX_BYTES`, Hinweis-Texte in einem Composable (`connections/staleness.ts`), ungenutzte Texte entfernt.
 
 #### 1.11g Zusammenführen mit der API (nach der Freigabe, mit 1.10)
 - [ ] Datei-Profil mit dem API-Profil zusammenführen, danach übernimmt der API-Sync dieselben Zeilen.

@@ -1,32 +1,16 @@
 <script setup lang="ts">
-import {
-  FILE_BULK_STALE_AFTER_DAYS,
-  FILE_METRICS_STALE_AFTER_DAYS,
-  fileDataStaleness,
-  formatDate,
-} from '@profitbash/shared';
+import { formatDate } from '@profitbash/shared';
 import { computed } from 'vue';
-import { useI18n } from 'vue-i18n';
 import { useSessionStore } from '../../stores/session';
+import { useFileStalenessHints } from '../staleness';
 import type { ProfileCellParams } from './types';
 
 /** „Letzter Import“ eines Profils ohne Connection mit Hinweisen auf veraltete Daten (1.11f). */
 const props = defineProps<{ params: ProfileCellParams }>();
-const { t } = useI18n();
 const session = useSessionStore();
 
 const profile = computed(() => props.params.data);
-// Stand beim Anzeigen (`new Date()` ist nicht reaktiv); die Liste lädt nach jedem Upload neu.
-const hints = computed(() => {
-  if (!profile.value) return [];
-  return fileDataStaleness(profile.value, new Date()).map((hint) =>
-    hint === 'noBulk'
-      ? t('connections.fileProfiles.noBulk')
-      : hint === 'bulkStale'
-        ? t('connections.fileProfiles.bulkStale', { days: FILE_BULK_STALE_AFTER_DAYS })
-        : t('connections.fileProfiles.metricsStale', { days: FILE_METRICS_STALE_AFTER_DAYS }),
-  );
-});
+const hints = useFileStalenessHints(() => profile.value ?? null);
 </script>
 
 <template>
