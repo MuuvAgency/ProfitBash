@@ -57,7 +57,9 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   nicht als Tageswerte gespeichert (wie 1.11d) und nicht in `amazon_ads_search_term_daily_metrics` geschrieben, sondern je
   Import mit Zeitraum (von/bis). Zeiträume verschiedener Dateien überlappen sich und lassen sich nicht addieren: Die Analyse
   rechnet je Datei-Zeitraum (Auswahl des Imports statt freiem Zeitraum) und sagt das im UI. Der Tagesbericht „Suchbegriff“
-  bleibt der spätere Weg (zusammen mit dem API-Sync).
+  bleibt dem API-Sync vorbehalten: Tagesberichte als Datei wird es nicht geben (`phase-1.md` 1.11e entfällt, Dominik
+  2026-10-07). „Ads aktiv“ für den Organic-Indikator (2b.4) kommt deshalb aus dem Datei-Zeitraum, der die SQP-Woche abdeckt,
+  nicht aus Tageswerten derselben Woche; beim Entwurf von 2b.4 klären.
 - **F2 – SQP-Ansicht.** Empfehlung: zuerst die **ASIN-Ansicht** (Woche), die Marken-Ansicht danach; Monat und Quartal nur, wenn du
   sie wirklich ziehst.
   **Entschieden (Dominik, 2026-10-07): ASIN- und Marken-Ansicht gleich von Anfang an** (Woche; Monat und Quartal nur bei
