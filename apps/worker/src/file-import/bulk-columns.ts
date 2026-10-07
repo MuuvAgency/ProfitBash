@@ -369,14 +369,16 @@ export function parseBulkDate(text: string): CellResult<string> {
 }
 
 /**
- * Amazon-ID als Text aus Ziffern. Amazon schreibt IDs als Text; eine Zahlzelle hieße, dass die Datei
- * bearbeitet wurde und Excel die ID als Gleitkommazahl hält: Ab 16 Stellen wären Ziffern schon verloren,
- * und eine falsche ID träfe still eine andere Entity. Deshalb lieber die Zeile ablehnen.
+ * Amazon-ID als Text aus Ziffern. Amazon schreibt IDs als Text; eine Zahlzelle heißt, dass die Datei
+ * bearbeitet wurde (z. B. in LibreOffice oder Google Sheets neu gespeichert) und die ID als Gleitkommazahl
+ * vorliegt. Bis 15 Stellen ist sie exakt (so lang sind die IDs der Bulk-Dateien); ab 16 Stellen oder in
+ * Exponentschreibweise können Ziffern verloren sein, und eine falsche ID träfe still eine andere Entity.
+ * Dann lieber die Zeile ablehnen.
  */
 export function parseBulkId(text: string, numericCell: boolean): CellResult<string> {
   const source = text.trim();
   if (source === '') return null;
-  if (numericCell || !/^\d{1,20}$/.test(source)) return 'invalid';
+  if (!(numericCell ? /^\d{1,15}$/ : /^\d{1,20}$/).test(source)) return 'invalid';
   return source;
 }
 
