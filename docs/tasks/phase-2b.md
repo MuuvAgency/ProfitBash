@@ -71,7 +71,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
 ## Aufgaben (Entwurf, nach den Antworten verfeinern)
 
 ### 2b.1 Suchbegriffe importieren
-- [ ] Suchbegriff-Blätter (SP, SB) der Bulk-Datei im Bulk-Import mitlesen (F1): Kopfzeilen über Aliasse (DE/EN), Zuordnung zu
+- [x] Suchbegriff-Blätter (SP, SB) der Bulk-Datei im Bulk-Import mitlesen (F1): Kopfzeilen über Aliasse (DE/EN), Zuordnung zu
       Target bzw. Ad Group und Kampagne über die IDs aus 1.11d, Speicherung als Zeitraumsummen je Import (Zeitraum aus der
       Datei bzw. dem Dateinamen; neue Tabelle, nicht `amazon_ads_search_term_daily_metrics`); Test mit nachgebauter Datei.
       Echte Kopfzeilen: siehe Befund unten.
@@ -87,6 +87,32 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   `Conversion Rate`, `ACOS`, `CPC`, `ROAS`. Kein Datum und keine Währung in den Zeilen (Zeitraum nur im Dateinamen, Währung =
   Profil). Abgeleitete Spalten (Klickrate, Conversion-Rate, ACOS, CPC, ROAS) nicht speichern, sondern berechnen. Die deutsche
   Datei hat eine falsch übersetzte Spalte für den aufgelösten Ausdruck („Problem mit dem Ausdruck … Behoben“).
+
+- [x] Umsetzung (Stand für 2b.2 und später):
+  - **Schema** (Migration `0021_search_term_period_metrics`): `amazon_ads_search_term_period_metrics` (Organisation, Profil,
+    `ad_product`, `period_start`/`period_end`, `amazon_campaign_id`, `amazon_ad_group_id`, `amazon_target_id` = Keyword- bzw.
+    Produkt-Targeting-ID, `search_term`, `currency_code` = Währung des Profils, `impressions`, `clicks`, `cost`, `sales`
+    (`numeric`), `purchases`, `units`, `imported_at`). Unique je (Profil, Ad-Typ, Zeitraum, Target, Suchbegriff). **Amazon-IDs
+    ohne Fremdschlüssel:** Die Datei kann eine Teilmenge sein (z. B. ohne pausierte Targets); 2b.2 verbindet beim Lesen über
+    (Profil, Amazon-ID) mit den Entity-Tabellen und muss mit fehlenden Entities rechnen.
+  - **Schreiben:** `replaceSearchTermPeriodMetrics` (`packages/db/src/amazon-ads-metrics.ts`, Systemzugriff des Datei-Imports)
+    ersetzt je Profil, Ad-Typ und Zeitraum; ohne Zeilen geschieht nichts (ein Download ohne Leistungsdaten löscht nichts).
+    Andere Zeiträume bleiben daneben stehen, auch überlappende: Auswertungen wählen **einen** Zeitraum, nie die Summe mehrerer.
+  - **Lesen der Blätter** (`apps/worker/src/file-import/bulk-search-terms.ts`, in `importBulkFile` in derselben Transaktion
+    wie die Entities): sichtbare Blätter „SP/SB … Suchbegriff“ bzw. „… Search Term …“; Kopfzeilen über eigene Aliasse (DE/EN);
+    Beträge wie in 1.11d auf 15 signifikante Stellen, Zähler als ganze Zahl; abgeleitete Spalten (Klickrate, ACOS, CPC …) werden
+    nicht gelesen. Doppelte Zeilen je Target und Suchbegriff werden summiert. Fehlen Spalten, wird das Blatt mit Log
+    `bulk_import.search_term_sheet_skipped` übergangen (die Datei nicht abgelehnt). Ungültige Zeilen (ID, Suchbegriff oder Zahl
+    fehlt bzw. unlesbar) zählen getrennt als `invalidSearchTermRows` und verhindern das Entfernen bei „vollständig“ nicht.
+  - **Zeitraum** nur aus dem Dateinamen der Werbekonsole (`bulk-<konto>-<von>-<bis>-<zeitstempel>.xlsx`, `parseBulkPeriod`).
+    Umbenannte Datei: Entities werden importiert, Suchbegriffe nicht (`searchTermsWithoutPeriod`, Log
+    `bulk_import.search_terms_without_period`). **Offen:** Zeitraum im Upload-Dialog von Hand angeben, falls das stört.
+  - **Zähler** im Verlauf und Sync-Status: `searchTerms`, `searchTermsWithoutPeriod`, `invalidSearchTermRows` (nur wenn > 0).
+  - **Echte Dateien gegengeprüft** (lokal gegen eine Wegwerf-Test-DB, 2026-10-07, drei Dateien von Dominik, nur Zähler): 359
+    bzw. 347 Suchbegriff-Zeilen wie die Blätter, keine ungültigen Zeilen, alle Targets der Suchbegriffe unter den Entities,
+    keine Gleitkomma-Reste, die deutsche und die englische Datei desselben Zeitraums ersetzen sich, je Datei rund 0,1 s.
+  - **Nicht enthalten:** Lesen über den Access-Layer und die Oberfläche (2b.2); SB-Suchbegriffe sind nur mit leerem Blatt
+    geprüft (Spalten wie SP ohne Portfolioname).
 
 ### 2b.2 Suchbegriff-Analyse (`packages/engine`, `apps/api`, `apps/web`)
 - [ ] N-Gramme (1–3) über Suchbegriffe mit Spend, Sales, ACoS, CVR je Datei-Zeitraum (F1); Grid im Explorer (`sp-explorer`).
