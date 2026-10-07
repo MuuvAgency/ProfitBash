@@ -92,11 +92,15 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - **Schema** (Migration `0021_search_term_period_metrics`): `amazon_ads_search_term_period_metrics` (Organisation, Profil,
     `ad_product`, `period_start`/`period_end`, `amazon_campaign_id`, `amazon_ad_group_id`, `amazon_target_id` = Keyword- bzw.
     Produkt-Targeting-ID, `search_term`, `currency_code` = Währung des Profils, `impressions`, `clicks`, `cost`, `sales`
-    (`numeric`), `purchases`, `units`, `imported_at`). Unique je (Profil, Ad-Typ, Zeitraum, Target, Suchbegriff). **Amazon-IDs
+    (`numeric`), `purchases`, `units`, `imported_at`, `file_import_id` = Datei, aus der die Zeile stammt, leer nach dem Löschen
+    des Verlaufs). Unique je (Profil, Ad-Typ, Zeitraum, Target, Suchbegriff). **Amazon-IDs
     ohne Fremdschlüssel:** Die Datei kann eine Teilmenge sein (z. B. ohne pausierte Targets); 2b.2 verbindet beim Lesen über
     (Profil, Amazon-ID) mit den Entity-Tabellen und muss mit fehlenden Entities rechnen.
   - **Schreiben:** `replaceSearchTermPeriodMetrics` (`packages/db/src/amazon-ads-metrics.ts`, Systemzugriff des Datei-Imports)
-    ersetzt je Profil, Ad-Typ und Zeitraum; ohne Zeilen geschieht nichts (ein Download ohne Leistungsdaten löscht nichts).
+    ersetzt je Profil, Ad-Typ und Zeitraum **nur die Kampagnen, die in der Datei stehen** (die Konsole exportiert auch
+    Teilmengen), bei „Datei ist vollständig“ den ganzen Zeitraum; ohne Zeilen geschieht nichts (ein Download ohne
+    Leistungsdaten löscht nichts). Bei einer fremd wirkenden Datei (`unmatchedCampaigns`) werden keine Suchbegriffe
+    geschrieben; Kampagnen der Suchbegriff-Zeilen zählen bei der Konto-Prüfung mit (anderes Profil → Ablehnung).
     Andere Zeiträume bleiben daneben stehen, auch überlappende: Auswertungen wählen **einen** Zeitraum, nie die Summe mehrerer.
   - **Lesen der Blätter** (`apps/worker/src/file-import/bulk-search-terms.ts`, in `importBulkFile` in derselben Transaktion
     wie die Entities): sichtbare Blätter „SP/SB … Suchbegriff“ bzw. „… Search Term …“; Kopfzeilen über eigene Aliasse (DE/EN);
@@ -111,6 +115,12 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   - **Echte Dateien gegengeprüft** (lokal gegen eine Wegwerf-Test-DB, 2026-10-07, drei Dateien von Dominik, nur Zähler): 359
     bzw. 347 Suchbegriff-Zeilen wie die Blätter, keine ungültigen Zeilen, alle Targets der Suchbegriffe unter den Entities,
     keine Gleitkomma-Reste, die deutsche und die englische Datei desselben Zeitraums ersetzen sich, je Datei rund 0,1 s.
+  - Review (unabhängig): keine kritischen Befunde. Übernommen: Ersetzen nur der Kampagnen der Datei (vorher löschte eine
+    Teilmengen-Datei die Suchbegriffe aller anderen Kampagnen des Zeitraums), nichts schreiben bei fremd wirkender Datei,
+    Suchbegriff-Kampagnen in der Konto-Prüfung, Herkunft `file_import_id`, Zähler ohne Runden (`0.9999999999999999` ist
+    ungültig), Konto-IDs mit Bindestrich im Dateinamen, Log für Suchbegriff-Blätter ohne „SP“/„SB“ im Namen. Bewusst so:
+    keine `>= 0`-Checks in der Tabelle (der Leser lässt nur Zahlen ≥ 0 durch), eigene Kopfzeilen-Abbildung neben `mapHeader`
+    (Kennzahlen-Spalten gehören nicht in die Entity-Blätter), Dateien mit Präfix („Kopie von bulk-…“) haben keinen Zeitraum.
   - **Nicht enthalten:** Lesen über den Access-Layer und die Oberfläche (2b.2); SB-Suchbegriffe sind nur mit leerem Blatt
     geprüft (Spalten wie SP ohne Portfolioname).
 

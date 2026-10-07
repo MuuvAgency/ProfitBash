@@ -14,6 +14,12 @@ describe('parseBulkPeriod', () => {
     });
   });
 
+  it('liest auch groß geschriebene Namen und Konto-IDs mit Bindestrich', () => {
+    const period = { startDate: '2026-09-01', endDate: '2026-09-30' };
+    expect(parseBulkPeriod('BULK-A1B2C3-20260901-20260930-17.XLSX')).toEqual(period);
+    expect(parseBulkPeriod('bulk-a1-b2-20260901-20260930-17.xlsx')).toEqual(period);
+  });
+
   it('liefert null bei umbenannten Dateien, unmöglichen Tagen und verdrehtem Zeitraum', () => {
     expect(parseBulkPeriod('bulk-test.xlsx')).toBeNull();
     expect(parseBulkPeriod('kunde-oktober.xlsx')).toBeNull();
@@ -46,7 +52,8 @@ describe('parseBulkCount', () => {
   });
 
   it('lehnt Brüche, negative und unlesbare Werte ab', () => {
-    for (const text of ['1.5', '-3', 'viele', '1e400']) {
+    // Kein Runden auf 15 Stellen: Ein Zähler ist in der Datei eine ganze Zahl oder ungültig.
+    for (const text of ['1.5', '-3', 'viele', '1e400', '0.9999999999999999']) {
       expect(parseBulkCount(text)).toBe('invalid');
     }
   });

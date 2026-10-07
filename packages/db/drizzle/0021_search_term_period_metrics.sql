@@ -17,9 +17,11 @@ CREATE TABLE "amazon_ads_search_term_period_metrics" (
 	"purchases" bigint NOT NULL,
 	"units" bigint NOT NULL,
 	"imported_at" timestamp with time zone NOT NULL,
+	"file_import_id" uuid,
 	CONSTRAINT "amazon_ads_search_term_period_metrics_key_uq" UNIQUE("profile_id","ad_product","period_start","period_end","amazon_target_id","search_term"),
 	CONSTRAINT "amazon_ads_search_term_period_metrics_period_ck" CHECK ("amazon_ads_search_term_period_metrics"."period_start" <= "amazon_ads_search_term_period_metrics"."period_end")
 );
 --> statement-breakpoint
 ALTER TABLE "amazon_ads_search_term_period_metrics" ADD CONSTRAINT "amazon_ads_search_term_period_metrics_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "amazon_ads_search_term_period_metrics" ADD CONSTRAINT "amazon_ads_search_term_period_metrics_file_import_id_file_imports_id_fk" FOREIGN KEY ("file_import_id") REFERENCES "public"."file_imports"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "amazon_ads_search_term_period_metrics" ADD CONSTRAINT "amazon_ads_search_term_period_metrics_profile_org_fk" FOREIGN KEY ("profile_id","organization_id") REFERENCES "public"."amazon_ads_profiles"("id","organization_id") ON DELETE no action ON UPDATE no action;

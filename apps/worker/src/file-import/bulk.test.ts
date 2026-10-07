@@ -1368,10 +1368,14 @@ const DE_SEARCH_TERM_ROWS: Array<Record<string, TestCell>> = [
 
 function searchTermFile(
   rows: Array<Record<string, TestCell>> = DE_SEARCH_TERM_ROWS,
-  options: { header?: string[]; sheetName?: string } = {},
+  options: {
+    header?: string[];
+    sheetName?: string;
+    spRows?: Array<Record<string, TestCell>>;
+  } = {},
 ) {
   return buildXlsx([
-    sheet('Sponsored Products-Kampagnen', DE_SP_HEADER, DE_SP_ROWS),
+    sheet('Sponsored Products-Kampagnen', DE_SP_HEADER, options.spRows ?? DE_SP_ROWS),
     sheet(
       options.sheetName ?? 'SP Bericht „Suchbegriff“',
       options.header ?? DE_SEARCH_TERM_HEADER,
@@ -1525,6 +1529,104 @@ describe('Suchbegriff-Blätter der Bulk-Datei (2b.1)', () => {
     expect(logs).toContainEqual(
       expect.objectContaining({ msg: 'bulk_import.search_term_sheet_skipped' }),
     );
+  });
+
+  const ONLY_C1 = DE_SP_ROWS.filter((row) => row['Kampagnen-ID'] === C1);
+  const existingCampaign = (profileId: string, amazonCampaignId: string) => ({
+    organizationId: ids.org,
+    profileId,
+    amazonCampaignId,
+    adProduct: SP,
+    name: amazonCampaignId,
+    state: 'ENABLED',
+    createdAt: new Date('2026-10-01T00:00:00Z'),
+    syncedAt: new Date('2026-10-01T00:00:00Z'),
+  });
+
+  it('ersetzt bei einer Teilmenge nur die Kampagnen der Datei, bei „vollständig“ den ganzen Zeitraum', async () => {
+    await run(searchTermFile(), { fileName: SEPTEMBER });
+    // Download „nur bestimmte Kampagnen“: Die Datei kennt nur C1.
+    const subset = searchTermFile([{ ...DE_SEARCH_TERM_ROWS[0]!, Klicks: 40 }], {
+      spRows: ONLY_C1,
+    });
+    await run(subset, { fileName: SEPTEMBER });
+    expect((await searchTerms()).map((r) => [r.amazonCampaignId, r.clicks])).toEqual([
+      [C2, 0],
+      [C1, 40],
+    ]);
+
+    await run(subset, { fileName: SEPTEMBER, complete: true });
+    expect((await searchTerms()).map((r) => r.amazonCampaignId)).toEqual([C1]);
+  });
+
+  it('speichert keine Suchbegriffe einer fremd wirkenden Datei (keine Kampagne passt zum Profil)', async () => {
+    await db.insert(amazonAdsCampaigns).values(existingCampaign(ids.profile, '399999999999991'));
+    const counters = await run(searchTermFile(), { fileName: SEPTEMBER });
+    expect(counters).toMatchObject({ unmatchedCampaigns: 2 });
+    expect(counters).not.toHaveProperty('searchTerms');
+    expect(await searchTerms()).toEqual([]);
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.search_terms_skipped_unmatched' }),
+    );
+  });
+
+  it('lehnt die Datei ab, wenn Suchbegriffe zu Kampagnen eines anderen Profils gehören', async () => {
+    const other = await createFileProfile(db, {
+      userId: ids.admin,
+      orgId: ids.org,
+      input: {
+        accountName: 'Reiher FR',
+        countryCode: 'FR',
+        currencyCode: 'EUR',
+        timezone: 'Europe/Paris',
+        accountType: 'seller',
+      },
+    });
+    const foreign = '399999999999992';
+    await db.insert(amazonAdsCampaigns).values(existingCampaign(other.id, foreign));
+    const file = searchTermFile([{ ...DE_SEARCH_TERM_ROWS[0]!, 'Kampagnen-ID': foreign }]);
+    await expect(run(file, { fileName: SEPTEMBER })).rejects.toThrow(/anderen Profil/);
+    expect(await searchTerms()).toEqual([]);
+    await db.delete(amazonAdsCampaigns);
+    await db.delete(amazonAdsProfiles).where(eq(amazonAdsProfiles.id, other.id));
+  });
+
+  it('meldet ein Suchbegriff-Blatt mit unbekanntem Namen im Log, statt es still zu übergehen', async () => {
+    await run(searchTermFile(DE_SEARCH_TERM_ROWS, { sheetName: 'Suchbegriff-Bericht' }), {
+      fileName: SEPTEMBER,
+    });
+    expect(await searchTerms()).toEqual([]);
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.search_term_sheet_skipped' }),
+    );
+  });
+
+  it('hält über den Job fest, aus welcher Datei die Suchbegriffe stammen', async () => {
+    const created = await createFileImport(db, {
+      userId: ids.admin,
+      orgId: ids.org,
+      profileId: ids.profile,
+      kind: 'bulk',
+      fileName: SEPTEMBER,
+      content: searchTermFile(),
+      enqueue: async () => {},
+    });
+    const runJob = createJobRunner({ db, logger: (entry) => logs.push(entry) });
+    await importProfileFiles(
+      runJob,
+      {
+        db,
+        logger: (entry) => logs.push(entry),
+        importers: FILE_IMPORTERS,
+        now: () => NOW,
+        enqueueFollowUp: async () => {},
+      },
+      { organizationId: ids.org, profileId: ids.profile },
+    );
+    expect((await searchTerms()).map((r) => r.fileImportId)).toEqual([created.id, created.id]);
+    // Der Verlauf darf gelöscht werden, die Summen bleiben.
+    await db.delete(fileImports);
+    expect((await searchTerms()).map((r) => r.fileImportId)).toEqual([null, null]);
   });
 
   it('schreibt keine Suchbegriffe, wenn die Datei abgelehnt wird', async () => {

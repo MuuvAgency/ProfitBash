@@ -42,6 +42,8 @@ export interface FileImporterInput {
   organizationId: string;
   profileId: string;
   fileName: string;
+  /** `file_imports.id` der Datei (fehlt bei direktem Aufruf in Tests). */
+  fileImportId?: string;
   content: Uint8Array;
   now: Date;
   /** Laut Upload enthält die Datei alle Entities (siehe `file_imports.complete`). */
@@ -123,6 +125,7 @@ export async function importProfileFiles(
               organizationId: job.organizationId,
               profileId: job.profileId,
               fileName: claimed.fileName,
+              fileImportId: claimed.id,
               content: claimed.content,
               now: deps.now(),
               complete: claimed.complete,
