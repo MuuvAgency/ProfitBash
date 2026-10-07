@@ -413,6 +413,7 @@ describe('campaignOwnership', () => {
       adProduct: 'SPONSORED_PRODUCTS',
       name: amazonCampaignId,
       state: 'ENABLED',
+      syncedAt: new Date(),
     });
     await db
       .insert(amazonAdsCampaigns)
@@ -427,7 +428,7 @@ describe('campaignOwnership', () => {
     expect(await campaignOwnership(db, { ...scope, amazonCampaignIds: ['222', '333'] })).toEqual({
       existing: 1,
       matched: 0,
-      otherProfiles: [{ id: ids.hiddenProfile, accountName: 'Datei' }],
+      otherProfiles: [{ id: ids.hiddenProfile, accountName: 'Datei', isHidden: true }],
     });
     // Andere Organisationen zählen nie.
     expect(

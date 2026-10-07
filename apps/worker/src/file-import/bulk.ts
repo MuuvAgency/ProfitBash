@@ -103,12 +103,28 @@ export const importBulkFile: FileImporter = async (input) => {
     );
 
     // Bulk-Datei eines anderen Kontos? (Dominik, 2026-10-07: eindeutig → ablehnen, sonst Hinweis.)
-    const fileCampaignIds = [...new Set(records.campaigns.map((c) => c.amazonCampaignId))];
+    // Auch Kampagnen, die nur über Ad Groups, Targets oder Anzeigen in der Datei stehen.
+    const fileCampaignIds = [
+      ...new Set(
+        [
+          ...records.campaigns,
+          ...records.adGroups,
+          ...records.targets,
+          ...records.negatives,
+          ...records.productAds,
+        ].map((r) => r.amazonCampaignId),
+      ),
+    ];
     const ownership = await campaignOwnership(tx, { ...scope, amazonCampaignIds: fileCampaignIds });
     if (ownership.otherProfiles.length > 0) {
-      const names = ownership.otherProfiles.map((p) => `„${p.accountName}“`).join(', ');
+      // Ausgeblendete Profile sehen nur Org-Admins (ADR 002): nicht beim Namen nennen.
+      const visible = ownership.otherProfiles.filter((p) => !p.isHidden);
+      const which =
+        visible.length > 0
+          ? `einem anderen Profil (${visible.map((p) => `„${p.accountName}“`).join(', ')})`
+          : 'einem anderen Profil der Organisation';
       throw new FileImportRejectedError(
-        `Die Kampagnen dieser Datei gehören schon zu einem anderen Profil (${names}). ` +
+        `Die Kampagnen dieser Datei gehören schon zu ${which}. ` +
           'Bitte die Datei beim passenden Profil hochladen.',
       );
     }
@@ -143,7 +159,7 @@ export const importBulkFile: FileImporter = async (input) => {
       placeholdersFilled: sum(counts, 'placeholdersFilled'),
       placeholdersCreated: sum(counts, 'placeholdersCreated'),
       invalidRows: collector.invalidRows,
-      removed: await markMissingAsRemoved(tx, input, scope, sheets, records, collector),
+      removed: await markMissingAsRemoved(tx, { ...input, unmatched }, scope, records, collector),
       ...(unmatched && { unmatchedCampaigns: fileCampaignIds.length }),
     };
   });
@@ -151,49 +167,60 @@ export const importBulkFile: FileImporter = async (input) => {
 
 /**
  * Nur bei einer laut Upload vollständigen Datei (Dominik, 2026-10-07): Entities, die vor dem Upload schon
- * existierten und in der Datei fehlen, gelten als entfernt. Je Ad-Typ nur, wenn sein Blatt in der Datei
- * steht und ganz gelesen wurde; nichts bei ungültigen Zeilen (eine ungültige Zeile ist eine Entity, die es
- * gibt). Portfolios nur mit Portfolio-Blatt.
+ * existierten und in der Datei fehlen, gelten als entfernt (`markEntitiesRemoved` wie beim API-Export).
+ * Bewusst vorsichtig, weil eine falsch gesetzte Markierung erst die nächste Datei zurücknimmt:
+ * - nichts bei ungültigen Zeilen (eine ungültige Zeile ist eine Entity, die es gibt) und nichts bei einer
+ *   fremd wirkenden Datei (keine Kampagne passt zum Profil);
+ * - je Ad-Typ und Ebene nur, wenn die Datei mindestens eine Zeile dieser Art enthält (ein leeres oder fehlendes
+ *   Blatt sagt nichts, ob die Konsole abgewählte Ad-Typen leer mitschreibt, ist offen), und nicht für Ad-Typen mit
+ *   nicht abgebildeten Zeilen (`partiallyRead`);
+ * - Eltern, auf die Zeilen der Datei verweisen (Ad Group eines Targets, Portfolio einer Kampagne), gelten als
+ *   gesehen.
  */
 async function markMissingAsRemoved(
   tx: DbOrTx,
-  input: { complete: boolean; uploadedAt: Date; logger: Logger },
+  input: { complete: boolean; uploadedAt: Date; logger: Logger; unmatched: boolean },
   scope: EntityWriteScope,
-  sheets: ReadonlyArray<{ kind: BulkSheetKind }>,
   records: BulkRecords,
   collector: BulkCollector,
 ): Promise<number> {
   if (!input.complete) return 0;
+  const skip = (reason: string, extra: Record<string, unknown> = {}) =>
+    input.logger({ level: 'warn', msg: 'bulk_import.removal_skipped', reason, ...extra });
   if (collector.invalidRows > 0) {
-    input.logger({
-      level: 'warn',
-      msg: 'bulk_import.removal_skipped',
-      reason: 'invalid_rows',
-      invalidRows: collector.invalidRows,
-    });
+    skip('invalid_rows', { invalidRows: collector.invalidRows });
     return 0;
   }
-  const mark = (entity: RemovableEntity, adProduct: string | null, seenAmazonIds: string[]) =>
-    markEntitiesRemoved(tx, {
+  if (input.unmatched) {
+    skip('unmatched');
+    return 0;
+  }
+  const mark = async (
+    entity: RemovableEntity,
+    adProduct: string | null,
+    own: readonly string[],
+    referenced: ReadonlyArray<string | null> = [],
+  ) => {
+    // Keine Zeile dieser Art in der Datei: keine Aussage über sie.
+    if (own.length === 0) return 0;
+    const seenAmazonIds = [
+      ...new Set([...own, ...referenced.filter((id): id is string => id !== null)]),
+    ];
+    return markEntitiesRemoved(tx, {
       ...scope,
       entity,
       adProduct,
       existedBefore: input.uploadedAt,
       seenAmazonIds,
     });
-  let removed = 0;
-  if (sheets.some((sheet) => sheet.kind === 'portfolios')) {
-    removed += await mark(
-      'portfolio',
-      null,
-      records.portfolios.map((r) => r.amazonPortfolioId),
-    );
-  }
-  const adProducts = new Set(
-    sheets.flatMap((sheet) =>
-      sheet.kind === 'portfolios' ? [] : [AD_PRODUCT_OF_SHEET[sheet.kind]],
-    ),
+  };
+  let removed = await mark(
+    'portfolio',
+    null,
+    records.portfolios.map((r) => r.amazonPortfolioId),
+    records.campaigns.map((r) => r.amazonPortfolioId),
   );
+  const adProducts = new Set(records.campaigns.map((r) => r.adProduct));
   for (const adProduct of adProducts) {
     if (collector.partiallyRead.has(adProduct)) {
       input.logger({
@@ -204,17 +231,27 @@ async function markMissingAsRemoved(
       });
       continue;
     }
-    const of = <T extends { adProduct: string }>(rows: T[], id: (row: T) => string) =>
-      rows.filter((row) => row.adProduct === adProduct).map(id);
+    const of = <T extends { adProduct: string }, V>(rows: T[], value: (row: T) => V) =>
+      rows.filter((row) => row.adProduct === adProduct).map(value);
+    const children = [
+      ...of(records.targets, (r) => r),
+      ...of(records.negatives, (r) => r),
+      ...of(records.productAds, (r) => r),
+    ];
     removed += await mark(
       'campaign',
       adProduct,
       of(records.campaigns, (r) => r.amazonCampaignId),
+      [
+        ...of(records.adGroups, (r) => r.amazonCampaignId),
+        ...children.map((r) => r.amazonCampaignId),
+      ],
     );
     removed += await mark(
       'adGroup',
       adProduct,
       of(records.adGroups, (r) => r.amazonAdGroupId),
+      children.map((r) => r.amazonAdGroupId),
     );
     removed += await mark(
       'target',
