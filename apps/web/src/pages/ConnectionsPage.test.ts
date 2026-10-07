@@ -993,6 +993,8 @@ describe('Datei-Importe (1.11f)', () => {
   });
 
   it('lädt eine Bulk-Datei hoch, „vollständig“ nur mit Häkchen und Hinweis', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-10-07T10:00:00.000Z'));
     let imports: FileImport[] = [];
     const { requests } = stubFetch(
       routes({
@@ -1033,16 +1035,22 @@ describe('Datei-Importe (1.11f)', () => {
 
     // Ist der Import fertig, läuft nichts mehr im Hintergrund: Der Hinweis verschwindet.
     imports = [fileImport({ complete: true })];
-    await vi.waitFor(() => expect(files.text()).toContain('Importiert'), { timeout: 8000 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() => expect(files.text()).toContain('Importiert'));
     expect(files.text()).not.toContain('Datei angenommen');
-  }, 15_000);
+  });
 
   it('zeigt die Datei-Profile bei 1440 px ohne waagerechtes Scrollen: ohne Zeitzone und „Daten bis“', async () => {
     stubFetch(routes({ 'GET /api/profiles/file': json({ profiles: [kranich] }) }));
     const { wrapper } = await mountPage();
     const fileRow = await waitForRow(wrapper, 'Kranich Datei');
-    const grid = fileRow.element.closest<HTMLElement>('[style*="min-width"]');
-    const headers = [...grid!.querySelectorAll('[role="columnheader"]')].map((h) =>
+    // Die Mindestbreite setzt das Grid nach `grid-ready`: darauf warten, statt einmal nachzusehen.
+    const grid = await vi.waitFor(() => {
+      const element = fileRow.element.closest<HTMLElement>('[style*="min-width"]');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    const headers = [...grid.querySelectorAll('[role="columnheader"]')].map((h) =>
       h.textContent?.trim(),
     );
     // Ohne Tagesberichte gibt es für Datei-Profile keinen Datenstand, die Zeitzone zählt keine Tage.
@@ -1056,9 +1064,8 @@ describe('Datei-Importe (1.11f)', () => {
       'Ausblenden',
       'Dateien',
     ]);
-    await vi.waitFor(() =>
-      expect(parseFloat(grid!.style.minWidth)).toBeLessThanOrEqual(FIT_WIDTH_AT_1440),
-    );
+    await vi.waitFor(() => expect(parseFloat(grid.style.minWidth)).toBe(1075));
+    expect(parseFloat(grid.style.minWidth)).toBeLessThanOrEqual(FIT_WIDTH_AT_1440);
     expect(wrapper.text()).not.toContain('Tagesbericht');
   });
 

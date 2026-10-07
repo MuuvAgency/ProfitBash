@@ -120,7 +120,6 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
       cellClass: DATA_CELL,
       width: 85,
     },
-    ...(props.fileImports ? [] : apiOnlyColumns(locale)),
     ...(props.fileImports
       ? [
           {
@@ -132,7 +131,7 @@ const columnDefs = computed<ColDef<Profile>[]>(() => {
             width: 170,
           } satisfies ColDef<Profile>,
         ]
-      : []),
+      : apiOnlyColumns(locale)),
     {
       colId: 'client',
       headerName: t('connections.profiles.column.client'),

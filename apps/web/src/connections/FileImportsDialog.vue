@@ -38,11 +38,14 @@ const session = useSessionStore();
 const labels = useJobRunLabels();
 
 const profileId = computed(() => props.profile?.id ?? null);
-const importsQuery = useFileImportsQuery(profileId);
+/**
+ * ID der zuletzt angenommenen Datei: Der Hinweis „läuft im Hintergrund“ gilt nur, bis ihr Import fertig ist. Nach
+ * dem Schließen des Dialogs entfällt er (der Verlauf zeigt den Status).
+ */
+const acceptedId = ref<string | null>(null);
+const importsQuery = useFileImportsQuery(profileId, { awaitImportId: acceptedId });
 const upload = useUploadFileImport();
 
-/** ID der zuletzt angenommenen Datei: Der Hinweis „läuft im Hintergrund“ gilt nur, bis ihr Import fertig ist. */
-const acceptedId = ref<string | null>(null);
 const file = ref<File | null>(null);
 const complete = ref(false);
 const errorKey = ref<string | null>(null);
@@ -53,7 +56,6 @@ watch(profileId, () => {
   file.value = null;
   complete.value = false;
   errorKey.value = null;
-  upload.reset();
 });
 
 const title = computed(() =>
@@ -75,9 +77,9 @@ const maxSize = computed(
 const removed = computed(() => Boolean(props.profile?.removedAt));
 const imports = computed(() => importsQuery.data.value ?? []);
 
-/** Angenommene Datei, solange sie noch nicht im Verlauf steht oder dort wartet bzw. läuft. */
+/** Angenommene Datei, solange sie noch nicht im Verlauf steht oder dort wartet bzw. läuft (nicht bei Ladefehler). */
 const importRunning = computed(() => {
-  if (!acceptedId.value) return false;
+  if (!acceptedId.value || importsQuery.isError.value) return false;
   const accepted = imports.value.find((fileImport) => fileImport.id === acceptedId.value);
   return !accepted || isOpenFileImport(accepted);
 });
@@ -99,7 +101,6 @@ function onFileChange(event: Event) {
   file.value = target.files?.[0] ?? null;
   errorKey.value = null;
   acceptedId.value = null;
-  upload.reset();
 }
 
 async function submit() {
@@ -251,33 +252,41 @@ function result(fileImport: FileImport) {
         </p>
         <!-- Unter `sm` stapelt jede Datei ihre Angaben (kein waagerechtes Scrollen im Dialog auf dem Handy). -->
         <div v-else class="sm:overflow-x-auto">
-          <table class="w-full border-collapse text-left text-body-sm sm:min-w-[34rem]">
-            <thead class="max-sm:sr-only">
-              <tr class="border-b border-line text-ink-secondary">
-                <th scope="col" class="py-space-xs pr-space-md font-semibold">
+          <!-- Rollen ausdrücklich: Mit geändertem `display` verliert die Tabelle in Safari sonst ihre Semantik. -->
+          <table
+            role="table"
+            class="w-full border-collapse text-left text-body-sm sm:min-w-[34rem]"
+          >
+            <thead role="rowgroup" class="max-sm:sr-only">
+              <tr role="row" class="border-b border-line text-ink-secondary">
+                <th role="columnheader" scope="col" class="py-space-xs pr-space-md font-semibold">
                   {{ t('connections.fileImports.history.uploadedAt') }}
                 </th>
-                <th scope="col" class="py-space-xs pr-space-md font-semibold">
+                <th role="columnheader" scope="col" class="py-space-xs pr-space-md font-semibold">
                   {{ t('connections.fileImports.history.file') }}
                 </th>
-                <th scope="col" class="py-space-xs pr-space-md font-semibold">
+                <th role="columnheader" scope="col" class="py-space-xs pr-space-md font-semibold">
                   {{ t('connections.fileImports.history.status') }}
                 </th>
-                <th scope="col" class="py-space-xs font-semibold">
+                <th role="columnheader" scope="col" class="py-space-xs font-semibold">
                   {{ t('connections.fileImports.history.result') }}
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
               <tr
                 v-for="fileImport in imports"
                 :key="fileImport.id"
+                role="row"
                 class="border-b border-line align-top last:border-b-0 max-sm:flex max-sm:flex-col max-sm:gap-space-xs max-sm:py-space-sm"
               >
-                <td class="font-data whitespace-nowrap text-ink sm:py-space-sm sm:pr-space-md">
+                <td
+                  role="cell"
+                  class="font-data whitespace-nowrap text-ink sm:py-space-sm sm:pr-space-md"
+                >
                   {{ formatDateTime(fileImport.createdAt, session.preferences.locale) }}
                 </td>
-                <td class="text-ink sm:py-space-sm sm:pr-space-md">
+                <td role="cell" class="text-ink sm:py-space-sm sm:pr-space-md">
                   <span class="break-all">{{ fileImport.fileName }}</span>
                   <span class="block text-ink-secondary">
                     {{ t(`connections.fileImports.kind.${fileImport.kind}`) }}
@@ -286,7 +295,7 @@ function result(fileImport: FileImport) {
                     </template>
                   </span>
                 </td>
-                <td class="whitespace-nowrap text-ink sm:py-space-sm sm:pr-space-md">
+                <td role="cell" class="whitespace-nowrap text-ink sm:py-space-sm sm:pr-space-md">
                   <span class="inline-flex items-center gap-1.5">
                     <span
                       :class="['size-2 shrink-0 rounded-full', STATUS_DOT[fileImport.status]]"
@@ -295,7 +304,7 @@ function result(fileImport: FileImport) {
                     {{ t(`connections.fileImports.status.${fileImport.status}`) }}
                   </span>
                 </td>
-                <td class="text-ink sm:py-space-sm">
+                <td role="cell" class="text-ink sm:py-space-sm">
                   <span v-if="fileImport.status === 'imported'">
                     <template v-for="(part, index) in result(fileImport)" :key="part.key">
                       <template v-if="index > 0"> · </template>
