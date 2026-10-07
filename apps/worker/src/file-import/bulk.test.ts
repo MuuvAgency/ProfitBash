@@ -101,15 +101,20 @@ beforeEach(async () => {
   logs.length = 0;
 });
 
-const run = (content: Uint8Array) =>
+const run = (
+  content: Uint8Array,
+  options: { complete?: boolean; uploadedAt?: Date; profileId?: string } = {},
+) =>
   importBulkFile({
     db,
     logger: (entry) => logs.push(entry),
     organizationId: ids.org,
-    profileId: ids.profile,
+    profileId: options.profileId ?? ids.profile,
     fileName: 'bulk-test.xlsx',
     content,
     now: NOW,
+    complete: options.complete ?? false,
+    uploadedAt: options.uploadedAt ?? NOW,
   });
 
 /** Blatt aus Kopfzeile und Zeilen als „Spalte → Wert“ (fehlende Spalten bleiben leer). */
@@ -345,6 +350,7 @@ describe('importBulkFile', () => {
       placeholdersFilled: 0,
       placeholdersCreated: 0,
       invalidRows: 0,
+      removed: 0,
     });
 
     const [portfolio] = await db.select().from(amazonAdsPortfolios);
@@ -709,6 +715,7 @@ describe('importBulkFile', () => {
       negatives: 2,
       productAds: 1,
       invalidRows: 0,
+      removed: 0,
     });
 
     const campaigns = await byAmazonId(
@@ -987,6 +994,96 @@ describe('importBulkFile', () => {
 
   it('meldet Dateien, die kein XLSX sind, als SheetReadError', async () => {
     await expect(run(new TextEncoder().encode('kein excel'))).rejects.toThrow(SheetReadError);
+  });
+});
+
+describe('Konto-Prüfung und vollständige Dateien (Dominik, 2026-10-07)', () => {
+  const BEFORE_UPLOAD = new Date('2026-10-01T00:00:00Z');
+  const campaign = (
+    profileId: string,
+    amazonCampaignId: string,
+    adProduct = SP,
+    createdAt = BEFORE_UPLOAD,
+  ) => ({
+    organizationId: ids.org,
+    profileId,
+    amazonCampaignId,
+    adProduct,
+    name: amazonCampaignId,
+    state: 'ENABLED',
+    createdAt,
+  });
+
+  it('lehnt eine Datei ab, deren Kampagnen schon zu einem anderen Profil gehören', async () => {
+    const other = await createFileProfile(db, {
+      userId: ids.admin,
+      orgId: ids.org,
+      input: {
+        accountName: 'Lumen FR',
+        countryCode: 'FR',
+        currencyCode: 'EUR',
+        timezone: 'Europe/Paris',
+        accountType: 'seller',
+      },
+    });
+    await db.insert(amazonAdsCampaigns).values(campaign(other.id, C1));
+    await expect(run(germanFile())).rejects.toThrow(/anderen Profil.*Lumen FR/);
+    expect((await db.select().from(amazonAdsCampaigns)).map((c) => c.profileId)).toEqual([
+      other.id,
+    ]);
+  });
+
+  it('weist darauf hin, wenn keine Kampagne der Datei zu den Kampagnen des Profils passt', async () => {
+    await db.insert(amazonAdsCampaigns).values(campaign(ids.profile, '399999999999999'));
+    const counters = await run(germanFile());
+    expect(counters).toMatchObject({ campaigns: 2, unmatchedCampaigns: 2 });
+    expect(logs).toContainEqual(
+      expect.objectContaining({ level: 'warn', msg: 'bulk_import.no_matching_campaigns' }),
+    );
+    // Passt mindestens eine, kein Hinweis.
+    logs.length = 0;
+    expect(await run(germanFile())).not.toHaveProperty('unmatchedCampaigns');
+  });
+
+  it('markiert bei vollständiger Datei fehlende Entities der enthaltenen Ad-Typen als entfernt', async () => {
+    await db.insert(amazonAdsCampaigns).values([
+      campaign(ids.profile, '399999999999991'),
+      // SB-Blatt ist in der Datei (leer): Auch SB-Kampagnen fehlen also wirklich.
+      campaign(ids.profile, '399999999999992', SB),
+      // SD-Blatt fehlt in der Datei: nichts zu SD sagen.
+      campaign(ids.profile, '399999999999993', SD),
+      // Erst nach dem Upload entstanden (z. B. Platzhalter aus einem Bericht): bleibt.
+      campaign(ids.profile, '399999999999994', SP, new Date('2026-10-05T07:59:00Z')),
+    ]);
+    const counters = await run(germanFile(), {
+      complete: true,
+      uploadedAt: new Date('2026-10-05T07:00:00Z'),
+    });
+    expect(counters).toMatchObject({ removed: 2 });
+    const rows = await db
+      .select({ id: amazonAdsCampaigns.amazonCampaignId, removedAt: amazonAdsCampaigns.removedAt })
+      .from(amazonAdsCampaigns)
+      .orderBy(asc(amazonAdsCampaigns.amazonCampaignId));
+    expect(rows.filter((r) => r.removedAt !== null).map((r) => r.id)).toEqual([
+      '399999999999991',
+      '399999999999992',
+    ]);
+  });
+
+  it('markiert nichts ohne Häkchen „vollständig“ oder bei ungültigen Zeilen', async () => {
+    await db.insert(amazonAdsCampaigns).values(campaign(ids.profile, '399999999999991'));
+    expect(await run(germanFile())).toMatchObject({ removed: 0 });
+    const rows = [...DE_SP_ROWS, sp({ ...DE_SP_ROWS[5]!, Gebot: 'viel' })];
+    expect(await run(germanFile({ spRows: rows }), { complete: true })).toMatchObject({
+      removed: 0,
+      invalidRows: 1,
+    });
+    expect(logs).toContainEqual(expect.objectContaining({ msg: 'bulk_import.removal_skipped' }));
+    const [kept] = await db
+      .select({ removedAt: amazonAdsCampaigns.removedAt })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.amazonCampaignId, '399999999999991'));
+    expect(kept?.removedAt).toBeNull();
   });
 });
 

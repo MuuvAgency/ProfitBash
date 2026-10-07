@@ -45,6 +45,8 @@ const COUNTER_ORDER = [
   'placeholdersCreated',
   'reassigned',
   'removed',
+  // Bulk-Import (1.11d): Kampagnen der Datei, von denen keine zum Profil passt (Hinweis).
+  'unmatchedCampaigns',
   'removalDeferred',
   'backfillsCompleted',
   'exportsWaiting',

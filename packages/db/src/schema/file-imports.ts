@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   customType,
   foreignKey,
@@ -38,6 +39,11 @@ export const fileImports = pgTable(
     fileName: text('file_name').notNull(),
     byteSize: integer('byte_size').notNull(),
     sha256: text('sha256').notNull(),
+    /**
+     * Laut Upload enthält die Datei alle Entities (z. B. alle Kampagnen der Bulk-Datei): Nur dann markiert der
+     * Import, was fehlt, als entfernt (1.11d, Dominik 2026-10-07).
+     */
+    complete: boolean('complete').notNull().default(false),
     /** `pending` → `running` → `imported` | `failed`. */
     status: text('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),

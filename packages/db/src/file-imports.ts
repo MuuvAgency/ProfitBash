@@ -5,11 +5,11 @@ import {
   type FileImportKind,
   type FileImportStatus,
 } from '@profitbash/shared';
-import { and, asc, desc, eq, inArray, lte, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import { AccessDeniedError, canSeeProfile, getOrgRole } from './access';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
-import { amazonAdsProfiles, fileImportContents, fileImports } from './schema';
+import { amazonAdsCampaigns, amazonAdsProfiles, fileImportContents, fileImports } from './schema';
 
 /**
  * Hochgeladene Dateien aus der Werbekonsole und ihr Import (`phase-1.md` 1.11c). Nutzerseitig (Upload,
@@ -42,6 +42,7 @@ const summaryColumns = {
   fileName: fileImports.fileName,
   byteSize: fileImports.byteSize,
   sha256: fileImports.sha256,
+  complete: fileImports.complete,
   status: fileImports.status,
   error: fileImports.error,
   counters: fileImports.counters,
@@ -96,6 +97,8 @@ export interface CreateFileImportInput extends Actor {
   kind: FileImportKind;
   fileName: string;
   content: Uint8Array;
+  /** Datei enthält laut Upload alle Entities (Standard `false`). */
+  complete?: boolean;
   /** Plant den Job in derselben Transaktion ein (pg-boss über `tx`). */
   enqueue: (tx: DbOrTx) => Promise<unknown>;
 }
@@ -122,6 +125,7 @@ export async function createFileImport(db: Db, input: CreateFileImportInput): Pr
         fileName: input.fileName,
         byteSize: input.content.byteLength,
         sha256,
+        complete: input.complete ?? false,
         uploadedBy: input.userId,
       })
       .returning(summaryColumns);
@@ -141,6 +145,7 @@ export async function createFileImport(db: Db, input: CreateFileImportInput): Pr
         fileName: input.fileName,
         byteSize: row.byteSize,
         sha256,
+        complete: row.complete,
       },
     });
     await input.enqueue(tx);
@@ -172,6 +177,10 @@ export interface ClaimedFileImport {
   fileName: string;
   content: Uint8Array;
   attempts: number;
+  /** Laut Upload vollständig (siehe `file_imports.complete`). */
+  complete: boolean;
+  /** Zeitpunkt des Uploads: Entities, die erst danach entstanden, gelten nie als fehlend. */
+  uploadedAt: Date;
 }
 
 export interface FileImportScope {
@@ -208,6 +217,8 @@ export async function claimNextFileImport(
         status: fileImports.status,
         attempts: fileImports.attempts,
         startedAt: fileImports.startedAt,
+        complete: fileImports.complete,
+        createdAt: fileImports.createdAt,
       })
       .from(fileImports)
       .where(
@@ -266,6 +277,8 @@ export async function claimNextFileImport(
           fileName: candidate.fileName,
           content: stored.content,
           attempts,
+          complete: candidate.complete,
+          uploadedAt: candidate.createdAt,
         },
         abandoned,
       };
@@ -370,4 +383,39 @@ export async function hasClaimableFileImport(
     return false;
   }
   return open.length > 0;
+}
+
+/**
+ * Wem gehören die Kampagnen einer Datei? Schutz gegen die Bulk-Datei eines anderen Kontos (1.11d, Dominik
+ * 2026-10-07): `otherProfiles` = Profile derselben Organisation, die schon eine dieser Kampagnen-IDs haben;
+ * `existing` = Kampagnen des Profils, `matched` = davon in der Datei.
+ */
+export async function campaignOwnership(
+  db: DbOrTx,
+  input: FileImportScope & { amazonCampaignIds: readonly string[] },
+): Promise<{
+  existing: number;
+  matched: number;
+  otherProfiles: Array<{ id: string; accountName: string }>;
+}> {
+  const ids = sql.param([...new Set(input.amazonCampaignIds)]);
+  const [counts] = await db.execute<{ existing: number; matched: number }>(sql`
+    select count(*)::int as existing,
+      (count(*) filter (where ${amazonAdsCampaigns.amazonCampaignId} = any(${ids}::text[])))::int as matched
+    from ${amazonAdsCampaigns}
+    where ${amazonAdsCampaigns.organizationId} = ${input.organizationId}
+      and ${amazonAdsCampaigns.profileId} = ${input.profileId}`);
+  const otherProfiles = await db
+    .selectDistinct({ id: amazonAdsProfiles.id, accountName: amazonAdsProfiles.accountName })
+    .from(amazonAdsCampaigns)
+    .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, amazonAdsCampaigns.profileId))
+    .where(
+      and(
+        eq(amazonAdsCampaigns.organizationId, input.organizationId),
+        ne(amazonAdsCampaigns.profileId, input.profileId),
+        sql`${amazonAdsCampaigns.amazonCampaignId} = any(${ids}::text[])`,
+      ),
+    )
+    .orderBy(amazonAdsProfiles.accountName, amazonAdsProfiles.id);
+  return { existing: counts?.existing ?? 0, matched: counts?.matched ?? 0, otherProfiles };
 }

@@ -152,6 +152,18 @@ describe('POST /api/profiles/:id/file-imports', () => {
     }
   });
 
+  it('nimmt das Häkchen „Datei ist vollständig“ an (Standard: nein)', async () => {
+    const data = form('bulk', 'x', 'bulk.xlsx');
+    data.set('complete', 'true');
+    expect((await readJson<FileImport>(await upload(ids.profile, data))).complete).toBe(true);
+    expect(
+      (await readJson<FileImport>(await upload(ids.profile, form('bulk', 'x')))).complete,
+    ).toBe(false);
+    const invalid = form('bulk', 'x');
+    invalid.set('complete', 'vielleicht');
+    expect((await upload(ids.profile, invalid)).status).toBe(400);
+  });
+
   it('legt nichts an, wenn das Einplanen scheitert', async () => {
     ctx.jobs.failNext = true;
     const res = await upload(ids.profile, form('bulk', 'x'));
