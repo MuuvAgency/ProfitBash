@@ -26,6 +26,14 @@ const COUNTER_ORDER = [
   'filesFailed',
   'superseded',
   'rows',
+  // Bulk-Datei (1.11d): Entities je Ebene, dann wie beim Entity-Sync neu/geändert.
+  'portfolios',
+  'campaigns',
+  'adGroups',
+  'targets',
+  'negatives',
+  'productAds',
+  'invalidRows',
   // Wechselkurse (2.2): geladen, davon neu, geändert, unverändert.
   'fetched',
   'currencies',
