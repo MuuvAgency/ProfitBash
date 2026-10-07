@@ -136,7 +136,7 @@ describe('importProfileFiles', () => {
       organizationId: ids.org,
       scope: ids.profile,
       status: 'success',
-      counters: { files: 2, imported: 2, failed: 0, campaigns: 3, created: 3, rows: 10 },
+      counters: { files: 2, imported: 2, filesFailed: 0, campaigns: 3, created: 3, rows: 10 },
     });
     expect(await testDb.db.select().from(fileImportContents)).toEqual([]);
   });
@@ -175,7 +175,7 @@ describe('importProfileFiles', () => {
     const [jobRun] = await testDb.db.select().from(jobRuns);
     expect(jobRun).toMatchObject({
       status: 'failed',
-      counters: { files: 3, imported: 1, failed: 2, rows: 1 },
+      counters: { files: 3, imported: 1, filesFailed: 2, rows: 1 },
     });
     expect(jobRun?.error).toContain('2');
   });
@@ -207,7 +207,7 @@ describe('importProfileFiles', () => {
     const outcome = await run({}).result;
     expect(outcome.status).toBe('success');
     const [jobRun] = await testDb.db.select().from(jobRuns);
-    expect(jobRun?.counters).toEqual({ files: 0, imported: 0, failed: 0 });
+    expect(jobRun?.counters).toEqual({ files: 0, imported: 0, filesFailed: 0 });
   });
 
   it('plant sich nach dem Zeitbudget neu ein, statt weiterzuarbeiten', async () => {

@@ -70,7 +70,7 @@ export async function importProfileFiles(
     { organizationId: job.organizationId, scope: job.profileId },
     async ({ runId }) => {
       const started = deps.now().getTime();
-      const counters: JobCounters = { files: 0, imported: 0, failed: 0 };
+      const counters: JobCounters = { files: 0, imported: 0, filesFailed: 0 };
       const add = (more: JobCounters) => {
         for (const [key, value] of Object.entries(more))
           counters[key] = (counters[key] ?? 0) + value;
@@ -131,13 +131,13 @@ export async function importProfileFiles(
           ...result,
           now: deps.now(),
         });
-        counters[result.status === 'imported' ? 'imported' : 'failed']! += 1;
+        counters[result.status === 'imported' ? 'imported' : 'filesFailed']! += 1;
         add(result.counters);
       }
 
-      if (counters.failed! > 0) {
+      if (counters.filesFailed! > 0) {
         throw new JobFailure(
-          `${counters.failed} von ${counters.files} Dateien nicht importiert.`,
+          `${counters.filesFailed} von ${counters.files} Dateien nicht importiert.`,
           counters,
         );
       }

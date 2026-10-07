@@ -1387,14 +1387,22 @@ export async function queryDashboardStatus(
       group by ad_product
     ),
     last_success as (
-      select c.connection_id, max(j.finished_at) as finished_at
+      -- Je Quelle der letzte Erfolg: Report-Sync je Connection, Datei-Import je Profil ohne Connection (1.11c).
+      select c.connection_id::text as source, max(j.finished_at) as finished_at
       from (select distinct p.connection_id from amazon_ads_profiles p
-        -- Profile ohne Connection (Datei-Import) haben keinen Report-Sync (Importe zählen ab 1.11c).
         where p.id in (select id from sel) and p.connection_id is not null) c
       left join job_runs j
         on j.organization_id = ${selection.orgId} and j.job = 'reports-sync' and j.status = 'success'
           and j.scope = c.connection_id::text
       group by c.connection_id
+      union all
+      select p.id::text as source, max(j.finished_at) as finished_at
+      from amazon_ads_profiles p
+      left join job_runs j
+        on j.organization_id = ${selection.orgId} and j.job = 'file-import' and j.status = 'success'
+          and j.scope = p.id::text
+      where p.id in (select id from sel) and p.connection_id is null
+      group by p.id
     )
     select
       (select case when count(*) = count(finished_at)

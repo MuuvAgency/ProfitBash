@@ -17,10 +17,13 @@ import { useSessionStore } from '../stores/session';
 const COUNTER_ORDER = [
   'refreshed',
   'profiles',
+  // Datei-Import (1.11c): Dateien, davon importiert (`imported`) bzw. nicht importiert.
+  'files',
   // Amazon-Aufträge (1.7): anfordern, abholen, importieren.
   'requested',
   'reused',
   'imported',
+  'filesFailed',
   'superseded',
   'rows',
   // Wechselkurse (2.2): geladen, davon neu, geändert, unverändert.
@@ -86,8 +89,10 @@ export function useJobRunLabels() {
     return te(key) ? t(key) : name;
   }
 
+  /** Spalte „Amazon-Konto“: Connection, bei Jobs je Profil das Profil, beim Kursabruf die Quelle. */
   function connection(run: JobRun) {
     if (isSharedPlatformJob(run.job)) return t('sync.ecbSource');
+    if (run.profile) return `${run.profile.accountName} (${run.profile.countryCode})`;
     return (
       run.connection?.externalAccountEmail ?? run.connection?.externalAccountId ?? MISSING_VALUE
     );

@@ -138,6 +138,7 @@ describe('GET /api/job-runs', () => {
       id: expect.any(String),
       job: 'profiles-sync',
       scope: connectionId,
+      profile: null,
       connection: {
         id: connectionId,
         externalAccountId: 'amzn1.account.EINS',
@@ -196,5 +197,63 @@ describe('GET /api/job-runs', () => {
     expect(runs).toHaveLength(100);
     expect(runs[0]!.startedAt).toBe(at(204).toISOString());
     expect(runs[99]!.startedAt).toBe(at(105).toISOString());
+  });
+});
+
+describe('Läufe je Profil (Datei-Import, 1.11c)', () => {
+  it('zeigt das Profil der eigenen Organisation, auch ausgeblendet, nie ein fremdes', async () => {
+    const { db } = ctx.testDb;
+    const fileProfile = (organizationId: string, accountName: string, isHidden = false) => ({
+      organizationId,
+      connectionId: null,
+      amazonProfileId: null,
+      accountName,
+      countryCode: 'DE',
+      currencyCode: 'EUR',
+      timezone: 'Europe/Berlin',
+      accountType: 'seller',
+      isHidden,
+    });
+    const [own, hidden, foreign] = await db
+      .insert(schema.amazonAdsProfiles)
+      .values([
+        fileProfile(orgId, 'Waldkauz Datei'),
+        fileProfile(orgId, 'Versteckt Datei', true),
+        fileProfile(otherOrgId, 'Fremdes Datei-Profil'),
+      ])
+      .returning({ id: schema.amazonAdsProfiles.id });
+    await db.insert(jobRuns).values([
+      {
+        organizationId: orgId,
+        job: 'file-import',
+        scope: own!.id,
+        status: 'success',
+        startedAt: at(-3),
+      },
+      {
+        organizationId: orgId,
+        job: 'file-import',
+        scope: hidden!.id,
+        status: 'failed',
+        startedAt: at(-2),
+      },
+      {
+        organizationId: orgId,
+        job: 'file-import',
+        scope: foreign!.id,
+        status: 'success',
+        startedAt: at(-1),
+      },
+    ]);
+
+    const runs = await list('?job=file-import');
+    expect(runs.map((run) => [run.scope, run.profile, run.connection])).toEqual([
+      [foreign!.id, null, null],
+      [hidden!.id, { id: hidden!.id, accountName: 'Versteckt Datei', countryCode: 'DE' }, null],
+      [own!.id, { id: own!.id, accountName: 'Waldkauz Datei', countryCode: 'DE' }, null],
+    ]);
+    expect(JSON.stringify(runs)).not.toContain('Fremdes');
+    // Connection-Läufe tragen kein Profil.
+    expect((await list('?job=token-refresh'))[0]).toMatchObject({ profile: null });
   });
 });

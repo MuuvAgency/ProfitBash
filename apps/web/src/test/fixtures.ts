@@ -111,6 +111,7 @@ export function jobRunFixture(overrides: Partial<JobRun> = {}): JobRun {
     id: `9a8b7c6d-1e2f-4a3b-8c4d-${String(jobRunCounter).padStart(12, '0')}`,
     job: 'profiles-sync',
     scope: CONNECTION_ID,
+    profile: null,
     connection: {
       id: CONNECTION_ID,
       externalAccountId: 'amzn1.account.MOCK',

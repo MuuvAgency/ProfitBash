@@ -1,10 +1,11 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
-import { schema } from '@profitbash/db';
+import { schema, visibleProfilesScope } from '@profitbash/db';
 import {
   errorResponseSchema,
   JOB_RUN_LIST_LIMIT,
   jobRunListQuerySchema,
   jobRunListSchema,
+  PROFILE_JOB_NAMES,
   SHARED_PLATFORM_JOB_NAMES,
   type JobRun,
 } from '@profitbash/shared';
@@ -13,7 +14,7 @@ import type { AppDeps, AppEnv } from '../context';
 import { orgAdminOnly } from '../middleware';
 import { toIso } from './serialize';
 
-const { connections, jobRuns } = schema;
+const { amazonAdsProfiles, connections, jobRuns } = schema;
 
 const json = <T>(schema: T) => ({ 'application/json': { schema } });
 
@@ -38,6 +39,14 @@ export function registerJobRunRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
     // requireRole garantiert eine aktive Organisation.
     const organizationId = c.get('auth').activeOrganization!.organizationId;
     const { job, status } = c.req.valid('query');
+    // Profil der Läufe je Profil (Datei-Import) nur über den Access-Layer (ADR 002); Admins sehen auch
+    // ausgeblendete und entfernte Profile.
+    const scope = await visibleProfilesScope(db, {
+      userId: c.get('auth').user.id,
+      orgId: organizationId,
+      includeHidden: true,
+      includeRemoved: true,
+    });
 
     // Jobläufe sind keine Profildaten: Die Organisation ist hier die Zugriffsregel. Plattformweite
     // Läufe (`organization_id` null) fallen dadurch heraus, außer den geteilten (Kursabruf: öffentliche
@@ -55,6 +64,9 @@ export function registerJobRunRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
         connectionId: connections.id,
         externalAccountId: connections.externalAccountId,
         externalAccountEmail: connections.externalAccountEmail,
+        profileId: amazonAdsProfiles.id,
+        profileAccountName: amazonAdsProfiles.accountName,
+        profileCountryCode: amazonAdsProfiles.countryCode,
       })
       .from(jobRuns)
       .leftJoin(
@@ -62,6 +74,14 @@ export function registerJobRunRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
         and(
           eq(connections.organizationId, jobRuns.organizationId),
           eq(sql`${connections.id}::text`, jobRuns.scope),
+        ),
+      )
+      .leftJoin(
+        amazonAdsProfiles,
+        and(
+          inArray(jobRuns.job, [...PROFILE_JOB_NAMES]),
+          eq(sql`${amazonAdsProfiles.id}::text`, jobRuns.scope),
+          scope ? inArray(amazonAdsProfiles.id, scope.ids) : sql`false`,
         ),
       )
       .where(
@@ -81,8 +101,20 @@ export function registerJobRunRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
       .limit(JOB_RUN_LIST_LIMIT);
 
     const result: JobRun[] = rows.map(
-      ({ connectionId, externalAccountId, externalAccountEmail, ...row }) => ({
+      ({
+        connectionId,
+        externalAccountId,
+        externalAccountEmail,
+        profileId,
+        profileAccountName,
+        profileCountryCode,
+        ...row
+      }) => ({
         ...row,
+        profile:
+          profileId !== null && profileAccountName !== null && profileCountryCode !== null
+            ? { id: profileId, accountName: profileAccountName, countryCode: profileCountryCode }
+            : null,
         connection:
           connectionId !== null && externalAccountId !== null
             ? { id: connectionId, externalAccountId, externalAccountEmail }
