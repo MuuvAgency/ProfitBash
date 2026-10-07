@@ -16,6 +16,7 @@ import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMemberRoutes } from './routes/members';
 import { registerMeRoutes } from './routes/me';
 import { registerSavedViewRoutes } from './routes/saved-views';
+import { registerSearchTermRoutes } from './routes/search-terms';
 import { registerSettingsRoutes } from './routes/settings';
 
 export type CreateAppOptions = Omit<AppDeps, 'logger'> & Partial<Pick<AppDeps, 'logger'>>;
@@ -94,6 +95,7 @@ export function createApp(options: CreateAppOptions) {
   registerFileImportRoutes(app, deps);
   registerAnalyticsRoutes(app, deps);
   registerSavedViewRoutes(app, deps);
+  registerSearchTermRoutes(app, deps);
   registerMemberRoutes(app, deps);
 
   app.doc31('/openapi.json', {
