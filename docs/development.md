@@ -27,7 +27,10 @@ Rechner. `AMAZON_ADS_MOCK_SCALE` wählt den Datenumfang:
 
 Der Mock nimmt auch Änderungen an (Phase 3, Sponsored Products): Updates, Archivieren und neue Negatives enden mit
 einem Ergebnis je Eintrag wie bei Amazon; Gebote und Budgets außerhalb der Grenzen des Marktplatzes lehnt er je Eintrag
-ab (Teilfehler). Er merkt sich die Änderungen nicht: Der nächste Export liefert wieder die erzeugten Daten.
+ab (Teilfehler). Angenommene Änderungen merkt er sich **im laufenden Prozess** (Phase 3, 3.3): Der nächste Export
+liefert sie mit, die Demo bleibt nach einem Sync stimmig. Nach einem Neustart (auch durch `tsx watch` bei einer
+Code-Änderung) liefert er wieder die erzeugten Daten; der nächste Sync setzt die Werte in der Datenbank dann zurück,
+und ein Revert meldet dafür „seit der Übermittlung geändert“.
 
 `large` ist nur für die Entwicklung (mit `AMAZON_ADS_USE_MOCK=true`, nie in Produktion). Die Daten sind
 deterministisch (fester Seed je Profil) und erfunden (`packages/amazon-ads/src/mock-large.ts`). Enthalten sind auch

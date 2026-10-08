@@ -593,3 +593,198 @@ describe('Mock-Anbieter: Änderungen (3.2a)', () => {
     ).rejects.toMatchObject({ status: 415 });
   });
 });
+
+describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () => {
+  const DE = '9007199254740993';
+  const SP = 'SPONSORED_PRODUCTS';
+  const START = Date.parse('2026-09-27T06:00:00Z');
+
+  function setup() {
+    let now = START;
+    const client = createMockAmazonAdsClient({
+      redirectUri: REDIRECT_URI,
+      consentUrl: CONSENT_URL,
+      store: storeWith('Atzr|mock-refresh'),
+      rateLimit: { requestsPerSecond: 1000 },
+      simulation: { now: () => now, processingMs: 60_000 },
+    });
+    async function exportRows<T extends AmazonAdsExportType>(
+      exportType: T,
+    ): Promise<AmazonAdsExportRows[T][]> {
+      const { exportId } = await client.requestExport(connection, {
+        amazonProfileId: DE,
+        exportType,
+        adProduct: SP,
+      });
+      now += 60_000;
+      const state = await client.getExport(connection, {
+        amazonProfileId: DE,
+        exportType,
+        exportId,
+      });
+      if (state.status !== 'COMPLETED') throw new Error('Export nicht fertig');
+      const file = await client.downloadFile(state.url ?? '');
+      if (file.status !== 'ok') throw new Error('Datei fehlt');
+      const rows = (await decodeGzipJson(file.body, { maxBytes: 10 * 1024 * 1024 })) as unknown[];
+      const schema = createExportRowSchema(exportType, { adProduct: SP, logger: () => {} });
+      return rows.map((row) => schema.parse(row));
+    }
+    return { client, exportRows };
+  }
+
+  it('liefert angenommene Änderungen im nächsten Export mit', async () => {
+    const { client, exportRows } = setup();
+    const campaign = (await exportRows('campaigns')).find((c) => c.state === 'ENABLED')!;
+    const adGroup = (await exportRows('adGroups')).find(
+      (g) => g.amazonCampaignId === campaign.amazonCampaignId,
+    )!;
+    const targets = await exportRows('targets');
+    const keyword = targets.flatMap((t) =>
+      t.kind === 'target' && t.target.targetType === 'keyword' ? [t.target] : [],
+    )[0]!;
+    const negative = targets.flatMap((t) => (t.kind === 'negative' ? [t.target] : []))[0]!;
+    const ad = (await exportRows('ads'))[0]!;
+
+    const outcome = await client.applyChanges(connection, {
+      amazonProfileId: DE,
+      adProduct: SP,
+      operations: [
+        {
+          ref: 'campaign',
+          type: 'update',
+          entity: 'campaign',
+          amazonId: campaign.amazonCampaignId,
+          state: 'PAUSED',
+          dailyBudget: '33.50',
+          bidding: {
+            strategy: 'NONE',
+            placements: [
+              { placement: 'PLACEMENT_TOP', percentage: '40' },
+              { placement: 'PLACEMENT_PRODUCT_PAGE', percentage: '15' },
+            ],
+          },
+        },
+        {
+          ref: 'adGroup',
+          type: 'update',
+          entity: 'adGroup',
+          amazonId: adGroup.amazonAdGroupId,
+          defaultBid: '0.66',
+        },
+        {
+          ref: 'keyword',
+          type: 'update',
+          entity: 'keyword',
+          amazonId: keyword.amazonTargetId,
+          bid: '0.77',
+          state: 'PAUSED',
+        },
+        {
+          ref: 'ad',
+          type: 'update',
+          entity: 'productAd',
+          amazonId: ad.amazonAdId,
+          state: 'PAUSED',
+        },
+        {
+          ref: 'archive',
+          type: 'archive',
+          entity: negative.level === 'campaign' ? 'campaignNegativeKeyword' : 'negativeKeyword',
+          amazonId: negative.amazonTargetId,
+        },
+        {
+          ref: 'new',
+          type: 'createNegative',
+          amazonCampaignId: campaign.amazonCampaignId,
+          amazonAdGroupId: adGroup.amazonAdGroupId,
+          negative: { type: 'keyword', keywordText: 'gebraucht kaufen', matchType: 'PHRASE' },
+        },
+        {
+          ref: 'newAsin',
+          type: 'createNegative',
+          amazonCampaignId: campaign.amazonCampaignId,
+          amazonAdGroupId: null,
+          negative: { type: 'product', asin: 'B0FREMD001' },
+        },
+      ],
+    });
+    expect(outcome.results.map((r) => r.status)).toEqual(Array(7).fill('applied'));
+    const created = outcome.results.flatMap((r) =>
+      r.ref.startsWith('new') && r.status === 'applied' ? [r.amazonId] : [],
+    );
+
+    const after = (await exportRows('campaigns')).find(
+      (c) => c.amazonCampaignId === campaign.amazonCampaignId,
+    )!;
+    expect(after).toMatchObject({
+      state: 'PAUSED',
+      // Der Export normalisiert Beträge (33.50 → 33.5).
+      budgetAmount: '33.5',
+      biddingStrategy: 'NONE',
+    });
+    expect(after.extra.placementBidAdjustments).toEqual([
+      { placement: 'PLACEMENT_TOP', percentage: 40 },
+      { placement: 'PLACEMENT_PRODUCT_PAGE', percentage: 15 },
+    ]);
+    expect(
+      (await exportRows('adGroups')).find((g) => g.amazonAdGroupId === adGroup.amazonAdGroupId),
+    ).toMatchObject({ defaultBid: '0.66' });
+    const targetsAfter = await exportRows('targets');
+    const byId = new Map(targetsAfter.map((t) => [t.target.amazonTargetId, t]));
+    expect(byId.get(keyword.amazonTargetId)!.target).toMatchObject({
+      bid: '0.77',
+      state: 'PAUSED',
+    });
+    expect(byId.get(negative.amazonTargetId)!.target).toMatchObject({ state: 'ARCHIVED' });
+    expect(byId.get(created[0]!)).toMatchObject({
+      kind: 'negative',
+      target: {
+        level: 'ad_group',
+        targetType: 'keyword',
+        keywordText: 'gebraucht kaufen',
+        matchType: 'PHRASE',
+        state: 'ENABLED',
+      },
+    });
+    expect(byId.get(created[1]!)).toMatchObject({
+      kind: 'negative',
+      target: { level: 'campaign', targetType: 'product', state: 'ENABLED' },
+    });
+    expect((await exportRows('ads')).find((a) => a.amazonAdId === ad.amazonAdId)).toMatchObject({
+      state: 'PAUSED',
+    });
+
+    // Nur im Speicher: Ein neuer Prozess liefert wieder die erzeugten Daten.
+    const fresh = (await setup().exportRows('campaigns')).find(
+      (c) => c.amazonCampaignId === campaign.amazonCampaignId,
+    )!;
+    expect(fresh).toMatchObject({ state: 'ENABLED', biddingStrategy: 'SALES_DOWN_ONLY' });
+  });
+
+  it('merkt sich abgelehnte Änderungen nicht', async () => {
+    const { client, exportRows } = setup();
+    const keyword = (await exportRows('targets')).flatMap((t) =>
+      t.kind === 'target' && t.target.targetType === 'keyword' ? [t.target] : [],
+    )[0]!;
+
+    const outcome = await client.applyChanges(connection, {
+      amazonProfileId: DE,
+      adProduct: SP,
+      operations: [
+        {
+          ref: 'zu-hoch',
+          type: 'update',
+          entity: 'keyword',
+          amazonId: keyword.amazonTargetId,
+          bid: '99999',
+        },
+      ],
+    });
+
+    expect(outcome.results[0]).toMatchObject({ status: 'failed' });
+    const after = (await exportRows('targets')).find(
+      (t) => t.target.amazonTargetId === keyword.amazonTargetId,
+    )!;
+    expect(after.target).toMatchObject({ bid: keyword.bid });
+  });
+});
