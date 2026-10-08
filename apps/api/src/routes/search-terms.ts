@@ -1,5 +1,6 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 import {
+  deleteSearchTermPeriod,
   getSearchTermRules,
   listSearchTermPeriods,
   querySearchTermPeriod,
@@ -22,6 +23,8 @@ import {
   MAX_SEARCH_TERM_ROWS,
   searchTermAnalysisRequestSchema,
   searchTermAnalysisResponseSchema,
+  searchTermPeriodDeleteRequestSchema,
+  searchTermPeriodDeleteResponseSchema,
   searchTermPeriodsRequestSchema,
   searchTermPeriodsResponseSchema,
   searchTermRulesResponseSchema,
@@ -35,8 +38,8 @@ import { requireFeature, requireSession } from '../middleware';
 /**
  * Suchbegriff-Analyse (`docs/tasks/phase-2b.md` 2b.2), Feature `sp-explorer`: Datei-Zeiträume je Profil, Analyse
  * **eines** Zeitraums (Zeilen mit Einstufung, N-Gramme, Summen) und die Regeln der Einstufung je Organisation.
- * Nur lesend bis auf die Regeln; Aktionen auf Suchbegriffe kommen mit dem Warenkorb (Phase 3). Gelesen wird über
- * `@profitbash/db` (Access-Layer), gerechnet in `@profitbash/engine`.
+ * Nur lesend bis auf die Regeln und das Löschen eines Datei-Zeitraums (2b.2d); Aktionen auf Suchbegriffe kommen mit
+ * dem Warenkorb (Phase 3). Gelesen wird über `@profitbash/db` (Access-Layer), gerechnet in `@profitbash/engine`.
  */
 
 const json = <T>(schema: T) => ({ 'application/json': { schema } });
@@ -59,6 +62,23 @@ const periodsRoute = createRoute({
   responses: {
     200: { description: 'Ergebnis.', content: json(searchTermPeriodsResponseSchema) },
     ...errors,
+  },
+});
+
+const deletePeriodRoute = createRoute({
+  method: 'post',
+  path: '/ads/search-terms/periods/delete',
+  tags: ['Suchbegriffe'],
+  summary:
+    'Suchbegriffe eines Profils für genau einen Datei-Zeitraum löschen, über alle Ad-Typen (Recht „write“)',
+  request: { body: { content: json(searchTermPeriodDeleteRequestSchema), required: true } },
+  responses: {
+    200: { description: 'Gelöscht.', content: json(searchTermPeriodDeleteResponseSchema) },
+    ...errors,
+    404: {
+      description: 'Profil nicht gefunden oder keine Suchbegriffe für diesen Zeitraum.',
+      content: json(errorResponseSchema),
+    },
   },
 });
 
@@ -148,6 +168,26 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
       },
       200,
     );
+  });
+
+  app.openapi({ ...deletePeriodRoute, middleware: guard('write') }, async (c) => {
+    const body = c.req.valid('json');
+    const deletedRows = await deleteSearchTermPeriod(db, {
+      ...visibility(c),
+      profileId: body.profileId,
+      periodStart: body.periodStart,
+      periodEnd: body.periodEnd,
+    });
+    if (deletedRows === null)
+      throw new ApiError(404, 'PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
+    if (deletedRows === 0) {
+      throw new ApiError(
+        404,
+        'SEARCH_TERM_PERIOD_NOT_FOUND',
+        'Für diesen Zeitraum liegen keine Suchbegriffe vor.',
+      );
+    }
+    return c.json({ deletedRows }, 200);
   });
 
   app.openapi({ ...analysisRoute, middleware: guard('view') }, async (c) => {

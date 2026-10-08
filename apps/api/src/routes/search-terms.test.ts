@@ -15,7 +15,7 @@ import {
   type ErrorResponse,
   type SearchTermAnalysisResponse,
 } from '@profitbash/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -553,9 +553,138 @@ describe('Regeln (GET/PUT /api/ads/search-terms/rules)', () => {
   });
 });
 
+describe('POST /api/ads/search-terms/periods/delete (2b.2d)', () => {
+  // Eigener Zeitraum (Tippfehler im Jahr), damit die übrigen Tests ihren Zeitraum behalten.
+  const TYPO = { periodStart: '2025-09-01', periodEnd: '2025-09-30' };
+  const remove = (cookie: string | undefined, body: Record<string, unknown> = {}) =>
+    call<{ deletedRows: number }>('POST', '/ads/search-terms/periods/delete', cookie, {
+      profileId: ids.visible,
+      ...TYPO,
+      ...body,
+    });
+  /** Zeilen je Profil und Zeitraum, direkt aus der Tabelle. */
+  const stored = async (profileId: string, period: typeof A) => {
+    const m = schema.amazonAdsSearchTermPeriodMetrics;
+    const rows = await ctx.testDb.db
+      .select({ id: m.id })
+      .from(m)
+      .where(
+        and(
+          eq(m.profileId, profileId),
+          eq(m.periodStart, period.periodStart),
+          eq(m.periodEnd, period.periodEnd),
+        ),
+      );
+    return rows.length;
+  };
+  const deleteEvents = () =>
+    ctx.testDb.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'search_term_period.delete'));
+  const untouched = async () => {
+    expect(await stored(ids.visible, TYPO)).toBe(2);
+    expect(await stored(ids.hidden, TYPO)).toBe(1);
+    expect(await deleteEvents()).toEqual([]);
+  };
+
+  beforeAll(async () => {
+    await write(orgId, ids.visible, [term('falsches jahr'), term('noch einer')], TYPO);
+    await write(orgId, ids.hidden, [term('versteckt')], TYPO);
+    await write(orgId, ids.big, [term('anderes profil')], TYPO);
+  });
+
+  it('verlangt das Recht „write“: Viewer bekommen 403', async () => {
+    const res = await remove(viewer);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FEATURE_FORBIDDEN');
+    await untouched();
+  });
+
+  it('verweigert ausgeblendete Profile (auch Admins) und fremde Organisationen mit 404', async () => {
+    for (const [cookie, profileId] of [
+      [editor, ids.hidden],
+      [admin, ids.hidden],
+      [foreign, ids.visible],
+    ] as const) {
+      const res = await remove(cookie, { profileId });
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('PROFILE_NOT_FOUND');
+    }
+    await untouched();
+  });
+
+  it('prüft die Eingabe', async () => {
+    for (const body of [
+      { periodStart: '2025-10-01' },
+      { periodEnd: '30.09.2025' },
+      { periodEnd: undefined },
+      { profileId: 'kein-profil' },
+    ]) {
+      const res = await remove(editor, body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    }
+    await untouched();
+  });
+
+  it('meldet einen Zeitraum ohne Suchbegriffe mit 404 und schreibt kein Audit-Event', async () => {
+    for (const body of [
+      { periodStart: '2025-01-01', periodEnd: '2025-01-31' },
+      // Nur ein Tag passt: Gelöscht wird genau ein Datei-Zeitraum.
+      { periodEnd: '2025-10-15' },
+    ]) {
+      const res = await remove(editor, body);
+      expect(res.status).toBe(404);
+      expect(res.body.error).toEqual({
+        code: 'SEARCH_TERM_PERIOD_NOT_FOUND',
+        message: 'Für diesen Zeitraum liegen keine Suchbegriffe vor.',
+      });
+    }
+    await untouched();
+  });
+
+  it('Editoren löschen genau den Zeitraum des Profils, mit Audit-Event', async () => {
+    const res = await remove(editor);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ deletedRows: 2 });
+
+    expect(await stored(ids.visible, TYPO)).toBe(0);
+    // Der andere Zeitraum des Profils und derselbe Zeitraum anderer Profile bleiben.
+    expect(await stored(ids.visible, A)).toBe(4);
+    expect(await stored(ids.hidden, TYPO)).toBe(1);
+    expect(await stored(ids.big, TYPO)).toBe(1);
+    const periods = await call<Periods>('POST', '/ads/search-terms/periods', viewer, {});
+    expect(
+      periods.body.periods.filter((p) => p.profileId === ids.visible).map((p) => p.periodStart),
+    ).toEqual([A.periodStart]);
+
+    const events = await deleteEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      organizationId: orgId,
+      target: {
+        type: 'search_term_period',
+        id: ids.visible,
+        profileId: ids.visible,
+        ...TYPO,
+        deletedRows: 2,
+      },
+    });
+    expect(events[0]?.actorUserId).toEqual(expect.any(String));
+
+    // Ein zweites Mal gibt es den Zeitraum nicht mehr.
+    const again = await remove(editor);
+    expect(again.status).toBe(404);
+    expect(again.body.error.code).toBe('SEARCH_TERM_PERIOD_NOT_FOUND');
+    expect(await deleteEvents()).toHaveLength(1);
+  });
+});
+
 describe('Rechte je Endpunkt', () => {
   const endpoints = (): [string, string, unknown][] => [
     ['POST', '/ads/search-terms/periods', {}],
+    ['POST', '/ads/search-terms/periods/delete', { profileId: ids.visible, ...A }],
     ['POST', '/ads/search-terms/analysis', { profileId: ids.visible, ...A }],
     ['GET', '/ads/search-terms/rules', undefined],
     ['PUT', '/ads/search-terms/rules', DEFAULT_SEARCH_TERM_RULES],
@@ -584,5 +713,7 @@ describe('Rechte je Endpunkt', () => {
     } finally {
       await set(true);
     }
+    // Ohne Feature wurde auch nichts gelöscht.
+    expect((await analysis(viewer)).body.meta.totalRows).toBe(4);
   });
 });

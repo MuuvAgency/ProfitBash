@@ -2965,6 +2965,39 @@
         "type": "object",
         "properties": {}
       },
+      "SearchTermPeriodDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "deletedRows": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deletedRows"
+        ]
+      },
+      "SearchTermPeriodDeleteRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "required": [
+          "profileId",
+          "periodStart",
+          "periodEnd"
+        ]
+      },
       "SearchTermAnalysisResponse": {
         "type": "object",
         "properties": {
@@ -5702,6 +5735,76 @@
           },
           "403": {
             "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/periods/delete": {
+      "post": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Suchbegriffe eines Profils für genau einen Datei-Zeitraum löschen, über alle Ad-Typen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchTermPeriodDeleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gelöscht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTermPeriodDeleteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden oder keine Suchbegriffe für diesen Zeitraum.",
             "content": {
               "application/json": {
                 "schema": {
