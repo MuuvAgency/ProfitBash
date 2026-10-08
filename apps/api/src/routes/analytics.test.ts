@@ -575,9 +575,19 @@ describe('Access-Layer je Endpunkt (DoD)', () => {
       )
     ).body.days.map((day) => [day.date, day.sums.cost]);
 
-  /** Die Antwort nennt nichts vom Ziel (IDs, Namen, Beträge). */
-  const leaks = (body: unknown, needles: string[]) =>
-    needles.filter((needle) => JSON.stringify(body).includes(needle));
+  /**
+   * Die Antwort nennt nichts vom Ziel (IDs, Namen, Beträge). Zahlen zählen als ganzer Wert (nicht von Ziffern oder
+   * Buchstaben umgeben): Als Teiltext stehen „999“ und „777“ gelegentlich in den zufälligen UUIDs der sichtbaren
+   * Zeilen, das ergab Fehlalarme in der CI.
+   */
+  const leaks = (body: unknown, needles: string[]) => {
+    const text = JSON.stringify(body);
+    return needles.filter((needle) =>
+      /^\d+$/.test(needle)
+        ? new RegExp(`(?<![0-9a-zA-Z])${needle}(?![0-9a-zA-Z])`).test(text)
+        : text.includes(needle),
+    );
+  };
 
   it('verlangt an jedem Endpunkt eine Session', async () => {
     for (const [path, body] of endpoints()) {
@@ -602,6 +612,14 @@ describe('Access-Layer je Endpunkt (DoD)', () => {
     } finally {
       await set(true);
     }
+  });
+
+  it('Gegenprobe: Zahlen werden als ganzer Wert gefunden, nicht als Teil einer UUID', () => {
+    expect(leaks({ cost: '999' }, ['999'])).toEqual(['999']);
+    expect(leaks({ cost: '999.50', impressions: 999 }, ['999'])).toEqual(['999']);
+    expect(leaks({ rows: [{ sales: '-999' }] }, ['999'])).toEqual(['999']);
+    expect(leaks({ id: '3f999a1e-0999-4c99-9999-19990aa999bc' }, ['999'])).toEqual([]);
+    expect(leaks({ impressions: 7770 }, ['777'])).toEqual([]);
   });
 
   it('Gegenprobe: Die Suche nach Werten greift (sichtbare Daten erscheinen)', async () => {
