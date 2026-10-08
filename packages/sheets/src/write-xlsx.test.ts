@@ -62,12 +62,20 @@ describe('writeXlsx', () => {
   });
 
   it('maskiert XML-Zeichen, erhält Leerraum und Umlaute und entfernt Steuerzeichen', async () => {
-    const text = ' <b>"R&D"</b> Küche\u0000\u0007 \u{1F600} ';
+    const text = ' <b>"R&D"</b> Küche\u0000\u0007\r\ufffe\ud800 \u{1F600} ';
 
     const file = writeXlsx([{ name: 'A & B', rows: [[text, '=1+1']] }]);
     const { rows, numeric, sheets } = await readBack(file, 'A & B');
 
     expect(sheets[0]!.name).toBe('A & B');
+    expect(
+      (
+        await readBack(
+          writeXlsx([{ name: `It's "A" <B>`, rows: [['Zeile\n\tzwei']] }]),
+          `It's "A" <B>`,
+        )
+      ).rows,
+    ).toEqual([['Zeile\n\tzwei']]);
     expect(rows).toEqual([[' <b>"R&D"</b> Küche \u{1F600} ', '=1+1']]);
     // Text bleibt Text: Eine Formel wird daraus nie.
     expect(numeric).toEqual([[]]);
@@ -84,7 +92,7 @@ describe('writeXlsx', () => {
 
   it('lehnt ungültige und doppelte Blattnamen und eine Mappe ohne Blatt ab', () => {
     expect(() => writeXlsx([])).toThrow(/mindestens ein Blatt/);
-    for (const name of ['', 'x'.repeat(32), 'a/b', 'a[b]', "'x"]) {
+    for (const name of ['', 'x'.repeat(32), 'a/b', 'a[b]', "'x", '\u0000', 'a\u0001']) {
       expect(() => writeXlsx([{ name, rows: [] }]), name).toThrow(/Blattname/);
     }
     expect(() =>

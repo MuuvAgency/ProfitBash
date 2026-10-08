@@ -9,8 +9,13 @@ import type { AmazonAdsBiddingStrategy, AmazonAdsWriteState } from './writes';
  * Grundlage: Amazons Bulksheets-Guides (gelesen am 2026-10-08, Zusammenfassung in `phase-3.md` 3.2b):
  * - Die Datei ist **englisch**: Beim Hochladen nimmt Amazon jede unterstützte Sprache an, unabhängig vom Konto.
  * - Zeilen brauchen `Product`, `Entity`, `Operation` (`Create` | `Update` | `Archive`) und die IDs der Entity.
- * - Ein Kampagnen-Update ohne `Portfolio Id` nimmt die Kampagne aus ihrem Portfolio, ein leeres `End Date` entfernt
- *   das Enddatum: Die Kampagnenzeile trägt deshalb immer den vollständigen Stand.
+ * - Ein Kampagnen-Update ohne `Portfolio ID` nimmt die Kampagne aus ihrem Portfolio, ein leeres `End Date` entfernt
+ *   das Enddatum: Beide stehen deshalb in jeder Kampagnenzeile. Alle übrigen Felder dürfen leer bleiben („can be left
+ *   either unchanged or blank“) und werden nur geschrieben, wenn sie sich ändern (der Stand in der Datenbank kann
+ *   älter sein als der in der Werbekonsole).
+ * - Je Entity steht höchstens eine Zeile in der Datei: Eine zweite überschriebe beim Hochladen die erste.
+ * - Kopfzeilen und Entity-Namen in der Schreibweise der heruntergeladenen englischen Datei (`Campaign ID`,
+ *   `Ad Group`); die Doku nutzt daneben `Campaign Id` und `Ad group`.
  * - Ein negatives Produkt-Target auf Kampagnenebene kennt die Doku nicht; es wird übersprungen.
  */
 
@@ -20,12 +25,12 @@ export const SP_BULK_COLUMNS = [
   'Product',
   'Entity',
   'Operation',
-  'Campaign Id',
-  'Ad Group Id',
-  'Portfolio Id',
-  'Ad Id',
-  'Keyword Id',
-  'Product Targeting Id',
+  'Campaign ID',
+  'Ad Group ID',
+  'Portfolio ID',
+  'Ad ID',
+  'Keyword ID',
+  'Product Targeting ID',
   'Campaign Name',
   'Ad Group Name',
   'Start Date',
@@ -49,19 +54,13 @@ export type SpBulkColumn = (typeof SP_BULK_COLUMNS)[number];
 /** Zelle wie `XlsxWriteCell` in `@profitbash/sheets`: Text, leer oder Zahl als Decimal-String. */
 export type BulkFileCell = string | null | { number: string };
 
-/** Stand der Kampagne laut Datenbank (Werte wie der Export bzw. der Bulk-Import sie speichert). */
+/** Was die Kampagnenzeile vom Stand in der Datenbank braucht. */
 export interface BulkFileCampaign {
   amazonCampaignId: string;
   amazonPortfolioId: string | null;
-  name: string | null;
   /** `YYYY-MM-DD`. */
-  startDate: string | null;
   endDate: string | null;
-  /** `MANUAL` | `AUTO`. */
-  targetingType: string | null;
   state: string | null;
-  dailyBudget: string | null;
-  biddingStrategy: string | null;
 }
 
 interface AdGroupIds {
@@ -82,7 +81,9 @@ export type BulkFileChange = { ref: string } & (
   | {
       type: 'placement';
       amazonCampaignId: string;
-      /** Geltende Gebotsstrategie der Kampagne (nach den Änderungen dieser Datei). */
+      /**
+       * Geltende Gebotsstrategie der Kampagne. Ändert dieselbe Datei die Strategie (Kampagnenzeile), gilt die neue.
+       */
       biddingStrategy: string | null;
       /** `PLACEMENT_TOP` | `PLACEMENT_REST_OF_SEARCH` | `PLACEMENT_PRODUCT_PAGE` | `SITE_AMAZON_BUSINESS`. */
       placement: string;
@@ -106,7 +107,7 @@ export type BulkFileChange = { ref: string } & (
     } & AdGroupIds)
   | {
       type: 'archive';
-      entity: 'campaignNegativeKeyword';
+      entity: 'campaignNegativeKeyword' | 'campaignNegativeProductTarget';
       amazonCampaignId: string;
       amazonId: string;
     }
@@ -122,10 +123,14 @@ export type BulkFileChange = { ref: string } & (
 );
 
 export type BulkFileSkipReason =
-  /** Der Stand der Kampagne reicht nicht für eine vollständige Zeile (Platzhalter, archiviert, fremde Strategie). */
-  | 'campaignIncomplete'
+  /** Die Kampagne ist archiviert (endgültig). */
+  | 'entityArchived'
   /** Die Bulk-Datei kennt diese Änderung laut Doku nicht (negative ASIN auf Kampagnenebene). */
   | 'notSupportedInBulkFile'
+  /** Für dieselbe Entity steht schon eine Zeile in der Datei. */
+  | 'duplicate'
+  /** Dieselbe Datei archiviert die Kampagne bzw. Ad Group; Amazon archiviert die Kinder mit. */
+  | 'parentArchived'
   | 'invalidValue'
   | 'nothingToChange';
 
@@ -138,29 +143,31 @@ export interface SpBulkSheet {
 }
 
 const PRODUCT = 'Sponsored Products';
-const STATES: Readonly<Record<string, string>> = { ENABLED: 'enabled', PAUSED: 'paused' };
-const TARGETING_TYPES: Readonly<Record<string, string>> = { MANUAL: 'Manual', AUTO: 'Auto' };
-const STRATEGIES: Readonly<Record<string, string>> = {
-  SALES_DOWN_ONLY: 'Dynamic bids - down only',
-  SALES_UP_AND_DOWN: 'Dynamic bids - up and down',
-  NONE: 'Fixed bid',
-};
+const STATES = new Map([
+  ['ENABLED', 'enabled'],
+  ['PAUSED', 'paused'],
+]);
+const STRATEGIES = new Map([
+  ['SALES_DOWN_ONLY', 'Dynamic bids - down only'],
+  ['SALES_UP_AND_DOWN', 'Dynamic bids - up and down'],
+  ['NONE', 'Fixed bid'],
+]);
 /** Schreibweise der heruntergeladenen Datei; Amazon nimmt auch `placementTop` usw. und achtet nicht auf Groß/Klein. */
-const PLACEMENTS: Readonly<Record<string, string>> = {
-  PLACEMENT_TOP: 'Placement Top',
-  PLACEMENT_REST_OF_SEARCH: 'Placement Rest Of Search',
-  PLACEMENT_PRODUCT_PAGE: 'Placement Product Page',
-  SITE_AMAZON_BUSINESS: 'Placement Amazon Business',
-};
+const PLACEMENTS = new Map([
+  ['PLACEMENT_TOP', 'Placement Top'],
+  ['PLACEMENT_REST_OF_SEARCH', 'Placement Rest Of Search'],
+  ['PLACEMENT_PRODUCT_PAGE', 'Placement Product Page'],
+  ['SITE_AMAZON_BUSINESS', 'Placement Amazon Business'],
+]);
 const ARCHIVE_ENTITIES = {
   campaign: 'Campaign',
-  adGroup: 'Ad group',
+  adGroup: 'Ad Group',
   keyword: 'Keyword',
-  productTarget: 'Product targeting',
-  productAd: 'Product ad',
-  negativeKeyword: 'Negative keyword',
-  campaignNegativeKeyword: 'Campaign negative keyword',
-  negativeProductTarget: 'Negative product targeting',
+  productTarget: 'Product Targeting',
+  productAd: 'Product Ad',
+  negativeKeyword: 'Negative Keyword',
+  campaignNegativeKeyword: 'Campaign Negative Keyword',
+  negativeProductTarget: 'Negative Product Targeting',
 } as const;
 
 class Skip extends Error {
@@ -176,59 +183,62 @@ function id(value: string): string {
   return value;
 }
 
-/** Betrag: höchstens zwei Nachkommastellen (mehr rundet Amazon). */
+/** Betrag größer 0 mit höchstens zwei Nachkommastellen (mehr rundet Amazon). */
 function amount(value: string): BulkFileCell {
-  if (!isPlainDecimal(value) || /\.\d{3,}$/.test(value)) throw invalid();
+  if (!isPlainDecimal(value) || /\.\d{3,}$/.test(value) || !/[1-9]/.test(value)) throw invalid();
   return { number: value };
 }
 
-function mapped(map: Readonly<Record<string, string>>, value: string | null | undefined): string {
-  const result = value === null || value === undefined ? undefined : map[value.toUpperCase()];
+function mapped(map: ReadonlyMap<string, string>, value: string | null | undefined): string {
+  const result = typeof value === 'string' ? map.get(value.toUpperCase()) : undefined;
   if (result === undefined) throw invalid();
   return result;
 }
 
-/** `YYYY-MM-DD` → `YYYYMMDD`. */
+/** `YYYY-MM-DD` → `YYYYMMDD`, nur für Tage, die es gibt. */
 function date(value: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw invalid();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) throw invalid();
+  const [, year, month, day] = match.map(Number) as [number, number, number, number];
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    throw invalid();
+  }
   return value.replaceAll('-', '');
 }
 
 type Row = Partial<Record<SpBulkColumn, BulkFileCell>>;
 
+interface Context {
+  /** Neue Strategie je Kampagne, wenn dieselbe Datei sie ändert. */
+  strategyByCampaign: ReadonlyMap<string, string>;
+}
+
 function campaignRow(change: Extract<BulkFileChange, { type: 'campaign' }>): Row {
   const { campaign, set } = change;
-  if (Object.values(set).every((value) => value === undefined)) throw new Skip('nothingToChange');
-  const state = set.state ?? campaign.state;
-  const strategy = set.biddingStrategy ?? campaign.biddingStrategy;
-  const budget = set.dailyBudget ?? campaign.dailyBudget;
-  if (
-    campaign.name === null ||
-    campaign.name === '' ||
-    campaign.startDate === null ||
-    budget === null ||
-    state === null ||
-    !Object.hasOwn(STATES, state.toUpperCase()) ||
-    strategy === null ||
-    !Object.hasOwn(STRATEGIES, strategy) ||
-    campaign.targetingType === null ||
-    !Object.hasOwn(TARGETING_TYPES, campaign.targetingType.toUpperCase())
-  ) {
-    throw new Skip('campaignIncomplete');
-  }
-  return {
-    Entity: 'Campaign',
-    Operation: 'Update',
-    'Campaign Id': id(campaign.amazonCampaignId),
-    ...(campaign.amazonPortfolioId !== null && { 'Portfolio Id': id(campaign.amazonPortfolioId) }),
-    'Campaign Name': campaign.name,
-    'Start Date': date(campaign.startDate),
-    ...(campaign.endDate !== null && { 'End Date': date(campaign.endDate) }),
-    'Targeting Type': mapped(TARGETING_TYPES, campaign.targetingType),
-    State: mapped(STATES, state),
-    'Daily Budget': amount(budget),
-    'Bidding Strategy': mapped(STRATEGIES, strategy),
-  };
+  if (campaign.state?.toUpperCase() === 'ARCHIVED') throw new Skip('entityArchived');
+  return withFields(
+    {
+      Entity: 'Campaign',
+      Operation: 'Update',
+      'Campaign ID': id(campaign.amazonCampaignId),
+      ...(campaign.amazonPortfolioId !== null && {
+        'Portfolio ID': id(campaign.amazonPortfolioId),
+      }),
+      ...(campaign.endDate !== null && { 'End Date': date(campaign.endDate) }),
+    },
+    {
+      ...stateField(set.state),
+      ...(set.dailyBudget !== undefined && { 'Daily Budget': amount(set.dailyBudget) }),
+      ...(set.biddingStrategy !== undefined && {
+        'Bidding Strategy': mapped(STRATEGIES, set.biddingStrategy),
+      }),
+    },
+  );
 }
 
 function withFields(row: Row, fields: Row): Row {
@@ -239,7 +249,7 @@ function withFields(row: Row, fields: Row): Row {
 const stateField = (state: AmazonAdsWriteState | undefined): Row =>
   state === undefined ? {} : { State: mapped(STATES, state) };
 
-function rowFor(change: BulkFileChange): Row {
+function rowFor(change: BulkFileChange, context: Context): Row {
   switch (change.type) {
     case 'campaign':
       return campaignRow(change);
@@ -248,10 +258,13 @@ function rowFor(change: BulkFileChange): Row {
         throw invalid();
       }
       return {
-        Entity: 'Bidding adjustment',
+        Entity: 'Bidding Adjustment',
         Operation: 'Update',
-        'Campaign Id': id(change.amazonCampaignId),
-        'Bidding Strategy': mapped(STRATEGIES, change.biddingStrategy),
+        'Campaign ID': id(change.amazonCampaignId),
+        'Bidding Strategy': mapped(
+          STRATEGIES,
+          context.strategyByCampaign.get(change.amazonCampaignId) ?? change.biddingStrategy,
+        ),
         Placement: mapped(PLACEMENTS, change.placement),
         Percentage: { number: change.percentage },
       };
@@ -259,10 +272,10 @@ function rowFor(change: BulkFileChange): Row {
     case 'adGroup':
       return withFields(
         {
-          Entity: 'Ad group',
+          Entity: 'Ad Group',
           Operation: 'Update',
-          'Campaign Id': id(change.amazonCampaignId),
-          'Ad Group Id': id(change.amazonAdGroupId),
+          'Campaign ID': id(change.amazonCampaignId),
+          'Ad Group ID': id(change.amazonAdGroupId),
         },
         {
           ...stateField(change.state),
@@ -275,11 +288,11 @@ function rowFor(change: BulkFileChange): Row {
     case 'productTarget':
       return withFields(
         {
-          Entity: change.type === 'keyword' ? 'Keyword' : 'Product targeting',
+          Entity: change.type === 'keyword' ? 'Keyword' : 'Product Targeting',
           Operation: 'Update',
-          'Campaign Id': id(change.amazonCampaignId),
-          'Ad Group Id': id(change.amazonAdGroupId),
-          [change.type === 'keyword' ? 'Keyword Id' : 'Product Targeting Id']: id(
+          'Campaign ID': id(change.amazonCampaignId),
+          'Ad Group ID': id(change.amazonAdGroupId),
+          [change.type === 'keyword' ? 'Keyword ID' : 'Product Targeting ID']: id(
             change.amazonTargetId,
           ),
         },
@@ -291,28 +304,32 @@ function rowFor(change: BulkFileChange): Row {
     case 'productAd':
       return withFields(
         {
-          Entity: 'Product ad',
+          Entity: 'Product Ad',
           Operation: 'Update',
-          'Campaign Id': id(change.amazonCampaignId),
-          'Ad Group Id': id(change.amazonAdGroupId),
-          'Ad Id': id(change.amazonAdId),
+          'Campaign ID': id(change.amazonCampaignId),
+          'Ad Group ID': id(change.amazonAdGroupId),
+          'Ad ID': id(change.amazonAdId),
         },
         stateField(change.state),
       );
     case 'archive': {
+      if (change.entity === 'campaignNegativeProductTarget')
+        throw new Skip('notSupportedInBulkFile');
       const row: Row = {
         Entity: ARCHIVE_ENTITIES[change.entity],
         Operation: 'Archive',
-        'Campaign Id': id(change.amazonCampaignId),
+        'Campaign ID': id(change.amazonCampaignId),
       };
-      if ('amazonAdGroupId' in change) row['Ad Group Id'] = id(change.amazonAdGroupId);
-      if (change.entity === 'productAd') row['Ad Id'] = id(change.amazonId);
-      else if (change.entity === 'keyword' || change.entity === 'negativeKeyword') {
-        row['Keyword Id'] = id(change.amazonId);
-      } else if (change.entity === 'campaignNegativeKeyword') {
-        row['Keyword Id'] = id(change.amazonId);
+      if ('amazonAdGroupId' in change) row['Ad Group ID'] = id(change.amazonAdGroupId);
+      if (change.entity === 'productAd') row['Ad ID'] = id(change.amazonId);
+      else if (
+        change.entity === 'keyword' ||
+        change.entity === 'negativeKeyword' ||
+        change.entity === 'campaignNegativeKeyword'
+      ) {
+        row['Keyword ID'] = id(change.amazonId);
       } else if (change.entity === 'productTarget' || change.entity === 'negativeProductTarget') {
-        row['Product Targeting Id'] = id(change.amazonId);
+        row['Product Targeting ID'] = id(change.amazonId);
       }
       return row;
     }
@@ -320,29 +337,57 @@ function rowFor(change: BulkFileChange): Row {
       const onCampaign = change.amazonAdGroupId === null;
       const parent: Row = {
         Operation: 'Create',
-        'Campaign Id': id(change.amazonCampaignId),
-        ...(change.amazonAdGroupId !== null && { 'Ad Group Id': id(change.amazonAdGroupId) }),
+        'Campaign ID': id(change.amazonCampaignId),
+        ...(change.amazonAdGroupId !== null && { 'Ad Group ID': id(change.amazonAdGroupId) }),
         State: 'enabled',
       };
       if (change.negative.type === 'keyword') {
-        if (change.negative.keywordText.trim() === '') throw invalid();
+        const keywordText = change.negative.keywordText.trim();
+        // eslint-disable-next-line no-control-regex
+        if (keywordText === '' || /[\u0000-\u001f\u007f]/.test(keywordText)) throw invalid();
         return {
-          Entity: onCampaign ? 'Campaign negative keyword' : 'Negative keyword',
+          Entity: onCampaign ? 'Campaign Negative Keyword' : 'Negative Keyword',
           ...parent,
-          'Keyword Text': change.negative.keywordText,
+          'Keyword Text': keywordText,
           'Match Type': change.negative.matchType === 'EXACT' ? 'negativeExact' : 'negativePhrase',
         };
       }
       if (onCampaign) throw new Skip('notSupportedInBulkFile');
       if (!/^[A-Z0-9]{10}$/.test(change.negative.asin)) throw invalid();
       return {
-        Entity: 'Negative product targeting',
+        Entity: 'Negative Product Targeting',
         ...parent,
         'Product Targeting Expression': `asin="${change.negative.asin}"`,
       };
     }
   }
 }
+
+/** Schlüssel der Entity einer Änderung (für „höchstens eine Zeile“); `null` bei Anlagen. */
+function entityKey(change: BulkFileChange): string | null {
+  switch (change.type) {
+    case 'campaign':
+      return `campaign:${change.campaign.amazonCampaignId}`;
+    case 'placement':
+      return `placement:${change.amazonCampaignId}:${change.placement}`;
+    case 'adGroup':
+      return `adGroup:${change.amazonAdGroupId}`;
+    case 'keyword':
+    case 'productTarget':
+      return `${change.type}:${change.amazonTargetId}`;
+    case 'productAd':
+      return `productAd:${change.amazonAdId}`;
+    case 'archive':
+      if (change.entity === 'campaign') return `campaign:${change.amazonCampaignId}`;
+      if (change.entity === 'adGroup') return `adGroup:${change.amazonAdGroupId}`;
+      return `${change.entity}:${change.amazonId}`;
+    case 'createNegative':
+      return null;
+  }
+}
+
+const campaignIdOf = (change: BulkFileChange) =>
+  change.type === 'campaign' ? change.campaign.amazonCampaignId : change.amazonCampaignId;
 
 /**
  * Zeilen des Blatts „Sponsored Products Campaigns“ für die Änderungen eines Profils, in der Reihenfolge der Eingabe.
@@ -351,10 +396,42 @@ function rowFor(change: BulkFileChange): Row {
 export function buildSpBulkSheet(changes: readonly BulkFileChange[]): SpBulkSheet {
   const rows: BulkFileCell[][] = [[...SP_BULK_COLUMNS]];
   const skipped: SpBulkSheet['skipped'] = [];
+
+  const strategyByCampaign = new Map<string, string>();
+  const archivedCampaigns = new Set<string>();
+  const archivedAdGroups = new Set<string>();
+  for (const change of changes) {
+    if (change.type === 'campaign' && change.set.biddingStrategy !== undefined) {
+      if (!strategyByCampaign.has(change.campaign.amazonCampaignId)) {
+        strategyByCampaign.set(change.campaign.amazonCampaignId, change.set.biddingStrategy);
+      }
+    } else if (change.type === 'archive' && change.entity === 'campaign') {
+      archivedCampaigns.add(change.amazonCampaignId);
+    } else if (change.type === 'archive' && change.entity === 'adGroup') {
+      archivedAdGroups.add(change.amazonAdGroupId);
+    }
+  }
+
+  const seen = new Set<string>();
   for (const change of changes) {
     let row: Row;
     try {
-      row = rowFor(change);
+      const isCampaignArchive = change.type === 'archive' && change.entity === 'campaign';
+      const isAdGroupArchive = change.type === 'archive' && change.entity === 'adGroup';
+      if (
+        (!isCampaignArchive && archivedCampaigns.has(campaignIdOf(change))) ||
+        (!isAdGroupArchive &&
+          !isCampaignArchive &&
+          'amazonAdGroupId' in change &&
+          change.amazonAdGroupId !== null &&
+          archivedAdGroups.has(change.amazonAdGroupId))
+      ) {
+        throw new Skip('parentArchived');
+      }
+      const key = entityKey(change);
+      if (key !== null && seen.has(key)) throw new Skip('duplicate');
+      row = rowFor(change, { strategyByCampaign });
+      if (key !== null) seen.add(key);
     } catch (error) {
       if (!(error instanceof Skip)) throw error;
       skipped.push({ ref: change.ref, reason: error.reason });
