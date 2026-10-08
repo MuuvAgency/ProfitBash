@@ -73,6 +73,8 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   die Clients-Verwaltung; die Suchbegriff-Analyse liest sie nur über ein sichtbares Profil dieses Clients mit
   (`querySearchTermPeriod` nach `visibleProfilesScope()`). Für Kunden-Orgs (Phase 6) gilt dafür dieselbe offene Frage wie
   für andere Client-Daten.
+  Einen Datei-Zeitraum der Suchbegriffe löschen (2b.2d, `deleteSearchTermPeriod`) dürfen nur Org-Admins für ein
+  sichtbares Profil (`orgAdminOnly` wie der Datei-Upload, dazu Feature `sp-explorer`), mit Audit-Event.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.
