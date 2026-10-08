@@ -613,7 +613,8 @@ export async function recordAdChangeResults(
 // Abschließen
 // ---------------------------------------------------------------------------
 
-async function closeSubmission(
+/** Setzt den Status der Übermittlung nach dem Stand ihrer Änderungen (in der Transaktion des Aufrufers). */
+export async function closeAdChangeSubmission(
   tx: DbOrTx,
   input: {
     submissionId: string;
@@ -681,7 +682,7 @@ export async function finishAdChangeSubmission(
       )
       .for('update');
     if (!submission) return null;
-    return closeSubmission(tx, input);
+    return closeAdChangeSubmission(tx, input);
   });
 }
 
@@ -717,7 +718,7 @@ export async function failOpenAdChangeSubmissions(
       )
       .for('update', { of: s });
     for (const submission of open) {
-      await closeSubmission(tx, {
+      await closeAdChangeSubmission(tx, {
         submissionId: submission.id,
         now: input.now,
         error: input.error,
@@ -819,7 +820,10 @@ export async function confirmBulkFileAdChanges(
 
     if (result.confirmed === 0) return result;
     for (const submission of submissions) {
-      const closed = await closeSubmission(tx, { submissionId: submission.id, now: input.now });
+      const closed = await closeAdChangeSubmission(tx, {
+        submissionId: submission.id,
+        now: input.now,
+      });
       if (closed.status === 'finished') result.finished += 1;
     }
     return result;
