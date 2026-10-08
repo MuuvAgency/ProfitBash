@@ -48,3 +48,15 @@ export {
   type SearchTermSums,
   type SearchTermWatchReason,
 } from './search-terms';
+export {
+  AD_CHANGE_WARNING_COUNT,
+  AD_CHANGE_WARNING_PERCENT,
+  checkAdChanges,
+  NEGATIVE_KEYWORD_MAX_LENGTH,
+  NEGATIVE_KEYWORD_MAX_WORDS,
+  type AdChangeCheckInput,
+  type AdChangeCheckResult,
+  type AdChangeLimitField,
+  type AdChangeLimitLookup,
+  type AdChangeLimitViolation,
+} from './ad-changes';
