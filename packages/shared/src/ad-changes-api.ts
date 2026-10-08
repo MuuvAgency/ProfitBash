@@ -142,6 +142,11 @@ export const pendingAdChangesResponseSchema = z
       adChangeSchema.extend({
         /** Andere Nutzer mit einer offenen Änderung an derselben Stelle (F4). */
         otherUsers: z.array(z.object({ userId: z.uuid(), name: z.string() })),
+        /**
+         * Vergleichswert der ±50-%-Warnung, wenn es kein „vorher“ gibt: das Standardgebot der Ad Group bei einem
+         * Target ohne eigenes Gebot; sonst `null`.
+         */
+        comparisonBefore: z.string().nullable(),
       }),
     ),
     check: adChangeCheckSchema,

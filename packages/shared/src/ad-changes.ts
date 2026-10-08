@@ -180,11 +180,57 @@ const adChangeCreateNegativeInputSchema = z.strictObject({
   negative: adChangeNegativeSchema,
 });
 
+/** Beträge, die sich relativ ändern lassen (Bulk-Dialoge, 3.5). */
+export const AD_CHANGE_ADJUSTABLE_FIELDS = ['budget', 'default_bid', 'bid'] as const;
+export const AD_CHANGE_ADJUST_MODES = ['percent', 'amount'] as const;
+export type AdChangeAdjustMode = (typeof AD_CHANGE_ADJUST_MODES)[number];
+
+const SIGNED_AMOUNT = /^-?\d{1,9}(\.\d{1,2})?$/;
+
+/** Prüft die Angabe einer Anpassung: Decimal-String mit Vorzeichen, nicht 0, Prozent über −100. */
+export function adChangeAdjustmentIssue(
+  mode: AdChangeAdjustMode,
+  value: string,
+): 'invalidValue' | null {
+  if (!SIGNED_AMOUNT.test(value) || !/[1-9]/.test(value)) return 'invalidValue';
+  // −100 % oder weniger ergäbe 0 oder einen negativen Betrag.
+  return mode === 'percent' && /^-\d{3,}/.test(value) ? 'invalidValue' : null;
+}
+
+/**
+ * Betrag relativ ändern: um Prozent oder um einen Betrag in der Währung der Entity, jeweils mit Vorzeichen. Der
+ * Server rechnet auf den Stand der Entity (ein Target ohne eigenes Gebot: Standardgebot der Ad Group), rundet
+ * kaufmännisch auf zwei Nachkommastellen und merkt das Ergebnis wie eine Feldänderung vor.
+ */
+const adChangeAdjustInputSchema = z
+  .strictObject({
+    operation: z.literal('adjust'),
+    entityType: z.enum(AD_CHANGE_ENTITY_TYPES),
+    entityId: z.uuid(),
+    field: z.enum(AD_CHANGE_ADJUSTABLE_FIELDS),
+    mode: z.enum(AD_CHANGE_ADJUST_MODES),
+    /** Prozent (z. B. `-10`, `12.5`) bzw. Betrag (z. B. `0.05`, `-0.10`). */
+    value: z.string(),
+  })
+  .superRefine((input, ctx) => {
+    if (!AD_CHANGE_FIELDS_BY_ENTITY[input.entityType].includes(input.field)) {
+      ctx.addIssue({ code: 'custom', path: ['field'], message: 'Feld passt nicht zur Entity' });
+    }
+    if (adChangeAdjustmentIssue(input.mode, input.value) !== null) {
+      ctx.addIssue({ code: 'custom', path: ['value'], message: 'Ungültige Anpassung' });
+    }
+  });
+
 export const adChangeInputSchema = z
-  .discriminatedUnion('operation', [adChangeUpdateInputSchema, adChangeCreateNegativeInputSchema])
+  .discriminatedUnion('operation', [
+    adChangeUpdateInputSchema,
+    adChangeAdjustInputSchema,
+    adChangeCreateNegativeInputSchema,
+  ])
   .meta({ id: 'AdChangeInput' });
 export type AdChangeInput = z.infer<typeof adChangeInputSchema>;
 export type AdChangeUpdateInput = Extract<AdChangeInput, { operation: 'update' }>;
+export type AdChangeAdjustInput = Extract<AdChangeInput, { operation: 'adjust' }>;
 export type AdChangeCreateNegativeInput = Extract<AdChangeInput, { operation: 'create_negative' }>;
 
 /** Woher eine Änderung stammt. `revert` und `retry` setzt nur der Server (3.3). */
@@ -244,5 +290,9 @@ export const AD_CHANGE_REJECTIONS = [
   'adProductNotSupported',
   /** Das Negative gibt es dort schon (nicht archiviert). */
   'alreadyExists',
+  /** Anpassen (±Prozent, ±Betrag): Die Entity hat keinen Wert, auf den sich rechnen ließe. */
+  'noCurrentValue',
+  /** Anpassen: Das Ergebnis ist kein Betrag über 0 (bzw. zu groß). */
+  'resultOutOfRange',
 ] as const;
 export type AdChangeRejection = (typeof AD_CHANGE_REJECTIONS)[number];

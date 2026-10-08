@@ -223,6 +223,39 @@ export function currentValue(
   }
 }
 
+/**
+ * Vergleichswert für die ±50-%-Warnung (F6) je Änderung: Ein Target ohne eigenes Gebot bietet mit dem Standardgebot
+ * seiner Ad Group, ein neues Gebot wird deshalb damit verglichen. Nur für Gebote ohne Wert vorher.
+ */
+export async function loadComparisonBids(
+  db: DbOrTx,
+  changes: readonly {
+    id: string;
+    field: string | null;
+    before: string | null;
+    adGroupId: string | null;
+  }[],
+): Promise<Map<string, string>> {
+  const open = changes.filter(
+    (change) => change.field === 'bid' && change.before === null && change.adGroupId !== null,
+  );
+  const defaultBids = new Map<string, string>();
+  for (const part of chunks([...new Set(open.map((change) => change.adGroupId!))])) {
+    for (const adGroup of await db
+      .select({ id: amazonAdsAdGroups.id, defaultBid: amazonAdsAdGroups.defaultBid })
+      .from(amazonAdsAdGroups)
+      .where(inArray(amazonAdsAdGroups.id, part))) {
+      if (adGroup.defaultBid !== null) defaultBids.set(adGroup.id, adGroup.defaultBid);
+    }
+  }
+  const result = new Map<string, string>();
+  for (const change of open) {
+    const defaultBid = defaultBids.get(change.adGroupId!);
+    if (defaultBid !== undefined) result.set(change.id, defaultBid);
+  }
+  return result;
+}
+
 /** Gleicher Wert? Beträge als Zahl verglichen (`0.5` = `0.50`); eine fehlende Platzierung gilt als 0 %. */
 export function sameValue(field: AdChangeField, a: string | null, b: string): boolean {
   if (adChangeFieldKind(field) === 'enum') return a === b;

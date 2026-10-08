@@ -3,6 +3,7 @@ import {
   AD_CHANGE_FIELDS_BY_ENTITY,
   adChangeFieldKind,
   adChangeInputSchema,
+  adChangeAdjustmentIssue,
   adChangeValueIssue,
   normalizeNegativeKeywordText,
   stageAdChangesRequestSchema,
@@ -191,5 +192,58 @@ describe('stageAdChangesRequestSchema', () => {
     expect(stageAdChangesRequestSchema.safeParse({ origin: 'explorer', changes }).success).toBe(
       false,
     );
+  });
+});
+
+describe('Anpassen (±Prozent, ±Betrag; 3.5)', () => {
+  const adjust = (patch: Record<string, unknown>) =>
+    adChangeInputSchema.safeParse({
+      operation: 'adjust',
+      entityType: 'target',
+      entityId: '00000000-0000-4000-8000-000000000001',
+      field: 'bid',
+      mode: 'percent',
+      value: '10',
+      ...patch,
+    }).success;
+
+  it('nimmt Prozent und Beträge mit Vorzeichen und höchstens zwei Nachkommastellen', () => {
+    for (const value of ['10', '-10', '12.5', '-99.99', '250']) {
+      expect(adChangeAdjustmentIssue('percent', value), value).toBeNull();
+    }
+    for (const value of ['0.05', '-0.10', '3']) {
+      expect(adChangeAdjustmentIssue('amount', value), value).toBeNull();
+    }
+  });
+
+  it('lehnt 0, mehr als zwei Nachkommastellen, andere Schreibweisen und −100 % oder weniger ab', () => {
+    for (const value of [
+      '0',
+      '0.00',
+      '-0',
+      '1.234',
+      '+5',
+      '1e2',
+      ' 5',
+      '5,5',
+      '',
+      '-100',
+      '-100.00',
+      '-250',
+    ]) {
+      expect(adChangeAdjustmentIssue('percent', value), value).toBe('invalidValue');
+    }
+    expect(adChangeAdjustmentIssue('amount', '-250')).toBeNull();
+  });
+
+  it('gilt nur für Budget und Gebote der passenden Entity', () => {
+    expect(adjust({})).toBe(true);
+    expect(
+      adjust({ entityType: 'campaign', field: 'budget', mode: 'amount', value: '-2.50' }),
+    ).toBe(true);
+    expect(adjust({ entityType: 'campaign', field: 'bid' })).toBe(false);
+    expect(adjust({ field: 'state' })).toBe(false);
+    expect(adjust({ value: '-100' })).toBe(false);
+    expect(adjust({ before: '1' })).toBe(false);
   });
 });
