@@ -51,8 +51,9 @@ function baseName(name: string): string {
 }
 
 const periodDay = (which: string) =>
-  z.iso
-    .date()
+  // Leerer Text gilt wie ein fehlendes Feld (HTML-Formulare senden leere Datumsfelder mit).
+  z
+    .union([z.iso.date(), z.literal('')])
     .optional()
     .describe(
       `${which} Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für ` +
@@ -80,7 +81,7 @@ const uploadSchema = z
     if (issue) {
       ctx.addIssue({
         code: 'custom',
-        path: [value.periodStart === undefined ? 'periodStart' : 'periodEnd'],
+        path: [!value.periodStart ? 'periodStart' : 'periodEnd'],
         message: BULK_PERIOD_ISSUE_MESSAGES[issue],
       });
     }
@@ -166,10 +167,7 @@ export function registerFileImportRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
         complete: complete === 'true',
         fileName: baseName(file.name),
         // Nur für Dateien ohne Zeitraum im Namen; sonst verwirft `createFileImport` die Angabe (Dateiname gewinnt).
-        period:
-          periodStart !== undefined && periodEnd !== undefined
-            ? { startDate: periodStart, endDate: periodEnd }
-            : null,
+        period: periodStart && periodEnd ? { startDate: periodStart, endDate: periodEnd } : null,
         content: new Uint8Array(await file.arrayBuffer()),
         enqueue: (tx) => deps.jobs.enqueueFileImport({ organizationId, profileId }, { tx }),
       });

@@ -274,6 +274,17 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     Zeitraum wird für jede Dateiart gespeichert, genutzt nur vom Bulk-Import. Ein gespeicherter Import lässt sich nicht
     nachträglich mit Zeitraum versehen (Datei erneut hochladen). Kein unabhängiges Review und kein Blick in die
     Browser-Pane in dieser Session (Auftrag ohne Dev-Server).
+  - Review (unabhängig): keine kritischen Befunde; `parseBulkPeriod` unverändert nach `shared` umgezogen, Vorrang des
+    Dateinamens einheitlich, Migration additiv, Rechte und Mandanten unverändert. Übernommen: Fehlercodes je Fall im
+    API-Test festgelegt (vorher „einer von beiden“), leere Formularfelder gelten wie fehlende, Hinweis im Dialog, dass
+    vorhandene Suchbegriffe desselben Zeitraums ersetzt werden, Texte „höchstens 60 Tage auseinander“ (die Regel ist
+    bis − von ≤ 60). **Offen (Dominik bei Bedarf):** Ein falsch angegebener Zeitraum lässt sich nicht zurücknehmen
+    (Tippfehler im Jahr ergibt einen dauerhaften Zeitraum in der Auswahl der Suchbegriff-Analyse; ein falscher, schon
+    vorhandener Zeitraum wird für die Kampagnen der Datei überschrieben): Löschen eines Suchbegriff-Zeitraums und eine
+    Untergrenze (z. B. höchstens ein Jahr zurück) wären eigene kleine Aufgaben; die Analyse kennzeichnet von Hand
+    angegebene Zeiträume noch nicht. Bewusst so: Ablehnungen der API erscheinen oben im Dialog (nur wenn Browser- und
+    Server-Prüfung auseinanderlaufen); `max` der Datumsfelder wird bei der Dateiwahl bestimmt (die Prüfung beim Senden
+    rechnet frisch).
 
 #### Später (nur mit Datei)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt

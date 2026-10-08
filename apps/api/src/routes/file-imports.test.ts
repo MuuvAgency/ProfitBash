@@ -210,22 +210,34 @@ describe('POST /api/profiles/:id/file-imports', () => {
       expect((await withPeriod(fileName, '30.09.2026', '01.10.2026')).status).toBe(400);
     });
 
+    it('behandelt leere Felder wie fehlende (Formulare senden leere Texte)', async () => {
+      const res = await withPeriod('kunde.xlsx', '', '');
+      expect(res.status).toBe(201);
+      expect(await readJson<FileImport>(res)).toMatchObject({ periodStart: null, periodEnd: null });
+      const named = await withPeriod('bulk-a1b2c3-20260801-20260831-1.xlsx', '', '');
+      expect(named.status).toBe(201);
+      expect((await withPeriod('kunde.xlsx', '2026-09-01', '')).status).toBe(400);
+    });
+
     it('lehnt unvollständige, verdrehte, zu lange, unmögliche und künftige Zeiträume ab', async () => {
       const dayAfterTomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
       const lastWeek = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
-      for (const [periodStart, periodEnd] of [
-        ['2026-09-01', undefined],
-        [undefined, '2026-09-30'],
-        ['2026-09-30', '2026-09-01'],
-        ['2026-06-01', '2026-09-30'],
-        ['2026-02-30', '2026-03-01'],
-        ['01.09.2026', '30.09.2026'],
-        [lastWeek, dayAfterTomorrow],
+      // Form und Regeln prüft zod (`VALIDATION_ERROR`, die Meldung nennt das Feld), „nicht in der Zukunft“ die
+      // DB-Schicht mit dem Kalendertag in der Zeitzone des Profils (`INVALID_PERIOD`).
+      for (const [periodStart, periodEnd, code, field] of [
+        ['2026-09-01', undefined, 'VALIDATION_ERROR', 'periodEnd'],
+        [undefined, '2026-09-30', 'VALIDATION_ERROR', 'periodStart'],
+        ['2026-09-30', '2026-09-01', 'VALIDATION_ERROR', 'periodEnd'],
+        ['2026-06-01', '2026-09-30', 'VALIDATION_ERROR', 'periodEnd'],
+        ['2026-02-30', '2026-03-01', 'VALIDATION_ERROR', 'periodStart'],
+        ['01.09.2026', '30.09.2026', 'VALIDATION_ERROR', 'periodStart'],
+        [lastWeek, dayAfterTomorrow, 'INVALID_PERIOD', ''],
       ] as const) {
         const res = await withPeriod('kunde.xlsx', periodStart, periodEnd);
         expect(res.status, `${periodStart}–${periodEnd}`).toBe(400);
         const body = await readJson<ErrorResponse>(res);
-        expect(['VALIDATION_ERROR', 'INVALID_PERIOD']).toContain(body.error.code);
+        expect(body.error.code, `${periodStart}–${periodEnd}`).toBe(code);
+        expect(body.error.message, `${periodStart}–${periodEnd}`).toContain(field);
         expect(body.error.message).not.toBe('');
       }
       expect(await ctx.testDb.db.select().from(fileImports)).toEqual([]);
