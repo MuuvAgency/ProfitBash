@@ -272,8 +272,9 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
   - **Operationen:** `Create`, `Update`, `Archive`. Archivieren braucht nur die IDs der Entity; wer ein Elternteil
     archiviert, archiviert die Kinder mit (Kinder nicht zusätzlich nennen, sonst Fehlerzeilen).
   - **Achtung beim Kampagnen-Update:** Ohne `Portfolio Id` fällt die Kampagne **aus ihrem Portfolio**, ein leeres `End
-    Date` **entfernt das Enddatum**. Die Kampagnenzeile trägt deshalb immer den vollständigen Stand (Portfolio-ID, Name,
-    Start- und Enddatum, Targeting-Typ, Zustand, Tagesbudget, Gebotsstrategie), geändert sind nur die gewünschten Felder.
+    Date` **entfernt das Enddatum**. Alle übrigen Felder dürfen leer bleiben („you can leave all other fields either
+    unchanged or blank“). Die Kampagnenzeile trägt deshalb immer Portfolio-ID und Enddatum, sonst nur die geänderten
+    Felder.
   - **Werte:** `State` `enabled` | `paused`; Gebotsstrategie `Dynamic bids - down only` | `Dynamic bids - up and down` |
     `Fixed bid`; Platzierung `placementTop` | `placementProductPage` | `placementRestOfSearch` |
     `placementAmazonBusiness` (Groß/Klein egal); `Percentage` ganze Zahl bis 900 ohne Zeichen; Datum `YYYYMMDD`; Beträge
@@ -295,35 +296,51 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     ungültigen oder doppelten Blattnamen (31 Zeichen, ohne `[ ] : * ? / \`), ohne Blatt und bei Zahlen, die kein
     einfacher Decimal-String sind.
   - **Zeilen** (`packages/amazon-ads/src/bulk-file.ts`): `buildSpBulkSheet(changes)` → `{ sheetName, rows, skipped }`
-    für das Blatt „Sponsored Products Campaigns“ mit den 26 Spalten der Vorlage (`SP_BULK_COLUMNS`), englisch. Eigenes
-    Eingabemodell `BulkFileChange` (die Datei braucht mehr als der API-Weg: Eltern-IDs in jeder Zeile und bei der
-    Kampagne den vollständigen Stand): `campaign` (Stand `BulkFileCampaign` plus `set` mit `state`, `dailyBudget`,
-    `biddingStrategy`; die Zeile trägt Portfolio-ID, Name, Start- und Enddatum, Targeting-Typ, Zustand, Tagesbudget und
-    Strategie), `placement` (Entity `Bidding adjustment`, Operation `Update`, mit der geltenden Strategie), `adGroup`,
-    `keyword`, `productTarget`, `productAd` (nur IDs und geänderte Felder), `archive` (Operation `Archive` für acht
-    Entities), `createNegative` (Keyword `negativeExact`/`negativePhrase` in Ad Group oder Kampagne, ASIN als
+    für das Blatt „Sponsored Products Campaigns“ mit den 26 Spalten der Vorlage (`SP_BULK_COLUMNS`), englisch, Kopfzeilen
+    und Entity-Namen in der Schreibweise der heruntergeladenen Datei (`Campaign ID`, `Ad Group`, `Bidding Adjustment`).
+    Eigenes Eingabemodell `BulkFileChange` (die Datei braucht anderes als der API-Weg: Eltern-IDs in jeder Zeile):
+    `campaign` (`BulkFileCampaign` = Amazon-ID, Portfolio-ID, Enddatum, Zustand; `set` mit `state`, `dailyBudget`,
+    `biddingStrategy`; die Zeile trägt immer Portfolio-ID und Enddatum und sonst nur die geänderten Felder: Der Stand
+    in der Datenbank kann älter sein als der in der Werbekonsole), `placement` (Entity `Bidding Adjustment`, Operation
+    `Update`, mit der geltenden Strategie; ändert dieselbe Datei die Strategie der Kampagne, gilt die neue), `adGroup`,
+    `keyword`, `productTarget`, `productAd` (nur IDs und geänderte Felder), `archive` (Operation `Archive`),
+    `createNegative` (Keyword `negativeExact`/`negativePhrase` in Ad Group oder Kampagne, ohne Ränder; ASIN als
     `asin="…"` in der Ad Group). IDs als Text, Beträge und Prozente als Zahlzelle, Datum `YYYYMMDD`, Zustand
-    `enabled`/`paused`, Platzierungen in der Schreibweise der heruntergeladenen Datei („Placement Top“ …; Amazon nimmt
-    auch `placementTop` und achtet nicht auf Groß/Klein).
-  - **Übersprungen** (`skipped` mit `ref` und Grund, die Zeile fehlt in der Datei): `campaignIncomplete` (Platzhalter
-    ohne Name oder Startdatum, archivierte Kampagne, Strategie `RULE_BASED` oder leer, kein Budget: ohne vollständigen
-    Stand wäre das Update riskant), `notSupportedInBulkFile` (negative ASIN auf Kampagnenebene), `invalidValue` (ID
-    nicht nur Ziffern, Betrag kein Decimal-String oder mehr als zwei Nachkommastellen, unbekannte Platzierung,
-    Prozentsatz außerhalb 0–900), `nothingToChange`.
+    `enabled`/`paused`, Platzierungen als „Placement Top“ usw. (Amazon nimmt auch `placementTop`).
+  - **Übersprungen** (`skipped` mit `ref` und Grund, die Zeile fehlt in der Datei): `duplicate` (für dieselbe Entity
+    bzw. dieselbe Platzierung steht schon eine Zeile: Eine zweite überschriebe beim Hochladen die erste),
+    `parentArchived` (dieselbe Datei archiviert die Kampagne bzw. Ad Group), `entityArchived` (Update einer
+    archivierten Kampagne), `notSupportedInBulkFile` (negative ASIN auf Kampagnenebene anlegen oder archivieren),
+    `invalidValue` (ID nicht nur Ziffern, Betrag 0, kein Decimal-String oder mehr als zwei Nachkommastellen, Tag, den es
+    nicht gibt, unbekannte Platzierung oder Strategie, Prozentsatz außerhalb 0–900, ASIN, Keyword leer oder mit
+    Steuerzeichen), `nothingToChange`.
   - **Rundlauf** (`apps/worker/src/file-import/bulk-export-roundtrip.test.ts`): Die erzeugte Datei wird mit `openXlsx`
-    und den Abbildungen des Bulk-Imports gelesen (Blatt als SP erkannt, alle Kopfzeilen bekannt, Entity-Namen,
-    Zustand, Targeting-Typ, Strategie, Platzierung, Match-Typ, Datum, Betrag, IDs als Text, Ausdruck `asin="…"`).
+    und den Abbildungen des Bulk-Imports gelesen (Blatt als SP erkannt, alle Kopfzeilen bekannt, alle neun
+    Entity-Namen, Zustand, Strategie, Platzierung, Match-Typ, Datum, Betrag, IDs als Text, Ausdruck `asin="…"`). Das
+    belegt, dass Schreiben und unser (toleranter) Leser zusammenpassen, nicht, was die Werbekonsole annimmt.
+  - Review (unabhängig): keine kritischen Befunde; Arbeitsmappe wohlgeformt (alle Teile mit `xmllint` geprüft),
+    Escaping, keine Formel- oder Zahl-Deutung von Texten, kein Betrag über `number`, IDs in den richtigen Spalten
+    bestätigt. Übernommen: Die Kampagnenzeile trägt nur noch geänderte Felder plus Portfolio-ID und Enddatum (vorher
+    der ganze, bis zu eine Woche alte Stand: Eine Zustandsänderung hätte ein inzwischen geändertes Budget
+    zurückgesetzt), je Entity eine Zeile, Kinder archivierter Eltern, Strategie der Platzierungszeile aus der
+    Kampagnenzeile, archivierte Kampagne am Stand statt am neuen Zustand erkannt, Kalenderprüfung, Betrag größer 0,
+    Keyword ohne Ränder und Steuerzeichen, Schreibweise der heruntergeladenen Datei, Blattname gegen unzulässige
+    Zeichen geprüft, Wagenrücklauf entfernt, Tests je Ablehnungsgrund und für alle Entities im Rundlauf.
   - **Für 3.3/3.4:** 3.4 liefert die Datei beim Download (Übermittlung mit Weg `bulk_file` → Änderungen laden, mit
-    Entity-Stand und Amazon-IDs zu `BulkFileChange` zusammenführen: mehrere Felder einer Entity in **eine** Zeile,
-    `state = ARCHIVED` zu `archive`, bei Platzierungen die Strategie nach den Änderungen der Datei). Übersprungene
-    Änderungen zeigt die Oberfläche mit Grund; sie gelten nicht als übermittelt. Dateiname frei (die Konsole verlangt
-    keinen), Vorschlag `profitbash-aenderungen-<konto>-<land>-<datum>.xlsx`. Eltern und Kinder nicht zusammen
-    archivieren (Amazon meldet sonst Fehlerzeilen für die Kinder).
+    Amazon-IDs und dem Stand der Kampagne zu `BulkFileChange` zusammenführen: mehrere Felder einer Entity in **eine**
+    Änderung, `state = ARCHIVED` zu `archive`, Negatives auf Kampagnenebene mit ASIN als
+    `campaignNegativeProductTarget`). Übersprungene Änderungen zeigt die Oberfläche mit Grund; sie gelten nicht als
+    übermittelt. Portfolio-ID und Enddatum stammen aus dem letzten Bulk-Import: 3.4 zeigt dessen Alter am Download
+    (ein inzwischen in der Konsole geändertes Portfolio oder Enddatum würde sonst zurückgesetzt). Dateiname frei,
+    Vorschlag `profitbash-aenderungen-<konto>-<land>-<datum>.xlsx`.
   - **Offen (braucht einen echten Upload von Dominik, sobald 3.4–3.6 stehen):** ob die Werbekonsole die Datei so annimmt
-    (nur ein Blatt, `inlineStr`-Texte, ohne Formate), ob `Bidding adjustment` für eine bisher nicht gesetzte
-    Platzierung `Update` oder `Create` braucht und ob die Strategie in der Zeile stehen darf, ob beim Kampagnen-Update
-    weitere leere Felder etwas zurücksetzen (z. B. „Sites“ bzw. Amazon Business, „Off-Amazon ad serving“; die Spalten
-    schreibt die Datei nicht), ob Vendor-Konten dieselben Zeilen annehmen.
+    (nur ein Blatt, `inlineStr`-Texte, ohne Formate und ohne das versteckte „Config“-Blatt; Öffnen in Excel bzw.
+    LibreOffice ist ebenfalls ungeprüft), ob sie bei Kopfzeilen und Entity-Namen auf die Schreibweise achtet, ob
+    `Bidding Adjustment` für eine bisher nicht gesetzte Platzierung `Update` oder `Create` braucht und ob die Strategie
+    in der Zeile stehen darf, ob beim Kampagnen-Update leere Spalten wirklich „unverändert“ heißen (auch die Spalten,
+    die die Datei nicht schreibt: „Sites“, „Off-Amazon ad serving“), ob Vendor-Konten dieselben Zeilen annehmen.
+  - **Bewusst so:** keine Grenzen im Schreiber (Excel: 1 048 576 Zeilen, 16 384 Spalten, 32 767 Zeichen je Zelle; das
+    Blatt entsteht als ein Text im Speicher, für einige Tausend Zeilen unkritisch, für Phase 4 vormerken).
   - **Nicht enthalten:** Sponsored Brands und Sponsored Display (eigene Blätter und Spalten, mit 3.2c), Portfolios,
     neue Kampagnen, Ad Groups und Keywords (Phase 4 nutzt denselben Schreiber).
 

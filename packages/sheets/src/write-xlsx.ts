@@ -19,10 +19,13 @@ const DECIMAL = /^-?(0|[1-9]\d*)(\.\d+)?$/;
 const INVALID_SHEET_NAME = /[[\]:*?/\\]|^'|'$/;
 const MAX_SHEET_NAME_LENGTH = 31;
 
-/** In XML 1.0 unzulässige Zeichen (Steuerzeichen außer Tab, Zeilenumbruch, Wagenrücklauf; einzelne Surrogate). */
+/**
+ * In XML 1.0 unzulässige Zeichen (Steuerzeichen außer Tab und Zeilenumbruch, einzelne Surrogate, U+FFFE/U+FFFF).
+ * Auch der Wagenrücklauf fällt weg: Ein XML-Parser machte daraus ohnehin einen Zeilenumbruch.
+ */
 const INVALID_XML_CHARS =
   // eslint-disable-next-line no-control-regex
-  /[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+  /[\u0000-\u0008\u000b-\u001f\ufffe\uffff]|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 
 function escapeXml(value: string): string {
   return value
@@ -81,7 +84,12 @@ export function writeXlsx(sheets: readonly XlsxWriteSheet[]): Uint8Array {
     throw new TypeError('writeXlsx: Eine Arbeitsmappe braucht mindestens ein Blatt.');
   const names = new Set<string>();
   for (const { name } of sheets) {
-    if (name === '' || name.length > MAX_SHEET_NAME_LENGTH || INVALID_SHEET_NAME.test(name)) {
+    if (
+      name === '' ||
+      name.length > MAX_SHEET_NAME_LENGTH ||
+      INVALID_SHEET_NAME.test(name) ||
+      name.replace(INVALID_XML_CHARS, '') !== name
+    ) {
       throw new TypeError('writeXlsx: ungültiger Blattname.');
     }
     // Excel unterscheidet Blattnamen nicht nach Groß- und Kleinschreibung.

@@ -14,7 +14,6 @@ import {
   parseTargetExpression,
   PLACEMENTS,
   STATES,
-  TARGETING_TYPES,
   type BulkColumn,
 } from './bulk-columns';
 
@@ -30,15 +29,10 @@ const changes: BulkFileChange[] = [
     campaign: {
       amazonCampaignId: '9007199254740993123',
       amazonPortfolioId: '9001',
-      name: 'SP Lampen & Mehr',
-      startDate: '2026-01-05',
       endDate: '2026-12-31',
-      targetingType: 'MANUAL',
       state: 'ENABLED',
-      dailyBudget: '20',
-      biddingStrategy: 'SALES_DOWN_ONLY',
     },
-    set: { dailyBudget: '35.50', biddingStrategy: 'SALES_UP_AND_DOWN' },
+    set: { dailyBudget: '35.50', biddingStrategy: 'SALES_UP_AND_DOWN', state: 'PAUSED' },
   },
   {
     ref: 'placement',
@@ -63,6 +57,36 @@ const changes: BulkFileChange[] = [
     amazonCampaignId: '9007199254740993123',
     amazonAdGroupId: '1101',
     negative: { type: 'keyword', keywordText: 'gebraucht lampe', matchType: 'PHRASE' },
+  },
+  {
+    ref: 'campaignNegative',
+    type: 'createNegative',
+    amazonCampaignId: '9007199254740993123',
+    amazonAdGroupId: null,
+    negative: { type: 'keyword', keywordText: 'kinder', matchType: 'EXACT' },
+  },
+  {
+    ref: 'adGroup',
+    type: 'adGroup',
+    amazonCampaignId: '9007199254740993123',
+    amazonAdGroupId: '1102',
+    defaultBid: '0.45',
+  },
+  {
+    ref: 'productAd',
+    type: 'productAd',
+    amazonCampaignId: '9007199254740993123',
+    amazonAdGroupId: '1101',
+    amazonAdId: '4001',
+    state: 'PAUSED',
+  },
+  {
+    ref: 'archive',
+    type: 'archive',
+    entity: 'productTarget',
+    amazonCampaignId: '9007199254740993123',
+    amazonAdGroupId: '1101',
+    amazonId: '3001',
   },
   {
     ref: 'asin',
@@ -137,14 +161,9 @@ describe('Bulk-Datei: Rundlauf mit dem Leser des Bulk-Imports', () => {
     );
     expect(isNumeric(0, 'campaignId')).toBe(false);
     expect(cell(0, 'portfolioId')).toBe('9001');
-    expect(cell(0, 'campaignName')).toBe('SP Lampen & Mehr');
-    expect(parseBulkDate(cell(0, 'startDate'))).toBe('2026-01-05');
+    expect(cell(0, 'campaignName')).toBe('');
     expect(parseBulkDate(cell(0, 'endDate'))).toBe('2026-12-31');
-    expect(mapValue(TARGETING_TYPES, cell(0, 'targetingType'))).toEqual({
-      value: 'MANUAL',
-      known: true,
-    });
-    expect(mapValue(STATES, cell(0, 'state'))).toEqual({ value: 'ENABLED', known: true });
+    expect(mapValue(STATES, cell(0, 'state'))).toEqual({ value: 'PAUSED', known: true });
     expect(parseBulkAmount(cell(0, 'dailyBudget'))).toBe('35.5');
     expect(isNumeric(0, 'dailyBudget')).toBe(true);
     expect(mapValue(BIDDING_STRATEGIES, cell(0, 'biddingStrategy'))).toEqual({
@@ -172,8 +191,17 @@ describe('Bulk-Datei: Rundlauf mit dem Leser des Bulk-Imports', () => {
     expect(cell(3, 'keywordText')).toBe('gebraucht lampe');
     expect(mapValue(MATCH_TYPES, cell(3, 'matchType'))).toEqual({ value: 'PHRASE', known: true });
 
-    expect(entity(4)).toBe('negativeProductTargeting');
-    expect(parseTargetExpression(cell(4, 'productTargetingExpression'), '')).toMatchObject({
+    expect(entity(4)).toBe('campaignNegativeKeyword');
+    expect(cell(4, 'adGroupId')).toBe('');
+    expect(entity(5)).toBe('adGroup');
+    expect(parseBulkAmount(cell(5, 'adGroupDefaultBid'))).toBe('0.45');
+    expect(entity(6)).toBe('productAd');
+    expect(cell(6, 'adId')).toBe('4001');
+    expect(entity(7)).toBe('productTargeting');
+    expect(cell(7, 'productTargetingId')).toBe('3001');
+
+    expect(entity(8)).toBe('negativeProductTargeting');
+    expect(parseTargetExpression(cell(8, 'productTargetingExpression'), '')).toMatchObject({
       targetType: 'product',
       expression: { asin: 'B0FREMD001' },
     });
