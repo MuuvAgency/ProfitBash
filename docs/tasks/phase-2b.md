@@ -110,7 +110,7 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
     fehlt bzw. unlesbar) zählen getrennt als `invalidSearchTermRows` und verhindern das Entfernen bei „vollständig“ nicht.
   - **Zeitraum** nur aus dem Dateinamen der Werbekonsole (`bulk-<konto>-<von>-<bis>-<zeitstempel>.xlsx`, `parseBulkPeriod`).
     Umbenannte Datei: Entities werden importiert, Suchbegriffe nicht (`searchTermsWithoutPeriod`, Log
-    `bulk_import.search_terms_without_period`). **Offen:** Zeitraum im Upload-Dialog von Hand angeben, falls das stört.
+    `bulk_import.search_terms_without_period`). Seit 2b.2c lässt sich der Zeitraum im Upload-Dialog von Hand angeben.
   - **Zähler** im Verlauf und Sync-Status: `searchTerms`, `searchTermsWithoutPeriod`, `invalidSearchTermRows` (nur wenn > 0).
   - **Echte Dateien gegengeprüft** (lokal gegen eine Wegwerf-Test-DB, 2026-10-07, drei Dateien von Dominik, nur Zähler): 359
     bzw. 347 Suchbegriff-Zeilen wie die Blätter, keine ungültigen Zeilen, alle Targets der Suchbegriffe unter den Entities,
@@ -242,8 +242,38 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     kann ihn schon); Sprung von einer Zeile in den Explorer (Kampagne, Ad Group).
 
 #### 2b.2c Zeitraum im Upload-Dialog (Ausweich-Feld)
-- [ ] Trägt der Dateiname keinen Zeitraum, erscheinen zwei Datumsfelder (von/bis); der Import nutzt sie für die
+- [x] Trägt der Dateiname keinen Zeitraum, erscheinen zwei Datumsfelder (von/bis); der Import nutzt sie für die
       Suchbegriffe. Sonst gilt weiter der Dateiname.
+- [x] Umsetzung:
+  - **Shared** (`packages/shared/src/file-imports.ts`, browserfähig): `parseBulkPeriod` und `BulkPeriod` liegen jetzt hier
+    (vorher im Worker), Import, API und Dialog nutzen dieselbe Funktion (eine Regex). Neu: `BULK_PERIOD_MAX_DAYS` (60),
+    `bulkPeriodIssue({ startDate, endDate }, today?)` → `incomplete` | `invalidDate` | `startAfterEnd` | `future` |
+    `tooLong` | `null` (keine Angabe ist erlaubt), `todayInTimezone`.
+  - **Regeln:** beide Tage oder keiner, von ≤ bis, letzter Tag nicht nach „heute“ **in der Zeitzone des Profils**,
+    höchstens 60 Tage **zwischen** erstem und letztem Tag (bis − von ≤ 60; ein Tag mehr als „60 Tage eingeschlossen“,
+    bewusst die großzügigere Lesart, damit kein echter Konsolen-Zeitraum abgelehnt wird).
+  - **Schema** (Migration `0023_file_imports_period`): `file_imports.period_start`/`period_end` (`date`, leer erlaubt), Check
+    `file_imports_period_ck` (beide oder keiner, von ≤ bis).
+  - **DB** (`packages/db/src/file-imports.ts`): `createFileImport` nimmt `period` (und `now` für Tests). **Der Dateiname
+    gewinnt:** Trägt er einen Zeitraum, wird die Angabe verworfen und nicht geprüft (sonst stünde im Verlauf ein Zeitraum,
+    der nicht gilt). Ungültige Angabe → `FileImportError` `INVALID_PERIOD`. Der Zeitraum steht im Audit-Event
+    `file_import.create` (`periodStart`, `periodEnd`), in `FileImport` (Upload-Antwort und Liste) und in
+    `ClaimedFileImport.period`.
+  - **API** (`POST /api/profiles/{id}/file-imports`): optionale Multipart-Felder `periodStart`, `periodEnd`
+    (`YYYY-MM-DD`). zod prüft die Schreibweise immer, „beide oder keiner“, Reihenfolge und Spanne nur, wenn der Dateiname
+    keinen Zeitraum trägt (`400 VALIDATION_ERROR`); „nicht in der Zukunft“ prüft die DB-Schicht mit der Zeitzone des
+    Profils (`400 INVALID_PERIOD`).
+  - **Worker:** `FileImporterInput.period`; `importBulkFile` nimmt `parseBulkPeriod(fileName) ?? period`. Nur wenn beides
+    fehlt, bleibt es bei `searchTermsWithoutPeriod`.
+  - **Web** (`FileImportsDialog.vue`): Nach der Dateiwahl erscheinen „Zeitraum von“/„Zeitraum bis“ (`input type="date"`,
+    `max` = heute im Profil) samt Hinweis nur, wenn `parseBulkPeriod` für den Namen nichts liefert. Prüfung beim Absenden
+    mit `bulkPeriodIssue`, Meldung bei den Feldern (`role="alert"`, `aria-invalid`, `aria-describedby`); beide leer →
+    Upload ohne Zeitraum. Eine neue Dateiwahl leert die Felder. Der Verlauf zeigt unter dem Dateinamen
+    „Zeitraum 01.09.2026 – 30.09.2026“ (`font-data`), nur bei von Hand angegebenem Zeitraum.
+  - **Bewusst so bzw. offen:** Der Zähler-Text „Suchbegriff ohne Zeitraum (Dateiname geändert)“ ist unverändert. Der
+    Zeitraum wird für jede Dateiart gespeichert, genutzt nur vom Bulk-Import. Ein gespeicherter Import lässt sich nicht
+    nachträglich mit Zeitraum versehen (Datei erneut hochladen). Kein unabhängiges Review und kein Blick in die
+    Browser-Pane in dieser Session (Auftrag ohne Dev-Server).
 
 #### Später (nur mit Datei)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt
