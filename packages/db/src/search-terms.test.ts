@@ -1,4 +1,4 @@
-import { DEFAULT_SEARCH_TERM_RULES } from '@profitbash/shared';
+import { DEFAULT_SEARCH_TERM_RULES, NO_SEARCH_TERM_RULE_OVERRIDES } from '@profitbash/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { replaceSearchTermPeriodMetrics, type SearchTermPeriodMetric } from './amazon-ads-metrics';
@@ -11,6 +11,7 @@ import {
   auditEvents,
   clients,
   members,
+  searchTermRuleOverrides,
   searchTermRules,
   users,
 } from './schema';
@@ -19,6 +20,7 @@ import {
   getSearchTermRules,
   listSearchTermPeriods,
   querySearchTermPeriod,
+  saveSearchTermRuleOverrides,
   saveSearchTermRules,
 } from './search-terms';
 import { createTestConnection, createTestOrganization } from './test-fixtures';
@@ -508,6 +510,97 @@ describe('Regeln je Organisation', () => {
         rules: DEFAULT_SEARCH_TERM_RULES,
       }),
     ).toBeNull();
+  });
+});
+
+describe('Abweichende Regeln je Profil (2b.2g)', () => {
+  const overrides = {
+    ...NO_SEARCH_TERM_RULE_OVERRIDES,
+    negateMinCost: '200',
+    harvestMaxAcos: '0.4',
+  };
+  const save = (userId: string, profileId: string, values = overrides, orgId = ids.org) =>
+    saveSearchTermRuleOverrides(testDb.db, { userId, orgId, profileId, overrides: values });
+  const read = async (profileId = ids.de) =>
+    (
+      await querySearchTermPeriod(testDb.db, {
+        ...as(ids.viewer),
+        profileId,
+        periodStart: A.startDate,
+        periodEnd: A.endDate,
+      })
+    )?.ruleOverrides;
+  const events = () =>
+    testDb.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'search_term_rule_overrides.update'));
+
+  it('ohne gespeicherte Abweichung nennt die Analyse je Feld „wie die Organisation“', async () => {
+    expect(await read()).toEqual(NO_SEARCH_TERM_RULE_OVERRIDES);
+  });
+
+  it('verweigert ausgeblendete und fremde Profile und Nicht-Mitglieder, ohne etwas zu speichern', async () => {
+    expect(await save(ids.admin, ids.hidden)).toBeNull();
+    expect(await save(ids.admin, ids.foreign)).toBeNull();
+    expect(await save(ids.outsider, ids.de)).toBeNull();
+    expect(await save(ids.outsider, ids.de, overrides, ids.otherOrg)).toBeNull();
+    expect(await save(ids.stranger, ids.de)).toBeNull();
+    expect(await testDb.db.select().from(searchTermRuleOverrides)).toHaveLength(0);
+    expect(await events()).toHaveLength(0);
+  });
+
+  it('speichert je Profil einzelne Werte mit Audit-Event; die Analyse liefert sie', async () => {
+    const saved = await save(ids.admin, ids.de);
+    expect(saved).toMatchObject({ overrides });
+    expect(saved?.updatedAt).toBeInstanceOf(Date);
+    expect(await read()).toEqual(overrides);
+    expect(await testDb.db.select().from(searchTermRuleOverrides)).toMatchObject([
+      { profileId: ids.de, organizationId: ids.org, negateMinCost: '200', negateMinClicks: null },
+    ]);
+    expect((await events()).at(-1)).toMatchObject({
+      organizationId: ids.org,
+      actorUserId: ids.admin,
+      target: {
+        type: 'search_term_rule_overrides',
+        id: ids.de,
+        profileId: ids.de,
+        before: null,
+        after: overrides,
+      },
+    });
+  });
+
+  it('überschreibt beim nächsten Speichern und nennt den alten Stand im Audit-Event', async () => {
+    const next = { ...NO_SEARCH_TERM_RULE_OVERRIDES, harvestMinPurchases: 5 };
+    await save(ids.admin, ids.de, next);
+    expect(await read()).toEqual(next);
+    expect(await testDb.db.select().from(searchTermRuleOverrides)).toHaveLength(1);
+    expect((await events()).at(-1)).toMatchObject({ target: { before: overrides, after: next } });
+  });
+
+  it('nimmt die Abweichung zurück, wenn alle Felder leer sind', async () => {
+    const saved = await save(ids.admin, ids.de, NO_SEARCH_TERM_RULE_OVERRIDES);
+    expect(saved).toEqual({ overrides: NO_SEARCH_TERM_RULE_OVERRIDES, updatedAt: null });
+    expect(await testDb.db.select().from(searchTermRuleOverrides)).toHaveLength(0);
+    expect(await read()).toEqual(NO_SEARCH_TERM_RULE_OVERRIDES);
+    expect((await events()).at(-1)).toMatchObject({
+      target: { before: { harvestMinPurchases: 5 }, after: null },
+    });
+  });
+
+  it('schreibt kein Audit-Event, wenn nichts abweicht und nichts gespeichert war', async () => {
+    const before = (await events()).length;
+    await save(ids.admin, ids.de, NO_SEARCH_TERM_RULE_OVERRIDES);
+    expect(await events()).toHaveLength(before);
+  });
+
+  it('die Datenbank lehnt eine Zeile ohne einen einzigen Wert ab', async () => {
+    await expect(
+      testDb.db
+        .insert(searchTermRuleOverrides)
+        .values({ profileId: ids.de, organizationId: ids.org }),
+    ).rejects.toThrow();
   });
 });
 

@@ -1,4 +1,6 @@
-import { integer, numeric, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { check, foreignKey, integer, numeric, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { amazonAdsProfiles } from './app';
 import { organizations, users } from './auth';
 
 /**
@@ -18,3 +20,33 @@ export const searchTermRules = pgTable('search_term_rules', {
   updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
 });
+
+/**
+ * Abweichende Regeln je Profil (`phase-2b.md` 2b.2g, Dominik 2026-10-08): je Feld ein eigener Wert oder leer = wie
+ * die Organisation (`search_term_rules` bzw. Startwerte). Ein Profil ist ein Client auf einem Marktplatz; die
+ * Spend-Grenze gilt in seiner Währung. Eine Zeile ohne Wert gibt es nicht (dann wird sie gelöscht).
+ */
+export const searchTermRuleOverrides = pgTable(
+  'search_term_rule_overrides',
+  {
+    profileId: uuid('profile_id').primaryKey(),
+    organizationId: uuid('organization_id').notNull(),
+    harvestMinPurchases: integer('harvest_min_purchases'),
+    harvestMaxAcos: numeric('harvest_max_acos', { mode: 'string' }),
+    negateMinClicks: integer('negate_min_clicks'),
+    negateMinCost: numeric('negate_min_cost', { mode: 'string' }),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'search_term_rule_overrides_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    check(
+      'search_term_rule_overrides_not_empty_ck',
+      sql`num_nonnulls(${t.harvestMinPurchases}, ${t.harvestMaxAcos}, ${t.negateMinClicks}, ${t.negateMinCost}) > 0`,
+    ),
+  ],
+);

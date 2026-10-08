@@ -1,5 +1,9 @@
 import { comparableSearchTerm } from '@profitbash/engine';
-import { DEFAULT_SEARCH_TERM_RULES, type SearchTermRulesInput } from '@profitbash/shared';
+import {
+  DEFAULT_SEARCH_TERM_RULES,
+  type SearchTermRuleOverrides,
+  type SearchTermRulesInput,
+} from '@profitbash/shared';
 import { and, asc, desc, eq, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { getOrgRole, visibleProfilesScope } from './access';
 import { recordAuditEvent } from './audit';
@@ -11,6 +15,7 @@ import {
   amazonAdsSearchTermPeriodMetrics,
   amazonAdsTargets,
   clients,
+  searchTermRuleOverrides,
   searchTermRules,
 } from './schema';
 
@@ -72,6 +77,13 @@ export async function listSearchTermPeriods(
   return rows.map((row) => ({ ...row, importedAt: row.importedAt! }));
 }
 
+const overrideColumns = {
+  harvestMinPurchases: searchTermRuleOverrides.harvestMinPurchases,
+  harvestMaxAcos: searchTermRuleOverrides.harvestMaxAcos,
+  negateMinClicks: searchTermRuleOverrides.negateMinClicks,
+  negateMinCost: searchTermRuleOverrides.negateMinCost,
+};
+
 export interface SearchTermPeriodQuery extends SearchTermAccessInput {
   profileId: string;
   /** Genau ein Datei-Zeitraum (`YYYY-MM-DD`, beide Tage eingeschlossen). */
@@ -117,6 +129,8 @@ export interface SearchTermPeriodResult {
   };
   /** Geschützte Begriffe des Clients (leer ohne Client). */
   protectedTerms: string[];
+  /** Abweichende Regeln des Profils (2b.2g); `null` je Feld = wie die Organisation. */
+  ruleOverrides: SearchTermRuleOverrides;
   /** Letzter Import in diesen Zeitraum; `null` ohne Zeilen. */
   importedAt: Date | null;
   /** Alle Zeilen des Zeitraums nach Spend absteigend (Kürzen ist Sache des Aufrufers: N-Gramme brauchen alle). */
@@ -141,9 +155,12 @@ export async function querySearchTermPeriod(
       currencyCode: amazonAdsProfiles.currencyCode,
       clientId: amazonAdsProfiles.clientId,
       protectedTerms: clients.protectedTerms,
+      // Flach gelesen: Ein geschachteltes Objekt setzt Drizzle bei einem Left Join auf `null`, sobald sein erstes Feld leer ist.
+      ...overrideColumns,
     })
     .from(amazonAdsProfiles)
     .leftJoin(clients, eq(clients.id, amazonAdsProfiles.clientId))
+    .leftJoin(searchTermRuleOverrides, eq(searchTermRuleOverrides.profileId, amazonAdsProfiles.id))
     .where(and(eq(amazonAdsProfiles.id, input.profileId), inArray(amazonAdsProfiles.id, scope.ids)))
     .limit(1);
   if (!profile) return null;
@@ -196,10 +213,18 @@ export async function querySearchTermPeriod(
   for (const row of rows) {
     if (importedAt === null || row.importedAt > importedAt) importedAt = row.importedAt;
   }
-  const { protectedTerms, ...profileInfo } = profile;
+  const {
+    protectedTerms,
+    harvestMinPurchases,
+    harvestMaxAcos,
+    negateMinClicks,
+    negateMinCost,
+    ...profileInfo
+  } = profile;
   return {
     profile: profileInfo,
     protectedTerms: protectedTerms ?? [],
+    ruleOverrides: { harvestMinPurchases, harvestMaxAcos, negateMinClicks, negateMinCost },
     importedAt,
     rows: rows.map(({ importedAt: _importedAt, ...row }) => ({
       ...row,
@@ -368,5 +393,71 @@ export async function saveSearchTermRules(
       },
     });
     return { rules, isDefault: false, updatedAt };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Abweichende Regeln je Profil (2b.2g)
+// ---------------------------------------------------------------------------
+
+export interface SearchTermRuleOverridesRecord {
+  overrides: SearchTermRuleOverrides;
+  /** `null`, wenn für das Profil nichts (mehr) abweicht. */
+  updatedAt: Date | null;
+}
+
+/**
+ * Speichert die abweichenden Regeln eines sichtbaren Profils (je Feld ein Wert oder `null` = wie die Organisation);
+ * sind alle Felder `null`, wird die Abweichung gelöscht. Audit `search_term_rule_overrides.update` in derselben
+ * Transaktion (nicht, wenn nichts gespeichert war und nichts abweicht). Das Recht (`write` im Feature `sp-explorer`)
+ * prüft die API; `null`, wenn der Nutzer das Profil nicht sehen darf.
+ */
+export async function saveSearchTermRuleOverrides(
+  db: Db,
+  input: SearchTermAccessInput & { profileId: string; overrides: SearchTermRuleOverrides },
+): Promise<SearchTermRuleOverridesRecord | null> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return null;
+  const [profile] = await db
+    .select({ id: amazonAdsProfiles.id, organizationId: amazonAdsProfiles.organizationId })
+    .from(amazonAdsProfiles)
+    .where(and(eq(amazonAdsProfiles.id, input.profileId), inArray(amazonAdsProfiles.id, scope.ids)))
+    .limit(1);
+  if (!profile) return null;
+
+  const { overrides } = input;
+  const empty = Object.values(overrides).every((value) => value === null);
+  const o = searchTermRuleOverrides;
+  return db.transaction(async (tx) => {
+    const [before] = await tx
+      .select(overrideColumns)
+      .from(o)
+      .where(eq(o.profileId, profile.id))
+      .for('update');
+    if (empty && !before) return { overrides, updatedAt: null };
+    const updatedAt = new Date();
+    if (empty) {
+      await tx.delete(o).where(eq(o.profileId, profile.id));
+    } else {
+      const values = { ...overrides, updatedBy: input.userId, updatedAt };
+      await tx
+        .insert(o)
+        // Die Daten gehören der Organisation des Profils (ADR 002).
+        .values({ profileId: profile.id, organizationId: profile.organizationId, ...values })
+        .onConflictDoUpdate({ target: o.profileId, set: values });
+    }
+    await recordAuditEvent(tx, {
+      organizationId: profile.organizationId,
+      actorUserId: input.userId,
+      action: 'search_term_rule_overrides.update',
+      target: {
+        type: 'search_term_rule_overrides',
+        id: profile.id,
+        profileId: profile.id,
+        before: before ?? null,
+        after: empty ? null : overrides,
+      },
+    });
+    return { overrides, updatedAt: empty ? null : updatedAt };
   });
 }

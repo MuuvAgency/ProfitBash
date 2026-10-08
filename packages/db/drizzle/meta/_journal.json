@@ -169,6 +169,13 @@
       "when": 1791407812332,
       "tag": "0023_file_imports_period",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791464306762,
+      "tag": "0024_search_term_rule_overrides",
+      "breakpoints": true
     }
   ]
 }

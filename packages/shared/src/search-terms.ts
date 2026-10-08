@@ -15,19 +15,21 @@ import { adProductSchema } from './analytics';
 const unsignedDecimal = (integerDigits: number, fractionDigits: number) =>
   z.string().regex(new RegExp(`^\\d{1,${integerDigits}}(\\.\\d{1,${fractionDigits}})?$`));
 
+const searchTermRuleFields = {
+  /** Harvest ab so vielen Käufen … */
+  harvestMinPurchases: z.int().min(1).max(100_000),
+  /** … und ACoS höchstens so hoch (Bruch: 0.25 = 25 %). */
+  harvestMaxAcos: unsignedDecimal(2, 4).refine((value) => /[1-9]/.test(value), {
+    message: 'größer als 0',
+  }),
+  /** Negieren ab so vielen Klicks ohne Kauf … */
+  negateMinClicks: z.int().min(1).max(1_000_000),
+  /** … und mindestens so viel Spend (Währung des Profils). */
+  negateMinCost: unsignedDecimal(9, 2),
+};
+
 export const searchTermRulesSchema = z
-  .strictObject({
-    /** Harvest ab so vielen Käufen … */
-    harvestMinPurchases: z.int().min(1).max(100_000),
-    /** … und ACoS höchstens so hoch (Bruch: 0.25 = 25 %). */
-    harvestMaxAcos: unsignedDecimal(2, 4).refine((value) => /[1-9]/.test(value), {
-      message: 'größer als 0',
-    }),
-    /** Negieren ab so vielen Klicks ohne Kauf … */
-    negateMinClicks: z.int().min(1).max(1_000_000),
-    /** … und mindestens so viel Spend (Währung des Profils). */
-    negateMinCost: unsignedDecimal(9, 2),
-  })
+  .strictObject(searchTermRuleFields)
   .meta({ id: 'SearchTermRules' });
 export type SearchTermRulesInput = z.infer<typeof searchTermRulesSchema>;
 
@@ -41,6 +43,55 @@ export const DEFAULT_SEARCH_TERM_RULES: SearchTermRulesInput = {
   negateMinClicks: 25,
   negateMinCost: '20',
 };
+
+/**
+ * Abweichende Regeln eines Profils (2b.2g): je Feld ein eigener Wert oder `null` = wie die Organisation. Die
+ * Spend-Grenze ist ein Betrag in der Währung des Profils; dieselbe Zahl bedeutet in SEK viel weniger als in EUR.
+ * Gespeichert in `search_term_rule_overrides`.
+ */
+export const searchTermRuleOverridesSchema = z
+  .strictObject({
+    harvestMinPurchases: searchTermRuleFields.harvestMinPurchases.nullable(),
+    harvestMaxAcos: searchTermRuleFields.harvestMaxAcos.nullable(),
+    negateMinClicks: searchTermRuleFields.negateMinClicks.nullable(),
+    negateMinCost: searchTermRuleFields.negateMinCost.nullable(),
+  })
+  .meta({ id: 'SearchTermRuleOverrides' });
+export type SearchTermRuleOverrides = z.infer<typeof searchTermRuleOverridesSchema>;
+
+export const NO_SEARCH_TERM_RULE_OVERRIDES: SearchTermRuleOverrides = {
+  harvestMinPurchases: null,
+  harvestMaxAcos: null,
+  negateMinClicks: null,
+  negateMinCost: null,
+};
+
+/** Geltende Regeln eines Profils: je Feld der Wert des Profils, sonst der der Organisation. */
+export function resolveSearchTermRules(
+  organization: SearchTermRulesInput,
+  overrides: SearchTermRuleOverrides | null,
+): SearchTermRulesInput {
+  return {
+    harvestMinPurchases: overrides?.harvestMinPurchases ?? organization.harvestMinPurchases,
+    harvestMaxAcos: overrides?.harvestMaxAcos ?? organization.harvestMaxAcos,
+    negateMinClicks: overrides?.negateMinClicks ?? organization.negateMinClicks,
+    negateMinCost: overrides?.negateMinCost ?? organization.negateMinCost,
+  };
+}
+
+/** Speichert die abweichenden Regeln eines Profils; alle Felder `null` nimmt die Abweichung zurück. */
+export const searchTermProfileRulesRequestSchema = z
+  .strictObject({ profileId: z.uuid(), overrides: searchTermRuleOverridesSchema })
+  .meta({ id: 'SearchTermProfileRulesRequest' });
+
+export const searchTermProfileRulesResponseSchema = z
+  .object({
+    profileId: z.uuid(),
+    overrides: searchTermRuleOverridesSchema,
+    /** `null`, wenn für das Profil nichts (mehr) abweicht. */
+    updatedAt: z.string().nullable(),
+  })
+  .meta({ id: 'SearchTermProfileRulesResponse' });
 
 export const searchTermRulesResponseSchema = z
   .object({
@@ -229,8 +280,14 @@ export const searchTermAnalysisResponseSchema = z
       periodStart: z.iso.date(),
       periodEnd: z.iso.date(),
       importedAt: z.string().nullable(),
+      /** Geltende Regeln des Profils: Regeln der Organisation, je Feld vom Profil überschrieben (`ruleOverrides`). */
       rules: searchTermRulesSchema,
+      /** Die Organisation hat noch nichts gespeichert (Startwerte); sagt nichts über `ruleOverrides`. */
       rulesAreDefault: z.boolean(),
+      /** Regeln der Organisation, ohne die Abweichungen des Profils. */
+      organizationRules: searchTermRulesSchema,
+      /** Abweichende Werte dieses Profils; `null` je Feld = wie die Organisation. */
+      ruleOverrides: searchTermRuleOverridesSchema,
       protectedTerms: z.array(z.string()),
       /** Alle Zeilen des Zeitraums; `rows` und `ngrams` können gekürzt sein. */
       totalRows: z.number().int(),
