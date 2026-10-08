@@ -3141,6 +3141,40 @@
               "watch"
             ]
           },
+          "termCounts": {
+            "type": "object",
+            "properties": {
+              "harvest": {
+                "type": "integer"
+              },
+              "negate": {
+                "type": "integer"
+              },
+              "watch": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "harvest",
+              "negate",
+              "watch"
+            ]
+          },
+          "termCountsOnlyAcrossTargets": {
+            "type": "object",
+            "properties": {
+              "harvest": {
+                "type": "integer"
+              },
+              "negate": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "harvest",
+              "negate"
+            ]
+          },
           "rows": {
             "type": "array",
             "items": {
@@ -3158,6 +3192,8 @@
           "meta",
           "total",
           "counts",
+          "termCounts",
+          "termCountsOnlyAcrossTargets",
           "rows",
           "ngrams"
         ]
@@ -3340,6 +3376,34 @@
           },
           "alreadyTargeted": {
             "type": "boolean"
+          },
+          "termClassification": {
+            "type": "string",
+            "enum": [
+              "harvest",
+              "negate",
+              "watch"
+            ]
+          },
+          "termReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "protected",
+              "alreadyTargeted",
+              "acosAboveTarget",
+              "noSales",
+              "tooFewData",
+              null
+            ]
+          },
+          "termTargets": {
+            "type": "integer"
+          },
+          "termOnlyAcrossTargets": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3370,7 +3434,11 @@
           "classification",
           "reason",
           "protected",
-          "alreadyTargeted"
+          "alreadyTargeted",
+          "termClassification",
+          "termReason",
+          "termTargets",
+          "termOnlyAcrossTargets"
         ]
       },
       "SearchTermNgram": {

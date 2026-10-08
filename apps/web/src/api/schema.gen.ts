@@ -3265,6 +3265,15 @@ export interface components {
                 negate: number;
                 watch: number;
             };
+            termCounts: {
+                harvest: number;
+                negate: number;
+                watch: number;
+            };
+            termCountsOnlyAcrossTargets: {
+                harvest: number;
+                negate: number;
+            };
             rows: components["schemas"]["SearchTermRow"][];
             ngrams: components["schemas"]["SearchTermNgram"][];
         };
@@ -3311,6 +3320,12 @@ export interface components {
             reason: "protected" | "alreadyTargeted" | "acosAboveTarget" | "noSales" | "tooFewData" | null;
             protected: boolean;
             alreadyTargeted: boolean;
+            /** @enum {string} */
+            termClassification: "harvest" | "negate" | "watch";
+            /** @enum {string|null} */
+            termReason: "protected" | "alreadyTargeted" | "acosAboveTarget" | "noSales" | "tooFewData" | null;
+            termTargets: number;
+            termOnlyAcrossTargets: boolean;
         };
         SearchTermNgram: {
             size: number;

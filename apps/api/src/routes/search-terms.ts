@@ -9,6 +9,8 @@ import {
 import {
   buildNgrams,
   classifySearchTerm,
+  classifySearchTermsAcrossTargets,
+  comparableSearchTerm,
   createProtectedTermMatcher,
   deriveMetrics,
   sumDecimals,
@@ -169,15 +171,33 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     // Einstufung, Zähler, Summe und N-Gramme über **alle** Zeilen; gekürzt wird erst die Antwort.
     const counts = { harvest: 0, negate: 0, watch: 0 };
     const isProtected = createProtectedTermMatcher(protectedTerms);
-    const rows = result.rows.map((row) => {
-      const flagged = { ...row, protected: isProtected(row.searchTerm) };
+    const flaggedRows = result.rows.map((row) => ({
+      ...row,
+      protected: isProtected(row.searchTerm),
+    }));
+    // Zusätzlich je Suchbegriff über alle Targets (Käufe oder Klicks verteilen sich): dieselben Regeln auf die Summe.
+    const terms = classifySearchTermsAcrossTargets(flaggedRows, rules);
+    const termCounts = { harvest: 0, negate: 0, watch: 0 };
+    const termCountsOnlyAcrossTargets = { harvest: 0, negate: 0 };
+    for (const term of terms.values()) {
+      termCounts[term.classification] += 1;
+      if (term.onlyAcrossTargets && term.classification !== 'watch') {
+        termCountsOnlyAcrossTargets[term.classification] += 1;
+      }
+    }
+    const rows = flaggedRows.map((flagged) => {
       const classification = classifySearchTerm(flagged, rules);
       counts[classification.classification] += 1;
+      const term = terms.get(comparableSearchTerm(flagged.searchTerm))!;
       return {
         ...flagged,
-        adProduct: row.adProduct as AdProduct,
-        ...derived(row),
+        adProduct: flagged.adProduct as AdProduct,
+        ...derived(flagged),
         ...classification,
+        termClassification: term.classification,
+        termReason: term.reason,
+        termTargets: term.targets,
+        termOnlyAcrossTargets: term.onlyAcrossTargets,
       };
     });
     const totalSums = Object.fromEntries(
@@ -208,6 +228,8 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
         },
         total: { ...totalSums, ...derived(totalSums) },
         counts,
+        termCounts,
+        termCountsOnlyAcrossTargets,
         rows: rows.slice(0, MAX_SEARCH_TERM_ROWS),
         ngrams: ngrams
           .slice(0, MAX_SEARCH_TERM_NGRAMS)
