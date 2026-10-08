@@ -17,8 +17,9 @@ import {
 /**
  * Suchbegriff-Analyse (`phase-2b.md` 2b.2): Lesezugriffe von Nutzern auf die Zeitraumsummen der Suchbegriff-Blätter
  * (`amazon_ads_search_term_period_metrics`), nur über `visibleProfilesScope()` (ADR 002). Gelesen wird je Profil und
- * **einem** Datei-Zeitraum: Zeiträume verschiedener Dateien überlappen sich und werden nie addiert. Dazu die Regeln
- * der Einstufung je Organisation (Organisationsdaten wie gespeicherte Ansichten, für alle Mitglieder lesbar).
+ * **einem** Datei-Zeitraum: Zeiträume verschiedener Dateien überlappen sich und werden nie addiert. Dazu das Löschen
+ * eines Datei-Zeitraums (2b.2d) und die Regeln der Einstufung je Organisation (Organisationsdaten wie gespeicherte
+ * Ansichten, für alle Mitglieder lesbar).
  */
 
 export interface SearchTermAccessInput {
@@ -234,6 +235,68 @@ async function exactTargetTerms(db: Db, profileId: string): Promise<Set<string>>
     if (term) terms.add(comparableSearchTerm(term));
   }
   return terms;
+}
+
+// ---------------------------------------------------------------------------
+// Datei-Zeitraum löschen
+// ---------------------------------------------------------------------------
+
+export interface DeleteSearchTermPeriodInput extends SearchTermAccessInput {
+  profileId: string;
+  /** Genau ein Datei-Zeitraum (`YYYY-MM-DD`, beide Tage eingeschlossen). */
+  periodStart: string;
+  periodEnd: string;
+}
+
+/**
+ * Löscht die Suchbegriffe eines Profils für genau einen Datei-Zeitraum, über alle Ad-Typen (2b.2d: ein beim Upload
+ * falsch angegebener Zeitraum bliebe sonst für immer in der Auswahl). Kampagnen, der Verlauf der Datei-Importe und
+ * andere Zeiträume bleiben. Audit `search_term_period.delete` in derselben Transaktion. Das Recht (`write` im
+ * Feature `sp-explorer`) prüft die API. `null`, wenn der Nutzer das Profil nicht sehen darf, sonst die Zahl der
+ * gelöschten Zeilen (0 = Zeitraum unbekannt, dann ohne Audit-Event).
+ */
+export async function deleteSearchTermPeriod(
+  db: Db,
+  input: DeleteSearchTermPeriodInput,
+): Promise<number | null> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return null;
+  const [profile] = await db
+    .select({ id: amazonAdsProfiles.id, organizationId: amazonAdsProfiles.organizationId })
+    .from(amazonAdsProfiles)
+    .where(and(eq(amazonAdsProfiles.id, input.profileId), inArray(amazonAdsProfiles.id, scope.ids)))
+    .limit(1);
+  if (!profile) return null;
+
+  const m = amazonAdsSearchTermPeriodMetrics;
+  return db.transaction(async (tx) => {
+    const deleted = await tx
+      .delete(m)
+      .where(
+        and(
+          eq(m.profileId, profile.id),
+          eq(m.periodStart, input.periodStart),
+          eq(m.periodEnd, input.periodEnd),
+        ),
+      )
+      .returning({ id: m.id });
+    if (deleted.length === 0) return 0;
+    await recordAuditEvent(tx, {
+      // Die Daten gehören der Organisation des Profils (ADR 002).
+      organizationId: profile.organizationId,
+      actorUserId: input.userId,
+      action: 'search_term_period.delete',
+      target: {
+        type: 'search_term_period',
+        id: profile.id,
+        profileId: profile.id,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        deletedRows: deleted.length,
+      },
+    });
+    return deleted.length;
+  });
 }
 
 // ---------------------------------------------------------------------------
