@@ -116,6 +116,25 @@ export const searchTermAnalysisRequestSchema = z
   })
   .meta({ id: 'SearchTermAnalysisRequest' });
 
+/** Löscht die Suchbegriffe genau eines Datei-Zeitraums eines Profils (2b.2d), über alle Ad-Typen. */
+export const searchTermPeriodDeleteRequestSchema = z
+  .object({
+    profileId: z.uuid(),
+    periodStart: z.iso.date(),
+    periodEnd: z.iso.date(),
+  })
+  .refine((body) => body.periodStart <= body.periodEnd, {
+    message: '`periodStart` liegt nach `periodEnd`',
+  })
+  .meta({ id: 'SearchTermPeriodDeleteRequest' });
+
+export const searchTermPeriodDeleteResponseSchema = z
+  .object({
+    /** Gelöschte Zeilen (Suchbegriff je Target). */
+    deletedRows: z.number().int(),
+  })
+  .meta({ id: 'SearchTermPeriodDeleteResponse' });
+
 export const SEARCH_TERM_CLASSIFICATIONS = ['harvest', 'negate', 'watch'] as const;
 export const SEARCH_TERM_WATCH_REASON_KEYS = [
   'protected',

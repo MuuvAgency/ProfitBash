@@ -1932,6 +1932,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/search-terms/periods/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suchbegriffe eines Profils für genau einen Datei-Zeitraum löschen, über alle Ad-Typen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SearchTermPeriodDeleteRequest"];
+                };
+            };
+            responses: {
+                /** @description Gelöscht. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SearchTermPeriodDeleteResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden oder keine Suchbegriffe für diesen Zeitraum. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/search-terms/analysis": {
         parameters: {
             query?: never;
@@ -3223,6 +3299,17 @@ export interface components {
             importedAt: string;
         };
         SearchTermPeriodsRequest: Record<string, never>;
+        SearchTermPeriodDeleteResponse: {
+            deletedRows: number;
+        };
+        SearchTermPeriodDeleteRequest: {
+            /** Format: uuid */
+            profileId: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+        };
         SearchTermAnalysisResponse: {
             meta: {
                 /** Format: uuid */
