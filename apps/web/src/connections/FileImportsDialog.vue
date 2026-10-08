@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import {
+  BULK_PERIOD_MAX_DAYS,
+  bulkPeriodIssue,
   FILE_IMPORT_MAX_BYTES,
   formatDateTime,
+  formatDay,
   formatNumber,
+  parseBulkPeriod,
+  todayInTimezone,
+  type BulkPeriodIssue,
   type FileImport,
   type Profile,
 } from '@profitbash/shared';
@@ -51,11 +57,39 @@ const complete = ref(false);
 const errorKey = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 
+/**
+ * Zeitraum von Hand (`phase-2b.md` 2b.2c): nur gefragt, wenn der Name der gewählten Datei keinen trägt. Dieselbe
+ * Erkennung wie im Import (`parseBulkPeriod`), sonst fragte der Dialog bei Dateien, deren Zeitraum der Import kennt.
+ */
+const periodStart = ref('');
+const periodEnd = ref('');
+const periodIssue = ref<BulkPeriodIssue | null>(null);
+const asksForPeriod = computed(
+  () => file.value !== null && parseBulkPeriod(file.value.name) === null,
+);
+/** Heute in der Zeitzone des Profils: spätester Tag eines Zeitraums. */
+const today = () => (props.profile ? todayInTimezone(props.profile.timezone, new Date()) : '');
+const latestDay = ref('');
+const periodDescribedBy = computed(() =>
+  periodIssue.value
+    ? 'file-import-period-error file-import-period-hint'
+    : 'file-import-period-hint',
+);
+
+function resetPeriod() {
+  periodStart.value = '';
+  periodEnd.value = '';
+  periodIssue.value = null;
+}
+// Eine Meldung gilt nur für die geprüfte Angabe.
+watch([periodStart, periodEnd], () => (periodIssue.value = null));
+
 watch(profileId, () => {
   acceptedId.value = null;
   file.value = null;
   complete.value = false;
   errorKey.value = null;
+  resetPeriod();
 });
 
 const title = computed(() =>
@@ -101,6 +135,9 @@ function onFileChange(event: Event) {
   file.value = target.files?.[0] ?? null;
   errorKey.value = null;
   acceptedId.value = null;
+  // Der Zeitraum gehört zur Datei: Eine neue Wahl beginnt ohne Angabe.
+  resetPeriod();
+  latestDay.value = today();
 }
 
 async function submit() {
@@ -114,6 +151,12 @@ async function submit() {
     return;
   }
   errorKey.value = null;
+  // Trägt der Dateiname einen Zeitraum, gilt der (so auch die API); die Felder sind dann nicht zu sehen.
+  const period = asksForPeriod.value
+    ? { startDate: periodStart.value, endDate: periodEnd.value }
+    : null;
+  periodIssue.value = period ? bulkPeriodIssue(period, today()) : null;
+  if (periodIssue.value) return;
   try {
     const created = await upload.mutateAsync({
       profileId: props.profile.id,
@@ -121,11 +164,14 @@ async function submit() {
       kind: 'bulk',
       file: file.value,
       complete: complete.value,
+      // Beide Felder leer: ohne Zeitraum hochladen (die Suchbegriffe bleiben dann weg).
+      period: period && period.startDate !== '' ? period : null,
     });
     acceptedId.value = created.id;
     emit('uploaded', created.profileId, created.id);
     file.value = null;
     complete.value = false;
+    resetPeriod();
     if (fileInput.value) fileInput.value.value = '';
   } catch (error) {
     errorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
@@ -196,6 +242,57 @@ function result(fileImport: FileImport) {
             />
             <p id="file-import-file-hint" class="text-body-sm text-ink-secondary">
               {{ t('connections.fileImports.upload.fileHint', { size: maxSize }) }}
+            </p>
+          </div>
+          <div v-if="asksForPeriod" class="flex flex-col gap-space-sm">
+            <div class="flex flex-wrap gap-space-md">
+              <div class="flex flex-col gap-space-xs">
+                <label for="file-import-period-start" class="text-body-sm font-semibold text-ink">
+                  {{ t('connections.fileImports.upload.period.start') }}
+                </label>
+                <input
+                  id="file-import-period-start"
+                  v-model="periodStart"
+                  type="date"
+                  :max="latestDay"
+                  :aria-invalid="periodIssue !== null"
+                  :aria-describedby="periodDescribedBy"
+                  class="font-data rounded-control border border-outline bg-tile px-space-sm py-space-xs text-body-sm text-ink"
+                />
+              </div>
+              <div class="flex flex-col gap-space-xs">
+                <label for="file-import-period-end" class="text-body-sm font-semibold text-ink">
+                  {{ t('connections.fileImports.upload.period.end') }}
+                </label>
+                <input
+                  id="file-import-period-end"
+                  v-model="periodEnd"
+                  type="date"
+                  :max="latestDay"
+                  :aria-invalid="periodIssue !== null"
+                  :aria-describedby="periodDescribedBy"
+                  class="font-data rounded-control border border-outline bg-tile px-space-sm py-space-xs text-body-sm text-ink"
+                />
+              </div>
+            </div>
+            <p
+              v-if="periodIssue"
+              id="file-import-period-error"
+              role="alert"
+              class="text-body-sm text-loss"
+            >
+              {{
+                t(`connections.fileImports.upload.period.error.${periodIssue}`, {
+                  days: BULK_PERIOD_MAX_DAYS,
+                })
+              }}
+            </p>
+            <p
+              id="file-import-period-hint"
+              class="flex items-start gap-space-sm text-body-sm text-ink-secondary"
+            >
+              <i class="pi pi-info-circle mt-0.5" aria-hidden="true" />
+              {{ t('connections.fileImports.upload.period.hint', { days: BULK_PERIOD_MAX_DAYS }) }}
             </p>
           </div>
           <div class="flex flex-col gap-space-xs">
@@ -293,6 +390,17 @@ function result(fileImport: FileImport) {
                     <template v-if="fileImport.complete">
                       · {{ t('connections.fileImports.history.complete') }}
                     </template>
+                  </span>
+                  <span
+                    v-if="fileImport.periodStart && fileImport.periodEnd"
+                    data-file-import-period
+                    class="block text-ink-secondary"
+                  >
+                    {{ t('connections.fileImports.history.period') }}
+                    <span class="font-data">
+                      {{ formatDay(fileImport.periodStart, session.preferences.locale) }} –
+                      {{ formatDay(fileImport.periodEnd, session.preferences.locale) }}
+                    </span>
                   </span>
                 </td>
                 <td role="cell" class="whitespace-nowrap text-ink sm:py-space-sm sm:pr-space-md">

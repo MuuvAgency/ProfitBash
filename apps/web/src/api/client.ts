@@ -1,5 +1,6 @@
 import type {
   AmazonOAuthStart,
+  BulkPeriod,
   Client,
   Connection,
   FileImport,
@@ -184,14 +185,21 @@ export function createApi(options: ApiOptions = {}) {
         )
       ).fileImports,
 
-    /** Datei hochladen (Multipart); `complete` nur für Downloads mit allen Elementen (1.11d). */
+    /**
+     * Datei hochladen (Multipart); `complete` nur für Downloads mit allen Elementen (1.11d), `period` nur für
+     * Dateien, deren Name keinen Zeitraum trägt (2b.2c).
+     */
     uploadFileImport: (
       profileId: string,
-      input: { kind: FileImportKind; file: File; complete: boolean },
+      input: { kind: FileImportKind; file: File; complete: boolean; period?: BulkPeriod | null },
     ): Promise<FileImport> => {
       const form = new FormData();
       form.append('kind', input.kind);
       form.append('complete', String(input.complete));
+      if (input.period) {
+        form.append('periodStart', input.period.startDate);
+        form.append('periodEnd', input.period.endDate);
+      }
       form.append('file', input.file, input.file.name);
       return unwrap(
         client.POST('/api/profiles/{id}/file-imports', {
@@ -201,6 +209,10 @@ export function createApi(options: ApiOptions = {}) {
             kind: input.kind,
             file: input.file.name,
             complete: input.complete ? 'true' : 'false',
+            ...(input.period && {
+              periodStart: input.period.startDate,
+              periodEnd: input.period.endDate,
+            }),
           },
           bodySerializer: () => form,
         }),

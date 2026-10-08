@@ -1,4 +1,5 @@
 import type {
+  BulkPeriod,
   Client,
   FileImport,
   FileImportKind,
@@ -228,6 +229,7 @@ export function useUploadFileImport() {
       kind: FileImportKind;
       file: File;
       complete: boolean;
+      period?: BulkPeriod | null;
     }) => api.uploadFileImport(profileId, input),
     onSuccess: (_created, { profileId }) =>
       queryClient.invalidateQueries({

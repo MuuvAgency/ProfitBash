@@ -295,6 +295,21 @@ export const de = {
         complete: 'Datei ist vollständig',
         completeHint:
           'Nur ankreuzen, wenn du die Bulk-Datei mit allen Optionen heruntergeladen hast: pausierte und archivierte Elemente sowie Elemente ohne Impressionen. Dann markiert der Import alles, was in der Datei fehlt, als entfernt. Ein Fehlgriff lässt sich erst mit der nächsten vollständigen Datei beheben.',
+        /** Nur bei Dateien, deren Name keinen Zeitraum trägt (`phase-2b.md` 2b.2c). */
+        period: {
+          start: 'Zeitraum von',
+          end: 'Zeitraum bis',
+          /** `{days}` aus `BULK_PERIOD_MAX_DAYS`. */
+          hint: 'Der Dateiname nennt keinen Zeitraum (Datei umbenannt). Gib an, über welche Tage die Datei ihre Kennzahlen summiert: den Zeitraum, den du beim Download in der Werbekonsole gewählt hast, höchstens {days} Tage. Ohne Angabe werden die Suchbegriffe der Datei nicht importiert.',
+          error: {
+            incomplete: 'Bitte beide Tage angeben oder keinen.',
+            invalidDate: 'Bitte gültige Tage angeben.',
+            startAfterEnd: '„Zeitraum von“ liegt nach „Zeitraum bis“.',
+            future: 'Der Zeitraum darf nicht in der Zukunft enden.',
+            tooLong:
+              'Der Zeitraum darf höchstens {days} Tage umfassen (so viel exportiert die Werbekonsole).',
+          },
+        },
         submit: 'Hochladen',
         required: 'Bitte eine Datei auswählen.',
         accepted: 'Datei angenommen. Der Import läuft im Hintergrund.',
@@ -311,6 +326,8 @@ export const de = {
         status: 'Status',
         result: 'Ergebnis',
         complete: 'vollständig',
+        /** Vor dem von Hand angegebenen Zeitraum eines Imports. */
+        period: 'Zeitraum',
         empty: 'Noch keine Dateien hochgeladen.',
         loadError: 'Der Verlauf konnte nicht geladen werden.',
         unmatched:
@@ -1003,6 +1020,7 @@ export const de = {
     /** `{size}` = größte erlaubte Datei; ohne Parameter (Fehler aus anderen Stellen) bleibt der Satz verständlich. */
     FILE_TOO_LARGE: 'Die Datei ist größer als erlaubt ({size}).',
     EMPTY_FILE: 'Die Datei ist leer.',
+    INVALID_PERIOD: 'Der angegebene Zeitraum ist ungültig.',
     PROFILE_HAS_CONNECTION:
       'Dieses Profil hat eine Connection; seine Daten kommen über die API, nicht per Datei.',
     CURRENCY_NOT_SELECTABLE:
