@@ -78,3 +78,23 @@ describe("parseJsonLossless mit { decimals: 'string' }", () => {
     expect(parseJsonLossless('[0.1, 1e-7]')).toEqual([0.1, 1e-7]);
   });
 });
+
+describe('stringifyJsonLossless', () => {
+  it('schreibt Beträge als JSON-Zahl mit genau den Ziffern des Decimal-Strings', async () => {
+    const { jsonDecimal, stringifyJsonLossless } = await import('./json');
+    const text = stringifyJsonLossless({
+      keywords: [{ keywordId: '9007199254740993', bid: jsonDecimal('0.10') }],
+      budget: jsonDecimal('1234567.89'),
+    });
+    expect(text).toBe(
+      '{"keywords":[{"keywordId":"9007199254740993","bid":0.10}],"budget":1234567.89}',
+    );
+  });
+
+  it('lehnt alles ab, was keine einfache Dezimalzahl ist', async () => {
+    const { jsonDecimal } = await import('./json');
+    for (const value of ['1e3', '-1', '1,5', '', '0.1"}', ' 1', '.5']) {
+      expect(() => jsonDecimal(value), value).toThrow(/keine einfache Dezimalzahl/);
+    }
+  });
+});

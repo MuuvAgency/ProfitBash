@@ -27,6 +27,7 @@ import { getReport, requestReport, type GetReportInput, type RequestReportInput 
 import { normalizeProfiles, profileResponseSchema, type AmazonAdsProfile } from './profiles';
 import { createProfileRateLimiter, type ProfileRateLimiterOptions } from './rate-limit';
 import { AMAZON_ADS_REGIONS, type AmazonAdsRegion, type AmazonAdsRegionEndpoints } from './regions';
+import { applyChanges, type ApplyChangesInput, type ApplyChangesResult } from './writes';
 
 export interface AdsApiRequest<S extends z.ZodType> {
   operation: string;
@@ -118,6 +119,15 @@ export interface AmazonAdsClient {
     amazonProfileId: string,
     options?: RequestOptions,
   ): Promise<AmazonAdsPortfolio[]>;
+  /**
+   * Sendet Änderungen eines Profils an Amazon (3.2a) und liefert je Änderung ein Ergebnis (Teilfehler brechen
+   * nicht ab). Wirft nur, wenn Profil oder Connection keinen Zugriff haben (401, 403, Re-Auth).
+   */
+  applyChanges(
+    connection: ConnectionRef,
+    input: ApplyChangesInput,
+    options?: RequestOptions,
+  ): Promise<ApplyChangesResult>;
 }
 
 export interface AmazonAdsClientOptions {
@@ -259,6 +269,8 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
       getReport({ request, logger }, connection, input, requestOptions),
     listPortfolios: (connection, amazonProfileId, requestOptions) =>
       listPortfolios({ request, logger }, connection, amazonProfileId, requestOptions),
+    applyChanges: (connection, input, requestOptions) =>
+      applyChanges({ request, logger }, connection, input, requestOptions),
     downloadFile: (url) =>
       downloadFile(url, { fetch: fetchImpl, logger, timeoutMs: DOWNLOAD_TIMEOUT_MS }),
   };
