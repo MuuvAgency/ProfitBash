@@ -48,3 +48,33 @@ export function parseJsonLossless(text: string, options: ParseJsonLosslessOption
   // Die TypeScript-Typen kennen das dritte Reviver-Argument (Quelltext-Kontext) noch nicht.
   return JSON.parse(text, reviver as (key: string, value: unknown) => unknown);
 }
+
+// ---------------------------------------------------------------------------
+// Schreiben: Beträge als JSON-Zahl ohne Umweg über `number`
+// ---------------------------------------------------------------------------
+
+const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
+
+interface RawJson {
+  rawJSON(text: string): unknown;
+}
+
+/**
+ * Betrag für einen Anfrage-Body: Amazons Schreib-Endpunkte erwarten Gebote und Budgets als JSON-Zahl. Der
+ * Decimal-String wird unverändert als Zahl-Literal geschrieben (`"0.10"` → `0.10`), nie über `number`.
+ * Nur mit `stringifyJsonLossless` bzw. `JSON.stringify` verwenden.
+ */
+export function jsonDecimal(value: string): unknown {
+  if (!PLAIN_DECIMAL.test(value)) {
+    throw new TypeError('jsonDecimal: Wert ist keine einfache Dezimalzahl.');
+  }
+  // `JSON.rawJSON` (Node.js >= 22) gehört zum selben Vorschlag wie der Quelltext-Zugriff im Reviver oben.
+  const { rawJSON } = JSON as unknown as Partial<RawJson>;
+  if (!rawJSON) throw new Error('JSON.rawJSON fehlt: Node.js >= 22 erforderlich.');
+  return rawJSON(value);
+}
+
+/** `JSON.stringify` für Anfrage-Bodys mit `jsonDecimal`-Werten. */
+export function stringifyJsonLossless(value: unknown): string {
+  return JSON.stringify(value);
+}

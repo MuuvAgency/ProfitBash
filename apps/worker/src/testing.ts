@@ -87,6 +87,7 @@ export function stubAmazonAdsClient(overrides: Partial<AmazonAdsClient> = {}): A
     requestReport: unused,
     getReport: unused,
     listPortfolios: unused,
+    applyChanges: unused,
     ...overrides,
   };
 }
