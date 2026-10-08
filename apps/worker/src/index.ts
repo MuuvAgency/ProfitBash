@@ -8,3 +8,4 @@ export type {
   ProfilesSyncJob,
 } from './queues';
 export { startJobQueue, startWorker, type StartWorkerOptions, type Worker } from './worker';
+export { buildSubmissionBulkFile, type SubmissionBulkFile } from './ad-changes/bulk-file';
