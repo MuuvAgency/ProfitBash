@@ -1055,6 +1055,172 @@ describe('Datei-Importe (1.11f)', () => {
     expect(files.text()).not.toContain('Datei angenommen');
   });
 
+  describe('Zeitraum von Hand (2b.2c)', () => {
+    const START = 'input#file-import-period-start';
+    const END = 'input#file-import-period-end';
+    const CONSOLE_NAME = 'bulk-a1b2c3-20260901-20260930-1791399063312.xlsx';
+
+    async function openUpload() {
+      const { requests } = stubFetch(
+        routes({
+          'GET /api/profiles/file': json({ profiles: [kranich] }),
+          [`GET ${importsPath}`]: json({ fileImports: [] }),
+          [`POST ${importsPath}`]: () => json(fileImport({ status: 'pending', counters: {} }), 201),
+        }),
+      );
+      const { wrapper } = await mountPage();
+      const files = await openFiles(wrapper);
+      const posts = () => requests.filter((r) => r.method === 'POST').map((r) => r.body);
+      const submit = async () => {
+        await files.get('form').trigger('submit');
+        await flushPromises();
+      };
+      return { files, posts, submit };
+    }
+
+    it('fragt nur nach dem Zeitraum, wenn der Dateiname keinen trägt', async () => {
+      const { files } = await openUpload();
+      // Ohne Datei ist noch offen, ob der Name einen Zeitraum trägt.
+      expect(files.find(START).exists()).toBe(false);
+
+      await chooseFile(files, new File(['xlsx'], CONSOLE_NAME));
+      expect(files.find(START).exists()).toBe(false);
+      expect(files.find(END).exists()).toBe(false);
+
+      await chooseFile(files, new File(['xlsx'], 'kunde-september.xlsx'));
+      expect(files.get('label[for="file-import-period-start"]').text()).toBe('Zeitraum von');
+      expect(files.get('label[for="file-import-period-end"]').text()).toBe('Zeitraum bis');
+      expect(files.get(START).attributes('type')).toBe('date');
+      // Heute in der Zeitzone des Profils als spätester Tag.
+      expect(files.get(END).attributes('max')).toBe('2026-10-07');
+      expect(files.text()).toContain(
+        'Ohne Angabe werden die Suchbegriffe der Datei nicht importiert',
+      );
+    });
+
+    it('schickt den angegebenen Zeitraum mit, ohne Angabe keine Felder', async () => {
+      const { files, posts, submit } = await openUpload();
+      await chooseFile(files, new File(['xlsx'], 'kunde-september.xlsx'));
+      await files.get(START).setValue('2026-09-01');
+      await files.get(END).setValue('2026-09-30');
+      await submit();
+      expect(posts()).toEqual([
+        {
+          kind: 'bulk',
+          complete: 'false',
+          periodStart: '2026-09-01',
+          periodEnd: '2026-09-30',
+          file: { name: 'kunde-september.xlsx', size: 4 },
+        },
+      ]);
+
+      // Nach dem Upload ist das Formular leer; die nächste Datei ohne Angabe geht ohne Zeitraum hinaus.
+      expect(files.find(START).exists()).toBe(false);
+      await chooseFile(files, new File(['xlsx'], 'kunde-oktober.xlsx'));
+      expect(files.get<HTMLInputElement>(START).element.value).toBe('');
+      await submit();
+      expect(posts()[1]).toEqual({
+        kind: 'bulk',
+        complete: 'false',
+        file: { name: 'kunde-oktober.xlsx', size: 4 },
+      });
+    });
+
+    it('schickt keinen Zeitraum, wenn danach eine Datei mit Zeitraum im Namen gewählt wird', async () => {
+      const { files, posts, submit } = await openUpload();
+      await chooseFile(files, new File(['xlsx'], 'kunde-september.xlsx'));
+      await files.get(START).setValue('2026-08-01');
+      await files.get(END).setValue('2026-08-31');
+      await chooseFile(files, new File(['xlsx'], CONSOLE_NAME));
+      await submit();
+      expect(posts()).toEqual([
+        { kind: 'bulk', complete: 'false', file: { name: CONSOLE_NAME, size: 4 } },
+      ]);
+    });
+
+    it('prüft den Zeitraum und meldet Fehler bei den Feldern, ohne hochzuladen', async () => {
+      const { files, posts, submit } = await openUpload();
+      await chooseFile(files, new File(['xlsx'], 'kunde-september.xlsx'));
+      const check = async (start: string, end: string, message: string) => {
+        await files.get(START).setValue(start);
+        await files.get(END).setValue(end);
+        await submit();
+        const error = files.get('#file-import-period-error');
+        expect(error.text()).toBe(message);
+        expect(error.attributes('role')).toBe('alert');
+        for (const field of [START, END]) {
+          expect(files.get(field).attributes('aria-invalid')).toBe('true');
+          expect(files.get(field).attributes('aria-describedby')).toContain(
+            'file-import-period-error',
+          );
+        }
+      };
+      await check('2026-09-01', '', 'Bitte beide Tage angeben oder keinen.');
+      await check('', '2026-09-30', 'Bitte beide Tage angeben oder keinen.');
+      await check('2026-09-30', '2026-09-01', '„Zeitraum von“ liegt nach „Zeitraum bis“.');
+      await check('2026-10-01', '2026-10-08', 'Der Zeitraum darf nicht in der Zukunft enden.');
+      await check(
+        '2026-07-01',
+        '2026-09-30',
+        'Der Zeitraum darf höchstens 60 Tage umfassen (so viel exportiert die Werbekonsole).',
+      );
+      expect(posts()).toEqual([]);
+
+      // Mit gültiger Angabe verschwindet die Meldung und die Datei geht hinaus.
+      await files.get(START).setValue('2026-09-01');
+      expect(files.find('#file-import-period-error').exists()).toBe(false);
+      await submit();
+      expect(posts()).toHaveLength(1);
+    });
+
+    it('zeigt die Ablehnung des Zeitraums durch die API', async () => {
+      stubFetch(
+        routes({
+          'GET /api/profiles/file': json({ profiles: [kranich] }),
+          [`GET ${importsPath}`]: json({ fileImports: [] }),
+          [`POST ${importsPath}`]: json({ error: { code: 'INVALID_PERIOD', message: 'x' } }, 400),
+        }),
+      );
+      const { wrapper } = await mountPage();
+      const files = await openFiles(wrapper);
+      await chooseFile(files, new File(['x'], 'kunde.xlsx'));
+      await files.get(START).setValue('2026-09-01');
+      await files.get(END).setValue('2026-09-30');
+      await files.get('form').trigger('submit');
+      await flushPromises();
+      await vi.waitFor(() =>
+        expect(files.text()).toContain('Der angegebene Zeitraum ist ungültig.'),
+      );
+    });
+
+    it('zeigt im Verlauf den von Hand angegebenen Zeitraum', async () => {
+      stubFetch(
+        routes({
+          'GET /api/profiles/file': json({ profiles: [kranich] }),
+          [`GET ${importsPath}`]: json({
+            fileImports: [
+              fileImport({
+                id: '0b7d3c1e-2a4f-4b6c-8d9e-000000000007',
+                fileName: 'kunde-september.xlsx',
+                periodStart: '2026-09-01',
+                periodEnd: '2026-09-30',
+              }),
+              fileImport({ fileName: CONSOLE_NAME }),
+            ],
+          }),
+        }),
+      );
+      const { wrapper } = await mountPage();
+      const files = await openFiles(wrapper);
+      await vi.waitFor(() => expect(files.text()).toContain('kunde-september.xlsx'));
+      const periods = files.findAll('[data-file-import-period]');
+      // Nur der Import mit Angabe; beim anderen steht der Zeitraum im Dateinamen.
+      expect(periods).toHaveLength(1);
+      expect(periods[0]!.text()).toBe('Zeitraum 01.09.2026 – 30.09.2026');
+      expect(periods[0]!.get('.font-data').text()).toBe('01.09.2026 – 30.09.2026');
+    });
+  });
+
   it('zeigt die Datei-Profile bei 1440 px ohne waagerechtes Scrollen: ohne Zeitzone und „Daten bis“', async () => {
     stubFetch(routes({ 'GET /api/profiles/file': json({ profiles: [kranich] }) }));
     const { wrapper } = await mountPage();
