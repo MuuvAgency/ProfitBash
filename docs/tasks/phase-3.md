@@ -350,13 +350,93 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
       nutzen heute fast nur SP, und die Bulk-Datei deckt SB und SD ab.
 
 ### 3.3 Übermitteln, Wiederholen, Revert (`apps/worker`, `packages/db`)
-- [ ] Job über `runJob` mit Lease je Connection (wie die Datenjobs): Übermittlung abholen, über den Schreib-Client senden,
+- [x] Job über `runJob` mit Lease je Connection (wie die Datenjobs): Übermittlung abholen, über den Schreib-Client senden,
       Ergebnis je Änderung festhalten (Teilfehler brechen nicht ab), Entity-Tabellen nach Erfolg nachziehen.
-- [ ] Weg `bulk_file`: Übermittlung bleibt offen, bis der nächste Bulk-Import die Werte bestätigt (nachher = neuer Stand →
+- [x] Weg `bulk_file`: Übermittlung bleibt offen, bis der nächste Bulk-Import die Werte bestätigt (nachher = neuer Stand →
       angewendet) oder der Nutzer sie von Hand abschließt.
-- [ ] Fehlgeschlagene Änderungen erneut versuchen (neue Änderung mit Verweis) oder verwerfen.
-- [ ] Revert einer Übermittlung oder einzelner Änderungen als neue Übermittlung; weicht der Stand der Entity vom „nachher“
+- [x] Fehlgeschlagene Änderungen erneut versuchen (neue Änderung mit Verweis) oder verwerfen.
+- [x] Revert einer Übermittlung oder einzelner Änderungen als neue Übermittlung; weicht der Stand der Entity vom „nachher“
       der Änderung ab, Rückfrage statt stillem Überschreiben (F8).
+- **Entschieden (Dominik, 2026-10-08):**
+  - **Mock:** merkt sich angenommene Änderungen **im Speicher** des laufenden Prozesses (kein eigener Speicherort); nach
+    einem Neustart liefert er wieder die erzeugten Daten.
+  - **Bulk-Weg:** Eine Änderung gilt als angewendet, sobald der nächste Import den neuen Wert zeigt; zusätzlich lässt sich
+    eine Übermittlung von Hand abschließen.
+  - **Revert auf „kein Wert“** (Target ohne eigenes Gebot): wird mit Hinweis übersprungen, der Rest geht zurück.
+- [x] Umsetzung (Stand für 3.4 und später):
+  - **Operationen** (`apps/worker/src/ad-changes/operations.ts`, ohne I/O): `buildWriteOperations(rows)` →
+    `{ batches, changeIdsByRef, rejected }`. Je Entity eine Operation (`ref` = `<entityType>:<entityId>`, bei Anlagen
+    `create:<changeId>`), je Ad-Typ ein Aufruf. `state = ARCHIVED` → `archive` (weitere Felder derselben Entity in
+    derselben Übermittlung scheitern mit `ENTITY_ARCHIVED`), Target mit `target_type = keyword` → `keyword`, sonst
+    `target`, Negatives je Ebene und Art. Strategie oder Platzierung geändert → `bidding` mit Strategie (neu oder aus
+    der Kampagne) und allen Platzierungen aus `extra.placementBidAdjustments` plus den Änderungen; trägt die Kampagne
+    keine der drei Strategien und setzt die Übermittlung keine, scheitern die Platzierungen mit
+    `BIDDING_STRATEGY_NOT_SUPPORTED`. Unbekannte oder entfernte Entities: `ENTITY_NOT_FOUND`.
+  - **Datenbank für den Job** (`packages/db/src/ad-change-processing.ts`, Systemzugriff ohne Nutzer, an Organisation
+    und Connection bzw. Profil gebunden): `claimNextAdChangeSubmission` (älteste offene Übermittlung über die API für
+    ein Profil der Connection → `running`, `attempts + 1`; eine vom vorigen Lauf unterbrochene wird wieder aufgenommen,
+    Anlagen ohne Ergebnis scheitern dabei als `UNKNOWN_OUTCOME`, Updates gehen erneut raus), `prepareAdChangeSubmission`
+    (noch offene Änderungen mit Amazon-IDs und Kampagnenstand; setzt **„vorher“ endgültig** auf den Stand der Entity),
+    `recordAdChangeResults` (Ergebnis je Änderung und Nachziehen der Entities in einer Transaktion),
+    `finishAdChangeSubmission` (`finished`, mit offenen Änderungen zurück auf `pending`, mit `failRemaining` → `failed`),
+    `failOpenAdChangeSubmissions`, `listConnectionsWithOpenAdChangeSubmissions`, `confirmBulkFileAdChanges`.
+  - **Entities nachziehen** (`applyAdChangeToEntity`): Zustand, Budget, Gebot, Standardgebot (Währung ergänzt, wo sie
+    fehlte), Strategie, Platzierung in `extra.placementBidAdjustments` (ersetzt bzw. ergänzt, nach Platzierung
+    sortiert, übrige Felder von `extra` bleiben); ein neues Negative entsteht als Zeile in
+    `amazon_ads_negative_targets` mit der ID von Amazon (`synced_at` leer, der nächste Sync füllt sie). Kinder einer
+    archivierten Entity bleiben unberührt (der nächste Sync bzw. Import liefert sie).
+  - **Job `ad-changes-submit`** (`apps/worker/src/jobs/ad-changes-submit.ts`, `CONNECTION_JOB_NAMES`, mit Lease): je
+    Lauf alle offenen Übermittlungen der Connection, älteste zuerst, höchstens 5 Min. (dann neu eingeplant, Zähler
+    `continued`). `applied` → angewendet (bei Anlagen mit neuer ID), `failed` → fehlgeschlagen mit Code und Text von
+    Amazon, `unknown` → fehlgeschlagen mit `UNKNOWN_OUTCOME` (nicht blind wiederholen; der erneute Versuch liest den
+    Stand neu und entfällt, wenn der Wert schon stimmt), `unsent` → bleibt `submitted`: Die Übermittlung geht zurück auf
+    `pending`, der Job plant sich nach `Retry-After` (mindestens 60 s, höchstens 1 h) neu ein und endet. Nach
+    `MAX_SUBMISSION_ATTEMPTS` (5) scheitert der Rest als `NOT_SENT`. **Abbruch** (`AmazonAdsWriteAbortedError`): erst
+    die Teilergebnisse festhalten, dann scheitert der Rest als `NOT_SENT` und die Übermittlung als `failed`; bei
+    abgelehntem Refresh-Token zusätzlich alle offenen Übermittlungen der Connection, die Connection geht auf
+    `reauth_required`. Bei 401/403 laufen die Übermittlungen anderer Profile weiter, der Lauf endet danach als
+    Fehlschlag. Eine Connection mit `reauth_required` sendet nichts: Ihre offenen Übermittlungen scheitern sofort
+    (sie gingen sonst Tage später unerwartet raus). Zähler `submissions`, `changesApplied`, `changesFailed`,
+    `changesUnsent`; Texte im Sync-Status. Kein Healthcheck.
+  - **Einplanen:** `jobs.enqueueAdChangesSubmit({ organizationId, connectionId }, { tx })` für die API (3.4, im
+    `enqueue` von `submitAdChanges`, `retryAdChanges`, `revertAdChanges`); Auslöser `ad-changes-submit-all` alle
+    10 Min. für Connections mit offenen Übermittlungen (nach Absturz oder Deploy).
+  - **Bulk-Datei** (`confirmBulkFileAdChanges`, aufgerufen am Ende des Bulk-Imports und des Entity-Exports, Zähler
+    `changesConfirmed`): Entspricht der Stand dem neuen Wert, gilt die Änderung als angewendet; Archivieren auch,
+    wenn die Entity nicht mehr geliefert wird; ein neues Negative, wenn es an der Stelle eines mit demselben Inhalt
+    gibt (dessen Amazon-ID wird übernommen). Sind alle Änderungen entschieden, ist die Übermittlung `finished`. Nicht
+    bei einer fremd wirkenden Datei. `closeBulkFileSubmission` (`outcome: applied | discarded`) schließt von Hand ab:
+    `applied` zieht die Entities nach, `discarded` setzt die offenen Änderungen auf `dismissed`.
+  - **Nutzer-Aktionen** (`packages/db/src/ad-change-actions.ts`, über `visibleProfilesScope()`, Recht prüft 3.4):
+    `retryAdChanges({ changeIds, channel, enqueue })`, `revertAdChanges({ submissionId | changeIds, channel,
+    overwriteChanged, enqueue })`, `dismissFailedAdChanges`, `closeBulkFileSubmission`. Erneuter Versuch und Revert
+    entstehen **direkt als neue Übermittlung** des handelnden Nutzers (nicht über dessen Warenkorb), mit `origin`
+    `retry` bzw. `revert` und `origin_change_id`; das Original bleibt stehen. Übersprungenes kommt mit Grund zurück
+    (`notFound`, `notFailed`, `notApplied`, `alreadyRetried`, `alreadyReverted`, `archiveNotRevertible`,
+    `noPreviousValue`, `nothingToChange` und die Gründe aus 3.1). **Revert:** Ziel ist „vorher“ (Platzierung ohne
+    Eintrag: 0 %); ein angelegtes Negative wird archiviert (gefunden über die Amazon-ID, sonst über denselben Inhalt
+    an derselben Stelle). Weicht der Stand vom „nachher“ ab, kommt `{ status: 'conflict', conflicts }` zurück und
+    nichts wird übermittelt; erst mit `overwriteChanged` wird überschrieben (F8). Audit:
+    `ad_change_submission.create` (mit `origin`), `ad_changes.dismiss`, `ad_change_submission.close`.
+    `getAdChangeSubmission` nennt je Änderung den letzten Folgeschritt (`followUp`).
+  - **Mock** (`mock-writes.ts`): angenommene Updates, Archivierungen und neue Negatives liegen je Profil im Speicher
+    und überlagern Exports und Reports (`overlay`); abgelehnte Änderungen nicht.
+  - **Tests:** `operations.test.ts` (rein), `ad-change-processing.test.ts`, `ad-change-actions.test.ts`,
+    `ad-changes-submit.test.ts` (Client als Stub), `ad-changes-flow.test.ts` (Ende-zu-Ende gegen den Mock-Anbieter:
+    Warenkorb → Übermittlung → Job → Sync → Revert → Sync), dazu Bulk-Import, Entity-Import, Auslöser und Mock.
+    Stammdaten für diese Tests: `seedAdChangeFixture` (`@profitbash/db/testing`).
+  - **Für 3.4:** `enqueue` an `jobs.enqueueAdChangesSubmit` hängen (Connection je Übermittlung über das Profil);
+    Endpunkte für erneut versuchen, verwerfen, Revert (erst ohne, nach Rückfrage mit `overwriteChanged`), Abschließen
+    von Hand; `channel` für Retry und Revert wählt der Nutzer (Standard: Weg der ursprünglichen Übermittlung). Beim
+    Download der Bulk-Datei dieselbe Zusammenführung je Entity wie `buildWriteOperations` (dort für
+    `BulkFileChange`). Offene Übermittlungen an derselben Stelle als Hinweis im Warenkorb (aus 3.1).
+  - **Bewusst so bzw. offen:** Zwei offene Bulk-Übermittlungen an derselben Stelle: Der Import bestätigt nur die,
+    deren Wert steht; die überholte schließt der Nutzer von Hand. „Vorher“ einer Bulk-Änderung bleibt der Stand beim
+    Übermitteln (der Import überschreibt die Entity, bevor er bestätigt). Eine fehlgeschlagene Änderung mit
+    Folgeversuch bleibt `failed` (die Oberfläche liest `followUp`). Revert und erneuter Versuch prüfen weder die
+    Grenzen von Amazon noch die Warnungen nach F6 (Amazon entscheidet; 3.4 kann die Grenzen davor hängen). Der Job
+    arbeitet die Übermittlungen einer Connection nacheinander ab und hört bei Drosselung ganz auf, obwohl die Pause
+    nur das Profil betrifft.
 
 ### 3.4 API (`apps/api`)
 - [ ] Endpunkte für Warenkorb, Übermittlungen (inkl. Download der Bulk-Datei) und Verlauf hinter

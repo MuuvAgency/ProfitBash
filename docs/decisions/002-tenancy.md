@@ -4,7 +4,7 @@
 - **Datum:** 2026-09-25, Geltungsbereich von Punkt 5 am 2026-09-26 dokumentiert (Stand Code Phase 0, vor dem ersten Deploy),
   am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt, am 2026-09-29 um gespeicherte Ansichten (`saved_views`),
   am 2026-10-07 um die Suchbegriff-Regeln (`search_term_rules`) und geschützte Begriffe, am 2026-10-08 um die
-  abweichenden Regeln je Profil (`search_term_rule_overrides`)
+  abweichenden Regeln je Profil (`search_term_rule_overrides`) und die Änderungen an Amazon-Werbung (`ad_changes`)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -50,7 +50,7 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   über `getOrgRole()`.
 - **Systemzugriffe ohne Nutzer:** Worker-Jobs, Token-Store, Wartung und Schlüsselrotation
   (`packages/db/src/system-access.ts`, `connection-tokens.ts`, `connection-leases.ts`, `amazon-requests.ts`,
-  `amazon-ads-entities.ts`, `amazon-ads-metrics.ts`, `maintenance.ts`, `key-rotation.ts`; `job_runs` schreibt
+  `amazon-ads-entities.ts`, `amazon-ads-metrics.ts`, `ad-change-processing.ts`, `maintenance.ts`, `key-rotation.ts`; `job_runs` schreibt
   `runJob` in `apps/worker`). Zugriffe auf einzelne Connections bzw. Profile sind an Organisation und Connection bzw. Profil gebunden.
   Keiner dieser Zugriffe entscheidet über die Sichtbarkeit für Nutzer. Plattformweit arbeiten die Planung der Jobs (`listActiveConnections`), die Wartung
   (alte und abgebrochene Jobläufe, abgelaufene OAuth-Nonces) und die Schlüsselrotation.
@@ -79,6 +79,12 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   Abweichende Regeln je Profil (2b.2g, `search_term_rule_overrides`) gehören der Organisation des Profils; gelesen
   werden sie nur mit einem sichtbaren Profil (`querySearchTermPeriod`), geschrieben über `saveSearchTermRuleOverrides`
   nach `visibleProfilesScope()` mit Recht `write` im Feature `sp-explorer` (prüft die API), mit Audit-Event.
+- **Änderungen an Amazon-Werbung** (ab Phase 3, 3.1 und 3.3): `ad_changes` und `ad_change_submissions` gehören der
+  Organisation des Profils. Nutzer lesen und schreiben nur über `visibleProfilesScope()` (`ad-changes.ts`: Warenkorb je
+  Nutzer, Übermittlungen für die ganze Organisation; `ad-change-actions.ts`: erneut versuchen, verwerfen, Revert,
+  Abschließen von Hand), mit Audit-Event; das Recht `write` im Feature `changes` prüft die API. Der Job
+  `ad-changes-submit` und die Bestätigung durch den Import arbeiten als Systemzugriff (`ad-change-processing.ts`),
+  gebunden an Organisation und Connection bzw. Profil.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.
