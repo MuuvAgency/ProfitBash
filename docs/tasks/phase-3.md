@@ -250,10 +250,42 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     die Bulk-Datei geht trotzdem), Bulk-Datei (3.2b).
 
 #### 3.2b Bulk-Datei erzeugen (F2)
-- [ ] XLSX-Schreiber in `@profitbash/sheets` (fflate, schmal wie der Leser) und Abbildung der Änderungen eines Profils auf die
-      Blätter und Spalten der Werbekonsole (Operation `Update`/`Create`, IDs als Text, Kopfzeilen in der Sprache des Kontos,
-      Werte englisch, zentrale Abbildung wie im Import, Ideen-Dokument C.3). Rundlauf-Test: erzeugte Datei mit dem Import-Leser
-      lesen.
+- [ ] XLSX-Schreiber in `@profitbash/sheets` (fflate, schmal wie der Leser) und Abbildung der Änderungen eines Profils auf das
+      Blatt und die Spalten der Werbekonsole für **Sponsored Products** (Operation `Update`/`Create`/`Archive`, IDs als
+      Text, Beträge ohne Umweg über `number`). Rundlauf-Test: erzeugte Datei mit dem Import-Leser lesen.
+- **Befund aus der Amazon-Doku** (Bulksheets-Guides unter `advertising.amazon.com/API/docs/en-us/no-code-tools/bulksheets/…`,
+  gelesen am 2026-10-08: Überblick, „Update campaigns“, „How to update/create Sponsored Products campaigns“, „Language
+  guide“):
+  - **Sprache:** Beim Hochladen nimmt Amazon jede unterstützte Sprache an, unabhängig von der Sprache des Kontos
+    („When you upload the file, you can use any supported language“). Die Datei wird deshalb **englisch** erzeugt
+    (Kopfzeilen, Entity-Namen, Werte); die Annahme „Kopfzeilen in der Sprache des Kontos“ aus dem Ideen-Dokument (C.3)
+    entfällt. Deutsche Operation-Werte wären `Erstellen`/`Aktualisieren`/`Archivieren`.
+  - **Blatt und Spalten (SP):** Blatt „Sponsored Products Campaigns“; Spalten der Vorlage: `Product`, `Entity`,
+    `Operation`, `Campaign Id`, `Ad Group Id`, `Portfolio Id`, `Ad Id`, `Keyword Id`, `Product Targeting Id`, `Campaign
+    Name`, `Ad Group Name`, `Start Date`, `End Date`, `Targeting Type`, `State`, `Daily Budget`, `SKU`, `ASIN`, `Ad Group
+    Default Bid`, `Bid`, `Keyword Text`, `Match Type`, `Bidding Strategy`, `Placement`, `Percentage`, `Product Targeting
+    Expression` (dazu optional `Audience ID`, `Shopper Cohort Percentage`, `Shopper Cohort Type`, `Sites`, `Off-Amazon ad
+    serving`). Zeilen ohne `Operation` werden ignoriert; zusätzliche Spalten stören nicht.
+  - **Entities (Spalte B):** `Campaign`, `Ad group`, `Product ad`, `Keyword`, `Negative keyword`, `Bidding adjustment`,
+    `Campaign negative keyword`, `Product targeting`, `Negative product targeting`. Ein negatives Produkt-Target **auf
+    Kampagnenebene** nennt die Doku nicht: per Bulk-Datei nicht anbieten, bis eine echte Datei es belegt.
+  - **Operationen:** `Create`, `Update`, `Archive`. Archivieren braucht nur die IDs der Entity; wer ein Elternteil
+    archiviert, archiviert die Kinder mit (Kinder nicht zusätzlich nennen, sonst Fehlerzeilen).
+  - **Achtung beim Kampagnen-Update:** Ohne `Portfolio Id` fällt die Kampagne **aus ihrem Portfolio**, ein leeres `End
+    Date` **entfernt das Enddatum**. Die Kampagnenzeile trägt deshalb immer den vollständigen Stand (Portfolio-ID, Name,
+    Start- und Enddatum, Targeting-Typ, Zustand, Tagesbudget, Gebotsstrategie), geändert sind nur die gewünschten Felder.
+  - **Werte:** `State` `enabled` | `paused`; Gebotsstrategie `Dynamic bids - down only` | `Dynamic bids - up and down` |
+    `Fixed bid`; Platzierung `placementTop` | `placementProductPage` | `placementRestOfSearch` |
+    `placementAmazonBusiness` (Groß/Klein egal); `Percentage` ganze Zahl bis 900 ohne Zeichen; Datum `YYYYMMDD`; Beträge
+    ohne Tausendertrennzeichen, höchstens zwei Nachkommastellen (mehr rundet Amazon).
+  - **Negatives anlegen:** `Negative keyword` mit `Campaign Id`, `Ad Group Id`, `State`, `Keyword Text`, `Match Type`
+    (`negativeExact` | `negativePhrase`); `Campaign negative keyword` ohne `Ad Group Id`; `Negative product targeting`
+    mit `Campaign Id`, `Ad Group Id`, `State`, `Product Targeting Expression` (`asin="…"`).
+  - **Gebotsanpassung:** Entity `Bidding adjustment` mit `Campaign Id`, `Placement`, `Percentage` (die Doku nennt
+    `Bidding Strategy` einmal als Pflicht und einmal als „leer lassen“; die heruntergeladene Datei trägt sie in der
+    Zeile). **Offen:** ob eine bisher nicht gesetzte Platzierung `Update` oder `Create` braucht (die heruntergeladene
+    Datei zeigt je Platzierung eine Zeile, deshalb zunächst `Update`); mit einer echten Datei von Dominik prüfen.
+  - Die IDs der Bulk-Datei sind laut Doku nicht die der Werbekonsole (URL); sie stammen aus unserem Bulk-Import (1.11d).
 
 #### 3.2c Schreib-Client für Sponsored Brands und Sponsored Display
 - [ ] Abbildung von `AmazonAdsWriteOperation` auf SB v4 (Keywords und Targets v3) und SD samt deren Antwortformen, Grenzen
