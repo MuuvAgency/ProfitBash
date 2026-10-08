@@ -282,7 +282,7 @@ async function onRulesSaved() {
               @update:model-value="onProfile"
             />
           </div>
-          <div class="flex w-80 max-w-full flex-col gap-space-xs">
+          <div class="flex w-96 max-w-full flex-col gap-space-xs">
             <label :for="`${id}-period`" class="text-label-eyebrow uppercase text-ink-tertiary">
               {{ t('searchTerms.period') }}
             </label>
