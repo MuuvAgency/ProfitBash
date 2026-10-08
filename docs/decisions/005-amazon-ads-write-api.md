@@ -63,7 +63,10 @@ Umgesetzt wird in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsore
   erneut senden) oder `unknown` (5xx, Netzwerkfehler, unlesbare Antwort: kann angewendet sein).
 - Wiederholt werden 429 immer, 5xx und Netzwerkfehler nur bei Updates und beim Archivieren (sie setzen denselben
   Zielwert). **Anlagen werden nicht wiederholt**, sonst entstünden doppelte Negatives.
-- 401, 403 und ein abgelehnter Refresh-Token sind Fehler der Connection und werden geworfen, nicht je Änderung gemeldet.
+- 401, 403 und ein abgelehnter oder nicht erneuerbarer Token sind Fehler der Connection: Der Lauf bricht mit
+  `AmazonAdsWriteAbortedError` ab, der die bis dahin feststehenden Ergebnisse trägt (der Rest ist `unsent`).
+- Ungültige Werte und IDs sowie doppelte Entities je Endpunkt werden je Änderung abgelehnt, ohne Amazon zu fragen. Die
+  Antwort wird über `index` zugeordnet und über die zurückgegebene ID gegengeprüft; Widersprüche gelten als `unknown`.
 - **Grenzen von Amazon** (Mindest- und Höchstgebot, Tagesbudget je Marktplatz, Wortzahl negativer Keywords) liegen als
   Daten in `limits.ts`, Quelle: Amazon-Doku „Limits, constraints, and quotas“, gelesen am 2026-10-08.
 
@@ -79,7 +82,9 @@ Umgesetzt wird in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsore
 - **Offen für 1.10 (erster echter Lauf):** ob `dynamicBidding` als Ganzes ersetzt wird (der Client schickt Strategie und
   alle Platzierungen deshalb immer zusammen), ob ein Budget-Update `budgetType` verlangt (die Spec sagt ja), ob die
   `delete`-Endpunkte je ID ein Ergebnis mit `index` liefern, welche Fehlercodes in der Praxis vorkommen, wie streng die
-  Drosselung beim Schreiben ist, ob Vendor-Profile dieselben Endpunkte annehmen.
+  Drosselung beim Schreiben ist, ob Vendor-Profile dieselben Endpunkte annehmen, wie Amazon auf ein wiederholtes
+  Archivieren antwortet (Fehler je Eintrag trotz Wirkung des ersten Versuchs?) und ob die Fehlertypen `throttledError`
+  und `internalServerError` je Eintrag in der Praxis vorkommen.
 - **Wiedervorlage:** Wechsel auf die Amazon Ads API v1, sobald sie SD abdeckt und stabil ist oder Amazon die
   produktspezifischen Schreib-Endpunkte abkündigt.
 

@@ -563,7 +563,11 @@ describe('Mock-Anbieter: Änderungen (3.2a)', () => {
       operations: [{ ref: 'k', type: 'update', entity: 'keyword', amazonId: '201', bid: '0.75' }],
     });
 
-    expect(outcome).toEqual({ results: [{ ref: 'k', status: 'unsent' }], retryAfterMs: 120_000 });
+    expect(outcome).toEqual({
+      results: [{ ref: 'k', status: 'unsent' }],
+      throttled: true,
+      retryAfterMs: 120_000,
+    });
   });
 
   it('verlangt den Content-Type des Endpunkts und ein Profil, auf das das Token Zugriff hat', async () => {
@@ -574,7 +578,7 @@ describe('Mock-Anbieter: Änderungen (3.2a)', () => {
         adProduct: SP,
         operations: [{ ref: 'k', type: 'update', entity: 'keyword', amazonId: '201', bid: '0.75' }],
       }),
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ cause: { status: 403 }, results: [{ ref: 'k', status: 'unsent' }] });
 
     await expect(
       client.request(connection, {

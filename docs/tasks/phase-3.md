@@ -197,14 +197,22 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     mit `state`, `defaultBid`; `keyword` bzw. `target` mit `state`, `bid`; `productAd` mit `state`), `archive` (neun
     Entities, auch die vier Arten von Negatives) und `createNegative` (Keyword exakt/Wortgruppe oder ASIN, in Ad Group
     oder Kampagne). `client.applyChanges(connection, { amazonProfileId, adProduct, operations }, { meter })` →
-    `{ results, retryAfterMs }`, je Änderung `applied` (mit ID) | `failed` (Code und Text) | `unsent` | `unknown`, in
-    der Reihenfolge der Eingabe.
+    `{ results, throttled, retryAfterMs }`, je Änderung `applied` (mit ID) | `failed` (Code und Text) | `unsent` |
+    `unknown`, in der Reihenfolge der Eingabe.
   - **Ablauf:** je Endpunkt Stücke zu 1000 (`MAX_WRITE_BATCH_SIZE`), erst Updates (Kampagne vor ihren Kindern), dann
     Archivieren, zuletzt Anlagen. Zuordnung der Antwort über `index`; fehlt ein Eintrag in der Antwort: `unknown`. Ein
     abgelehnter Aufruf (400) macht sein Stück `failed`, die übrigen Endpunkte laufen weiter. Hält die Drosselung an
     (429 nach den Wiederholungen bzw. `Retry-After` über 60 s), hört der Client auf: alles Weitere ist `unsent`,
     `retryAfterMs` nennt die Wartezeit. 5xx und Netzwerkfehler: Updates und Archivieren werden wiederholt, Anlagen nicht
-    (`unknown`). 401, 403 und Re-Auth werden geworfen.
+    (`unknown`). **Abbruch:** 401, 403, ein abgelehnter oder nicht erneuerbarer Token und unerwartete Fehler enden als
+    `AmazonAdsWriteAbortedError` mit `results` (was bis dahin feststeht, der Rest `unsent`) und `cause`; der Job hält
+    die Teilergebnisse fest, bevor er die Ursache behandelt.
+  - **Eingaben und Antworten:** Ungültige Werte und IDs (kein Decimal-String ohne führende Nullen, ID nicht nur
+    Ziffern, Prozentsatz nicht ganz) werden je Änderung `failed` (`INVALID_VALUE`), der Rest geht raus. Dieselbe Entity
+    zweimal am selben Endpunkt: die zweite `failed` (`DUPLICATE_OPERATION`). Nennt die Antwort für ein Update oder
+    Archivieren eine andere ID, oder einen Index doppelt: `unknown`. Fehler-Einträge `throttledError` → `unsent`,
+    `internalServerError` → `unknown`. Als Code gilt nur ein einfacher Bezeichner (`reason`, sonst `errorType`), Texte
+    von Amazon gehen ohne Steuerzeichen und Token-Muster und auf 300 Zeichen gekürzt ins Ergebnis.
   - **Beträge** gehen als JSON-Zahl mit den Ziffern des Decimal-Strings raus (`jsonDecimal`/`stringifyJsonLossless` in
     `json.ts`, `JSON.rawJSON`); IDs bleiben Strings, neue IDs kommen verlustfrei zurück.
   - **Grenzen** (`limits.ts`): `SP_BID_LIMITS`, `SP_DAILY_BUDGET_LIMITS` für die 13 Marktplätze aus
@@ -222,6 +230,22 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Änderungen); mehrere Felder einer Entity gehören in **eine** Operation (scheitert sie, scheitern alle ihre Felder).
     `unknown` nicht blind wiederholen: erst den Stand per Sync prüfen. Die Prüfung der Grenzen vor dem Übermitteln
     hängt 3.4 ein (`amazonAdsValueLimitIssue` mit dem Land des Profils).
+  - Review (unabhängig): keine kritischen Befunde; Abbildung, Endpunkt-Tabellen, Wiederholungsregeln, Decimal-Ausgabe
+    (kein Betrag über `number`, keine Injection über `JSON.rawJSON`) und Logging (keine Bodies, keine Tokens) bestätigt.
+    Übernommen: Abbruch mit Teilergebnissen statt nacktem Fehler (vorher gingen schon angewendete Änderungen eines
+    Laufs verloren), ungültige Werte je Änderung statt Abbruch des ganzen Aufrufs, Fehler beim Holen des Tokens als
+    „nicht gesendet“ (vorher `unknown` bzw. `failed`), Duplikate und abweichende IDs, Fehlertypen je Eintrag,
+    Antwort über den Schlüssel des Endpunkts gelesen (zusätzliche Felder stören nicht), `throttled` als eigenes Feld,
+    `amazonAdsValueLimitIssue` wirft bei Werten, die keine einfache Dezimalzahl sind, Test-IDs als Ziffern (die ID kommt
+    jetzt wirklich aus der Antwort), Tests für Abbruch, anhaltende 5xx, Netzwerkfehler bei Anlagen, leere Liste.
+  - **Für 3.3 zusätzlich (aus dem Review):** `bidding` lässt sich nur bilden, wenn die Kampagne eine der drei
+    Strategien trägt; bei `RULE_BASED` oder leerer Strategie lehnt 3.3 Änderungen an Platzierungen ab. Archivieren
+    lässt sich bei Amazon nicht zurücknehmen (kein Revert). Ein wiederholtes Archivieren nach Timeout kann je Eintrag
+    einen Fehler liefern, obwohl der erste Versuch gewirkt hat: fehlgeschlagenes Archivieren gegen den nächsten Sync
+    prüfen. Die Pause des Anfrage-Budgets nach `Retry-After` gilt für Lese- und Schreibaufrufe des Profils gemeinsam.
+  - **Bewusst so:** `placement` und `adProduct` bleiben `string` (wie im Lese-Modell); der Mock ist großzügiger als
+    Amazon (unbekannte IDs und Archivieren gelingen immer, Platzierungen und Stückgröße prüft er nicht); die Länder in
+    `limits.ts` sind nicht gegen `AMAZON_MARKETPLACES` getestet (das Paket hängt nicht an `@profitbash/shared`).
   - **Nicht enthalten:** Sponsored Brands und Sponsored Display (3.2c; bis dahin `AD_PRODUCT_NOT_SUPPORTED` je Änderung,
     die Bulk-Datei geht trotzdem), Bulk-Datei (3.2b).
 

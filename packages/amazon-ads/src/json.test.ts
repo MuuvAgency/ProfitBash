@@ -93,7 +93,7 @@ describe('stringifyJsonLossless', () => {
 
   it('lehnt alles ab, was keine einfache Dezimalzahl ist', async () => {
     const { jsonDecimal } = await import('./json');
-    for (const value of ['1e3', '-1', '1,5', '', '0.1"}', ' 1', '.5']) {
+    for (const value of ['1e3', '-1', '1,5', '', '0.1"}', ' 1', '.5', '007', '00.5']) {
       expect(() => jsonDecimal(value), value).toThrow(/keine einfache Dezimalzahl/);
     }
   });

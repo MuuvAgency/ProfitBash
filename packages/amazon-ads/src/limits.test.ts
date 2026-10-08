@@ -85,6 +85,15 @@ describe('Grenzen von Amazon für Sponsored Products (Doku-Stand 2026-10-08)', (
     ).toBeNull();
   });
 
+  it('wirft bei Werten, die keine einfache Dezimalzahl sind', () => {
+    for (const value of ['abc', '', ' 1', 'NaN', '0x10', '1e3', '-1']) {
+      expect(
+        () => amazonAdsValueLimitIssue({ adProduct: SP, countryCode: 'DE', field: 'bid', value }),
+        value,
+      ).toThrow(/keine einfache Dezimalzahl/);
+    }
+  });
+
   it('vergleicht große und lange Beträge exakt', () => {
     expect(
       amazonAdsValueLimitIssue({
