@@ -217,7 +217,10 @@ export function classifySearchTerm(
 
 /** Einstufung eines Suchbegriffs über alle seine Zeilen (Targets) mit den Summen, die sie begründen. */
 export interface SearchTermAcrossTargets extends SearchTermClassification, SearchTermSums {
-  /** Zeilen (Suchbegriff je Target), die in die Summen eingehen. */
+  /**
+   * Anzahl der **Zeilen**, die in die Summen eingehen. Das ist nicht die Zahl verschiedener Targets: Zwei
+   * Schreibweisen eines Begriffs auf einem Target oder Zeilen mehrerer Ad-Typen zählen je für sich.
+   */
   targets: number;
   /** Harvest bzw. Negieren, das keine Zeile des Begriffs allein erreicht (erst die Summe). */
   onlyAcrossTargets: boolean;

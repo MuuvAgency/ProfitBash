@@ -431,13 +431,67 @@ describe('Einstufung über alle Targets', () => {
     await waitForRow('stehlampe billig');
     await waitForRow('lampe solo');
     await waitForRow('deckenlampe rot');
-    await waitForRow('Über alle Targets: Ernten (2 Targets)');
-    await waitForRow('Über alle Targets: Ernten (3 Targets)');
-    await waitForRow('Über alle Targets: Negieren (2 Targets)');
-    // Allein ein Negativ-Vorschlag, über alle Targets nicht.
-    await waitForRow('Über alle Targets: Beobachten (2 Targets)');
+    await waitForRow('Über alle Targets: Ernten (2 Zeilen)');
+    await waitForRow('Über alle Targets: Ernten (3 Zeilen)');
+    await waitForRow('Über alle Targets: Negieren (2 Zeilen)');
+    // Allein ein Negativ-Vorschlag, über alle Targets nicht: mit Grund wie in der Zeile selbst.
+    await waitForRow('Über alle Targets: Beobachten · Zu wenig Daten (2 Zeilen)');
     // „lampe solo“ ist schon in der Zeile ein Harvest: kein zweiter Hinweis.
     expect(occurrences('Über alle Targets:')).toBe(4);
+  });
+
+  it('zeichnet die zweite Zeile nach einem Neuladen mit denselben Zeilen-IDs neu (erscheint, verschwindet)', async () => {
+    const base = analysisResponse();
+    const [first, ...rest] = base.rows;
+    // Dieselbe Zeile (ID, eigene Einstufung „Ernten“), nur die Einstufung über alle Targets wechselt.
+    const withAcross = {
+      ...base,
+      rows: [
+        {
+          ...first!,
+          termClassification: 'watch' as const,
+          termReason: 'acosAboveTarget' as const,
+          termTargets: 2,
+        },
+        ...rest,
+      ],
+    };
+    const answers = [base, withAcross, base];
+    let calls = 0;
+    const { queryClient } = await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': () =>
+        json(answers[Math.min(calls++, answers.length - 1)]),
+    });
+    const line = 'Über alle Targets: Beobachten · ACoS über dem Ziel (2 Zeilen)';
+    await waitForRow('led lampe warmweiß');
+    expect(document.body.textContent).not.toContain('Über alle Targets');
+
+    await queryClient.invalidateQueries({ queryKey: ['search-terms'] });
+    await waitForRow(line);
+
+    await queryClient.invalidateQueries({ queryKey: ['search-terms'] });
+    await vi.waitFor(() => expect(document.body.textContent).not.toContain('Über alle Targets'), {
+      timeout: 3000,
+    });
+    expect(document.body.textContent).toContain('led lampe warmweiß');
+  });
+
+  it('übergeht den Filter in den Wortbausteinen und eine unbekannte Angabe in `class`', async () => {
+    await mountSpread(`${PATH}?view=ngrams&class=harvest-across`);
+    await waitForRow('led lampe');
+    expect(document.body.textContent).toContain('Wörter');
+    expect(document.body.textContent).not.toContain('gartenlampe solar');
+    cleanupMounted();
+    vi.unstubAllGlobals();
+
+    await mountSpread(`${PATH}?class=alles-across`);
+    await waitForRow('gartenlampe solar');
+    await waitForRow('stehlampe billig');
+    await waitForRow('lampe solo');
+    await waitForRow('deckenlampe rot');
+    for (const label of ['Ernten', 'Negieren', 'Beobachten', 'zum Ernten', 'zum Negieren']) {
+      expect(button(label)!.getAttribute('aria-pressed'), label).toBe('false');
+    }
   });
 
   it('zeigt ohne Abweichung keinen Hinweis und keine Zeile in der Kachel', async () => {
