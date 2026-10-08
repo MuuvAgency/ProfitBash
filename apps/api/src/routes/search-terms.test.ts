@@ -243,6 +243,17 @@ describe('POST /api/ads/search-terms/analysis', () => {
       ['lampe rot', 'watch', 'tooFewData', false],
     ]);
     expect(res.body.counts).toEqual({ harvest: 1, negate: 1, watch: 2 });
+    // Jeder Begriff steht hier auf einem Target: Die Einstufung über alle Targets gleicht der Zeile.
+    expect(res.body.termCounts).toEqual({ harvest: 1, negate: 1, watch: 2 });
+    expect(res.body.termCountsOnlyAcrossTargets).toEqual({ harvest: 0, negate: 0 });
+    for (const row of res.body.rows) {
+      expect(row).toMatchObject({
+        termClassification: row.classification,
+        termReason: row.reason,
+        termTargets: 1,
+        termOnlyAcrossTargets: false,
+      });
+    }
     expect(res.body.meta).toMatchObject({
       profileId: ids.visible,
       accountName: 'Konto 1',
@@ -329,6 +340,78 @@ describe('POST /api/ads/search-terms/analysis', () => {
     expect(body.ngrams[0]).toMatchObject({ gram: 'lampe', searchTerms: 10_001, cost: '10005' });
     expect(body.total.cost).toBe('10005');
     expect(body.counts).toEqual({ harvest: 0, negate: 0, watch: 10_001 });
+    expect(body.termCounts).toEqual({ harvest: 0, negate: 0, watch: 10_001 });
+  });
+
+  it('stuft jeden Suchbegriff zusätzlich über alle Targets des Profils ein', async () => {
+    const { db } = ctx.testDb;
+    const [source] = await db
+      .select()
+      .from(amazonAdsProfiles)
+      .where(eq(amazonAdsProfiles.id, ids.visible));
+    const { id: _id, ...copy } = source!;
+    const [spread] = await db
+      .insert(amazonAdsProfiles)
+      .values({ ...copy, amazonProfileId: '4', accountName: 'Konto 4' })
+      .returning({ id: amazonAdsProfiles.id });
+    const t2 = { amazonAdGroupId: 'AG2', amazonTargetId: 'T2' };
+    await write(orgId, spread!.id, [
+      // Käufe 1 + 2: erst zusammen ein Harvest (Schreibweisen desselben Begriffs).
+      term('LED Lampe', { clicks: 5, cost: '5', sales: '40', purchases: 1, units: 1 }),
+      term('led  lampe', { ...t2, clicks: 5, cost: '10', sales: '60', purchases: 2, units: 2 }),
+      // Klicks ohne Kauf: erst zusammen 25 Klicks und 20 Spend.
+      term('lampe billig', { clicks: 10, cost: '8' }),
+      term('lampe billig', { ...t2, clicks: 15, cost: '12' }),
+      // Geschützt: auch zusammen kein Negativ-Vorschlag.
+      term('nordwind lampe', { clicks: 20, cost: '15' }),
+      term('nordwind lampe', { ...t2, clicks: 20, cost: '15' }),
+      // Allein ein Negativ-Vorschlag, auf dem anderen Target aber gekauft.
+      term('lampe rot', { clicks: 30, cost: '30' }),
+      term('lampe rot', { ...t2, clicks: 2, cost: '1', sales: '20', purchases: 1, units: 1 }),
+      // Ein Target: wie die Zeile.
+      term('lampe solo', { clicks: 40, cost: '20', sales: '100', purchases: 4, units: 4 }),
+    ]);
+
+    const res = await analysis(viewer, { profileId: spread!.id });
+    expect(res.status).toBe(200);
+    expect(searchTermAnalysisResponseSchema.safeParse(res.body).error).toBeUndefined();
+    const byTerm = (searchTerm: string) =>
+      res.body.rows
+        .filter((r) => r.searchTerm === searchTerm)
+        .map((r) => [
+          r.amazonTargetId,
+          r.classification,
+          r.reason,
+          r.termClassification,
+          r.termReason,
+          r.termTargets,
+          r.termOnlyAcrossTargets,
+        ]);
+    expect(byTerm('LED Lampe')).toEqual([['T1', 'watch', 'tooFewData', 'harvest', null, 2, true]]);
+    expect(byTerm('led  lampe')).toEqual([['T2', 'watch', 'tooFewData', 'harvest', null, 2, true]]);
+    expect(byTerm('lampe billig')).toEqual([
+      ['T2', 'watch', 'tooFewData', 'negate', null, 2, true],
+      ['T1', 'watch', 'tooFewData', 'negate', null, 2, true],
+    ]);
+    expect(byTerm('nordwind lampe')).toEqual([
+      ['T1', 'watch', 'tooFewData', 'watch', 'protected', 2, false],
+      ['T2', 'watch', 'tooFewData', 'watch', 'protected', 2, false],
+    ]);
+    expect(byTerm('lampe rot')).toEqual([
+      ['T1', 'negate', null, 'watch', 'tooFewData', 2, false],
+      ['T2', 'watch', 'tooFewData', 'watch', 'tooFewData', 2, false],
+    ]);
+    expect(byTerm('lampe solo')).toEqual([['T1', 'harvest', null, 'harvest', null, 1, false]]);
+    // Zeilen je Einstufung wie bisher; daneben verschiedene Suchbegriffe je Einstufung über alle Targets.
+    expect(res.body.counts).toEqual({ harvest: 1, negate: 1, watch: 7 });
+    expect(res.body.termCounts).toEqual({ harvest: 2, negate: 1, watch: 2 });
+    expect(res.body.termCountsOnlyAcrossTargets).toEqual({ harvest: 1, negate: 1 });
+
+    // Der Ausschnitt nach Ad-Typ gilt auch für die Einstufung je Begriff.
+    const sb = await analysis(viewer, { profileId: spread!.id, adProducts: ['SPONSORED_BRANDS'] });
+    expect(sb.body.rows).toEqual([]);
+    expect(sb.body.termCounts).toEqual({ harvest: 0, negate: 0, watch: 0 });
+    expect(sb.body.termCountsOnlyAcrossTargets).toEqual({ harvest: 0, negate: 0 });
   });
 
   it('verweigert ausgeblendete Profile (auch Admins) und fremde Organisationen mit 404', async () => {

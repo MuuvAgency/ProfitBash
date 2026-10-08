@@ -169,6 +169,16 @@ export const searchTermRowSchema = z
     protected: z.boolean(),
     /** Im Profil gibt es schon ein aktives exaktes Keyword bzw. Produkt-Target dafür. */
     alreadyTargeted: z.boolean(),
+    /**
+     * Einstufung des Suchbegriffs über **alle** seine Zeilen (Targets) im Profil und Datei-Zeitraum: Zeilen desselben
+     * Begriffs (klein, Leerraum zusammengefasst) summiert, dieselben Regeln. `classification` bleibt die der Zeile.
+     */
+    termClassification: z.enum(SEARCH_TERM_CLASSIFICATIONS),
+    termReason: z.enum(SEARCH_TERM_WATCH_REASON_KEYS).nullable(),
+    /** Zeilen (Targets) des Begriffs, die in diese Einstufung eingehen. */
+    termTargets: z.number().int(),
+    /** Harvest bzw. Negieren, das keine Zeile des Begriffs allein erreicht (erst die Summe über die Targets). */
+    termOnlyAcrossTargets: z.boolean(),
   })
   .meta({ id: 'SearchTermRow' });
 export type SearchTermRow = z.infer<typeof searchTermRowSchema>;
@@ -215,6 +225,17 @@ export const searchTermAnalysisResponseSchema = z
       harvest: z.number().int(),
       negate: z.number().int(),
       watch: z.number().int(),
+    }),
+    /** Verschiedene Suchbegriffe je Einstufung über alle Targets (alle Zeilen des Zeitraums). */
+    termCounts: z.object({
+      harvest: z.number().int(),
+      negate: z.number().int(),
+      watch: z.number().int(),
+    }),
+    /** Davon Suchbegriffe, die erst über alle Targets zusammen Harvest bzw. Negieren erreichen. */
+    termCountsOnlyAcrossTargets: z.object({
+      harvest: z.number().int(),
+      negate: z.number().int(),
     }),
     rows: z.array(searchTermRowSchema),
     ngrams: z.array(searchTermNgramSchema),
