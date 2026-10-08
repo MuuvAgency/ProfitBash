@@ -193,15 +193,24 @@ type View = 'terms' | 'ngrams';
 const view = computed<View>(() => (route.query.view === 'ngrams' ? 'ngrams' : 'terms'));
 const CLASSES = ['harvest', 'negate', 'watch'] as const;
 type Classification = SearchTermRowData['classification'];
-const classFilter = computed<Classification | null>(() => {
+/**
+ * Zusätzliche Filter (2b.2f): Zeilen der Suchbegriffe, die erst über alle Targets zusammen ein Kandidat sind
+ * (keine Zeile erreicht die Einstufung allein).
+ */
+const ACROSS_FILTERS = { 'harvest-across': 'harvest', 'negate-across': 'negate' } as const;
+type AcrossFilter = keyof typeof ACROSS_FILTERS;
+const ACROSS_KEYS = Object.keys(ACROSS_FILTERS) as AcrossFilter[];
+type ClassFilter = Classification | AcrossFilter;
+const classFilter = computed<ClassFilter | null>(() => {
   const value = one(route.query.class);
-  return CLASSES.find((entry) => entry === value) ?? null;
+  return [...CLASSES, ...ACROSS_KEYS].find((entry) => entry === value) ?? null;
 });
+const isAcrossFilter = (value: ClassFilter): value is AcrossFilter => value in ACROSS_FILTERS;
 
 // Die Einstufung filtert nur die Suchbegriffe: Die Wortbausteine nehmen sie nicht mit.
 const setView = (next: View) =>
   navigate(next === 'terms' ? { view: undefined } : { view: next, class: undefined });
-const toggleClass = (next: Classification) =>
+const toggleClass = (next: ClassFilter) =>
   navigate({ class: classFilter.value === next ? undefined : next, view: undefined });
 
 const NGRAM_SIZES = [1, 2, 3] as const;
@@ -213,8 +222,22 @@ const ngramDefs = computed(() => ngramColumns(columnContext.value));
 
 const termRows = computed<TermGridRow[]>(() => {
   const rows = data.value?.rows ?? [];
-  return classFilter.value ? rows.filter((row) => row.classification === classFilter.value) : rows;
+  const filter = classFilter.value;
+  if (filter === null) return rows;
+  if (isAcrossFilter(filter)) {
+    const wanted = ACROSS_FILTERS[filter];
+    return rows.filter((row) => row.termOnlyAcrossTargets && row.termClassification === wanted);
+  }
+  return rows.filter((row) => row.classification === filter);
 });
+/** Suchbegriffe, die erst über alle Targets Kandidaten sind; ohne Treffer nur, solange der Filter noch gilt. */
+const acrossEntries = computed(() =>
+  ACROSS_KEYS.map((key) => ({
+    key,
+    target: ACROSS_FILTERS[key],
+    value: data.value?.termCountsOnlyAcrossTargets[ACROSS_FILTERS[key]] ?? 0,
+  })).filter((entry) => entry.value > 0 || classFilter.value === entry.key),
+);
 const total = computed(() => (data.value ? totalRow(data.value.total) : null));
 const ngramRows = computed<NgramGridRow[]>(() =>
   (data.value?.ngrams ?? [])
@@ -399,6 +422,30 @@ async function onRulesSaved() {
                   ]"
                   >{{ count(data.counts[entry]) }}</span
                 >
+              </button>
+            </div>
+            <div
+              v-if="acrossEntries.length > 0"
+              role="group"
+              :aria-label="t('searchTerms.acrossTargets.filter')"
+              class="flex flex-wrap items-center gap-x-space-sm gap-y-space-xs text-body-sm text-ink-secondary"
+            >
+              <span>{{ t('searchTerms.acrossTargets.lead') }}</span>
+              <button
+                v-for="entry in acrossEntries"
+                :key="entry.key"
+                type="button"
+                :aria-pressed="classFilter === entry.key"
+                :class="[
+                  'min-h-11 rounded-control px-space-sm py-space-xs text-body-sm transition-colors',
+                  classFilter === entry.key
+                    ? 'bg-violet-wash text-ink'
+                    : 'text-ink-secondary hover:bg-violet-wash',
+                ]"
+                @click="toggleClass(entry.key)"
+              >
+                <span class="font-data">{{ count(entry.value) }}</span>
+                {{ t(`searchTerms.acrossTargets.${entry.target}`, entry.value) }}
               </button>
             </div>
             <dl class="flex flex-wrap gap-x-space-xl gap-y-space-sm">

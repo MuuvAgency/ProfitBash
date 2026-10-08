@@ -767,6 +767,14 @@ export const de = {
       noSales: 'Käufe ohne Umsatz',
       tooFewData: 'Zu wenig Daten',
     },
+    acrossTargets: {
+      cell: 'Über alle Targets: {label} ({targets})',
+      targets: '{n} Target | {n} Targets',
+      lead: 'Erst über alle Targets zusammen:',
+      filter: 'Nach Einstufung über alle Targets filtern',
+      harvest: 'Suchbegriff zum Ernten | Suchbegriffe zum Ernten',
+      negate: 'Suchbegriff zum Negieren | Suchbegriffe zum Negieren',
+    },
     rules: {
       title: 'Regeln',
       edit: 'Regeln ändern',
