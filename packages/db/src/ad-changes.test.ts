@@ -1,5 +1,5 @@
 import type { AdChangeInput } from '@profitbash/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   AdChangeError,
@@ -275,7 +275,7 @@ beforeAll(async () => {
       adGroupId: ids.adGroup,
       amazonAdId: 'AD1',
       adProduct: SP,
-      asin: 'B0TEST00001',
+      asin: 'B0TEST0001',
       sku: 'SKU-1',
       state: 'ENABLED',
     })
@@ -459,6 +459,30 @@ describe('stageAdChanges: Feldänderungen', () => {
     });
   });
 
+  it('liest eine Gebotsanpassung auch, wenn sie in `extra` als Zahl steht (API-Export)', async () => {
+    await testDb.db
+      .update(amazonAdsCampaigns)
+      .set({ extra: { placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 50 }] } })
+      .where(eq(amazonAdsCampaigns.id, ids.campaign));
+    try {
+      const result = await stage(ids.ada, [
+        update('campaign', ids.campaign, 'placement_top', '50'),
+        update('campaign', ids.campaign, 'placement_top', '70'),
+      ]);
+
+      expect(result.results.map((r) => r.outcome)).toEqual(['unchanged', 'created']);
+      const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+      expect(cart!.map((c) => [c.before, c.after])).toEqual([['50', '70']]);
+    } finally {
+      await testDb.db
+        .update(amazonAdsCampaigns)
+        .set({
+          extra: { placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: '50' }] },
+        })
+        .where(eq(amazonAdsCampaigns.id, ids.campaign));
+    }
+  });
+
   it('liest die Gebotsanpassung einer Platzierung aus `extra`; ohne Anpassung gilt 0 %', async () => {
     const result = await stage(ids.ada, [
       update('campaign', ids.campaign, 'placement_top', '120'),
@@ -562,14 +586,14 @@ describe('stageAdChanges: Negatives anlegen', () => {
         operation: 'create_negative',
         campaignId: ids.campaign,
         adGroupId: null,
-        negative: { type: 'product', asin: 'B0FREMD0001' },
+        negative: { type: 'product', asin: 'B0FREMD001' },
       },
     ]);
 
     const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
     expect(cart![0]).toMatchObject({
       adGroupId: null,
-      negative: { type: 'product', asin: 'B0FREMD0001' },
+      negative: { type: 'product', asin: 'B0FREMD001' },
     });
   });
 
@@ -602,6 +626,59 @@ describe('stageAdChanges: Negatives anlegen', () => {
     expect(result.results[1]).toMatchObject({ outcome: 'created' });
   });
 
+  it('lehnt eine negative ASIN ab, die es dort schon gibt', async () => {
+    const [existing] = await testDb.db
+      .insert(amazonAdsNegativeTargets)
+      .values({
+        organizationId: ids.org,
+        profileId: ids.de,
+        level: 'campaign',
+        campaignId: ids.campaign,
+        adGroupId: null,
+        amazonTargetId: 'N-ASIN',
+        adProduct: SP,
+        targetType: 'product',
+        expression: { matchType: 'PRODUCT_EXACT', asin: 'b0fremd001' },
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsNegativeTargets.id });
+    try {
+      const asin = (adGroupId: string | null): AdChangeInput => ({
+        operation: 'create_negative',
+        campaignId: ids.campaign,
+        adGroupId,
+        negative: { type: 'product', asin: 'B0FREMD001' },
+      });
+
+      const result = await stage(ids.ada, [asin(null), asin(ids.adGroup)]);
+
+      expect(result.results[0]).toEqual({ outcome: 'rejected', reason: 'alreadyExists' });
+      expect(result.results[1]).toMatchObject({ outcome: 'created' });
+    } finally {
+      await testDb.db
+        .delete(amazonAdsNegativeTargets)
+        .where(eq(amazonAdsNegativeTargets.id, existing!.id));
+    }
+  });
+
+  it('weist auf dasselbe offene Negative eines anderen Nutzers hin, nicht auf ein anderes', async () => {
+    await stage(ids.emil, [negativeKeyword('kinder lampe'), negativeKeyword('holz lampe')]);
+
+    const result = await stage(ids.ada, [negativeKeyword('Kinder Lampe'), negativeKeyword('x')]);
+
+    expect(result.results.map((r) => (r.outcome === 'created' ? r.otherUsers : null))).toEqual([
+      1, 0,
+    ]);
+    const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+    const byText = Object.fromEntries(
+      cart!.map((c) => [
+        c.negative?.type === 'keyword' ? c.negative.keywordText : '',
+        c.otherUsers,
+      ]),
+    );
+    expect(byText).toEqual({ 'Kinder Lampe': [{ userId: ids.emil, name: 'Emil' }], x: [] });
+  });
+
   it('lehnt unsichtbare Kampagnen und Ad Groups anderer Kampagnen als `notFound` ab', async () => {
     const result = await stage(ids.ada, [
       negativeKeyword('x', { campaignId: ids.foreignCampaign, adGroupId: null }),
@@ -622,6 +699,43 @@ describe('stageAdChanges: Negatives anlegen', () => {
     ]);
 
     expect(result.results[0]).toEqual({ outcome: 'rejected', reason: 'entityArchived' });
+  });
+});
+
+describe('stageAdChanges: Nebenläufigkeit', () => {
+  it('löscht nie eine Änderung, die gleichzeitig übermittelt wird', async () => {
+    await stage(ids.ada, [update('target', ids.target, 'bid', '0.75')]);
+    let racing: ReturnType<typeof stage> | undefined;
+
+    const submitted = await submitAdChanges(testDb.db, {
+      ...as(ids.ada),
+      channel: 'api',
+      enqueue: async () => {
+        // Zweite Verbindung: liest die Änderung noch als offen und will sie zurücknehmen.
+        racing = stage(ids.ada, [update('target', ids.target, 'bid', '0.50')]);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      },
+    });
+    const result = await racing!;
+
+    expect(result.results[0]).toEqual({ outcome: 'unchanged' });
+    const rows = await testDb.db.select().from(adChanges);
+    expect(rows.map((row) => [row.status, row.submissionId])).toEqual([
+      ['submitted', submitted!.submissions[0]!.id],
+    ]);
+  });
+
+  it('legt dasselbe Negative bei gleichzeitigem Vormerken nur einmal an', async () => {
+    const results = await Promise.all(
+      [1, 2, 3].map(() => stage(ids.ada, [negativeKeyword('kinder lampe')])),
+    );
+
+    expect(results.map((r) => r.results[0]!.outcome).sort()).toEqual([
+      'created',
+      'unchanged',
+      'unchanged',
+    ]);
+    expect(await testDb.db.select().from(adChanges)).toHaveLength(1);
   });
 });
 
@@ -671,7 +785,7 @@ describe('Warenkorb je Nutzer (F4)', () => {
       adGroupName: 'AG Lampen',
       entity: { targetType: 'keyword', keywordText: 'kw T1', matchType: 'BROAD', expression: null },
     });
-    expect(byType.product_ad!.entity).toEqual({ asin: 'B0TEST00001', sku: 'SKU-1' });
+    expect(byType.product_ad!.entity).toEqual({ asin: 'B0TEST0001', sku: 'SKU-1' });
     expect(byType.negative_target!.entity).toMatchObject({
       targetType: 'keyword',
       keywordText: 'Gebraucht  Lampe',
@@ -898,6 +1012,60 @@ describe('submitAdChanges', () => {
     }
   });
 
+  it('lässt ein vorgemerktes Negative im Warenkorb, wenn es das Negative inzwischen gibt', async () => {
+    const staged = await stage(ids.ada, [negativeKeyword('neu negiert')]);
+    const changeId = (staged.results[0] as { changeId: string }).changeId;
+    const [existing] = await testDb.db
+      .insert(amazonAdsNegativeTargets)
+      .values({
+        organizationId: ids.org,
+        profileId: ids.de,
+        level: 'ad_group',
+        campaignId: ids.campaign,
+        adGroupId: ids.adGroup,
+        amazonTargetId: 'N-NEU',
+        adProduct: SP,
+        targetType: 'keyword',
+        keywordText: 'Neu Negiert',
+        matchType: 'NEGATIVE_EXACT',
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsNegativeTargets.id });
+    try {
+      const result = await submitAdChanges(testDb.db, {
+        ...as(ids.ada),
+        channel: 'api',
+        enqueue: noEnqueue,
+      });
+
+      expect(result).toEqual({
+        submissions: [],
+        dropped: 0,
+        blocked: [{ changeId, reason: 'alreadyExists' }],
+      });
+    } finally {
+      await testDb.db
+        .delete(amazonAdsNegativeTargets)
+        .where(eq(amazonAdsNegativeTargets.id, existing!.id));
+    }
+  });
+
+  it('plant für Bulk-Dateien keinen Job ein', async () => {
+    await stage(ids.ada, [update('target', ids.target, 'bid', '0.75')]);
+    let enqueued = 0;
+
+    const result = await submitAdChanges(testDb.db, {
+      ...as(ids.ada),
+      channel: 'bulk_file',
+      enqueue: async () => {
+        enqueued += 1;
+      },
+    });
+
+    expect(result!.submissions).toHaveLength(1);
+    expect(enqueued).toBe(0);
+  });
+
   it('übermittelt Profile ohne Connection nicht über die API und lässt dann alles im Warenkorb', async () => {
     await stage(ids.ada, [
       update('target', ids.target, 'bid', '0.75'),
@@ -1074,7 +1242,9 @@ describe('Schema', () => {
     const [row] = await testDb.db.select().from(adChanges);
     const { id: _id, ...copy } = row!;
 
-    await expect(testDb.db.insert(adChanges).values(copy)).rejects.toThrow();
+    await expect(testDb.db.insert(adChanges).values(copy)).rejects.toMatchObject({
+      cause: { constraint_name: 'ad_changes_pending_uq' },
+    });
   });
 
   it('verlangt bei Feldänderungen genau einen neuen Wert passend zur Art', async () => {
@@ -1083,10 +1253,16 @@ describe('Schema', () => {
 
     await expect(
       testDb.db.update(adChanges).set({ newValue: 'PAUSED' }).where(eq(adChanges.id, row!.id)),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ cause: { constraint_name: 'ad_changes_operation_ck' } });
+    await expect(
+      testDb.db
+        .update(adChanges)
+        .set({ newValue: 'PAUSED', newAmount: null })
+        .where(eq(adChanges.id, row!.id)),
+    ).rejects.toMatchObject({ cause: { constraint_name: 'ad_changes_value_kind_ck' } });
     await expect(
       testDb.db.update(adChanges).set({ status: 'submitted' }).where(eq(adChanges.id, row!.id)),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ cause: { constraint_name: 'ad_changes_pending_ck' } });
   });
 
   it('löscht eine Organisation samt Änderungen und Übermittlungen', async () => {
@@ -1148,12 +1324,7 @@ describe('Schema', () => {
       await db
         .select()
         .from(adChangeSubmissions)
-        .where(
-          and(
-            eq(adChangeSubmissions.organizationId, org),
-            inArray(adChangeSubmissions.status, ['pending']),
-          ),
-        ),
+        .where(eq(adChangeSubmissions.organizationId, org)),
     ).toHaveLength(0);
   });
 });

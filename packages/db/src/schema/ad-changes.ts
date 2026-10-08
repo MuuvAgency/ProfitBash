@@ -173,7 +173,7 @@ export const adChanges = pgTable(
     uniqueIndex('ad_changes_pending_uq')
       .on(t.createdBy, t.entityType, t.entityId, t.field)
       .where(sql`${t.status} = 'pending' and ${t.operation} = 'update'`),
-    index('ad_changes_entity_idx').on(t.entityType, t.entityId),
+    index('ad_changes_entity_idx').on(t.entityId, t.entityType),
     index('ad_changes_submission_idx').on(t.submissionId),
     index('ad_changes_campaign_idx').on(t.campaignId),
     index('ad_changes_ad_group_idx').on(t.adGroupId),
