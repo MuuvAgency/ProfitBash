@@ -51,7 +51,10 @@ export interface AdChangeActor {
   orgId: string;
 }
 
-export type AdChangeErrorCode = 'PROFILE_HAS_NO_CONNECTION';
+export type AdChangeErrorCode =
+  | 'PROFILE_HAS_NO_CONNECTION'
+  /** Die Übermittlung ist keine offene Übermittlung per Bulk-Datei (3.3: von Hand abschließen). */
+  | 'SUBMISSION_NOT_OPEN';
 
 export class AdChangeError extends Error {
   constructor(
@@ -641,7 +644,8 @@ export interface AdChangeSubmissionSummary {
   counts: { submitted: number; applied: number; failed: number; dismissed: number };
 }
 
-async function loadSubmissions(
+/** Übermittlungen mit Zählern; die Bedingung begrenzt der Aufrufer auf sichtbare Profile. */
+export async function loadAdChangeSubmissionSummaries(
   db: DbOrTx,
   where: SQL | undefined,
   limit?: number,
@@ -855,7 +859,10 @@ export async function submitAdChanges(
         },
       });
     }
-    result.submissions = await loadSubmissions(tx, inArray(adChangeSubmissions.id, submissionIds));
+    result.submissions = await loadAdChangeSubmissionSummaries(
+      tx,
+      inArray(adChangeSubmissions.id, submissionIds),
+    );
     if (input.channel === 'api') await input.enqueue(tx, result.submissions);
     return result;
   });
@@ -870,21 +877,33 @@ export async function listAdChangeSubmissions(
 ): Promise<AdChangeSubmissionSummary[] | null> {
   const scope = await visibleProfilesScope(db, input);
   if (scope === null) return null;
-  return loadSubmissions(
+  return loadAdChangeSubmissionSummaries(
     db,
     inArray(adChangeSubmissions.profileId, scope.ids),
     Math.min(input.limit ?? AD_CHANGE_SUBMISSION_LIST_LIMIT, AD_CHANGE_SUBMISSION_LIST_LIMIT),
   );
 }
 
+/** Der letzte erneute Versuch bzw. Revert einer Änderung (3.3). */
+export interface AdChangeFollowUp {
+  changeId: string;
+  origin: Extract<AdChangeOrigin, 'retry' | 'revert'>;
+  status: AdChangeStatus;
+  submissionId: string | null;
+}
+
+export interface SubmittedAdChange extends AdChangeRecord {
+  followUp: AdChangeFollowUp | null;
+}
+
 /** Eine Übermittlung mit ihren Änderungen; `null`, wenn der Nutzer das Profil nicht sehen darf. */
 export async function getAdChangeSubmission(
   db: Db,
   input: AdChangeActor & { submissionId: string },
-): Promise<{ submission: AdChangeSubmissionSummary; changes: AdChangeRecord[] } | null> {
+): Promise<{ submission: AdChangeSubmissionSummary; changes: SubmittedAdChange[] } | null> {
   const scope = await visibleProfilesScope(db, input);
   if (scope === null) return null;
-  const [submission] = await loadSubmissions(
+  const [submission] = await loadAdChangeSubmissionSummaries(
     db,
     and(
       eq(adChangeSubmissions.id, input.submissionId),
@@ -893,5 +912,32 @@ export async function getAdChangeSubmission(
   );
   if (!submission) return null;
   const changes = await loadChanges(db, eq(adChanges.submissionId, submission.id));
-  return { submission, changes };
+  const followUps = new Map<string, AdChangeFollowUp>();
+  for (const part of chunks(changes.map((change) => change.id))) {
+    const rows = await db
+      .select({
+        changeId: adChanges.id,
+        originChangeId: adChanges.originChangeId,
+        origin: adChanges.origin,
+        status: adChanges.status,
+        submissionId: adChanges.submissionId,
+      })
+      .from(adChanges)
+      .where(
+        and(inArray(adChanges.originChangeId, part), eq(adChanges.profileId, submission.profileId)),
+      )
+      .orderBy(asc(adChanges.createdAt), asc(adChanges.id));
+    // Aufsteigend gelesen: Der jüngste Folgeschritt gewinnt.
+    for (const { originChangeId, ...row } of rows) {
+      followUps.set(originChangeId!, {
+        ...row,
+        origin: row.origin as AdChangeFollowUp['origin'],
+        status: row.status as AdChangeStatus,
+      });
+    }
+  }
+  return {
+    submission,
+    changes: changes.map((change) => ({ ...change, followUp: followUps.get(change.id) ?? null })),
+  };
 }
