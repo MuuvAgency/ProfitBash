@@ -6,7 +6,7 @@ import {
   MISSING_VALUE,
   type Locale,
 } from '@profitbash/shared';
-import type { CellClassParams, ColDef } from 'ag-grid-community';
+import type { CellClassParams, ColDef, ICellRendererParams } from 'ag-grid-community';
 import { markRaw } from 'vue';
 import type { SearchTermAnalysisData, SearchTermNgramData, SearchTermRowData } from '../api/client';
 import DecimalFilter from '../explorer/DecimalFilter.vue';
@@ -110,6 +110,51 @@ const CLASS_TONE: Record<SearchTermRowData['classification'], string> = {
   watch: 'text-ink-secondary',
 };
 
+/**
+ * Einstufung des Suchbegriffs über alle Targets (2b.2f), nur wenn sie von der Einstufung der Zeile abweicht:
+ * Sonst sagt sie nichts Neues.
+ */
+export function acrossTargetsLabel(
+  row: Pick<SearchTermRowData, 'classification' | 'termClassification' | 'termTargets'>,
+  t: Labels['t'],
+): string | null {
+  if (row.termClassification === row.classification) return null;
+  return t('searchTerms.acrossTargets.cell', {
+    label: t(`searchTerms.class.${row.termClassification}`),
+    targets: t('searchTerms.acrossTargets.targets', { n: row.termTargets }),
+  });
+}
+
+/** Farbe der zweiten Zeile (Einstufung über alle Targets); das Gewicht bleibt normal, die Zeile selbst führt. */
+const ACROSS_TONE: Record<SearchTermRowData['classification'], string> = {
+  harvest: 'text-lime-deep',
+  negate: 'text-loss',
+  watch: 'text-ink-secondary',
+};
+
+/** Zelle „Einstufung“: die Einstufung der Zeile, darunter bei Abweichung die über alle Targets. */
+function classificationCell(
+  { data, valueFormatted, value }: ICellRendererParams<TermGridRow>,
+  t: Labels['t'],
+): HTMLElement {
+  // Eigene Zeilenhöhen: Die Zelle des Grids ist sonst so hoch wie die Zeile, zwei Zeilen passten nicht hinein.
+  const cell = document.createElement('span');
+  cell.className = 'flex min-w-0 flex-col';
+  const own = document.createElement('span');
+  own.className = 'truncate text-body-md';
+  own.textContent = valueFormatted ?? String(value ?? '');
+  cell.append(own);
+  const across = data && !data.isTotal ? acrossTargetsLabel(data, t) : null;
+  if (across !== null && data && !data.isTotal) {
+    const line = document.createElement('span');
+    line.className = `truncate text-body-sm font-normal ${ACROSS_TONE[data.termClassification]}`;
+    line.textContent = across;
+    line.title = across;
+    cell.append(line);
+  }
+  return cell;
+}
+
 export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
   const { t } = context;
   const text = (
@@ -154,9 +199,11 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
     def.colId === 'classification'
       ? {
           ...def,
-          minWidth: 220,
+          // Platz für die zweite Zeile „Über alle Targets: … (n Targets)“.
+          minWidth: 260,
+          cellRenderer: (params: ICellRendererParams<TermGridRow>) => classificationCell(params, t),
           cellClass: ({ data }: CellClassParams<TermGridRow>) =>
-            data && !data.isTotal ? CLASS_TONE[data.classification] : '',
+            `flex items-center ${data && !data.isTotal ? CLASS_TONE[data.classification] : ''}`,
         }
       : def,
   );

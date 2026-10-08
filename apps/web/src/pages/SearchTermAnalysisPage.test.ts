@@ -70,6 +70,11 @@ const row = (searchTerm: string, patch: Partial<SearchTermRow> = {}): SearchTerm
   reason: 'tooFewData',
   protected: false,
   alreadyTargeted: false,
+  // Ohne eigene Angabe: ein Target, über alle Targets wie die Zeile.
+  termClassification: patch.classification ?? 'watch',
+  termReason: patch.reason === undefined ? 'tooFewData' : patch.reason,
+  termTargets: 1,
+  termOnlyAcrossTargets: false,
   ...patch,
 });
 
@@ -120,6 +125,8 @@ function analysisResponse(
     },
     total: { ...sums, cost: '1234.5', sales: '4938', acos: '0.25' },
     counts: { harvest: 1, negate: 1, watch: 1 },
+    termCounts: { harvest: 1, negate: 1, watch: 1 },
+    termCountsOnlyAcrossTargets: { harvest: 0, negate: 0 },
     rows,
     ngrams: [ngram('lampe', { searchTerms: 3 }), ngram('led lampe')],
     ...patch,
@@ -384,6 +391,114 @@ describe('Suchbegriff-Analyse', () => {
       ),
     });
     expect(document.querySelector('[role="alert"]')).not.toBeNull();
+  });
+});
+
+describe('Einstufung über alle Targets', () => {
+  /** Käufe bzw. Klicks verteilen sich auf zwei Targets; „lampe solo“ steht auf einem. */
+  const spread = () => {
+    const across = { termTargets: 2, termReason: null, termOnlyAcrossTargets: true };
+    const harvest = { ...across, termClassification: 'harvest' as const };
+    const negate = { ...across, termClassification: 'negate' as const };
+    const rows = [
+      row('gartenlampe solar', { ...harvest, amazonTargetId: 'T1' }),
+      row('gartenlampe solar', { ...harvest, amazonTargetId: 'T2', termTargets: 3 }),
+      row('stehlampe billig', negate),
+      row('lampe solo', { classification: 'harvest', reason: null }),
+      row('deckenlampe rot', {
+        classification: 'negate',
+        reason: null,
+        termClassification: 'watch',
+        termReason: 'tooFewData',
+        termTargets: 2,
+      }),
+    ];
+    return analysisResponse({
+      rows,
+      counts: { harvest: 1, negate: 1, watch: 3 },
+      termCounts: { harvest: 2, negate: 1, watch: 1 },
+      termCountsOnlyAcrossTargets: { harvest: 1, negate: 1 },
+    });
+  };
+  const mountSpread = (path = PATH) =>
+    mountPage(path, { 'POST /api/ads/search-terms/analysis': json(spread()) });
+  const occurrences = (needle: string) =>
+    (document.body.textContent ?? '').split(needle).length - 1;
+
+  it('zeigt sie in der Zeile nur, wenn sie von der Einstufung der Zeile abweicht', async () => {
+    await mountSpread();
+    await waitForRow('gartenlampe solar');
+    await waitForRow('stehlampe billig');
+    await waitForRow('lampe solo');
+    await waitForRow('deckenlampe rot');
+    await waitForRow('Über alle Targets: Ernten (2 Targets)');
+    await waitForRow('Über alle Targets: Ernten (3 Targets)');
+    await waitForRow('Über alle Targets: Negieren (2 Targets)');
+    // Allein ein Negativ-Vorschlag, über alle Targets nicht.
+    await waitForRow('Über alle Targets: Beobachten (2 Targets)');
+    // „lampe solo“ ist schon in der Zeile ein Harvest: kein zweiter Hinweis.
+    expect(occurrences('Über alle Targets:')).toBe(4);
+  });
+
+  it('zeigt ohne Abweichung keinen Hinweis und keine Zeile in der Kachel', async () => {
+    await mountPage();
+    await waitForRow('led lampe warmweiß');
+    await waitForRow('nordwind lampe');
+    expect(document.body.textContent).not.toContain('Über alle Targets');
+    expect(document.body.textContent).not.toContain('über alle Targets');
+  });
+
+  it('nennt in der Kachel die Suchbegriffe, die erst über alle Targets Kandidaten sind', async () => {
+    await mountSpread();
+    await waitForRow('gartenlampe solar');
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('Erst über alle Targets zusammen:');
+    expect(button('zum Ernten')!.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      '1 Suchbegriff zum Ernten',
+    );
+    expect(button('zum Negieren')!.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      '1 Suchbegriff zum Negieren',
+    );
+  });
+
+  it('nennt nur die Einstufung mit Treffern (Mehrzahl mit Tausenderpunkt)', async () => {
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json({
+        ...spread(),
+        termCountsOnlyAcrossTargets: { harvest: 1234, negate: 0 },
+      }),
+    });
+    await waitForRow('gartenlampe solar');
+    expect(button('zum Ernten')!.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      '1.234 Suchbegriffe zum Ernten',
+    );
+    expect(button('zum Negieren')).toBeUndefined();
+  });
+
+  it('filtert auf die Zeilen dieser Suchbegriffe (URL `class`) und wieder zurück', async () => {
+    const { router } = await mountSpread();
+    await waitForRow('lampe solo');
+    button('zum Ernten')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(document.body.textContent).not.toContain('lampe solo'));
+    await waitForRow('gartenlampe solar');
+    expect(document.body.textContent).not.toContain('stehlampe billig');
+    expect(router.currentRoute.value.query.class).toBe('harvest-across');
+    expect(button('zum Ernten')!.getAttribute('aria-pressed')).toBe('true');
+    expect(button('Ernten')!.getAttribute('aria-pressed')).toBe('false');
+
+    button('zum Ernten')!.click();
+    await flushPromises();
+    await waitForRow('lampe solo');
+    expect(router.currentRoute.value.query.class).toBeUndefined();
+  });
+
+  it('liest den Filter aus der URL', async () => {
+    await mountSpread(`${PATH}?class=negate-across`);
+    await waitForRow('stehlampe billig');
+    expect(document.body.textContent).not.toContain('gartenlampe solar');
+    expect(document.body.textContent).not.toContain('deckenlampe rot');
+    expect(button('zum Negieren')!.getAttribute('aria-pressed')).toBe('true');
   });
 });
 
