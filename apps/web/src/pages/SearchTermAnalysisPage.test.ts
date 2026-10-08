@@ -907,6 +907,38 @@ describe('CSV-Export', () => {
     );
   });
 
+  it('Suchbegriffe: Die Einstufung über alle Targets steht in derselben Zelle, ohne Zeilenumbruch (2b.2f)', async () => {
+    const download = captureDownload();
+    await mountPage(`${PATH}?class=harvest-across`, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [
+            row('led lampe', {
+              termClassification: 'harvest',
+              termReason: null,
+              termTargets: 2,
+              termOnlyAcrossTargets: true,
+            }),
+            row('lampe billig'),
+          ],
+          termCountsOnlyAcrossTargets: { harvest: 1, negate: 0 },
+        }),
+      ),
+    });
+    await waitForRow('led lampe');
+    button(EXPORT)!.click();
+    const csv = await download.text();
+    expect(csv).toContain(
+      '"led lampe","Beobachten · Zu wenig Daten; Über alle Targets: Ernten (2 Zeilen)"',
+    );
+    expect(csv).not.toContain('lampe billig');
+    // Kopfzeile und eine Zeile.
+    expect(csv.split('\r\n')).toHaveLength(2);
+    expect(download.fileName()).toBe(
+      'profitbash-search-term-analysis-harvest-across-demo-de-de-2026-09-01_2026-09-30.csv',
+    );
+  });
+
   it('Suchbegriffe: Spaltenfilter und Sortierung des Grids gelten auch im Export', async () => {
     const download = captureDownload();
     const { wrapper } = await mountPage(PATH, {

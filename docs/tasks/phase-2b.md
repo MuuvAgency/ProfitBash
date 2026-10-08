@@ -238,8 +238,8 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     Filterleiste merkt sich ihre Auswahl selbst, ein Drill-Down geht beim Umweg verloren); die Länge der Wortbausteine
     steht nicht in der URL; die Clients-Kachel erscheint erst mit mindestens einem Client (Ladefehler der Clients meldet
     die Seite schon).
-  - **Nicht enthalten:** CSV-Export, Spaltenauswahl und gespeicherte Ansichten für diese Seite; Filter nach Ad-Typ (die API
-    kann ihn schon); Sprung von einer Zeile in den Explorer (Kampagne, Ad Group).
+  - **Nicht enthalten:** Spaltenauswahl und gespeicherte Ansichten für diese Seite; Filter nach Ad-Typ (die API kann ihn
+    schon). CSV-Export und Sprung in den Explorer kamen mit 2b.2e.
 
 #### 2b.2c Zeitraum im Upload-Dialog (Ausweich-Feld)
 - [x] Trägt der Dateiname keinen Zeitraum, erscheinen zwei Datumsfelder (von/bis); der Import nutzt sie für die
@@ -367,6 +367,40 @@ Upload-Dialog mit Datei-Art SQP wie die Bulk-Datei; Client und Marktplatz kommen
     angegebene Zeiträume weiter nicht.
   - **Offen:** Blick in die Browser-Pane (Knopf neben der Auswahl, Dialog, Handy-Breite): in dieser Session war der
     Zugriff auf die Browser-Pane gesperrt.
+
+#### 2b.2e CSV-Export und Sprung in den Explorer
+- [x] CSV-Export für „Suchbegriffe“ und „Wortbausteine“; Kampagne und Ad Group einer Zeile verlinken in den Explorer.
+- [x] Umsetzung (nur `apps/web`, keine API-Änderung):
+  - **Geteilte Helfer** aus dem Explorer herausgelöst, Verhalten dort unverändert bis auf den Hinweis (unten):
+    `grid/csv.ts` (`gridCsv`, `downloadCsv`, `fileNamePart`, `csvSafe`), `grid/keyboard.ts`
+    (`activateCellControlOnEnter`), `filterLink` in `analytics/useAnalyticsFilters.ts`.
+  - **Export:** Knopf „CSV exportieren“ neben dem Umschalter der Ansicht, gesperrt ohne Zeilen und bis das Grid bereit
+    ist. Die Datei enthält, was das Grid zeigt (Einstufungs-Filter, Wortzahl, Spaltenfilter, Sortierung), in der
+    Schreibweise des Explorers: Komma, BOM, Beträge und Zähler als Decimal-String mit Punkt, Spalte „Währung“, fehlende
+    Werte leer, Texte gegen Formeln entschärft, ohne Summenzeile. Einstufung als Text wie im Grid, die Einstufung über
+    alle Targets (2b.2f) in derselben Zelle („Beobachten · Zu wenig Daten; Über alle Targets: Ernten (2 Zeilen)“).
+    Dateiname `profitbash-search-term-analysis-[<class>-]<konto>-<land>-<von>_<bis>.csv` bzw. `…-ngrams-…`. Bei
+    gekürzter Antwort steht ein eigener Hinweis (`searchTerms.csvTruncatedNote`, `csvNgramsTruncatedNote`) als erste
+    Zeile, als ein Feld in Anführungszeichen (gilt jetzt auch für den Hinweis des Explorers).
+  - **Sprung:** `search-terms/explorer-link.ts` und `EntityLinkCell.vue` (RouterLink, Enter auf der Zelle, `title` mit
+    dem vollen Namen). Kampagne → `/ads/explorer/ad-groups?campaign=…`, Ad Group → `/ads/explorer/targets?campaign=…
+    &adGroup=…`, dazu Client (`clients=…` bzw. `nc=1`), der Datei-Zeitraum (`period=custom&from&to`) und `removed=1`.
+    Fehlt die Entity im Profil (Datei war eine Teilmenge) oder hat sie keinen Namen, bleibt es reiner Text.
+  - Review (unabhängig): keine kritischen Befunde; das Herauslösen der Helfer zeilenweise als verhaltensgleich bestätigt,
+    ebenso Quoting und Formel-Schutz. Übernommen: Der Link nennt **keine einzelnen Profile** mehr (mit `pf=1` löste er
+    sich in einem neuen Tab oder bei einem Kollegen auf deren gespeicherte Profil-Auswahl auf und konnte leer landen;
+    Client plus Kampagne bzw. Ad Group legen die Daten fest), `removed=1` (der Explorer blendet entfernte Entities sonst
+    aus, ein Sprung aus einem älteren Zeitraum landete leer), eigener Hinweis-Text in der Datei, `csvSafe` nach
+    `grid/csv.ts`, kein Export vor dem Grid, Tests für Formeln in Namen, Sonderzeichen, Summenzeile ohne Link.
+  - **Bewusst so bzw. bekannte Grenzen:** Die Filterleiste des Explorers zeigt nach dem Sprung den Client, nicht das
+    einzelne Profil; mit Währung „auto“ und Profilen in verschiedenen Währungen kann der Explorer umgerechnete Beträge
+    zeigen, die Analyse die Währung des Profils (nicht geprüft). „Entfernte anzeigen“ bleibt nach dem Sprung angehakt.
+    Vergleich, Währung und Attribution des Links sind die Standardwerte des Explorers. Spaltenfilter ohne Treffer
+    ergeben eine Datei nur mit Kopfzeile (wie im Explorer). Kontonamen ohne lateinische Zeichen fallen im Dateinamen
+    weg. Datei-Zeiträume über 400 Tage (nur über umbenannte Dateien denkbar) nimmt der Explorer nicht an und zeigt
+    seinen Standard-Zeitraum. Dass der Knopf vor „Grid bereit“ gesperrt ist, deckt nur der Test des Grids ab.
+  - **Offen:** Blick in die Browser-Pane (Knopf, Links, Sprung in den Explorer mit echten Daten): in dieser Session war
+    der Zugriff auf die Browser-Pane gesperrt. Gerade der Sprung sollte einmal mit den Demo-Daten geklickt werden.
 
 #### Später (nur mit Datei)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt
