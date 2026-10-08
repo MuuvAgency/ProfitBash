@@ -4,7 +4,7 @@ import type {
   AdChangeField,
   AdChangeStatus,
 } from '@profitbash/shared';
-import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, max } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { chunks } from './ad-change-entities';
 import { loadAdChangeJobRows, type AdChangeJobRow } from './ad-change-processing';
@@ -18,7 +18,13 @@ import {
 } from './ad-changes';
 import type { DbOrTx } from './audit';
 import type { Db } from './client';
-import { adChangeSubmissions, adChanges, amazonAdsProfiles, users } from './schema';
+import {
+  adChangeSubmissions,
+  adChanges,
+  amazonAdsCampaigns,
+  amazonAdsProfiles,
+  users,
+} from './schema';
 
 /**
  * Lesen für API und Oberfläche (`docs/tasks/phase-3.md` 3.4), alles über `visibleProfilesScope()` (ADR 002):
@@ -218,4 +224,19 @@ export async function listSubmissionConnections(
     }
   }
   return [...found.values()];
+}
+
+/**
+ * Letzter Sync bzw. Import der Kampagnen eines Profils (`max(synced_at)`), `null` ohne synchronisierte Kampagne.
+ * Der Aufrufer hat die Sichtbarkeit des Profils schon geprüft (über die Übermittlung).
+ */
+export async function getProfileEntitiesSyncedAt(
+  db: DbOrTx,
+  profileId: string,
+): Promise<Date | null> {
+  const [row] = await db
+    .select({ syncedAt: max(amazonAdsCampaigns.syncedAt) })
+    .from(amazonAdsCampaigns)
+    .where(eq(amazonAdsCampaigns.profileId, profileId));
+  return row?.syncedAt ?? null;
 }

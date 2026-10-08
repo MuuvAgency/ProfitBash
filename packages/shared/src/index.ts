@@ -18,3 +18,4 @@ export * from './saved-views';
 export * from './slug';
 export * from './search-terms';
 export * from './ad-changes';
+export * from './ad-changes-api';

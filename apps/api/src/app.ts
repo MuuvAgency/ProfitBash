@@ -6,6 +6,7 @@ import type { AppDeps, AppEnv } from './context';
 import { ApiError, createErrorHandler, errorResponse, notFoundHandler } from './errors';
 import { consoleLogger } from './logger';
 import { csrfProtection, requestLogger } from './middleware';
+import { isAdChangesWrite, registerAdChangeRoutes } from './routes/ad-changes';
 import { registerAmazonOAuthRoutes } from './routes/amazon-oauth';
 import { registerAnalyticsRoutes } from './routes/analytics';
 import { registerClientRoutes } from './routes/clients';
@@ -71,9 +72,11 @@ export function createApp(options: CreateAppOptions) {
       throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'Der Request-Body ist zu groß.');
     },
   });
-  // Der Datei-Upload hat ein eigenes, größeres Limit an seiner Route (1.11c).
+  // Der Datei-Upload (1.11c) und Sammeländerungen (3.4) haben eigene, größere Limits an ihren Routen.
   app.use((c, next) =>
-    isFileUpload(c.req.method, c.req.path) ? next() : defaultBodyLimit(c, next),
+    isFileUpload(c.req.method, c.req.path) || isAdChangesWrite(c.req.method, c.req.path)
+      ? next()
+      : defaultBodyLimit(c, next),
   );
   app.use(csrfProtection(deps.appUrl));
   // Auswertungen liefern bis zu 10 000 Zeilen mit Vergleich (mehrere MB JSON): komprimieren (F7).
@@ -96,6 +99,7 @@ export function createApp(options: CreateAppOptions) {
   registerAnalyticsRoutes(app, deps);
   registerSavedViewRoutes(app, deps);
   registerSearchTermRoutes(app, deps);
+  registerAdChangeRoutes(app, deps);
   registerMemberRoutes(app, deps);
 
   app.doc31('/openapi.json', {
