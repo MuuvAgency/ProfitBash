@@ -138,3 +138,5 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     },
   };
 }
+
+export { seedAdChangeFixture, type AdChangeFixture } from './ad-change-fixture';
