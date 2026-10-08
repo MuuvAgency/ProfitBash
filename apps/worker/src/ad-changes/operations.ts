@@ -6,13 +6,12 @@ import type {
   AmazonAdsWriteOperation,
   AmazonAdsWriteState,
 } from '@profitbash/amazon-ads';
+import type { AdChangeJobRow } from '@profitbash/db';
 import {
   AD_CHANGE_BIDDING_STRATEGIES,
   AD_CHANGE_PLACEMENTS,
   isAdChangePlacementField,
-  type AdChangeEntityType,
   type AdChangeField,
-  type AdChangeNegative,
 } from '@profitbash/shared';
 
 /**
@@ -26,29 +25,7 @@ import {
  */
 
 /** Eine Änderung der Übermittlung mit dem, was der Job über Entity und Kampagne gelesen hat. */
-export interface SubmissionChange {
-  id: string;
-  operation: 'update' | 'create';
-  entityType: AdChangeEntityType;
-  entityId: string | null;
-  field: AdChangeField | null;
-  /** Neuer Wert (Text bzw. Decimal-String); leer beim Anlegen. */
-  after: string | null;
-  negative: AdChangeNegative | null;
-  /** Ad-Typ der Kampagne. */
-  adProduct: string;
-  amazonCampaignId: string;
-  amazonAdGroupId: string | null;
-  /** Amazon-ID der geänderten Entity; `null`, wenn es sie nicht (mehr) gibt, und beim Anlegen. */
-  amazonEntityId: string | null;
-  /** Art des Targets bzw. Negatives (`keyword`, `product` …). */
-  targetType: string | null;
-  negativeLevel: 'campaign' | 'ad_group' | null;
-  entityRemoved: boolean;
-  campaignBiddingStrategy: string | null;
-  /** `extra.placementBidAdjustments` der Kampagne, ungeprüft. */
-  campaignPlacements: unknown;
-}
+export type SubmissionChange = AdChangeJobRow;
 
 export interface RejectedChange {
   changeId: string;

@@ -984,7 +984,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll" | "file-import" | "fx-rates-sync";
+                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll" | "ad-changes-submit" | "file-import" | "fx-rates-sync";
                     status?: "running" | "success" | "failed";
                 };
                 header?: never;

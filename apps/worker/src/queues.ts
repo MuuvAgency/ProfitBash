@@ -13,7 +13,8 @@ export const CONNECTION_QUEUES: readonly ConnectionQueue[] = CONNECTION_JOB_NAME
 
 /**
  * Cron-Auslöser, die für jede aktive Connection einen Job der Ziel-Queue einplanen
- * (`amazon-requests-poll-all` nur für Connections mit fälligen Aufträgen, siehe `worker.ts`).
+ * (`amazon-requests-poll-all` nur für Connections mit fälligen Aufträgen, `ad-changes-submit-all` nur für
+ * Connections mit offenen Übermittlungen, siehe `jobs/dispatch.ts`).
  */
 export const DISPATCH_QUEUES = {
   'token-refresh-all': 'token-refresh',
@@ -21,6 +22,7 @@ export const DISPATCH_QUEUES = {
   'entities-sync-all': 'entities-sync',
   'reports-sync-all': 'reports-sync',
   'amazon-requests-poll-all': 'amazon-requests-poll',
+  'ad-changes-submit-all': 'ad-changes-submit',
 } as const satisfies Record<string, ConnectionQueue>;
 
 export const CLEANUP_QUEUE = 'job-runs-cleanup';
@@ -49,6 +51,8 @@ export const SCHEDULES = [
   { queue: 'entities-sync-all', cron: '0 6 * * *', tz: 'Europe/Berlin' },
   { queue: 'reports-sync-all', cron: '0 6 * * *', tz: 'Europe/Berlin' },
   { queue: 'amazon-requests-poll-all', cron: '*/10 * * * *' },
+  // Holt offene Übermittlungen nach Absturz oder Deploy nach (3.3); sonst plant die API den Job direkt ein.
+  { queue: 'ad-changes-submit-all', cron: '*/10 * * * *' },
   { queue: CLEANUP_QUEUE, cron: '30 3 * * *', tz: 'Europe/Berlin' },
   { queue: FX_RATES_QUEUE, cron: '0 6 * * *', tz: 'Europe/Berlin' },
   { queue: FILE_IMPORT_SWEEP_QUEUE, cron: '*/10 * * * *' },
@@ -106,11 +110,21 @@ export interface FileImportJob {
   profileId: string;
 }
 
+export interface AdChangesSubmitJob {
+  organizationId: string;
+  connectionId: string;
+}
+
 /** Hintergrundjobs, die die API anstößt. */
 export interface JobQueue {
   enqueueProfilesSync(job: ProfilesSyncJob, options?: EnqueueOptions): Promise<void>;
   /** Liefert `false`, wenn für das Profil schon ein Job wartet (der holt die Datei mit ab). */
   enqueueFileImport(job: FileImportJob, options?: EnqueueOptions): Promise<boolean>;
+  /**
+   * Übermittlungen von Änderungen über die API senden (3.3). Liefert `false`, wenn für die Connection schon ein
+   * Job wartet (der holt alle offenen Übermittlungen ab).
+   */
+  enqueueAdChangesSubmit(job: AdChangesSubmitJob, options?: EnqueueOptions): Promise<boolean>;
 }
 
 export interface ConnectionJobQueue extends JobQueue {
@@ -147,6 +161,13 @@ export function createJobQueue(boss: PgBoss): ConnectionJobQueue {
         },
       );
       return id !== null;
+    },
+    enqueueAdChangesSubmit(job, options) {
+      return enqueueConnectionJob(
+        'ad-changes-submit',
+        { organizationId: job.organizationId, connectionId: job.connectionId },
+        options,
+      );
     },
     async enqueueProfilesSync(job, options) {
       await enqueueConnectionJob(

@@ -90,6 +90,7 @@ describe('startWorker', () => {
       sql`select name, cron, timezone from pgboss.schedule order by name`,
     );
     expect([...rows]).toEqual([
+      { name: 'ad-changes-submit-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'amazon-requests-poll-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'entities-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'file-import-all', cron: '*/10 * * * *', timezone: 'UTC' },
