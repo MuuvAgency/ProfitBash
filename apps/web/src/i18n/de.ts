@@ -799,6 +799,14 @@ export const de = {
       invalid:
         'Bitte ganze Zahlen ab 1 für Käufe und Klicks, einen ACoS über 0 % und einen Betrag ab 0 angeben, jeweils mit höchstens zwei Nachkommastellen und ohne Tausenderpunkt.',
     },
+    deletePeriod: {
+      action: 'Zeitraum löschen',
+      title: 'Zeitraum löschen?',
+      /** `{rows}` = formatierte Zeilenzahl des Zeitraums. */
+      rows: '{rows} Zeilen',
+      text: 'Gelöscht werden nur die Suchbegriffe dieses Zeitraums. Kampagnen, der Verlauf der Datei-Importe und andere Zeiträume bleiben. Du kannst die Datei danach erneut hochladen, zum Beispiel mit dem richtigen Zeitraum.',
+      confirm: 'Zeitraum löschen',
+    },
     protected: {
       some: 'Geschützter Begriff des Clients (nie negieren): | Geschützte Begriffe des Clients (nie negieren):',
       none: 'Keine geschützten Begriffe. Marke und Hero-Begriffe pflegt ein Admin je Client unter „Clients & Connections“.',
@@ -1030,6 +1038,8 @@ export const de = {
     FILE_TOO_LARGE: 'Die Datei ist größer als erlaubt ({size}).',
     EMPTY_FILE: 'Die Datei ist leer.',
     INVALID_PERIOD: 'Der angegebene Zeitraum ist ungültig.',
+    SEARCH_TERM_PERIOD_NOT_FOUND:
+      'Für diesen Zeitraum liegen keine Suchbegriffe mehr vor. Bitte lade die Seite neu.',
     PROFILE_HAS_CONNECTION:
       'Dieses Profil hat eine Connection; seine Daten kommen über die API, nicht per Datei.',
     CURRENCY_NOT_SELECTABLE:

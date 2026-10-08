@@ -34,6 +34,7 @@ import {
   type TermGridRow,
 } from '../search-terms/columns';
 import { fractionToPercent } from '../search-terms/decimal-input';
+import DeletePeriodDialog from '../search-terms/DeletePeriodDialog.vue';
 import RulesDialog from '../search-terms/RulesDialog.vue';
 import SearchTermGrid from '../search-terms/SearchTermGrid.vue';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
@@ -281,6 +282,34 @@ async function onRulesSaved() {
   await queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'analysis'] });
   rulesOpen.value = false;
 }
+
+// --- Zeitraum löschen (2b.2d) ---------------------------------------------------------------
+
+const deleteOpen = ref(false);
+/** Der Zeitraum, nach dem der Dialog fragt: beim Öffnen festgehalten, nicht die laufende Auswahl. */
+const periodToDelete = ref<SearchTermPeriodData | null>(null);
+function openDeletePeriod() {
+  periodToDelete.value = selected.value;
+  deleteOpen.value = periodToDelete.value !== null;
+}
+async function onPeriodDeleted(period: SearchTermPeriodData) {
+  // Erst die Zeiträume neu laden: Die Auswahl fällt dann auf den nächsten gültigen Zeitraum (oder den Leerzustand),
+  // die URL folgt per `replace`. Die Analyse des gelöschten Zeitraums bleibt nicht im Zwischenspeicher.
+  await queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'periods'] });
+  queryClient.removeQueries({
+    queryKey: [
+      'search-terms',
+      orgId.value,
+      'analysis',
+      {
+        profileId: period.profileId,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+      },
+    ],
+  });
+  deleteOpen.value = false;
+}
 </script>
 
 <template>
@@ -344,6 +373,15 @@ async function onRulesSaved() {
               @update:model-value="onPeriod"
             />
           </div>
+          <Button
+            v-if="canWrite && selected"
+            :label="t('searchTerms.deletePeriod.action')"
+            icon="pi pi-trash"
+            size="small"
+            severity="secondary"
+            variant="text"
+            @click="openDeletePeriod"
+          />
         </div>
         <p class="max-w-prose text-body-sm text-ink-secondary">
           <template v-if="selected">
@@ -599,5 +637,14 @@ async function onRulesSaved() {
         @saved="onRulesSaved"
       />
     </template>
+
+    <!-- Außerhalb der Zustände: Nach dem letzten Zeitraum (Leerzustand) schließt der Dialog noch regulär. -->
+    <DeletePeriodDialog
+      v-if="canWrite"
+      :visible="deleteOpen"
+      :period="periodToDelete"
+      @close="deleteOpen = false"
+      @deleted="onPeriodDeleted"
+    />
   </div>
 </template>

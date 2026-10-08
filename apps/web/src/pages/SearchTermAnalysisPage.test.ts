@@ -610,3 +610,143 @@ describe('Regeln ändern', () => {
     expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
   });
 });
+
+describe('Zeitraum löschen (2b.2d)', () => {
+  const DELETE = 'POST /api/ads/search-terms/periods/delete';
+  const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]');
+  const inDialog = (label: string) =>
+    [...(dialog()?.querySelectorAll('button') ?? [])].find((b) =>
+      b.textContent?.trim().includes(label),
+    );
+  const deleteRequests = (requests: RecordedRequest[]) =>
+    requests.filter((r) => r.path === '/api/ads/search-terms/periods/delete').map((r) => r.body);
+  const periodRequests = (requests: RecordedRequest[]) =>
+    requests.filter((r) => r.path === '/api/ads/search-terms/periods');
+
+  /** Die Zeiträume verschwinden beim Löschen aus der Liste, wie auf dem Server. */
+  function deletable(list: SearchTermPeriod[]) {
+    let current = list;
+    return {
+      'POST /api/ads/search-terms/periods': () => json({ periods: current }),
+      [DELETE]: (request: RecordedRequest) => {
+        const body = request.body as { profileId: string; periodStart: string; periodEnd: string };
+        const gone = current.filter(
+          (p) =>
+            p.profileId === body.profileId &&
+            p.periodStart === body.periodStart &&
+            p.periodEnd === body.periodEnd,
+        );
+        current = current.filter((p) => !gone.includes(p));
+        return json({ deletedRows: gone.reduce((sum, p) => sum + p.rows, 0) });
+      },
+    };
+  }
+
+  async function openDialog() {
+    button('Zeitraum löschen')!.click();
+    await flushPromises();
+  }
+
+  it('bietet Viewern keinen Knopf an', async () => {
+    await mountPage(PATH, { 'GET /api/me': json(meFixture({ orgRole: 'viewer' })) });
+    await waitForRow('led lampe warmweiß');
+    expect(button('Zeitraum löschen')).toBeUndefined();
+  });
+
+  it('nennt im Dialog Profil, Zeitraum und Zeilenzahl und was erhalten bleibt; Abbrechen löscht nichts', async () => {
+    const { requests } = await mountPage(PATH, deletable(periods()));
+    await waitForRow('led lampe warmweiß');
+    expect(dialog()).toBeNull();
+    await openDialog();
+
+    const text = dialog()?.textContent ?? '';
+    expect(text).toContain('Demo DE · DE');
+    expect(text).toContain('01.09.2026 – 30.09.2026');
+    expect(text).toContain('2 Zeilen');
+    expect(text).toContain('nur die Suchbegriffe dieses Zeitraums');
+    expect(text).toContain('Kampagnen, der Verlauf der Datei-Importe und andere Zeiträume bleiben');
+    expect(text).toContain('erneut hochladen');
+    // Die Zahlen stehen in der Zahlenschrift.
+    expect(dialog()?.querySelector('.font-data')?.textContent).toContain('01.09.2026');
+
+    inDialog('Abbrechen')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(dialog()).toBeNull());
+    expect(deleteRequests(requests)).toEqual([]);
+  });
+
+  it('löscht den gewählten Zeitraum, lädt die Zeiträume neu und wechselt auf den nächsten', async () => {
+    const { requests, router } = await mountPage(PATH, deletable(periods()));
+    await waitForRow('led lampe warmweiß');
+    await openDialog();
+    inDialog('Zeitraum löschen')!.click();
+    await flushPromises();
+
+    expect(deleteRequests(requests)).toEqual([
+      { profileId: P1, periodStart: '2026-09-01', periodEnd: '2026-09-30' },
+    ]);
+    await vi.waitFor(() => expect(periodRequests(requests)).toHaveLength(2));
+    await vi.waitFor(() => expect(dialog()).toBeNull());
+    // Die Auswahl fällt auf den nächsten Zeitraum des Profils zurück.
+    await vi.waitFor(() =>
+      expect(router.currentRoute.value.query).toMatchObject({
+        profile: P1,
+        from: '2026-08-01',
+        to: '2026-09-29',
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(analysisRequests(requests).at(-1)).toEqual({
+        profileId: P1,
+        periodStart: '2026-08-01',
+        periodEnd: '2026-09-29',
+      }),
+    );
+    expect(document.body.textContent).toContain('01.08.2026 – 29.09.2026');
+  });
+
+  it('zeigt den Leerzustand, wenn kein Zeitraum übrig ist', async () => {
+    const { requests } = await mountPage(PATH, deletable([period()]));
+    await waitForRow('led lampe warmweiß');
+    await openDialog();
+    inDialog('Zeitraum löschen')!.click();
+    await flushPromises();
+
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Noch keine Suchbegriffe'));
+    expect(deleteRequests(requests)).toHaveLength(1);
+    expect(button('Zeitraum löschen')).toBeUndefined();
+    await vi.waitFor(() => expect(dialog()).toBeNull());
+  });
+
+  it('zeigt einen Fehler im Dialog und lässt die Auswahl stehen', async () => {
+    const { requests, router } = await mountPage(PATH, {
+      [DELETE]: json(
+        {
+          error: {
+            code: 'SEARCH_TERM_PERIOD_NOT_FOUND',
+            message: 'Für diesen Zeitraum liegen keine Suchbegriffe vor.',
+          },
+        },
+        404,
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    await openDialog();
+    inDialog('Zeitraum löschen')!.click();
+    await flushPromises();
+
+    const alert = dialog()?.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain(
+      'Für diesen Zeitraum liegen keine Suchbegriffe mehr vor. Bitte lade die Seite neu.',
+    );
+    expect(periodRequests(requests)).toHaveLength(1);
+    expect(router.currentRoute.value.query).toMatchObject({ from: '2026-09-01', to: '2026-09-30' });
+
+    // Beim erneuten Öffnen ist die Meldung weg.
+    inDialog('Abbrechen')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(dialog()).toBeNull());
+    await openDialog();
+    expect(dialog()?.querySelector('[role="alert"]')).toBeNull();
+  });
+});
