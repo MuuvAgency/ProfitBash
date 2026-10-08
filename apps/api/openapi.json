@@ -3044,6 +3044,12 @@
               "rulesAreDefault": {
                 "type": "boolean"
               },
+              "organizationRules": {
+                "$ref": "#/components/schemas/SearchTermRules"
+              },
+              "ruleOverrides": {
+                "$ref": "#/components/schemas/SearchTermRuleOverrides"
+              },
               "protectedTerms": {
                 "type": "array",
                 "items": {
@@ -3080,6 +3086,8 @@
               "importedAt",
               "rules",
               "rulesAreDefault",
+              "organizationRules",
+              "ruleOverrides",
               "protectedTerms",
               "totalRows",
               "truncated",
@@ -3250,6 +3258,48 @@
           },
           "negateMinCost": {
             "type": "string",
+            "pattern": "^\\d{1,9}(\\.\\d{1,2})?$"
+          }
+        },
+        "required": [
+          "harvestMinPurchases",
+          "harvestMaxAcos",
+          "negateMinClicks",
+          "negateMinCost"
+        ],
+        "additionalProperties": false
+      },
+      "SearchTermRuleOverrides": {
+        "type": "object",
+        "properties": {
+          "harvestMinPurchases": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "harvestMaxAcos": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\d{1,2}(\\.\\d{1,4})?$"
+          },
+          "negateMinClicks": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "negateMinCost": {
+            "type": [
+              "string",
+              "null"
+            ],
             "pattern": "^\\d{1,9}(\\.\\d{1,2})?$"
           }
         },
@@ -3610,6 +3660,46 @@
           "isDefault",
           "updatedAt"
         ]
+      },
+      "SearchTermProfileRulesResponse": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/SearchTermRuleOverrides"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "overrides",
+          "updatedAt"
+        ]
+      },
+      "SearchTermProfileRulesRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/SearchTermRuleOverrides"
+          }
+        },
+        "required": [
+          "profileId",
+          "overrides"
+        ],
+        "additionalProperties": false
       },
       "MemberList": {
         "type": "object",
@@ -5974,6 +6064,77 @@
           },
           "403": {
             "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/rules/profile": {
+      "put": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Abweichende Regeln eines Profils speichern (Recht „write“)",
+        "description": "Je Feld ein eigener Wert oder `null` = wie die Organisation; sind alle Felder `null`, gilt für das Profil wieder nur die Regel der Organisation. Die geltenden Regeln nennt die Analyse (`meta.rules`, `meta.organizationRules`, `meta.ruleOverrides`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchTermProfileRulesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeichert.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchTermProfileRulesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden.",
             "content": {
               "application/json": {
                 "schema": {

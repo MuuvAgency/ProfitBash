@@ -2192,6 +2192,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/search-terms/rules/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Abweichende Regeln eines Profils speichern (Recht „write“)
+         * @description Je Feld ein eigener Wert oder `null` = wie die Organisation; sind alle Felder `null`, gilt für das Profil wieder nur die Regel der Organisation. Die geltenden Regeln nennt die Analyse (`meta.rules`, `meta.organizationRules`, `meta.ruleOverrides`).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SearchTermProfileRulesRequest"];
+                };
+            };
+            responses: {
+                /** @description Gespeichert. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SearchTermProfileRulesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/members": {
         parameters: {
             query?: never;
@@ -3329,6 +3408,8 @@ export interface components {
                 importedAt: string | null;
                 rules: components["schemas"]["SearchTermRules"];
                 rulesAreDefault: boolean;
+                organizationRules: components["schemas"]["SearchTermRules"];
+                ruleOverrides: components["schemas"]["SearchTermRuleOverrides"];
                 protectedTerms: string[];
                 totalRows: number;
                 truncated: boolean;
@@ -3372,6 +3453,12 @@ export interface components {
             harvestMaxAcos: string;
             negateMinClicks: number;
             negateMinCost: string;
+        };
+        SearchTermRuleOverrides: {
+            harvestMinPurchases: number | null;
+            harvestMaxAcos: string | null;
+            negateMinClicks: number | null;
+            negateMinCost: string | null;
         };
         SearchTermRow: {
             /** Format: uuid */
@@ -3446,6 +3533,17 @@ export interface components {
             rules: components["schemas"]["SearchTermRules"];
             isDefault: boolean;
             updatedAt: string | null;
+        };
+        SearchTermProfileRulesResponse: {
+            /** Format: uuid */
+            profileId: string;
+            overrides: components["schemas"]["SearchTermRuleOverrides"];
+            updatedAt: string | null;
+        };
+        SearchTermProfileRulesRequest: {
+            /** Format: uuid */
+            profileId: string;
+            overrides: components["schemas"]["SearchTermRuleOverrides"];
         };
         MemberList: {
             members: components["schemas"]["Member"][];
