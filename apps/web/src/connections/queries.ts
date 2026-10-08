@@ -241,5 +241,9 @@ export function useRefreshFileProfiles() {
   const orgId = useActiveOrgId();
   const queryClient = useQueryClient();
   return () =>
-    queryClient.invalidateQueries({ queryKey: connectionKeys.fileProfiles(orgId.value) });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: connectionKeys.fileProfiles(orgId.value) }),
+      // Ein Bulk-Import bringt neue Datei-Zeiträume: Die Suchbegriff-Analyse lädt beim nächsten Öffnen neu.
+      queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value] }),
+    ]);
 }

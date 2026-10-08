@@ -730,6 +730,9 @@ export const de = {
       'Die Kennzahlen sind Summen über den Download-Zeitraum einer Bulk-Datei. Zeiträume verschiedener Dateien werden nie addiert: Wähle einen Zeitraum, ein freier Zeitraum ist hier nicht möglich.',
     periodsError: 'Die Datei-Zeiträume konnten nicht geladen werden.',
     analysisError: 'Die Suchbegriffe konnten nicht geladen werden.',
+    staleError:
+      'Die Suchbegriffe konnten nicht neu geladen werden. Die Anzeige ist möglicherweise nicht aktuell.',
+    classFilter: 'Nach Einstufung filtern',
     empty: {
       title: 'Noch keine Suchbegriffe',
       text: 'Lade unter „Clients & Connections“ eine Bulk-Datei der Werbekonsole mit Leistungsdaten hoch. Der Dateiname muss den Zeitraum tragen (bulk-…-von-bis-….xlsx).',
@@ -768,11 +771,11 @@ export const de = {
       costHint:
         'Der Betrag gilt in der Währung des jeweiligen Profils (hier {currency}), ohne Umrechnung.',
       invalid:
-        'Bitte ganze Zahlen ab 1 für Käufe und Klicks, einen ACoS über 0 % und einen Betrag ab 0 angeben.',
+        'Bitte ganze Zahlen ab 1 für Käufe und Klicks, einen ACoS über 0 % und einen Betrag ab 0 angeben, jeweils mit höchstens zwei Nachkommastellen und ohne Tausenderpunkt.',
     },
     protected: {
       some: 'Geschützter Begriff des Clients (nie negieren): | Geschützte Begriffe des Clients (nie negieren):',
-      none: 'Keine geschützten Begriffe. Marke und Hero-Begriffe pflegst du je Client unter „Clients & Connections“.',
+      none: 'Keine geschützten Begriffe. Marke und Hero-Begriffe pflegt ein Admin je Client unter „Clients & Connections“.',
     },
     view: {
       label: 'Ansicht',
@@ -792,6 +795,8 @@ export const de = {
       'Es werden die {max} Wortbausteine mit dem höchsten Spend gezeigt (von {total}).',
     noRows: 'Keine Suchbegriffe in diesem Zeitraum.',
     noRowsInClass: 'Keine Suchbegriffe mit dieser Einstufung.',
+    noRowsInClassTruncated:
+      'Unter den gezeigten Zeilen ist keine mit dieser Einstufung. Die Zähler gelten für alle Zeilen des Zeitraums.',
     column: {
       searchTerm: 'Suchbegriff',
       classification: 'Einstufung',

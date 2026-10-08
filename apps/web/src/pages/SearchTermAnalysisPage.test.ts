@@ -5,6 +5,7 @@ import type {
   SearchTermRow,
 } from '@profitbash/shared';
 import { flushPromises } from '@vue/test-utils';
+import Select from 'primevue/select';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch, type RecordedRequest } from '../test/fetch-stub';
 import { meFixture } from '../test/fixtures';
@@ -205,7 +206,7 @@ describe('Suchbegriff-Analyse', () => {
     expect(campaigns?.getAttribute('href')).toBe('/ads/explorer/campaigns');
   });
 
-  it('lädt den Zeitraum aus der URL und wechselt das Profil auf dessen neuesten Zeitraum', async () => {
+  it('lädt den Zeitraum aus der URL', async () => {
     const { requests } = await mountPage(`${PATH}?profile=${P1}&from=2026-08-01&to=2026-09-29`);
     await waitForRow('led lampe warmweiß');
     expect(analysisRequests(requests)).toEqual([
@@ -213,12 +214,103 @@ describe('Suchbegriff-Analyse', () => {
     ]);
   });
 
-  it('ersetzt unbekannte URL-Angaben durch die erste gültige Auswahl', async () => {
-    const { requests } = await mountPage(`${PATH}?profile=${P2}&from=2020-01-01&to=2020-01-31`);
+  it('ersetzt unbekannte URL-Angaben durch die erste gültige Auswahl (auch in der URL)', async () => {
+    const { requests, router } = await mountPage(
+      `${PATH}?profile=${P2}&from=2020-01-01&to=2020-01-31`,
+    );
     await waitForRow('led lampe warmweiß');
     expect(analysisRequests(requests)).toEqual([
       { profileId: P2, periodStart: '2026-08-01', periodEnd: '2026-09-29' },
     ]);
+    expect(router.currentRoute.value.query).toMatchObject({
+      profile: P2,
+      from: '2026-08-01',
+      to: '2026-09-29',
+    });
+  });
+
+  it('wechselt Profil (auf dessen neuesten Zeitraum) und Zeitraum mit Verlaufseintrag; Zurück stellt die Auswahl wieder her', async () => {
+    const { requests, router, wrapper } = await mountPage();
+    await waitForRow('led lampe warmweiß');
+    const [profile, range] = wrapper.findAllComponents(Select);
+
+    profile!.vm.$emit('update:modelValue', P2);
+    await flushPromises();
+    expect(router.currentRoute.value.query).toMatchObject({
+      profile: P2,
+      from: '2026-08-01',
+      to: '2026-09-29',
+    });
+    await vi.waitFor(() =>
+      expect(analysisRequests(requests).at(-1)).toEqual({
+        profileId: P2,
+        periodStart: '2026-08-01',
+        periodEnd: '2026-09-29',
+      }),
+    );
+
+    router.back();
+    await vi.waitFor(() => expect(router.currentRoute.value.query.profile).toBe(P1));
+    await flushPromises();
+    range!.vm.$emit('update:modelValue', '2026-08-01_2026-09-29');
+    await flushPromises();
+    expect(router.currentRoute.value.query).toMatchObject({
+      profile: P1,
+      from: '2026-08-01',
+      to: '2026-09-29',
+    });
+  });
+
+  it('zeigt Beträge in der Währung des gewählten Profils', async () => {
+    await mountPage(`${PATH}?profile=${P2}&from=2026-08-01&to=2026-09-29`, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({}, { profileId: P2, currency: 'GBP' }),
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    expect(document.body.textContent).toContain('1.234,50\u00a0£');
+  });
+
+  it('ergänzt die Auswahl wieder, wenn die URL sie verliert (Klick auf den eigenen Reiter)', async () => {
+    const { router } = await mountPage();
+    await waitForRow('led lampe warmweiß');
+    await router.push(PATH);
+    await flushPromises();
+    expect(router.currentRoute.value.query).toMatchObject({ profile: P1, from: '2026-09-01' });
+  });
+
+  it('leitet beim Verlassen der Seite nicht zurück', async () => {
+    const { router } = await mountPage(`${PATH}?profile=${P2}&from=2026-08-01&to=2026-09-29`);
+    await waitForRow('led lampe warmweiß');
+    await router.push('/admin/connections');
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe('/admin/connections');
+    expect(router.currentRoute.value.query.profile).toBeUndefined();
+  });
+
+  it('meldet einen Fehler beim Neuladen, auch wenn noch alte Daten zu sehen sind', async () => {
+    let calls = 0;
+    const { queryClient } = await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': () =>
+        ++calls === 1
+          ? json(analysisResponse())
+          : json({ error: { code: 'INTERNAL', message: 'kaputt' } }, 500),
+    });
+    await waitForRow('led lampe warmweiß');
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    await queryClient.invalidateQueries({ queryKey: ['search-terms'] });
+    await vi.waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(document.body.textContent).toContain('led lampe warmweiß');
+    expect(document.body.textContent).toContain('nicht aktuell');
+  });
+
+  it('nimmt den Einstufungs-Filter nicht mit in die Wortbausteine', async () => {
+    const { router } = await mountPage(`${PATH}?class=negate`);
+    await waitForRow('lampe billig');
+    button('Wortbausteine')!.click();
+    await flushPromises();
+    expect(router.currentRoute.value.query.class).toBeUndefined();
+    expect(button('Negieren')!.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('filtert die Zeilen über die Einstufungs-Kacheln', async () => {
