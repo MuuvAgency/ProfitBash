@@ -317,7 +317,7 @@ function parseErrorBody(text: string): { code: string | null; details: string | 
 }
 
 /** Entfernt Steuerzeichen (Log-Injection) und mögliche Tokens, kürzt auf `max` Zeichen. */
-function sanitize(value: string, max: number): string {
+export function sanitize(value: string, max: number): string {
   // eslint-disable-next-line no-control-regex
   const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/Atz[ra]\|\S+/g, '[token]');
   return cleaned.length > max ? `${cleaned.slice(0, max)}…` : cleaned;

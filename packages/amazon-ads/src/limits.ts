@@ -1,4 +1,5 @@
 import { Decimal } from 'decimal.js';
+import { isPlainDecimal } from './json';
 
 /**
  * Grenzen von Amazon für Schreibaufträge (`docs/tasks/phase-3.md` 3.2a, F6: hart gesperrt wird nur, was Amazon
@@ -78,10 +79,17 @@ function limitFor(input: AmazonAdsValueLimitInput): AmazonAdsValueLimit | undefi
   return Object.hasOwn(table, input.countryCode) ? table[input.countryCode] : undefined;
 }
 
-/** Prüft einen neuen Wert gegen Amazons Grenze; `null`, wenn er passt oder keine Grenze bekannt ist. */
+/**
+ * Prüft einen neuen Wert gegen Amazons Grenze; `null`, wenn er passt oder keine Grenze bekannt ist. Wirft `TypeError`
+ * bei Werten, die keine einfache Dezimalzahl sind (die Form prüft `adChangeValueIssue` in `@profitbash/shared` vorher).
+ */
 export function amazonAdsValueLimitIssue(
   input: AmazonAdsValueLimitInput,
 ): AmazonAdsValueLimitIssue | null {
+  // Auch ohne bekannte Grenze: `new Decimal` nähme sonst `NaN`, Hex- und Exponentialschreibweise an.
+  if (!isPlainDecimal(input.value)) {
+    throw new TypeError('amazonAdsValueLimitIssue: Wert ist keine einfache Dezimalzahl.');
+  }
   const limit = limitFor(input);
   if (!limit) return null;
   const value = new Decimal(input.value);

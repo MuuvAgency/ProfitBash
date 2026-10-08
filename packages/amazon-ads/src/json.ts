@@ -53,7 +53,12 @@ export function parseJsonLossless(text: string, options: ParseJsonLosslessOption
 // Schreiben: Beträge als JSON-Zahl ohne Umweg über `number`
 // ---------------------------------------------------------------------------
 
-const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
+/** Ohne Vorzeichen, Exponent und führende Nullen (die wären kein gültiges JSON-Zahl-Literal). */
+const PLAIN_DECIMAL = /^(0|[1-9]\d*)(\.\d+)?$/;
+
+export function isPlainDecimal(value: string): boolean {
+  return PLAIN_DECIMAL.test(value);
+}
 
 interface RawJson {
   rawJSON(text: string): unknown;
@@ -65,7 +70,7 @@ interface RawJson {
  * Nur mit `stringifyJsonLossless` bzw. `JSON.stringify` verwenden.
  */
 export function jsonDecimal(value: string): unknown {
-  if (!PLAIN_DECIMAL.test(value)) {
+  if (!isPlainDecimal(value)) {
     throw new TypeError('jsonDecimal: Wert ist keine einfache Dezimalzahl.');
   }
   // `JSON.rawJSON` (Node.js >= 22) gehört zum selben Vorschlag wie der Quelltext-Zugriff im Reviver oben.

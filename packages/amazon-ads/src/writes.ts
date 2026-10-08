@@ -2,12 +2,13 @@ import { z } from 'zod';
 import type { ConnectionRef } from './access-token';
 import type { AdsEndpointDeps, RequestOptions } from './client';
 import {
+  AmazonAdsError,
   AmazonAdsHttpError,
   AmazonAdsNetworkError,
-  AmazonAdsReauthRequiredError,
   AmazonAdsResponseError,
 } from './errors';
-import { jsonDecimal, stringifyJsonLossless } from './json';
+import { sanitize } from './http';
+import { isPlainDecimal, jsonDecimal, stringifyJsonLossless } from './json';
 import { amazonIdSchema } from './profiles';
 
 /**
@@ -107,7 +108,11 @@ export type AmazonAdsWriteResult = { ref: string } &
     | { status: 'applied'; amazonId: string | null }
     /** Amazon hat die Änderung abgelehnt (Grund und Text von Amazon) oder sie ließ sich nicht abbilden. */
     | { status: 'failed'; code: string; message: string }
-    /** Nicht gesendet bzw. von Amazon gedrosselt: unverändert, später erneut senden. */
+    /**
+     * Nicht gesendet bzw. von Amazon gedrosselt: später erneut senden. (Randfall: Lief ein erster Versuch in einen
+     * Timeout und der Wiederholversuch in die Drosselung, kann ein Update oder Archivieren schon gewirkt haben; ein
+     * erneutes Senden setzt denselben Zielwert.)
+     */
     | { status: 'unsent' }
     /** Ausgang unklar (5xx, Netzwerkfehler, unlesbare Antwort): kann angewendet sein, vor erneutem Senden prüfen. */
     | { status: 'unknown'; message: string }
@@ -123,8 +128,28 @@ export interface ApplyChangesInput {
 export interface ApplyChangesResult {
   /** Je Änderung ein Ergebnis, in der Reihenfolge der Eingabe. */
   results: AmazonAdsWriteResult[];
-  /** Amazon drosselt: frühestens nach dieser Zeit weitersenden (`null`: keine Angabe bzw. nicht gedrosselt). */
+  /** Amazon hat gedrosselt: Änderungen mit `unsent` später erneut senden. */
+  throttled: boolean;
+  /** Bei Drosselung: frühestens nach dieser Zeit weitersenden, falls Amazon sie nennt. */
   retryAfterMs: number | null;
+}
+
+/**
+ * Der Lauf wurde abgebrochen, weil Profil oder Connection keinen Zugriff haben (401, 403, abgelehnter oder nicht
+ * erneuerbarer Token) oder ein unerwarteter Fehler auftrat. `results` nennt, was bis dahin feststeht (schon
+ * angewendete Änderungen!), der Rest ist `unsent`; `cause` ist der ursprüngliche Fehler.
+ */
+export class AmazonAdsWriteAbortedError extends AmazonAdsError {
+  constructor(
+    operation: string,
+    public readonly results: AmazonAdsWriteResult[],
+    cause: unknown,
+  ) {
+    super(`${operation}: Übermittlung abgebrochen, Teilergebnisse liegen vor.`, operation, {
+      cause,
+    });
+    this.name = 'AmazonAdsWriteAbortedError';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +163,8 @@ interface Endpoint {
   contentType: string;
   /** Schlüssel der ID im Erfolgs-Eintrag der Antwort. */
   idKey: string;
+  /** Schlüssel des Ergebnisses in der Antwort (`campaigns`, `keywords` …). */
+  responseKey: string;
   /** 5xx und Netzwerkfehler wiederholen (nur, wenn eine Wiederholung nichts doppelt anlegt). */
   idempotent: boolean;
   body: (items: unknown[]) => unknown;
@@ -156,6 +183,7 @@ const UPDATE_ENDPOINTS: Record<AmazonAdsUpdateOperation['entity'], Endpoint> = {
     contentType: vnd('Campaign'),
     idKey: 'campaignId',
     idempotent: true,
+    responseKey: 'campaigns',
     body: list('campaigns'),
   },
   adGroup: {
@@ -165,6 +193,7 @@ const UPDATE_ENDPOINTS: Record<AmazonAdsUpdateOperation['entity'], Endpoint> = {
     contentType: vnd('AdGroup'),
     idKey: 'adGroupId',
     idempotent: true,
+    responseKey: 'adGroups',
     body: list('adGroups'),
   },
   keyword: {
@@ -174,6 +203,7 @@ const UPDATE_ENDPOINTS: Record<AmazonAdsUpdateOperation['entity'], Endpoint> = {
     contentType: vnd('Keyword'),
     idKey: 'keywordId',
     idempotent: true,
+    responseKey: 'keywords',
     body: list('keywords'),
   },
   target: {
@@ -183,6 +213,7 @@ const UPDATE_ENDPOINTS: Record<AmazonAdsUpdateOperation['entity'], Endpoint> = {
     contentType: vnd('TargetingClause'),
     idKey: 'targetId',
     idempotent: true,
+    responseKey: 'targetingClauses',
     body: list('targetingClauses'),
   },
   productAd: {
@@ -192,17 +223,25 @@ const UPDATE_ENDPOINTS: Record<AmazonAdsUpdateOperation['entity'], Endpoint> = {
     contentType: vnd('ProductAd'),
     idKey: 'adId',
     idempotent: true,
+    responseKey: 'productAds',
     body: list('productAds'),
   },
 };
 
-const archive = (path: string, entity: string, idKey: string, filterKey: string): Endpoint => ({
+const archive = (
+  path: string,
+  entity: string,
+  idKey: string,
+  filterKey: string,
+  responseKey: string = path,
+): Endpoint => ({
   operation: `sp.${path}.archive`,
   method: 'POST',
   path: `/sp/${path}/delete`,
   contentType: vnd(entity),
   idKey,
   idempotent: true,
+  responseKey,
   body: filter(filterKey),
 });
 
@@ -210,7 +249,7 @@ const ARCHIVE_ENDPOINTS: Record<AmazonAdsArchiveEntity, Endpoint> = {
   campaign: archive('campaigns', 'Campaign', 'campaignId', 'campaignIdFilter'),
   adGroup: archive('adGroups', 'AdGroup', 'adGroupId', 'adGroupIdFilter'),
   keyword: archive('keywords', 'Keyword', 'keywordId', 'keywordIdFilter'),
-  target: archive('targets', 'TargetingClause', 'targetId', 'targetIdFilter'),
+  target: archive('targets', 'TargetingClause', 'targetId', 'targetIdFilter', 'targetingClauses'),
   productAd: archive('productAds', 'ProductAd', 'adId', 'adIdFilter'),
   negativeKeyword: archive(
     'negativeKeywords',
@@ -229,12 +268,14 @@ const ARCHIVE_ENDPOINTS: Record<AmazonAdsArchiveEntity, Endpoint> = {
     'NegativeTargetingClause',
     'targetId',
     'negativeTargetIdFilter',
+    'negativeTargetingClauses',
   ),
   campaignNegativeTarget: archive(
     'campaignNegativeTargets',
     'CampaignNegativeTargetingClause',
     'campaignNegativeTargetingClauseId',
     'campaignNegativeTargetIdFilter',
+    'campaignNegativeTargetingClauses',
   ),
 };
 
@@ -248,6 +289,7 @@ const create = (path: string, entity: string, idKey: string, listKey: string): E
   contentType: vnd(entity),
   idKey,
   idempotent: false,
+  responseKey: listKey,
   body: list(listKey),
 });
 
@@ -298,7 +340,7 @@ const STRATEGIES: Record<AmazonAdsBiddingStrategy, string> = {
 /** Eintrag im Body des Endpunkts, oder `null`, wenn die Änderung nichts ändert. */
 function updateItem(op: AmazonAdsUpdateOperation): Record<string, unknown> | null {
   const endpoint = UPDATE_ENDPOINTS[op.entity];
-  const item: Record<string, unknown> = { [endpoint.idKey]: op.amazonId };
+  const item: Record<string, unknown> = { [endpoint.idKey]: requireId(op.amazonId) };
   if (op.state !== undefined) item.state = op.state;
   if (op.entity === 'campaign') {
     if (op.dailyBudget !== undefined) {
@@ -323,15 +365,21 @@ function updateItem(op: AmazonAdsUpdateOperation): Record<string, unknown> | nul
 }
 
 function wholeNumber(value: string): string {
-  if (!/^\d+$/.test(value))
+  if (!/^\d+$/.test(value) || !isPlainDecimal(value)) {
     throw new TypeError('Prozentsatz einer Platzierung ist keine ganze Zahl.');
+  }
+  return value;
+}
+
+function requireId(value: string): string {
+  if (!/^\d+$/.test(value)) throw new TypeError('Amazon-ID besteht nicht nur aus Ziffern.');
   return value;
 }
 
 function createTarget(op: AmazonAdsCreateNegativeOperation): { endpoint: Endpoint; item: unknown } {
   const parent = {
-    campaignId: op.amazonCampaignId,
-    ...(op.amazonAdGroupId !== null && { adGroupId: op.amazonAdGroupId }),
+    campaignId: requireId(op.amazonCampaignId),
+    ...(op.amazonAdGroupId !== null && { adGroupId: requireId(op.amazonAdGroupId) }),
   };
   const onCampaign = op.amazonAdGroupId === null;
   if (op.negative.type === 'keyword') {
@@ -375,27 +423,42 @@ const mutationResultSchema = z.object({
     .transform((value) => value ?? []),
 });
 
-/** Genau ein Schlüssel je Antwort (`campaigns`, `keywords` …); gelesen wird der erste. */
-const mutationResponseSchema = z.record(z.string(), mutationResultSchema);
+/** Gelesen wird nur der Schlüssel des Endpunkts (`responseKey`); weitere Felder der Antwort stören nicht. */
+const mutationResponseSchema = z.record(z.string(), z.unknown());
 
 const MAX_MESSAGE_LENGTH = 300;
+const ERROR_CODE = /^[A-Za-z0-9_]{1,64}$/;
 
-/** Text von Amazon für die Anzeige: Leerraum zusammengefasst, gekürzt. */
+/** Text von Amazon für die Anzeige: ohne Steuerzeichen und Tokens, Leerraum zusammengefasst, gekürzt. */
 function cleanMessage(text: string): string {
-  const clean = text.replace(/\s+/gu, ' ').trim();
-  return clean.length > MAX_MESSAGE_LENGTH ? `${clean.slice(0, MAX_MESSAGE_LENGTH - 1)}…` : clean;
+  return sanitize(text.replace(/\s+/gu, ' ').trim(), MAX_MESSAGE_LENGTH - 1);
 }
 
-function failureOf(errors: z.output<typeof mutationErrorSchema>[] | null | undefined) {
+type ItemOutcome = AmazonAdsWriteResult extends infer R
+  ? R extends { ref: string }
+    ? Omit<R, 'ref'>
+    : never
+  : never;
+
+/** Ergebnis eines Fehler-Eintrags der 207-Antwort. */
+function failureOf(errors: z.output<typeof mutationErrorSchema>[] | null | undefined): ItemOutcome {
   const first = errors?.[0];
   const errorType = first?.errorType ?? null;
   const detail = errorType ? first?.errorValue?.[errorType] : undefined;
   const fields =
     typeof detail === 'object' && detail !== null ? (detail as Record<string, unknown>) : {};
-  const reason = typeof fields.reason === 'string' && fields.reason !== '' ? fields.reason : null;
   const message = typeof fields.message === 'string' ? cleanMessage(fields.message) : '';
+  // Kein Urteil über die Änderung: Amazon hat sie gedrosselt bzw. ist selbst gescheitert.
+  if (errorType === 'throttledError') return { status: 'unsent' };
+  if (errorType === 'internalServerError') {
+    return { status: 'unknown', message: message || 'Interner Fehler bei Amazon.' };
+  }
+  const code = [fields.reason, errorType].find(
+    (value): value is string => typeof value === 'string' && ERROR_CODE.test(value),
+  );
   return {
-    code: reason ?? errorType ?? 'UNKNOWN',
+    status: 'failed',
+    code: code ?? 'UNKNOWN',
     message: message || 'Amazon hat die Änderung ohne Begründung abgelehnt.',
   };
 }
@@ -410,9 +473,11 @@ interface Pending {
   ref: string;
   /** Eintrag im Body bzw. ID im Filter. */
   item: unknown;
-  /** ID, falls die Antwort keine nennt (Updates, Archivieren). */
+  /** ID der geänderten Entity (Updates, Archivieren); `null` bei Anlagen. */
   amazonId: string | null;
 }
+
+const OPERATION = 'sp.applyChanges';
 
 export async function applyChanges(
   deps: AdsEndpointDeps,
@@ -424,86 +489,112 @@ export async function applyChanges(
     ref: op.ref,
     status: 'unsent',
   }));
+  const fail = (position: number, code: string, message: string) => {
+    results[position] = { ref: input.operations[position]!.ref, status: 'failed', code, message };
+  };
   if (input.adProduct !== 'SPONSORED_PRODUCTS') {
-    return {
-      results: input.operations.map((op) => ({
-        ref: op.ref,
-        status: 'failed',
-        code: 'AD_PRODUCT_NOT_SUPPORTED',
-        message: 'Änderungen über die API gibt es bisher nur für Sponsored Products.',
-      })),
-      retryAfterMs: null,
-    };
+    input.operations.forEach((_, position) =>
+      fail(
+        position,
+        'AD_PRODUCT_NOT_SUPPORTED',
+        'Änderungen über die API gibt es bisher nur für Sponsored Products.',
+      ),
+    );
+    return { results, throttled: false, retryAfterMs: null };
   }
 
   const byEndpoint = new Map<Endpoint, Pending[]>();
+  /** Je Endpunkt jede Entity nur einmal: Die Antwort wird über den Index zugeordnet. */
+  const seen = new Set<string>();
   const add = (endpoint: Endpoint, pending: Pending) => {
+    if (pending.amazonId !== null) {
+      const key = `${endpoint.path}:${pending.amazonId}`;
+      if (seen.has(key)) {
+        fail(
+          pending.position,
+          'DUPLICATE_OPERATION',
+          'Dieselbe Entity steht in diesem Aufruf schon einmal; Felder einer Entity gehören in eine Änderung.',
+        );
+        return;
+      }
+      seen.add(key);
+    }
     const group = byEndpoint.get(endpoint) ?? [];
     group.push(pending);
     byEndpoint.set(endpoint, group);
   };
   input.operations.forEach((op, position) => {
-    if (op.type === 'update') {
-      const item = updateItem(op);
-      if (item === null) {
-        results[position] = {
-          ref: op.ref,
-          status: 'failed',
-          code: 'NOTHING_TO_CHANGE',
-          message: 'Die Änderung nennt kein Feld.',
-        };
-        return;
+    try {
+      if (op.type === 'update') {
+        const item = updateItem(op);
+        if (item === null) {
+          fail(position, 'NOTHING_TO_CHANGE', 'Die Änderung nennt kein Feld.');
+          return;
+        }
+        add(UPDATE_ENDPOINTS[op.entity], { position, ref: op.ref, item, amazonId: op.amazonId });
+      } else if (op.type === 'archive') {
+        const amazonId = requireId(op.amazonId);
+        add(ARCHIVE_ENDPOINTS[op.entity], { position, ref: op.ref, item: amazonId, amazonId });
+      } else {
+        const { endpoint, item } = createTarget(op);
+        add(endpoint, { position, ref: op.ref, item, amazonId: null });
       }
-      add(UPDATE_ENDPOINTS[op.entity], { position, ref: op.ref, item, amazonId: op.amazonId });
-    } else if (op.type === 'archive') {
-      add(ARCHIVE_ENDPOINTS[op.entity], {
+    } catch (error) {
+      // Ein ungültiger Wert betrifft nur diese Änderung (`jsonDecimal` und `requireId` werfen `TypeError`).
+      if (!(error instanceof TypeError) && !(error instanceof SyntaxError)) throw error;
+      fail(
         position,
-        ref: op.ref,
-        item: op.amazonId,
-        amazonId: op.amazonId,
-      });
-    } else {
-      const { endpoint, item } = createTarget(op);
-      add(endpoint, { position, ref: op.ref, item, amazonId: null });
+        'INVALID_VALUE',
+        'Die Änderung enthält einen ungültigen Wert oder eine ungültige ID.',
+      );
     }
   });
 
+  let throttled = false;
   let retryAfterMs: number | null = null;
   sending: for (const endpoint of ENDPOINT_ORDER) {
     const group = byEndpoint.get(endpoint);
     if (!group) continue;
     for (let start = 0; start < group.length; start += MAX_WRITE_BATCH_SIZE) {
       const batch = group.slice(start, start + MAX_WRITE_BATCH_SIZE);
-      const outcome = await sendBatch(
-        deps,
-        connection,
-        input.amazonProfileId,
-        endpoint,
-        batch,
-        options,
-      );
+      let outcome: BatchOutcome;
+      try {
+        outcome = await sendBatch(
+          deps,
+          connection,
+          input.amazonProfileId,
+          endpoint,
+          batch,
+          options,
+        );
+      } catch (error) {
+        // Was schon feststeht, darf nicht verloren gehen: Der Aufrufer hält es fest und behandelt dann die Ursache.
+        throw new AmazonAdsWriteAbortedError(OPERATION, results, error);
+      }
       if (outcome.type === 'throttled') {
         // Alles Weitere bleibt `unsent`: Der Aufrufer sendet es nach der Wartezeit erneut.
+        throttled = true;
         retryAfterMs = outcome.retryAfterMs;
         break sending;
       }
+      const done = outcome.results;
       batch.forEach((pending, index) => {
-        results[pending.position] = { ref: pending.ref, ...outcome.results[index]! };
+        const result = done[index]!;
+        if (result.status === 'unsent') throttled = true;
+        results[pending.position] = { ref: pending.ref, ...result };
       });
     }
   }
-  return { results, retryAfterMs };
+  return { results, throttled, retryAfterMs };
 }
-
-type ItemOutcome = AmazonAdsWriteResult extends infer R
-  ? R extends { ref: string }
-    ? Omit<R, 'ref'>
-    : never
-  : never;
 
 type BatchOutcome =
   { type: 'throttled'; retryAfterMs: number | null } | { type: 'done'; results: ItemOutcome[] };
 
+/**
+ * Sendet ein Stück an einen Endpunkt. Wirft, wenn der Lauf nicht weitergehen kann: kein Zugriff (401, 403), Fehler
+ * beim Holen des Access-Tokens (dann wurde nichts gesendet) oder Unerwartetes.
+ */
 async function sendBatch(
   deps: AdsEndpointDeps,
   connection: ConnectionRef,
@@ -530,10 +621,10 @@ async function sendBatch(
       ...(options.meter && { meter: options.meter }),
     });
   } catch (error) {
-    if (error instanceof AmazonAdsReauthRequiredError) throw error;
+    // Fehler anderer Aufrufe (Token holen bei LWA) sagen nichts über dieses Stück: Es wurde nicht gesendet.
+    if (!(error instanceof AmazonAdsError) || error.operation !== endpoint.operation) throw error;
     if (error instanceof AmazonAdsHttpError) {
       if (error.status === 429) return { type: 'throttled', retryAfterMs: error.retryAfterMs };
-      // Kein Zugriff auf Profil oder Connection: kein Ergebnis je Änderung, der Aufrufer bricht ab.
       if (error.status === 401 || error.status === 403) throw error;
       if (error.status >= 500) {
         return all({
@@ -543,7 +634,8 @@ async function sendBatch(
       }
       return all({
         status: 'failed',
-        code: error.code ?? `HTTP_${error.status}`,
+        code:
+          error.code !== null && ERROR_CODE.test(error.code) ? error.code : `HTTP_${error.status}`,
         message: error.details
           ? cleanMessage(error.details)
           : `Amazon hat den Aufruf abgelehnt (${error.status}).`,
@@ -561,23 +653,46 @@ async function sendBatch(
     throw error;
   }
 
-  const result = Object.values(response)[0];
+  const parsed = mutationResultSchema.safeParse(response[endpoint.responseKey]);
+  if (!parsed.success) {
+    return all({ status: 'unknown', message: 'Die Antwort von Amazon war nicht lesbar.' });
+  }
   const outcomes: ItemOutcome[] = batch.map(() => ({
     status: 'unknown',
     message: 'Amazon hat für diese Änderung kein Ergebnis genannt.',
   }));
-  for (const success of result?.success ?? []) {
+  /** Wie oft die Antwort einen Index nennt: mehr als einmal ist widersprüchlich. */
+  const mentions = new Map<number, number>();
+  const mention = (index: number) => mentions.set(index, (mentions.get(index) ?? 0) + 1);
+  for (const success of parsed.data.success) {
     const pending = batch[success.index];
     if (!pending) continue;
+    mention(success.index);
     const id = amazonIdSchema.safeParse(success[endpoint.idKey]);
+    if (pending.amazonId !== null && id.success && id.data !== pending.amazonId) {
+      outcomes[success.index] = {
+        status: 'unknown',
+        message: 'Amazon hat für diese Änderung eine andere ID genannt.',
+      };
+      continue;
+    }
     outcomes[success.index] = {
       status: 'applied',
       amazonId: id.success ? id.data : pending.amazonId,
     };
   }
-  for (const failure of result?.error ?? []) {
+  for (const failure of parsed.data.error) {
     if (!batch[failure.index]) continue;
-    outcomes[failure.index] = { status: 'failed', ...failureOf(failure.errors) };
+    mention(failure.index);
+    outcomes[failure.index] = failureOf(failure.errors);
+  }
+  for (const [index, count] of mentions) {
+    if (count > 1) {
+      outcomes[index] = {
+        status: 'unknown',
+        message: 'Amazon hat für diese Änderung widersprüchliche Ergebnisse genannt.',
+      };
+    }
   }
   return { type: 'done', results: outcomes };
 }

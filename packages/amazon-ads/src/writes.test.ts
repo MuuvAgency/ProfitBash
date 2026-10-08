@@ -5,7 +5,11 @@ import type { RefreshTokenStore } from './access-token';
 import { createAmazonAdsClient } from './client';
 import { AmazonAdsHttpError } from './errors';
 import { createRequestMeter } from './http';
-import { MAX_WRITE_BATCH_SIZE, type AmazonAdsWriteOperation } from './writes';
+import {
+  AmazonAdsWriteAbortedError,
+  MAX_WRITE_BATCH_SIZE,
+  type AmazonAdsWriteOperation,
+} from './writes';
 
 /** Schreib-Client für Sponsored Products (3.2a): Abbildung auf SP v3, Ergebnis je Änderung, Teilfehler, Rate-Limits. */
 
@@ -128,6 +132,7 @@ describe('applyChanges: Feldänderungen', () => {
     ]);
     expect(outcome).toEqual({
       results: [{ ref: 'c1', status: 'applied', amazonId: '9007199254740993123' }],
+      throttled: false,
       retryAfterMs: null,
     });
   });
@@ -138,7 +143,7 @@ describe('applyChanges: Feldänderungen', () => {
       'put',
       '/sp/campaigns',
       () =>
-        `{"campaigns":{"success":[{"index":0,"campaignId":"C1"},{"index":1,"campaignId":"C2"}]}}`,
+        `{"campaigns":{"success":[{"index":0,"campaignId":"1001"},{"index":1,"campaignId":"1002"}]}}`,
     );
 
     await apply(client, [
@@ -146,7 +151,7 @@ describe('applyChanges: Feldänderungen', () => {
         ref: 'a',
         type: 'update',
         entity: 'campaign',
-        amazonId: 'C1',
+        amazonId: '1001',
         dailyBudget: '35.50',
         bidding: {
           strategy: 'SALES_DOWN_ONLY',
@@ -160,7 +165,7 @@ describe('applyChanges: Feldänderungen', () => {
         ref: 'b',
         type: 'update',
         entity: 'campaign',
-        amazonId: 'C2',
+        amazonId: '1002',
         state: 'ENABLED',
         bidding: { strategy: 'NONE', placements: [] },
       },
@@ -169,10 +174,10 @@ describe('applyChanges: Feldänderungen', () => {
     expect(seen[0]!.contentType).toBe('application/vnd.spCampaign.v3+json');
     expect(seen[0]!.body).toBe(
       '{"campaigns":[' +
-        '{"campaignId":"C1","budget":{"budgetType":"DAILY","budget":35.50},' +
+        '{"campaignId":"1001","budget":{"budgetType":"DAILY","budget":35.50},' +
         '"dynamicBidding":{"strategy":"LEGACY_FOR_SALES","placementBidding":[' +
         '{"placement":"PLACEMENT_TOP","percentage":120},{"placement":"SITE_AMAZON_BUSINESS","percentage":0}]}},' +
-        '{"campaignId":"C2","state":"ENABLED","dynamicBidding":{"strategy":"MANUAL","placementBidding":[]}}' +
+        '{"campaignId":"1002","state":"ENABLED","dynamicBidding":{"strategy":"MANUAL","placementBidding":[]}}' +
         ']}',
     );
   });
@@ -182,7 +187,7 @@ describe('applyChanges: Feldänderungen', () => {
     const seen = capture(
       'put',
       '/sp/campaigns',
-      () => `{"campaigns":{"success":[{"index":0,"campaignId":"C1"}]}}`,
+      () => `{"campaigns":{"success":[{"index":0,"campaignId":"1001"}]}}`,
     );
 
     await apply(client, [
@@ -190,7 +195,7 @@ describe('applyChanges: Feldänderungen', () => {
         ref: 'a',
         type: 'update',
         entity: 'campaign',
-        amazonId: 'C1',
+        amazonId: '1001',
         bidding: { strategy: 'SALES_UP_AND_DOWN', placements: [] },
       },
     ]);
@@ -203,36 +208,36 @@ describe('applyChanges: Feldänderungen', () => {
     const adGroups = capture(
       'put',
       '/sp/adGroups',
-      () => `{"adGroups":{"success":[{"index":0,"adGroupId":"AG1"}]}}`,
+      () => `{"adGroups":{"success":[{"index":0,"adGroupId":"1101"}]}}`,
     );
     const targets = capture(
       'put',
       '/sp/targets',
-      () => `{"targetingClauses":{"success":[{"index":0,"targetId":"T1"}]}}`,
+      () => `{"targetingClauses":{"success":[{"index":0,"targetId":"3001"}]}}`,
     );
     const ads = capture(
       'put',
       '/sp/productAds',
-      () => `{"productAds":{"success":[{"index":0,"adId":"AD1"}]}}`,
+      () => `{"productAds":{"success":[{"index":0,"adId":"4001"}]}}`,
     );
 
     const outcome = await apply(client, [
-      { ref: 'g', type: 'update', entity: 'adGroup', amazonId: 'AG1', defaultBid: '0.45' },
-      { ref: 't', type: 'update', entity: 'target', amazonId: 'T1', bid: '1' },
-      { ref: 'p', type: 'update', entity: 'productAd', amazonId: 'AD1', state: 'PAUSED' },
+      { ref: 'g', type: 'update', entity: 'adGroup', amazonId: '1101', defaultBid: '0.45' },
+      { ref: 't', type: 'update', entity: 'target', amazonId: '3001', bid: '1' },
+      { ref: 'p', type: 'update', entity: 'productAd', amazonId: '4001', state: 'PAUSED' },
     ]);
 
     expect(adGroups[0]).toMatchObject({
       contentType: 'application/vnd.spAdGroup.v3+json',
-      body: '{"adGroups":[{"adGroupId":"AG1","defaultBid":0.45}]}',
+      body: '{"adGroups":[{"adGroupId":"1101","defaultBid":0.45}]}',
     });
     expect(targets[0]).toMatchObject({
       contentType: 'application/vnd.spTargetingClause.v3+json',
-      body: '{"targetingClauses":[{"targetId":"T1","bid":1}]}',
+      body: '{"targetingClauses":[{"targetId":"3001","bid":1}]}',
     });
     expect(ads[0]).toMatchObject({
       contentType: 'application/vnd.spProductAd.v3+json',
-      body: '{"productAds":[{"adId":"AD1","state":"PAUSED"}]}',
+      body: '{"productAds":[{"adId":"4001","state":"PAUSED"}]}',
     });
     expect(outcome.results.map((r) => [r.ref, r.status])).toEqual([
       ['g', 'applied'],
@@ -246,18 +251,19 @@ describe('applyChanges: Feldänderungen', () => {
     capture(
       'put',
       '/sp/keywords',
-      () => `{"keywords":{"success":[{"index":0,"keywordId":"K1"},{"index":1,"keywordId":"K2"}]}}`,
+      () =>
+        `{"keywords":{"success":[{"index":0,"keywordId":"2001"},{"index":1,"keywordId":"2002"}]}}`,
     );
     capture(
       'put',
       '/sp/adGroups',
-      () => `{"adGroups":{"success":[{"index":0,"adGroupId":"AG1"}]}}`,
+      () => `{"adGroups":{"success":[{"index":0,"adGroupId":"1101"}]}}`,
     );
 
     const outcome = await apply(client, [
-      { ref: '1', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
-      { ref: '2', type: 'update', entity: 'adGroup', amazonId: 'AG1', state: 'PAUSED' },
-      { ref: '3', type: 'update', entity: 'keyword', amazonId: 'K2', bid: '0.6' },
+      { ref: '1', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: '2', type: 'update', entity: 'adGroup', amazonId: '1101', state: 'PAUSED' },
+      { ref: '3', type: 'update', entity: 'keyword', amazonId: '2002', bid: '0.6' },
     ]);
 
     expect(outcome.results.map((r) => r.ref)).toEqual(['1', '2', '3']);
@@ -266,11 +272,8 @@ describe('applyChanges: Feldänderungen', () => {
   it('teilt mehr als 1000 Änderungen eines Endpunkts auf mehrere Anfragen auf', async () => {
     const client = setup();
     const seen = capture('put', '/sp/keywords', (body) => {
-      const count = (JSON.parse(body) as { keywords: unknown[] }).keywords.length;
-      const success = Array.from({ length: count }, (_, index) => ({
-        index,
-        keywordId: `K${index}`,
-      }));
+      const { keywords } = JSON.parse(body) as { keywords: { keywordId: string }[] };
+      const success = keywords.map(({ keywordId }, index) => ({ index, keywordId }));
       return JSON.stringify({ keywords: { success } });
     });
     const operations = Array.from(
@@ -279,7 +282,7 @@ describe('applyChanges: Feldänderungen', () => {
         ref: `r${i}`,
         type: 'update',
         entity: 'keyword',
-        amazonId: `K${i}`,
+        amazonId: String(10_000 + i),
         bid: '0.5',
       }),
     );
@@ -297,7 +300,7 @@ describe('applyChanges: Feldänderungen', () => {
     const client = setup();
 
     const outcome = await apply(client, [
-      { ref: 'x', type: 'update', entity: 'keyword', amazonId: 'K1' },
+      { ref: 'x', type: 'update', entity: 'keyword', amazonId: '2001' },
     ]);
 
     expect(outcome.results).toEqual([
@@ -313,27 +316,27 @@ describe('applyChanges: Teilfehler', () => {
       'put',
       '/sp/keywords',
       () => `{"keywords":{
-        "success":[{"index":2,"keywordId":"K3"},{"index":0,"keywordId":"K1"}],
+        "success":[{"index":2,"keywordId":"2003"},{"index":0,"keywordId":"2001"}],
         "error":[{"index":1,"errors":[{"errorType":"biddingError","errorValue":{"biddingError":{
           "reason":"BID_OUT_OF_MARKET_PLACE_RANGE","marketplace":"DE","lowerLimit":"0.02","upperLimit":"1000",
           "cause":{"location":"$.keywords[1].bid"},"message":"Bid  must be between\\n0.02 and 1000"}}}]}]}}`,
     );
 
     const outcome = await apply(client, [
-      { ref: 'a', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
-      { ref: 'b', type: 'update', entity: 'keyword', amazonId: 'K2', bid: '5000' },
-      { ref: 'c', type: 'update', entity: 'keyword', amazonId: 'K3', bid: '0.7' },
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'b', type: 'update', entity: 'keyword', amazonId: '2002', bid: '5000' },
+      { ref: 'c', type: 'update', entity: 'keyword', amazonId: '2003', bid: '0.7' },
     ]);
 
     expect(outcome.results).toEqual([
-      { ref: 'a', status: 'applied', amazonId: 'K1' },
+      { ref: 'a', status: 'applied', amazonId: '2001' },
       {
         ref: 'b',
         status: 'failed',
         code: 'BID_OUT_OF_MARKET_PLACE_RANGE',
         message: 'Bid must be between 0.02 and 1000',
       },
-      { ref: 'c', status: 'applied', amazonId: 'K3' },
+      { ref: 'c', status: 'applied', amazonId: '2003' },
     ]);
     expect(outcome.retryAfterMs).toBeNull();
   });
@@ -348,7 +351,7 @@ describe('applyChanges: Teilfehler', () => {
     );
 
     const outcome = await apply(client, [
-      { ref: 'a', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
     ]);
 
     const [result] = outcome.results;
@@ -358,11 +361,15 @@ describe('applyChanges: Teilfehler', () => {
 
   it('meldet `unknown`, wenn die Antwort eine Änderung weder als Erfolg noch als Fehler nennt', async () => {
     const client = setup();
-    capture('put', '/sp/keywords', () => `{"keywords":{"success":[{"index":0,"keywordId":"K1"}]}}`);
+    capture(
+      'put',
+      '/sp/keywords',
+      () => `{"keywords":{"success":[{"index":0,"keywordId":"2001"}]}}`,
+    );
 
     const outcome = await apply(client, [
-      { ref: 'a', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
-      { ref: 'b', type: 'update', entity: 'keyword', amazonId: 'K2', bid: '0.6' },
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'b', type: 'update', entity: 'keyword', amazonId: '2002', bid: '0.6' },
     ]);
 
     expect(outcome.results[1]).toEqual({
@@ -383,12 +390,12 @@ describe('applyChanges: Teilfehler', () => {
     capture(
       'put',
       '/sp/adGroups',
-      () => `{"adGroups":{"success":[{"index":0,"adGroupId":"AG1"}]}}`,
+      () => `{"adGroups":{"success":[{"index":0,"adGroupId":"1101"}]}}`,
     );
 
     const outcome = await apply(client, [
-      { ref: 'k', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
-      { ref: 'g', type: 'update', entity: 'adGroup', amazonId: 'AG1', state: 'PAUSED' },
+      { ref: 'k', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'g', type: 'update', entity: 'adGroup', amazonId: '1101', state: 'PAUSED' },
     ]);
 
     expect(outcome.results).toEqual([
@@ -398,7 +405,7 @@ describe('applyChanges: Teilfehler', () => {
         code: 'INVALID_ARGUMENT',
         message: expect.stringContaining('malformed'),
       },
-      { ref: 'g', status: 'applied', amazonId: 'AG1' },
+      { ref: 'g', status: 'applied', amazonId: '1101' },
     ]);
   });
 });
@@ -410,54 +417,72 @@ describe('applyChanges: Archivieren und Negatives', () => {
       'post',
       '/sp/keywords/delete',
       () =>
-        `{"keywords":{"success":[{"index":0,"keywordId":"K1"}],"error":[{"index":1,"errors":[{"errorType":"entityNotFoundError","errorValue":{"entityNotFoundError":{"reason":"ENTITY_NOT_FOUND","entityId":"K2","entityType":"KEYWORD","message":"Keyword not found"}}}]}]}}`,
+        `{"keywords":{"success":[{"index":0,"keywordId":"2001"}],"error":[{"index":1,"errors":[{"errorType":"entityNotFoundError","errorValue":{"entityNotFoundError":{"reason":"ENTITY_NOT_FOUND","entityId":"2002","entityType":"KEYWORD","message":"Keyword not found"}}}]}]}}`,
     );
     const negatives = capture(
       'post',
       '/sp/campaignNegativeKeywords/delete',
       () =>
-        `{"campaignNegativeKeywords":{"success":[{"index":0,"campaignNegativeKeywordId":"N1"}]}}`,
+        `{"campaignNegativeKeywords":{"success":[{"index":0,"campaignNegativeKeywordId":"5001"}]}}`,
     );
 
     const outcome = await apply(client, [
-      { ref: 'a', type: 'archive', entity: 'keyword', amazonId: 'K1' },
-      { ref: 'b', type: 'archive', entity: 'keyword', amazonId: 'K2' },
-      { ref: 'c', type: 'archive', entity: 'campaignNegativeKeyword', amazonId: 'N1' },
+      { ref: 'a', type: 'archive', entity: 'keyword', amazonId: '2001' },
+      { ref: 'b', type: 'archive', entity: 'keyword', amazonId: '2002' },
+      { ref: 'c', type: 'archive', entity: 'campaignNegativeKeyword', amazonId: '5001' },
     ]);
 
     expect(keywords[0]).toMatchObject({
       method: 'POST',
       contentType: 'application/vnd.spKeyword.v3+json',
-      body: '{"keywordIdFilter":{"include":["K1","K2"]}}',
+      body: '{"keywordIdFilter":{"include":["2001","2002"]}}',
     });
-    expect(negatives[0]!.body).toBe('{"campaignNegativeKeywordIdFilter":{"include":["N1"]}}');
+    expect(negatives[0]!.body).toBe('{"campaignNegativeKeywordIdFilter":{"include":["5001"]}}');
     expect(outcome.results).toEqual([
-      { ref: 'a', status: 'applied', amazonId: 'K1' },
+      { ref: 'a', status: 'applied', amazonId: '2001' },
       { ref: 'b', status: 'failed', code: 'ENTITY_NOT_FOUND', message: 'Keyword not found' },
-      { ref: 'c', status: 'applied', amazonId: 'N1' },
+      { ref: 'c', status: 'applied', amazonId: '5001' },
     ]);
   });
 
   it.each([
-    ['campaign', '/sp/campaigns/delete', 'campaignIdFilter'],
-    ['adGroup', '/sp/adGroups/delete', 'adGroupIdFilter'],
-    ['target', '/sp/targets/delete', 'targetIdFilter'],
-    ['productAd', '/sp/productAds/delete', 'adIdFilter'],
-    ['negativeKeyword', '/sp/negativeKeywords/delete', 'negativeKeywordIdFilter'],
-    ['negativeTarget', '/sp/negativeTargets/delete', 'negativeTargetIdFilter'],
+    ['campaign', '/sp/campaigns/delete', 'campaignIdFilter', 'campaigns', 'campaignId'],
+    ['adGroup', '/sp/adGroups/delete', 'adGroupIdFilter', 'adGroups', 'adGroupId'],
+    ['target', '/sp/targets/delete', 'targetIdFilter', 'targetingClauses', 'targetId'],
+    ['productAd', '/sp/productAds/delete', 'adIdFilter', 'productAds', 'adId'],
+    [
+      'negativeKeyword',
+      '/sp/negativeKeywords/delete',
+      'negativeKeywordIdFilter',
+      'negativeKeywords',
+      'negativeKeywordId',
+    ],
+    [
+      'negativeTarget',
+      '/sp/negativeTargets/delete',
+      'negativeTargetIdFilter',
+      'negativeTargetingClauses',
+      'targetId',
+    ],
     [
       'campaignNegativeTarget',
       '/sp/campaignNegativeTargets/delete',
       'campaignNegativeTargetIdFilter',
+      'campaignNegativeTargetingClauses',
+      'campaignNegativeTargetingClauseId',
     ],
-  ] as const)('archiviert %s über %s', async (entity, path, filter) => {
+  ] as const)('archiviert %s über %s', async (entity, path, filter, listKey, idKey) => {
     const client = setup();
-    const seen = capture('post', path, () => `{"x":{"success":[{"index":0}]}}`);
+    const seen = capture(
+      'post',
+      path,
+      () => `{"${listKey}":{"success":[{"index":0,"${idKey}":6001}]},"requestId":"abc"}`,
+    );
 
-    const outcome = await apply(client, [{ ref: 'a', type: 'archive', entity, amazonId: 'ID1' }]);
+    const outcome = await apply(client, [{ ref: 'a', type: 'archive', entity, amazonId: '6001' }]);
 
-    expect(seen[0]!.body).toBe(`{"${filter}":{"include":["ID1"]}}`);
-    expect(outcome.results).toEqual([{ ref: 'a', status: 'applied', amazonId: 'ID1' }]);
+    expect(seen[0]!.body).toBe(`{"${filter}":{"include":["6001"]}}`);
+    expect(outcome.results).toEqual([{ ref: 'a', status: 'applied', amazonId: '6001' }]);
   });
 
   it('legt negative Keywords in Ad Group und Kampagne an und liefert die neue ID verlustfrei', async () => {
@@ -479,14 +504,14 @@ describe('applyChanges: Archivieren und Negatives', () => {
       {
         ref: 'a',
         type: 'createNegative',
-        amazonCampaignId: 'C1',
-        amazonAdGroupId: 'AG1',
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '1101',
         negative: { type: 'keyword', keywordText: 'gebraucht "lampe"', matchType: 'EXACT' },
       },
       {
         ref: 'b',
         type: 'createNegative',
-        amazonCampaignId: 'C1',
+        amazonCampaignId: '1001',
         amazonAdGroupId: null,
         negative: { type: 'keyword', keywordText: 'kinder', matchType: 'PHRASE' },
       },
@@ -495,13 +520,13 @@ describe('applyChanges: Archivieren und Negatives', () => {
     expect(adGroup[0]).toMatchObject({
       contentType: 'application/vnd.spNegativeKeyword.v3+json',
       body:
-        '{"negativeKeywords":[{"campaignId":"C1","adGroupId":"AG1","keywordText":"gebraucht \\"lampe\\"",' +
+        '{"negativeKeywords":[{"campaignId":"1001","adGroupId":"1101","keywordText":"gebraucht \\"lampe\\"",' +
         '"matchType":"NEGATIVE_EXACT","state":"ENABLED"}]}',
     });
     expect(campaign[0]).toMatchObject({
       contentType: 'application/vnd.spCampaignNegativeKeyword.v3+json',
       body:
-        '{"campaignNegativeKeywords":[{"campaignId":"C1","keywordText":"kinder",' +
+        '{"campaignNegativeKeywords":[{"campaignId":"1001","keywordText":"kinder",' +
         '"matchType":"NEGATIVE_PHRASE","state":"ENABLED"}]}',
     });
     expect(outcome.results).toEqual([
@@ -528,14 +553,14 @@ describe('applyChanges: Archivieren und Negatives', () => {
       {
         ref: 'a',
         type: 'createNegative',
-        amazonCampaignId: 'C1',
-        amazonAdGroupId: 'AG1',
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '1101',
         negative: { type: 'product', asin: 'B0FREMD001' },
       },
       {
         ref: 'b',
         type: 'createNegative',
-        amazonCampaignId: 'C1',
+        amazonCampaignId: '1001',
         amazonAdGroupId: null,
         negative: { type: 'product', asin: 'B0FREMD002' },
       },
@@ -544,13 +569,13 @@ describe('applyChanges: Archivieren und Negatives', () => {
     expect(adGroup[0]).toMatchObject({
       contentType: 'application/vnd.spNegativeTargetingClause.v3+json',
       body:
-        '{"negativeTargetingClauses":[{"campaignId":"C1","adGroupId":"AG1",' +
+        '{"negativeTargetingClauses":[{"campaignId":"1001","adGroupId":"1101",' +
         '"expression":[{"type":"ASIN_SAME_AS","value":"B0FREMD001"}],"state":"ENABLED"}]}',
     });
     expect(campaign[0]).toMatchObject({
       contentType: 'application/vnd.spCampaignNegativeTargetingClause.v3+json',
       body:
-        '{"campaignNegativeTargetingClauses":[{"campaignId":"C1",' +
+        '{"campaignNegativeTargetingClauses":[{"campaignId":"1001",' +
         '"expression":[{"type":"ASIN_SAME_AS","value":"B0FREMD002"}],"state":"ENABLED"}]}',
     });
     expect(outcome.results.map((r) => r.status === 'applied' && r.amazonId)).toEqual([
@@ -566,13 +591,13 @@ describe('applyChanges: Rate-Limits und Ausfälle', () => {
     const seen = capture('put', '/sp/keywords', (_body, call) =>
       call === 1
         ? HttpResponse.json({ code: 'THROTTLED', message: 'Too many requests' }, { status: 429 })
-        : `{"keywords":{"success":[{"index":0,"keywordId":"K1"}]}}`,
+        : `{"keywords":{"success":[{"index":0,"keywordId":"2001"}]}}`,
     );
     const meter = createRequestMeter();
 
     const outcome = await apply(
       client,
-      [{ ref: 'a', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' }],
+      [{ ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' }],
       SP,
       meter,
     );
@@ -587,7 +612,7 @@ describe('applyChanges: Rate-Limits und Ausfälle', () => {
     capture(
       'put',
       '/sp/campaigns',
-      () => `{"campaigns":{"success":[{"index":0,"campaignId":"C1"}]}}`,
+      () => `{"campaigns":{"success":[{"index":0,"campaignId":"1001"}]}}`,
     );
     const keywords = capture('put', '/sp/keywords', () =>
       HttpResponse.json(
@@ -601,20 +626,20 @@ describe('applyChanges: Rate-Limits und Ausfälle', () => {
       {
         ref: 'n',
         type: 'createNegative',
-        amazonCampaignId: 'C1',
-        amazonAdGroupId: 'AG1',
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '1101',
         negative: { type: 'keyword', keywordText: 'x', matchType: 'EXACT' },
       },
-      { ref: 'k', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
-      { ref: 'c', type: 'update', entity: 'campaign', amazonId: 'C1', state: 'PAUSED' },
+      { ref: 'k', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'c', type: 'update', entity: 'campaign', amazonId: '1001', state: 'PAUSED' },
     ]);
 
     expect(outcome.results).toEqual([
       { ref: 'n', status: 'unsent' },
       { ref: 'k', status: 'unsent' },
-      { ref: 'c', status: 'applied', amazonId: 'C1' },
+      { ref: 'c', status: 'applied', amazonId: '1001' },
     ]);
-    expect(outcome.retryAfterMs).toBe(120_000);
+    expect(outcome).toMatchObject({ throttled: true, retryAfterMs: 120_000 });
     expect(keywords.length).toBeGreaterThanOrEqual(1);
     expect(negatives).toHaveLength(0);
   });
@@ -624,11 +649,11 @@ describe('applyChanges: Rate-Limits und Ausfälle', () => {
     const seen = capture('put', '/sp/keywords', (_body, call) =>
       call === 1
         ? HttpResponse.json({ code: 'INTERNAL_ERROR', message: 'boom' }, { status: 500 })
-        : `{"keywords":{"success":[{"index":0,"keywordId":"K1"}]}}`,
+        : `{"keywords":{"success":[{"index":0,"keywordId":"2001"}]}}`,
     );
 
     const outcome = await apply(client, [
-      { ref: 'a', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
     ]);
 
     expect(seen).toHaveLength(2);
@@ -640,23 +665,27 @@ describe('applyChanges: Rate-Limits und Ausfälle', () => {
     const seen = capture('post', '/sp/negativeKeywords', () =>
       HttpResponse.json({ code: 'INTERNAL_ERROR', message: 'boom' }, { status: 500 }),
     );
-    capture('put', '/sp/keywords', () => `{"keywords":{"success":[{"index":0,"keywordId":"K1"}]}}`);
+    capture(
+      'put',
+      '/sp/keywords',
+      () => `{"keywords":{"success":[{"index":0,"keywordId":"2001"}]}}`,
+    );
 
     const outcome = await apply(client, [
       {
         ref: 'n',
         type: 'createNegative',
-        amazonCampaignId: 'C1',
-        amazonAdGroupId: 'AG1',
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '1101',
         negative: { type: 'keyword', keywordText: 'x', matchType: 'EXACT' },
       },
-      { ref: 'k', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
+      { ref: 'k', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
     ]);
 
     expect(seen).toHaveLength(1);
     expect(outcome.results).toEqual([
       { ref: 'n', status: 'unknown', message: expect.any(String) },
-      { ref: 'k', status: 'applied', amazonId: 'K1' },
+      { ref: 'k', status: 'applied', amazonId: '2001' },
     ]);
   });
 
@@ -665,21 +694,228 @@ describe('applyChanges: Rate-Limits und Ausfälle', () => {
     capture('put', '/sp/keywords', () => `{"keywords":"kaputt"}`);
 
     const outcome = await apply(client, [
-      { ref: 'a', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
     ]);
 
     expect(outcome.results[0]).toMatchObject({ ref: 'a', status: 'unknown' });
   });
 
-  it('reicht 403 als Fehler der Connection durch', async () => {
+  it('bricht bei 403 ab und nennt im Fehler, was schon angewendet ist', async () => {
     const client = setup();
+    capture(
+      'put',
+      '/sp/campaigns',
+      () => `{"campaigns":{"success":[{"index":0,"campaignId":1001}]}}`,
+    );
     capture('put', '/sp/keywords', () =>
       HttpResponse.json({ code: 'ACCESS_DENIED', message: 'no access' }, { status: 403 }),
     );
+    const negatives = capture('post', '/sp/negativeKeywords', () => `{}`);
 
-    await expect(
-      apply(client, [{ ref: 'a', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' }]),
-    ).rejects.toBeInstanceOf(AmazonAdsHttpError);
+    const error = await apply(client, [
+      { ref: 'k', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'c', type: 'update', entity: 'campaign', amazonId: '1001', state: 'PAUSED' },
+      {
+        ref: 'n',
+        type: 'createNegative',
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '1101',
+        negative: { type: 'keyword', keywordText: 'x', matchType: 'EXACT' },
+      },
+    ]).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AmazonAdsWriteAbortedError);
+    const aborted = error as AmazonAdsWriteAbortedError;
+    expect(aborted.cause).toBeInstanceOf(AmazonAdsHttpError);
+    expect(aborted.cause).toMatchObject({ status: 403 });
+    expect(aborted.results).toEqual([
+      { ref: 'k', status: 'unsent' },
+      { ref: 'c', status: 'applied', amazonId: '1001' },
+      { ref: 'n', status: 'unsent' },
+    ]);
+    expect(negatives).toHaveLength(0);
+  });
+
+  it('bricht ab, wenn schon das Access-Token nicht zu holen ist: nichts wurde gesendet', async () => {
+    const client = setup();
+    server.use(
+      http.post(TOKEN_URL, () => HttpResponse.json({ error: 'server_error' }, { status: 500 })),
+    );
+    const keywords = capture('put', '/sp/keywords', () => `{}`);
+
+    const error = await apply(client, [
+      { ref: 'k', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+    ]).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AmazonAdsWriteAbortedError);
+    expect((error as AmazonAdsWriteAbortedError).results).toEqual([{ ref: 'k', status: 'unsent' }]);
+    expect(keywords).toHaveLength(0);
+  });
+
+  it('meldet Updates nach anhaltenden 5xx als `unknown`', async () => {
+    const client = setup();
+    const seen = capture('put', '/sp/keywords', () =>
+      HttpResponse.json({ code: 'INTERNAL_ERROR', message: 'boom' }, { status: 503 }),
+    );
+
+    const outcome = await apply(client, [
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+    ]);
+
+    expect(seen).toHaveLength(3);
+    expect(outcome.results[0]).toMatchObject({ status: 'unknown' });
+  });
+
+  it('meldet eine Anlage nach einem Netzwerkfehler als `unknown`, ohne Wiederholung', async () => {
+    const client = setup();
+    const seen = capture('post', '/sp/negativeKeywords', () => HttpResponse.error());
+
+    const outcome = await apply(client, [
+      {
+        ref: 'n',
+        type: 'createNegative',
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '1101',
+        negative: { type: 'keyword', keywordText: 'x', matchType: 'EXACT' },
+      },
+    ]);
+
+    expect(seen).toHaveLength(1);
+    expect(outcome.results[0]).toMatchObject({ status: 'unknown' });
+  });
+});
+
+describe('applyChanges: Eingaben und widersprüchliche Antworten', () => {
+  it('meldet ungültige Werte und IDs je Änderung als `failed` und sendet die übrigen', async () => {
+    const client = setup();
+    const seen = capture(
+      'put',
+      '/sp/keywords',
+      () => `{"keywords":{"success":[{"index":0,"keywordId":2001}]}}`,
+    );
+
+    const outcome = await apply(client, [
+      { ref: 'exp', type: 'update', entity: 'keyword', amazonId: '2002', bid: '1e3' },
+      { ref: 'zero', type: 'update', entity: 'keyword', amazonId: '2003', bid: '007' },
+      { ref: 'id', type: 'update', entity: 'keyword', amazonId: 'K1', bid: '0.5' },
+      {
+        ref: 'pct',
+        type: 'update',
+        entity: 'campaign',
+        amazonId: '1001',
+        bidding: {
+          strategy: 'NONE',
+          placements: [{ placement: 'PLACEMENT_TOP', percentage: '12.5' }],
+        },
+      },
+      {
+        ref: 'parent',
+        type: 'createNegative',
+        amazonCampaignId: 'C1',
+        amazonAdGroupId: null,
+        negative: { type: 'keyword', keywordText: 'x', matchType: 'EXACT' },
+      },
+      { ref: 'ok', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+    ]);
+
+    expect(
+      outcome.results.map((r) => [r.ref, r.status, r.status === 'failed' ? r.code : null]),
+    ).toEqual([
+      ['exp', 'failed', 'INVALID_VALUE'],
+      ['zero', 'failed', 'INVALID_VALUE'],
+      ['id', 'failed', 'INVALID_VALUE'],
+      ['pct', 'failed', 'INVALID_VALUE'],
+      ['parent', 'failed', 'INVALID_VALUE'],
+      ['ok', 'applied', null],
+    ]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.body).toBe('{"keywords":[{"keywordId":"2001","bid":0.5}]}');
+  });
+
+  it('lehnt eine zweite Änderung derselben Entity am selben Endpunkt ab (Zuordnung über den Index)', async () => {
+    const client = setup();
+    const seen = capture(
+      'put',
+      '/sp/keywords',
+      () => `{"keywords":{"success":[{"index":0,"keywordId":2001}]}}`,
+    );
+
+    const outcome = await apply(client, [
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'b', type: 'update', entity: 'keyword', amazonId: '2001', state: 'PAUSED' },
+    ]);
+
+    expect(outcome.results).toEqual([
+      { ref: 'a', status: 'applied', amazonId: '2001' },
+      { ref: 'b', status: 'failed', code: 'DUPLICATE_OPERATION', message: expect.any(String) },
+    ]);
+    expect(seen[0]!.body).toBe('{"keywords":[{"keywordId":"2001","bid":0.5}]}');
+  });
+
+  it('meldet `unknown`, wenn die Antwort eine andere ID nennt oder einen Index doppelt', async () => {
+    const client = setup();
+    capture(
+      'put',
+      '/sp/keywords',
+      () => `{"keywords":{
+        "success":[{"index":0,"keywordId":9999},{"index":1,"keywordId":2002},{"index":2,"keywordId":2003},{"index":7,"keywordId":1}],
+        "error":[{"index":1,"errors":[{"errorType":"otherError","errorValue":{"otherError":{"message":"x"}}}]}]}}`,
+    );
+
+    const outcome = await apply(client, [
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'b', type: 'update', entity: 'keyword', amazonId: '2002', bid: '0.5' },
+      { ref: 'c', type: 'update', entity: 'keyword', amazonId: '2003', bid: '0.5' },
+    ]);
+
+    expect(outcome.results.map((r) => r.status)).toEqual(['unknown', 'unknown', 'applied']);
+  });
+
+  it('ordnet Drosselung und Serverfehler je Eintrag als `unsent` bzw. `unknown` ein, nicht als abgelehnt', async () => {
+    const client = setup();
+    capture(
+      'put',
+      '/sp/keywords',
+      () => `{"keywords":{"error":[
+        {"index":0,"errors":[{"errorType":"throttledError","errorValue":{"throttledError":{"reason":"THROTTLED","message":"slow down"}}}]},
+        {"index":1,"errors":[{"errorType":"internalServerError","errorValue":{"internalServerError":{"reason":"INTERNAL_ERROR","message":"boom"}}}]}]}}`,
+    );
+
+    const outcome = await apply(client, [
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+      { ref: 'b', type: 'update', entity: 'keyword', amazonId: '2002', bid: '0.5' },
+    ]);
+
+    expect(outcome.results).toEqual([
+      { ref: 'a', status: 'unsent' },
+      { ref: 'b', status: 'unknown', message: expect.any(String) },
+    ]);
+    expect(outcome.throttled).toBe(true);
+  });
+
+  it('übernimmt als Code nur einfache Bezeichner und entfernt Tokens aus dem Text', async () => {
+    const client = setup();
+    capture(
+      'put',
+      '/sp/keywords',
+      () =>
+        `{"keywords":{"error":[{"index":0,"errors":[{"errorType":"otherError","errorValue":{"otherError":{"reason":"<script>alert(1)</script>","message":"bad Atza|geheim123 token"}}}]}]}}`,
+    );
+
+    const outcome = await apply(client, [
+      { ref: 'a', type: 'update', entity: 'keyword', amazonId: '2001', bid: '0.5' },
+    ]);
+
+    expect(outcome.results[0]).toEqual({
+      ref: 'a',
+      status: 'failed',
+      code: 'otherError',
+      message: 'bad [token] token',
+    });
+  });
+
+  it('liefert für eine leere Liste ein leeres Ergebnis, ohne Amazon zu fragen', async () => {
+    expect(await apply(setup(), [])).toEqual({ results: [], throttled: false, retryAfterMs: null });
   });
 });
 
@@ -689,7 +925,7 @@ describe('applyChanges: andere Ad-Typen', () => {
 
     const outcome = await apply(
       client,
-      [{ ref: 'a', type: 'update', entity: 'campaign', amazonId: 'C1', state: 'PAUSED' }],
+      [{ ref: 'a', type: 'update', entity: 'campaign', amazonId: '1001', state: 'PAUSED' }],
       'SPONSORED_BRANDS',
     );
 

@@ -118,6 +118,7 @@ export {
   type NegativeKeywordLimitIssue,
 } from './limits';
 export {
+  AmazonAdsWriteAbortedError,
   MAX_WRITE_BATCH_SIZE,
   type AmazonAdsArchiveEntity,
   type AmazonAdsArchiveOperation,
