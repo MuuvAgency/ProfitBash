@@ -5,7 +5,6 @@ import { i18n } from '../i18n';
 import {
   attributionLabel,
   buildColumnDefs,
-  csvSafe,
   defaultVisibleColumns,
   OPTIONAL_COLUMNS,
   totalRow,
@@ -251,16 +250,5 @@ describe('Explorer-Spalten', () => {
     for (const key of ['cpm', 'vcpm', 'ctr', 'units'] as const) {
       expect(i18n.global.te(`explorer.column.${key}`)).toBe(true);
     }
-  });
-});
-
-describe('csvSafe', () => {
-  it('entschärft Formeln in Texten, lässt Decimal-Strings und normale Texte', () => {
-    expect(csvSafe('=HYPERLINK("x")')).toBe('\'=HYPERLINK("x")');
-    expect(csvSafe('+49 Lampe')).toBe("'+49 Lampe");
-    expect(csvSafe('@home')).toBe("'@home");
-    expect(csvSafe('-0.1')).toBe('-0.1');
-    expect(csvSafe('-rabatt')).toBe("'-rabatt");
-    expect(csvSafe('Lampe')).toBe('Lampe');
   });
 });

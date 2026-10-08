@@ -201,17 +201,6 @@ function metricValue(row: GridRow | undefined, key: ColumnMetric): string | null
 
 const DATA_CELL = 'font-data text-right justify-end';
 
-const DECIMAL_STRING = /^-?\d+(\.\d+)?$/;
-/**
- * Text für den CSV-Export ohne Formel-Wirkung in Tabellenkalkulationen: Werte, die mit `=`, `+`, `-`, `@`, Tab oder
- * Zeilenumbruch beginnen, bekommen ein `'` vorangestellt (Suchbegriffe stammen von beliebigen Käufern). Decimal-Strings
- * wie `-0.1` bleiben.
- */
-export function csvSafe(value: string): string {
-  if (DECIMAL_STRING.test(value)) return value;
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-}
-
 export function buildColumnDefs(
   input: ColumnContext & {
     level: ExplorerLevel;

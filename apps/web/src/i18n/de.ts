@@ -827,6 +827,10 @@ export const de = {
       'Es werden die {max} Zeilen mit dem höchsten Spend gezeigt (von {total}). Summe und Einstufungs-Zähler gelten für alle.',
     ngramsTruncated:
       'Es werden die {max} Wortbausteine mit dem höchsten Spend gezeigt (von {total}).',
+    csvTruncatedNote:
+      'Hinweis: Die Analyse hat nur die {max} Zeilen mit dem höchsten Spend geliefert (von {total}), die Datei kann deshalb unvollständig sein.',
+    csvNgramsTruncatedNote:
+      'Hinweis: Die Analyse hat nur die {max} Wortbausteine mit dem höchsten Spend geliefert (von {total}), die Datei kann deshalb unvollständig sein.',
     noRows: 'Keine Suchbegriffe in diesem Zeitraum.',
     noRowsInClass: 'Keine Suchbegriffe mit dieser Einstufung.',
     noRowsInClassTruncated:

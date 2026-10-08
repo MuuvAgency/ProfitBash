@@ -9,7 +9,7 @@ import {
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import { computed, ref, useId, watch } from 'vue';
+import { computed, ref, shallowRef, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
 import { api } from '../api';
@@ -25,17 +25,20 @@ import {
   SEARCH_TERM_ANALYSIS_PATH,
   SEARCH_TERM_ANALYSIS_TAB,
 } from '../explorer/state';
+import { downloadCsv, fileNamePart } from '../grid/csv';
 import { canAccess } from '../navigation/navigation';
 import {
   formatSearchTermMetric,
   ngramColumns,
   termColumns,
   totalRow,
+  type ColumnContext,
   type NgramGridRow,
   type TermGridRow,
 } from '../search-terms/columns';
 import { fractionToPercent } from '../search-terms/decimal-input';
 import DeletePeriodDialog from '../search-terms/DeletePeriodDialog.vue';
+import { explorerEntityLink } from '../search-terms/explorer-link';
 import RulesDialog from '../search-terms/RulesDialog.vue';
 import SearchTermGrid from '../search-terms/SearchTermGrid.vue';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
@@ -223,7 +226,18 @@ const toggleClass = (next: ClassFilter) =>
 const NGRAM_SIZES = [1, 2, 3] as const;
 const ngramSize = ref<number | null>(null);
 
-const columnContext = computed(() => ({ t, te, locale: locale.value, currency: currency.value }));
+/** Sprung in den Explorer (2b.2e): Client und Datei-Zeitraum der gezeigten Analyse, nicht der Auswahl im Wechsel. */
+const explorerLink = computed<ColumnContext['explorerLink']>(() => {
+  const source = meta.value;
+  return source ? (level, row) => explorerEntityLink(source, level, row) : undefined;
+});
+const columnContext = computed<ColumnContext>(() => ({
+  t,
+  te,
+  locale: locale.value,
+  currency: currency.value,
+  explorerLink: explorerLink.value,
+}));
 const termDefs = computed(() => termColumns(columnContext.value));
 const ngramDefs = computed(() => ngramColumns(columnContext.value));
 
@@ -279,6 +293,45 @@ const rulesText = computed(() => {
     }),
   };
 });
+
+// --- CSV -----------------------------------------------------------------------------------
+
+/** Das Grid der gewählten Ansicht (es gibt immer nur eines). */
+const grid = shallowRef<{ csv: (note?: string) => string; ready: boolean }>();
+// Ohne Zeilen gibt es kein Grid; bis seine API bereit ist, wäre die Datei leer.
+const canExport = computed(
+  () =>
+    grid.value?.ready === true &&
+    (view.value === 'terms' ? termRows.value.length > 0 : ngramRows.value.length > 0),
+);
+
+/**
+ * CSV der Ansicht, wie das Grid sie zeigt (Einstufung, Spaltenfilter, Sortierung), in der Schreibweise des Explorers.
+ * Bei gekürzter Antwort enthält die Datei nur die geladenen Zeilen; ein eigener Hinweis steht dann vor der Kopfzeile.
+ */
+function exportCsv() {
+  const m = meta.value;
+  if (!grid.value?.ready || !m) return;
+  const terms = view.value === 'terms';
+  const note = terms
+    ? m.truncated
+      ? t('searchTerms.csvTruncatedNote', { max: count(m.maxRows), total: count(m.totalRows) })
+      : undefined
+    : m.ngramsTruncated
+      ? t('searchTerms.csvNgramsTruncatedNote', {
+          max: count(m.maxNgrams),
+          total: count(m.totalNgrams),
+        })
+      : undefined;
+  const name = [
+    'profitbash',
+    terms ? 'search-term-analysis' : 'search-term-ngrams',
+    terms ? classFilter.value : null,
+    fileNamePart(`${m.accountName} ${m.countryCode}`),
+    `${m.periodStart}_${m.periodEnd}`,
+  ].filter(Boolean);
+  downloadCsv(`${name.join('-')}.csv`, grid.value.csv(note));
+}
 
 // --- Regeln ändern ------------------------------------------------------------------------
 
@@ -588,6 +641,15 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
                 }}
               </button>
             </div>
+            <span class="flex-1" />
+            <Button
+              icon="pi pi-download"
+              :label="t('explorer.exportCsv')"
+              severity="secondary"
+              size="small"
+              :disabled="!canExport"
+              @click="exportCsv"
+            />
           </div>
 
           <template v-if="view === 'terms'">
@@ -611,7 +673,13 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
                 )
               }}
             </p>
-            <SearchTermGrid v-else :rows="termRows" :column-defs="termDefs" :total="total" />
+            <SearchTermGrid
+              v-else
+              ref="grid"
+              :rows="termRows"
+              :column-defs="termDefs"
+              :total="total"
+            />
           </template>
 
           <template v-else>
@@ -629,7 +697,7 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
             <p v-if="ngramRows.length === 0" class="text-body-md text-ink-secondary">
               {{ t('searchTerms.noRows') }}
             </p>
-            <SearchTermGrid v-else :rows="ngramRows" :column-defs="ngramDefs" />
+            <SearchTermGrid v-else ref="grid" :rows="ngramRows" :column-defs="ngramDefs" />
           </template>
         </section>
       </template>

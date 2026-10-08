@@ -1,12 +1,22 @@
 import { MISSING_VALUE } from '@profitbash/shared';
 import type { GridApi, ProcessCellForExportParams } from 'ag-grid-community';
-import { csvSafe } from '../explorer/columns';
 
 /**
  * CSV-Export der Grids (Explorer F6/F7, Suchbegriff-Analyse 2b.2e): eine Schreibweise für alle Tabellen. Trennzeichen
  * Komma, Beträge und Zähler als Decimal-String mit Punkt (Spalten mit `useValueFormatterForExport: false`), dazu die
  * Spalte `currency` (auch ausgeblendet).
  */
+
+const DECIMAL_STRING = /^-?\d+(\.\d+)?$/;
+/**
+ * Text für den CSV-Export ohne Formel-Wirkung in Tabellenkalkulationen: Werte, die mit `=`, `+`, `-`, `@`, Tab oder
+ * Zeilenumbruch beginnen, bekommen ein `'` vorangestellt (Suchbegriffe stammen von beliebigen Käufern). Decimal-Strings
+ * wie `-0.1` bleiben.
+ */
+export function csvSafe(value: string): string {
+  if (DECIMAL_STRING.test(value)) return value;
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
 
 /**
  * Zellen im CSV: Beträge und Zähler roh (Decimal-String), Texte formatiert und gegen Formeln entschärft; fehlende Werte
@@ -22,9 +32,11 @@ function processCell<Row>(params: ProcessCellForExportParams<Row>): string {
 
 /**
  * CSV der geladenen Zeilen in aktueller Filterung und Sortierung: sichtbare Spalten und die Währung, ohne Summenzeile
- * (sie gilt für alle Zeilen der Auswahl, nicht für die exportierten). `prependContent` steht vor der Kopfzeile.
+ * (sie gilt für alle Zeilen der Auswahl, nicht für die exportierten). `note` (z. B. der Hinweis auf gekürzte Zeilen)
+ * steht als eigene Zeile vor der Kopfzeile, als ein Feld in Anführungszeichen: Kommas oder Anführungszeichen im Text
+ * trennen so keine Spalten ab.
  */
-export function gridCsv<Row>(gridApi: GridApi<Row>, prependContent?: string): string {
+export function gridCsv<Row>(gridApi: GridApi<Row>, note?: string): string {
   const columnKeys = gridApi
     .getAllGridColumns()
     .filter((column) => column.isVisible() || column.getColId() === 'currency')
@@ -35,7 +47,7 @@ export function gridCsv<Row>(gridApi: GridApi<Row>, prependContent?: string): st
       columnKeys,
       skipPinnedBottom: true,
       processCellCallback: processCell,
-      ...(prependContent && { prependContent }),
+      ...(note && { prependContent: `"${note.replaceAll('"', '""')}"` }),
     }) ?? ''
   );
 }
