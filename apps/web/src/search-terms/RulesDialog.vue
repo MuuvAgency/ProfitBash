@@ -55,6 +55,8 @@ let initial = { all: blank(), own: blank() };
 const errorKey = ref<string | null>(null);
 /** Die Regeln für alle sind schon gespeichert, die des Profils noch nicht (Fehler dazwischen). */
 const partlySaved = ref(false);
+/** Gespeichert, die Seite lädt neu und schließt dann: bis dahin bleibt alles gesperrt (kein zweites Absenden). */
+const done = ref(false);
 
 const WHOLE = /^\d{1,7}$/;
 const comma = (value: string) => value.replace('.', ',');
@@ -75,6 +77,7 @@ function parse(field: Field, text: string): number | string | undefined {
 
 const changed = (now: Texts, before: Texts) =>
   FIELDS.some((field) => now[field.key].trim() !== before[field.key]);
+const locked = computed(() => save.isPending.value || done.value);
 const hasOwn = computed(() => FIELDS.some((field) => own[field.key].trim() !== ''));
 
 function parsedRules(): SearchTermRulesData | null {
@@ -104,7 +107,8 @@ const save = useMutation({
     if (input.rules) {
       await api.searchTerms.saveRules(input.rules);
       partlySaved.value = true;
-      initial.all = { ...all };
+      // Die Felder sind während des Speicherns gesperrt: Der Text ist der gesendete Stand.
+      for (const field of FIELDS) initial.all[field.key] = all[field.key].trim();
     }
     if (input.overrides) {
       await api.searchTerms.saveProfileRules({
@@ -126,6 +130,7 @@ watch(
     initial = { all: { ...all }, own: { ...own } };
     errorKey.value = null;
     partlySaved.value = false;
+    done.value = false;
     save.reset();
   },
   { immediate: true },
@@ -150,6 +155,7 @@ async function submit() {
       rules: allChanged ? rules : null,
       overrides: ownChanged ? overrides : null,
     });
+    done.value = true;
     emit('saved');
   } catch (error) {
     errorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
@@ -171,8 +177,8 @@ function resetOwn() {
   <Dialog
     :visible="visible"
     modal
-    :closable="!save.isPending.value"
-    :close-on-escape="!save.isPending.value"
+    :closable="!locked"
+    :close-on-escape="!locked"
     :header="t('searchTerms.rulesDialog.title')"
     :style="{ width: 'min(34rem, calc(100vw - 2rem))' }"
     @update:visible="(next) => !next && close()"
@@ -219,6 +225,7 @@ function resetOwn() {
                 v-if="scope === 'all'"
                 :id="`rules-${field.id}`"
                 v-model="all[field.key]"
+                :disabled="locked"
                 :inputmode="field.kind === 'whole' ? 'numeric' : 'decimal'"
                 autocomplete="off"
                 class="font-data"
@@ -228,6 +235,8 @@ function resetOwn() {
                 v-else
                 :id="`rules-profile-${field.id}`"
                 v-model="own[field.key]"
+                :disabled="locked"
+                aria-describedby="rules-profile-hint"
                 :placeholder="all[field.key]"
                 :inputmode="field.kind === 'whole' ? 'numeric' : 'decimal'"
                 autocomplete="off"
@@ -241,7 +250,7 @@ function resetOwn() {
           {{ t('searchTerms.rulesDialog.costHint', { currency }) }}
         </p>
         <div v-else class="flex flex-wrap items-start justify-between gap-space-sm">
-          <p class="min-w-0 flex-1 text-body-sm text-ink-secondary">
+          <p id="rules-profile-hint" class="min-w-0 flex-1 text-body-sm text-ink-secondary">
             {{ t('searchTerms.rulesDialog.thisProfileHint', { currency }) }}
           </p>
           <Button
@@ -251,7 +260,7 @@ function resetOwn() {
             size="small"
             severity="secondary"
             variant="text"
-            :disabled="save.isPending.value"
+            :disabled="locked"
             @click="resetOwn"
           />
         </div>
@@ -263,10 +272,10 @@ function resetOwn() {
           :label="t('common.cancel')"
           severity="secondary"
           variant="text"
-          :disabled="save.isPending.value"
+          :disabled="locked"
           @click="close"
         />
-        <Button type="submit" :label="t('common.save')" :loading="save.isPending.value" />
+        <Button type="submit" :label="t('common.save')" :loading="locked" />
       </div>
     </form>
   </Dialog>

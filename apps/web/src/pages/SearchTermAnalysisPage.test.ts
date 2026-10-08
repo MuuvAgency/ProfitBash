@@ -648,7 +648,7 @@ describe('Abweichende Regeln je Profil (2b.2g)', () => {
   it('zeigt im Dialog die Regeln für alle Profile und leere Felder für das Profil (Platzhalter = Wert für alle)', async () => {
     await mountPage();
     await waitForRow('led lampe warmweiß');
-    expect(document.body.textContent).not.toContain('Für dieses Profil weicht ab');
+    expect(document.body.textContent).not.toContain('Eigene Werte für dieses Profil');
     button('Regeln ändern')!.click();
     await flushPromises();
     expect(document.body.textContent).toContain('Nur für Demo DE · DE');
@@ -693,7 +693,7 @@ describe('Abweichende Regeln je Profil (2b.2g)', () => {
     const text = document.body.textContent!;
     expect(text).toContain('einem ACoS bis 40,0\u00a0%');
     expect(text).toContain('mindestens 200,00\u00a0€ Spend');
-    expect(text).toContain('Für dieses Profil weicht ab: ACoS, Spend.');
+    expect(text).toContain('Eigene Werte für dieses Profil: ACoS, Spend.');
     expect(text).toContain('Für alle Profile gilt: ACoS bis 25,0\u00a0%, Spend ab 20,00\u00a0€.');
 
     button('Regeln ändern')!.click();
@@ -761,6 +761,113 @@ describe('Abweichende Regeln je Profil (2b.2g)', () => {
     await flushPromises();
     expect(puts(requests)).toHaveLength(0);
     expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
+  });
+
+  it('nach einem halb gelungenen Speichern sendet der zweite Versuch nur noch die Abweichung; Abbrechen lädt neu', async () => {
+    let fail = true;
+    const { requests } = await mountPage(PATH, {
+      'PUT /api/ads/search-terms/rules': json({
+        rules: { ...rules, negateMinClicks: 30 },
+        isDefault: false,
+        updatedAt: '2026-10-08T12:00:00.000Z',
+      }),
+      [PROFILE_PUT]: () =>
+        fail
+          ? json({ error: { code: 'INTERNAL', message: 'kaputt' } }, 500)
+          : json({
+              profileId: P1,
+              overrides: { ...noOverrides, harvestMinPurchases: 2 },
+              updatedAt: '2026-10-08T12:00:00.000Z',
+            }),
+    });
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    type('rules-negate-clicks', '30');
+    type('rules-profile-harvest-purchases', '2');
+    await flushPromises();
+    button('Speichern')!.click();
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull(),
+    );
+    expect(puts(requests).map((r) => r.path)).toEqual([
+      '/api/ads/search-terms/rules',
+      '/api/ads/search-terms/rules/profile',
+    ]);
+    // Der Dialog bleibt offen, die Seite hat noch nicht neu geladen.
+    expect(analysisRequests(requests)).toHaveLength(1);
+
+    fail = false;
+    button('Speichern')!.click();
+    await vi.waitFor(() => expect(puts(requests)).toHaveLength(3));
+    expect(puts(requests)[2]!.path).toBe('/api/ads/search-terms/rules/profile');
+    await vi.waitFor(() => expect(analysisRequests(requests)).toHaveLength(2));
+  });
+
+  it('lädt nach einem halb gelungenen Speichern auch beim Abbrechen neu', async () => {
+    const { requests } = await mountPage(PATH, {
+      'PUT /api/ads/search-terms/rules': json({
+        rules: { ...rules, negateMinClicks: 30 },
+        isDefault: false,
+        updatedAt: '2026-10-08T12:00:00.000Z',
+      }),
+      [PROFILE_PUT]: json({ error: { code: 'INTERNAL', message: 'kaputt' } }, 500),
+    });
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    type('rules-negate-clicks', '30');
+    type('rules-profile-harvest-purchases', '2');
+    await flushPromises();
+    button('Speichern')!.click();
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull(),
+    );
+    button('Abbrechen')!.click();
+    await vi.waitFor(() => expect(analysisRequests(requests)).toHaveLength(2));
+  });
+
+  it('sperrt Felder und Knöpfe, während gespeichert und neu geladen wird', async () => {
+    let release = () => {};
+    const { requests } = await mountPage(PATH, {
+      [PROFILE_PUT]: () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(json({ profileId: P1, overrides: noOverrides, updatedAt: null }));
+        }),
+    });
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    type('rules-profile-negate-cost', '200');
+    await flushPromises();
+    button('Speichern')!.click();
+    await flushPromises();
+    expect(input('rules-profile-negate-cost').disabled).toBe(true);
+    expect(input('rules-negate-cost').disabled).toBe(true);
+    release();
+    await vi.waitFor(() => expect(analysisRequests(requests)).toHaveLength(2));
+    expect(puts(requests)).toHaveLength(1);
+  });
+
+  it('verbindet den Hinweis „leer heißt wie für alle“ mit den Feldern des Profils', async () => {
+    await mountPage();
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    const hint = input('rules-profile-negate-cost').getAttribute('aria-describedby');
+    expect(document.getElementById(hint!)?.textContent).toContain('Leer heißt');
+  });
+
+  it('kennzeichnet die Startwerte als Regeln für alle Profile', async () => {
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({}, { ruleOverrides: overrides, rulesAreDefault: true }),
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    expect(document.body.textContent).toContain(
+      'Für alle Profile gelten noch die vorläufigen Startwerte.',
+    );
   });
 
   it('schließt ohne Anfrage, wenn nichts geändert wurde', async () => {

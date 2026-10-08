@@ -364,10 +364,20 @@ und Editoren). „Zeitraum löschen“ (2b.2d) bleibt bei Org-Admins.
     die Felder des Profils sind leer oder tragen den abweichenden Wert, der Platzhalter zeigt den Wert für alle.
     „Abweichung zurücknehmen“ leert sie. Gesendet wird nur, was sich geändert hat (Regeln für alle, Abweichung des
     Profils oder beides nacheinander); ohne Änderung schließt der Dialog ohne Anfrage. Die Kachel „Regeln“ zeigt die
-    geltenden Regeln des Profils und darunter „Für dieses Profil weicht ab: … Für alle Profile gilt: …“.
+    geltenden Regeln des Profils und darunter „Eigene Werte für dieses Profil: … Für alle Profile gilt: …“.
   - **Browser-Pane (2026-10-08, Demo-Profil SE):** Dialog mit beiden Bereichen und Platzhaltern geprüft; Spend-Grenze
     200 SEK nur für das Profil gespeichert: „Negieren“ fiel von 312 auf 0 Zeilen, die Kachel nennt die Abweichung. Die
     Abweichung steht noch in der lokalen Dev-DB. Kein Screenshot des Dialogs (die Pane war zuletzt nicht eingeblendet).
+  - Review (unabhängig): keine kritischen Befunde; Access-Layer, Rechte, Decimal-Rechnung, Audit, Migration und „geltende
+    Regeln nur in der Einstufung“ bestätigt (CSV-Export und Spalten nutzen keine Regeln). Übernommen: Tests für das halb
+    gelungene Speichern (Regeln für alle gespeichert, Abweichung scheitert: der zweite Versuch sendet nur noch die
+    Abweichung, Abbrechen lädt neu); Felder und Knöpfe bleiben gesperrt, während gespeichert und neu geladen wird (kein
+    zweites Absenden); der Hinweis zu den Startwerten heißt „Für alle Profile gelten noch die vorläufigen Startwerte“;
+    „Eigene Werte für dieses Profil“ statt „weicht ab“ (ein eigener Wert kann dem für alle gleichen und folgt dessen
+    Änderungen nicht); der Hinweis „leer heißt wie für alle“ hängt per `aria-describedby` an den Feldern des Profils.
+    Bewusst so: „geändert“ vergleicht die Texte der Felder („20,00“ statt „20“ sendet erneut, mit Audit-Event ohne
+    Unterschied); die Meldung bei ungültiger Eingabe nennt weder Bereich noch Feld; kein Test für das Mitlöschen der
+    Abweichung mit dem Profil (Fremdschlüssel mit Cascade, Profile werden im Betrieb nicht gelöscht).
   - **Bewusst so bzw. bekannte Grenzen:** Abweichungen gibt es nur je Profil; wer denselben Wert für alle Profile eines
     Clients oder Marktplatzes will, trägt ihn je Profil ein. Eine Übersicht aller Abweichungen (z. B. bei Clients &
     Connections) gibt es nicht, man sieht sie beim jeweiligen Profil. Profile ohne Suchbegriffe erreicht der Dialog
