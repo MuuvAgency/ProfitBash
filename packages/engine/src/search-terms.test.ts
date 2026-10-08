@@ -437,6 +437,39 @@ describe('classifySearchTermsAcrossTargets', () => {
     });
   });
 
+  it('Harvest über alle Targets, obwohl eine Zeile allein ein Negativ-Vorschlag ist', () => {
+    const rows = [
+      target('lampe', { clicks: '30', cost: '30', purchases: '0', sales: '0' }),
+      target('lampe', { clicks: '4', cost: '2', purchases: '1', sales: '60' }),
+      target('lampe', { clicks: '6', cost: '3', purchases: '2', sales: '80' }),
+    ];
+    expect(rows.map((row) => classifySearchTerm(row, rules).classification)).toEqual([
+      'negate',
+      'watch',
+      'watch',
+    ]);
+    // 35 Spend auf 140 Umsatz: genau am Ziel von 25 %.
+    expect(across(rows).get('lampe')).toMatchObject({
+      classification: 'harvest',
+      reason: null,
+      targets: 3,
+      onlyAcrossTargets: true,
+      cost: '35',
+      sales: '140',
+      purchases: '3',
+    });
+  });
+
+  it('fasst leere Suchbegriffe (auch nur Leerraum) zu einer Gruppe zusammen', () => {
+    const result = across([
+      target('', { clicks: '10', cost: '8' }),
+      target('   ', { clicks: '10', cost: '7' }),
+      target('\t', { clicks: '5', cost: '5' }),
+    ]);
+    expect([...result.keys()]).toEqual(['']);
+    expect(result.get('')).toMatchObject({ classification: 'negate', targets: 3, clicks: '25' });
+  });
+
   it('ergibt ohne Zeilen nichts', () => {
     expect(across([]).size).toBe(0);
   });
