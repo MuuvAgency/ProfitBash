@@ -768,8 +768,8 @@ export const de = {
       tooFewData: 'Zu wenig Daten',
     },
     acrossTargets: {
-      cell: 'Über alle Targets: {label} ({targets})',
-      targets: '{n} Target | {n} Targets',
+      cell: 'Über alle Targets: {label} ({rows})',
+      rows: '{n} Zeile | {n} Zeilen',
       lead: 'Erst über alle Targets zusammen:',
       filter: 'Nach Einstufung über alle Targets filtern',
       harvest: 'Suchbegriff zum Ernten | Suchbegriffe zum Ernten',

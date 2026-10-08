@@ -175,7 +175,10 @@ export const searchTermRowSchema = z
      */
     termClassification: z.enum(SEARCH_TERM_CLASSIFICATIONS),
     termReason: z.enum(SEARCH_TERM_WATCH_REASON_KEYS).nullable(),
-    /** Zeilen (Targets) des Begriffs, die in diese Einstufung eingehen. */
+    /**
+     * Anzahl der **Zeilen** des Begriffs, die in diese Einstufung eingehen. Das ist nicht die Zahl verschiedener
+     * Targets: Zwei Schreibweisen eines Begriffs oder eine SP- und eine SB-Zeile zählen je für sich.
+     */
     termTargets: z.number().int(),
     /** Harvest bzw. Negieren, das keine Zeile des Begriffs allein erreicht (erst die Summe über die Targets). */
     termOnlyAcrossTargets: z.boolean(),

@@ -111,17 +111,28 @@ const CLASS_TONE: Record<SearchTermRowData['classification'], string> = {
 };
 
 /**
- * Einstufung des Suchbegriffs über alle Targets (2b.2f), nur wenn sie von der Einstufung der Zeile abweicht:
- * Sonst sagt sie nichts Neues.
+ * Einstufung des Suchbegriffs über alle Targets (2b.2f), nur wenn sie von der Einstufung der Zeile abweicht (der
+ * Grund allein zählt nicht): Sonst sagt sie nichts Neues. Bei „Beobachten“ mit Grund wie die Zeile selbst. Gezählt
+ * werden Zeilen, nicht Targets: Schreibweisen eines Begriffs oder Ad-Typen können sich ein Target teilen.
  */
 export function acrossTargetsLabel(
-  row: Pick<SearchTermRowData, 'classification' | 'termClassification' | 'termTargets'>,
-  t: Labels['t'],
+  row: Pick<
+    SearchTermRowData,
+    'classification' | 'termClassification' | 'termReason' | 'termTargets'
+  >,
+  { t, locale }: Pick<ColumnContext, 't' | 'locale'>,
 ): string | null {
   if (row.termClassification === row.classification) return null;
   return t('searchTerms.acrossTargets.cell', {
-    label: t(`searchTerms.class.${row.termClassification}`),
-    targets: t('searchTerms.acrossTargets.targets', { n: row.termTargets }),
+    label: classificationLabel(
+      { classification: row.termClassification, reason: row.termReason },
+      t,
+    ),
+    // `count` wählt Ein- oder Mehrzahl, `n` ist die formatierte Zahl.
+    rows: t('searchTerms.acrossTargets.rows', {
+      count: row.termTargets,
+      n: formatNumber(String(row.termTargets), locale),
+    }),
   });
 }
 
@@ -132,20 +143,33 @@ const ACROSS_TONE: Record<SearchTermRowData['classification'], string> = {
   watch: 'text-ink-secondary',
 };
 
-/** Zelle „Einstufung“: die Einstufung der Zeile, darunter bei Abweichung die über alle Targets. */
-function classificationCell(
-  { data, valueFormatted, value }: ICellRendererParams<TermGridRow>,
-  t: Labels['t'],
-): HTMLElement {
+/** Trennt im Wert der Spalte „Einstufung“ die Zeile selbst von der Einstufung über alle Targets. */
+const ACROSS_SEPARATOR = '\n';
+
+/**
+ * Wert der Spalte „Einstufung“: die Einstufung der Zeile, bei Abweichung dahinter die über alle Targets. Beides
+ * steht im Wert, weil das Grid eine Zelle nur neu zeichnet, wenn sich ihr Wert ändert (die Zeilen behalten nach
+ * einem Neuladen ihre ID). Textfilter und Sortierung der Spalte sehen damit bewusst auch die zweite Zeile: „Ernten“
+ * findet auch Zeilen, deren Begriff erst über alle Targets ein Harvest ist.
+ */
+function classificationValue(row: SearchTermRowData, context: ColumnContext): string {
+  const own = classificationLabel(row, context.t);
+  const across = acrossTargetsLabel(row, context);
+  return across === null ? own : `${own}${ACROSS_SEPARATOR}${across}`;
+}
+
+/** Zelle „Einstufung“: zeichnet die beiden Teile des Werts als zwei Zeilen. */
+function classificationCell({ data, value }: ICellRendererParams<TermGridRow>): HTMLElement {
+  const [ownText = MISSING_VALUE, across] =
+    typeof value === 'string' ? value.split(ACROSS_SEPARATOR) : [];
   // Eigene Zeilenhöhen: Die Zelle des Grids ist sonst so hoch wie die Zeile, zwei Zeilen passten nicht hinein.
   const cell = document.createElement('span');
   cell.className = 'flex min-w-0 flex-col';
   const own = document.createElement('span');
   own.className = 'truncate text-body-md';
-  own.textContent = valueFormatted ?? String(value ?? '');
+  own.textContent = ownText;
   cell.append(own);
-  const across = data && !data.isTotal ? acrossTargetsLabel(data, t) : null;
-  if (across !== null && data && !data.isTotal) {
+  if (across !== undefined && data && !data.isTotal) {
     const line = document.createElement('span');
     line.className = `truncate text-body-sm font-normal ${ACROSS_TONE[data.termClassification]}`;
     line.textContent = across;
@@ -183,7 +207,7 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
       filter: 'agTextColumnFilter',
     },
     text('classification', t('searchTerms.column.classification'), (row) =>
-      classificationLabel(row, t),
+      classificationValue(row, context),
     ),
     text('campaign', t('explorer.column.campaign'), (row) => row.campaignName),
     text('adGroup', t('explorer.column.adGroup'), (row) => row.adGroupName),
@@ -199,9 +223,9 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
     def.colId === 'classification'
       ? {
           ...def,
-          // Platz für die zweite Zeile „Über alle Targets: … (n Targets)“.
-          minWidth: 260,
-          cellRenderer: (params: ICellRendererParams<TermGridRow>) => classificationCell(params, t),
+          // Platz für die zweite Zeile „Über alle Targets: … (n Zeilen)“; längere Texte kürzt die Zelle (Titel).
+          minWidth: 300,
+          cellRenderer: classificationCell,
           cellClass: ({ data }: CellClassParams<TermGridRow>) =>
             `flex items-center ${data && !data.isTotal ? CLASS_TONE[data.classification] : ''}`,
         }
