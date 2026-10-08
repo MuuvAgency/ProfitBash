@@ -106,7 +106,13 @@ beforeEach(async () => {
 
 const run = (
   content: Uint8Array,
-  options: { complete?: boolean; uploadedAt?: Date; profileId?: string; fileName?: string } = {},
+  options: {
+    complete?: boolean;
+    uploadedAt?: Date;
+    profileId?: string;
+    fileName?: string;
+    period?: { startDate: string; endDate: string } | null;
+  } = {},
 ) =>
   importBulkFile({
     db,
@@ -114,6 +120,7 @@ const run = (
     organizationId: ids.org,
     profileId: options.profileId ?? ids.profile,
     fileName: options.fileName ?? 'bulk-test.xlsx',
+    period: options.period,
     content,
     now: NOW,
     complete: options.complete ?? false,
@@ -1497,6 +1504,65 @@ describe('Suchbegriff-Blätter der Bulk-Datei (2b.1)', () => {
     expect(logs).toContainEqual(
       expect.objectContaining({ level: 'warn', msg: 'bulk_import.search_terms_without_period' }),
     );
+  });
+
+  it('nutzt bei umbenannter Datei den beim Upload angegebenen Zeitraum (2b.2c)', async () => {
+    const counters = await run(searchTermFile(), {
+      fileName: 'kunde-oktober.xlsx',
+      period: { startDate: '2026-09-08', endDate: '2026-10-07' },
+    });
+    expect(counters).toMatchObject({ campaigns: 2, searchTerms: 2 });
+    expect(counters).not.toHaveProperty('searchTermsWithoutPeriod');
+    expect((await searchTerms()).map((r) => [r.periodStart, r.periodEnd])).toEqual([
+      ['2026-09-08', '2026-10-07'],
+      ['2026-09-08', '2026-10-07'],
+    ]);
+    expect(logs).not.toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.search_terms_without_period' }),
+    );
+  });
+
+  it('zieht den Zeitraum im Dateinamen dem angegebenen vor', async () => {
+    await run(searchTermFile(), {
+      fileName: SEPTEMBER,
+      period: { startDate: '2026-08-01', endDate: '2026-08-31' },
+    });
+    expect((await searchTerms()).map((r) => [r.periodStart, r.periodEnd])).toEqual([
+      ['2026-09-01', '2026-09-30'],
+      ['2026-09-01', '2026-09-30'],
+    ]);
+  });
+
+  it('reicht den am Import gespeicherten Zeitraum über den Job an den Importer', async () => {
+    await createFileImport(db, {
+      userId: ids.admin,
+      orgId: ids.org,
+      profileId: ids.profile,
+      kind: 'bulk',
+      fileName: 'kunde-september.xlsx',
+      period: { startDate: '2026-09-01', endDate: '2026-09-30' },
+      now: NOW,
+      content: searchTermFile(),
+      enqueue: async () => {},
+    });
+    const runJob = createJobRunner({ db, logger: (entry) => logs.push(entry) });
+    await importProfileFiles(
+      runJob,
+      {
+        db,
+        logger: (entry) => logs.push(entry),
+        importers: FILE_IMPORTERS,
+        now: () => NOW,
+        enqueueFollowUp: async () => {},
+      },
+      { organizationId: ids.org, profileId: ids.profile },
+    );
+    const [imported] = await db.select({ counters: fileImports.counters }).from(fileImports);
+    expect(imported?.counters).toMatchObject({ searchTerms: 2 });
+    expect((await searchTerms()).map((r) => [r.periodStart, r.periodEnd])).toEqual([
+      ['2026-09-01', '2026-09-30'],
+      ['2026-09-01', '2026-09-30'],
+    ]);
   });
 
   it('überspringt ungültige Zeilen, zählt sie getrennt und fasst doppelte zusammen', async () => {

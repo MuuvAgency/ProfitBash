@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 import {
+  BULK_PERIOD_MAX_DAYS,
+  bulkPeriodIssue,
   FILE_IMPORT_LIST_LIMIT,
+  parseBulkPeriod,
+  todayInTimezone,
+  type BulkPeriod,
+  type BulkPeriodIssue,
   type FileImport,
   type FileImportKind,
   type FileImportStatus,
@@ -31,7 +37,17 @@ import { amazonAdsCampaigns, amazonAdsProfiles, fileImportContents, fileImports 
  * überschriebe der tägliche Sync die Daten aus der Datei.
  */
 
-export type FileImportErrorCode = 'PROFILE_NOT_FOUND' | 'PROFILE_HAS_CONNECTION' | 'EMPTY_FILE';
+export type FileImportErrorCode =
+  'PROFILE_NOT_FOUND' | 'PROFILE_HAS_CONNECTION' | 'EMPTY_FILE' | 'INVALID_PERIOD';
+
+/** Meldungen zu einem ungültigen, von Hand angegebenen Zeitraum (API und Upload teilen sie). */
+export const BULK_PERIOD_ISSUE_MESSAGES: Record<BulkPeriodIssue, string> = {
+  incomplete: 'Für den Zeitraum bitte beide Tage angeben oder keinen.',
+  invalidDate: 'Der Zeitraum enthält keinen gültigen Tag (JJJJ-MM-TT).',
+  startAfterEnd: 'Der erste Tag des Zeitraums liegt nach dem letzten.',
+  future: 'Der Zeitraum darf nicht in der Zukunft enden.',
+  tooLong: `Der Zeitraum ist länger als ${BULK_PERIOD_MAX_DAYS} Tage.`,
+};
 
 export class FileImportError extends Error {
   constructor(
@@ -60,6 +76,8 @@ const summaryColumns = {
   error: fileImports.error,
   counters: fileImports.counters,
   uploadedBy: fileImports.uploadedBy,
+  periodStart: fileImports.periodStart,
+  periodEnd: fileImports.periodEnd,
   createdAt: fileImports.createdAt,
   startedAt: fileImports.startedAt,
   finishedAt: fileImports.finishedAt,
@@ -98,7 +116,7 @@ async function requireFileProfile(
   });
   if (!visible) throw new FileImportError('PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
   const [profile] = await db
-    .select({ connectionId: amazonAdsProfiles.connectionId })
+    .select({ connectionId: amazonAdsProfiles.connectionId, timezone: amazonAdsProfiles.timezone })
     .from(amazonAdsProfiles)
     .where(eq(amazonAdsProfiles.id, input.profileId));
   if (!profile) throw new FileImportError('PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
@@ -112,6 +130,13 @@ export interface CreateFileImportInput extends Actor {
   content: Uint8Array;
   /** Datei enthält laut Upload alle Entities (Standard `false`). */
   complete?: boolean;
+  /**
+   * Von Hand angegebener Zeitraum der Kennzahlen (2b.2c), für Dateien, deren Name keinen trägt. Trägt der Name
+   * einen, gilt der und die Angabe wird ignoriert (auch nicht geprüft).
+   */
+  period?: BulkPeriod | null;
+  /** Für „kein Tag in der Zukunft“ (Standard: jetzt). */
+  now?: Date;
   /** Plant den Job in derselben Transaktion ein (pg-boss über `tx`). */
   enqueue: (tx: DbOrTx) => Promise<unknown>;
 }
@@ -127,6 +152,17 @@ export async function createFileImport(db: Db, input: CreateFileImportInput): Pr
   if (input.content.byteLength === 0) {
     throw new FileImportError('EMPTY_FILE', 'Die Datei ist leer.');
   }
+  // Der Dateiname der Werbekonsole gewinnt: Der Import liest den Zeitraum zuerst dort (`parseBulkPeriod`), eine
+  // abweichende Angabe von Hand stünde sonst im Verlauf, ohne zu gelten.
+  const period = parseBulkPeriod(input.fileName) ? null : (input.period ?? null);
+  if (period) {
+    // „Heute“ in der Zeitzone des Profils: Dort endet auch der Zeitraum der Werbekonsole.
+    const issue = bulkPeriodIssue(
+      period,
+      todayInTimezone(profile.timezone, input.now ?? new Date()),
+    );
+    if (issue) throw new FileImportError('INVALID_PERIOD', BULK_PERIOD_ISSUE_MESSAGES[issue]);
+  }
   const sha256 = createHash('sha256').update(input.content).digest('hex');
   return db.transaction(async (tx) => {
     const [row] = await tx
@@ -139,6 +175,8 @@ export async function createFileImport(db: Db, input: CreateFileImportInput): Pr
         byteSize: input.content.byteLength,
         sha256,
         complete: input.complete ?? false,
+        periodStart: period?.startDate ?? null,
+        periodEnd: period?.endDate ?? null,
         uploadedBy: input.userId,
       })
       .returning(summaryColumns);
@@ -159,6 +197,8 @@ export async function createFileImport(db: Db, input: CreateFileImportInput): Pr
         byteSize: row.byteSize,
         sha256,
         complete: row.complete,
+        periodStart: row.periodStart,
+        periodEnd: row.periodEnd,
       },
     });
     await input.enqueue(tx);
@@ -194,6 +234,8 @@ export interface ClaimedFileImport {
   complete: boolean;
   /** Zeitpunkt des Uploads: Entities, die erst danach entstanden, gelten nie als fehlend. */
   uploadedAt: Date;
+  /** Beim Upload von Hand angegebener Zeitraum der Kennzahlen (2b.2c), sonst `null`. */
+  period: BulkPeriod | null;
 }
 
 export interface FileImportScope {
@@ -232,6 +274,8 @@ export async function claimNextFileImport(
         startedAt: fileImports.startedAt,
         complete: fileImports.complete,
         createdAt: fileImports.createdAt,
+        periodStart: fileImports.periodStart,
+        periodEnd: fileImports.periodEnd,
       })
       .from(fileImports)
       .where(
@@ -292,6 +336,10 @@ export async function claimNextFileImport(
           attempts,
           complete: candidate.complete,
           uploadedAt: candidate.createdAt,
+          period:
+            candidate.periodStart !== null && candidate.periodEnd !== null
+              ? { startDate: candidate.periodStart, endDate: candidate.periodEnd }
+              : null,
         },
         abandoned,
       };

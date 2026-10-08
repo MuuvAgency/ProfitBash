@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   customType,
+  date,
   foreignKey,
   index,
   integer,
@@ -44,6 +45,12 @@ export const fileImports = pgTable(
      * Import, was fehlt, als entfernt (1.11d, Dominik 2026-10-07).
      */
     complete: boolean('complete').notNull().default(false),
+    /**
+     * Beim Upload von Hand angegebener Zeitraum der Kennzahlen (beide Tage eingeschlossen), für Dateien, deren Name
+     * keinen Zeitraum trägt (`phase-2b.md` 2b.2c). Leer, wenn der Dateiname ihn nennt oder keiner angegeben wurde.
+     */
+    periodStart: date('period_start', { mode: 'string' }),
+    periodEnd: date('period_end', { mode: 'string' }),
     /** `pending` → `running` → `imported` | `failed`. */
     status: text('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
@@ -72,6 +79,10 @@ export const fileImports = pgTable(
     check(
       'file_imports_status_ck',
       sql`${t.status} in ('pending', 'running', 'imported', 'failed')`,
+    ),
+    check(
+      'file_imports_period_ck',
+      sql`(${t.periodStart} is null and ${t.periodEnd} is null) or (${t.periodStart} is not null and ${t.periodEnd} is not null and ${t.periodStart} <= ${t.periodEnd})`,
     ),
     unique('file_imports_id_org_uq').on(t.id, t.organizationId),
     index('file_imports_profile_created_idx').on(t.profileId, t.createdAt.desc()),

@@ -1067,7 +1067,7 @@ export interface paths {
                         "application/json": components["schemas"]["FileImportList"];
                     };
                 };
-                /** @description Ungültige Eingabe oder leere Datei. */
+                /** @description Ungültige Eingabe, ungültiger Zeitraum oder leere Datei. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1125,6 +1125,16 @@ export interface paths {
                         file: string;
                         /** @enum {string} */
                         complete?: "true" | "false";
+                        /**
+                         * Format: date
+                         * @description Erster Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert.
+                         */
+                        periodStart?: string;
+                        /**
+                         * Format: date
+                         * @description Letzter Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert.
+                         */
+                        periodEnd?: string;
                     };
                 };
             };
@@ -1138,7 +1148,7 @@ export interface paths {
                         "application/json": components["schemas"]["FileImport"];
                     };
                 };
-                /** @description Ungültige Eingabe oder leere Datei. */
+                /** @description Ungültige Eingabe, ungültiger Zeitraum oder leere Datei. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2837,6 +2847,10 @@ export interface components {
             };
             /** Format: uuid */
             uploadedBy: string | null;
+            /** Format: date */
+            periodStart: string | null;
+            /** Format: date */
+            periodEnd: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

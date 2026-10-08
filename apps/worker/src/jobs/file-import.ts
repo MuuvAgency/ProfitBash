@@ -5,7 +5,7 @@ import {
   hasClaimableFileImport,
   type Db,
 } from '@profitbash/db';
-import type { FileImportKind, Logger } from '@profitbash/shared';
+import type { BulkPeriod, FileImportKind, Logger } from '@profitbash/shared';
 import { SheetReadError } from '@profitbash/sheets';
 import { z } from 'zod';
 import { JobFailure, type JobCounters, type JobRunResult, type RunJob } from '../run-job';
@@ -50,6 +50,8 @@ export interface FileImporterInput {
   complete: boolean;
   /** Zeitpunkt des Uploads. */
   uploadedAt: Date;
+  /** Beim Upload von Hand angegebener Zeitraum der Kennzahlen (`file_imports.period_start`/`period_end`, 2b.2c). */
+  period?: BulkPeriod | null;
 }
 
 /** Importiert eine Datei und liefert ihre Zähler; wirft `FileImportRejectedError` bei ungeeigneten Dateien. */
@@ -130,6 +132,7 @@ export async function importProfileFiles(
               now: deps.now(),
               complete: claimed.complete,
               uploadedAt: claimed.uploadedAt,
+              period: claimed.period,
             });
             result = { status: 'imported', error: null, counters: fileCounters };
           } catch (error) {

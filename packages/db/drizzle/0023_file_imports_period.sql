@@ -1,0 +1,3 @@
+ALTER TABLE "file_imports" ADD COLUMN "period_start" date;--> statement-breakpoint
+ALTER TABLE "file_imports" ADD COLUMN "period_end" date;--> statement-breakpoint
+ALTER TABLE "file_imports" ADD CONSTRAINT "file_imports_period_ck" CHECK (("file_imports"."period_start" is null and "file_imports"."period_end" is null) or ("file_imports"."period_start" is not null and "file_imports"."period_end" is not null and "file_imports"."period_start" <= "file_imports"."period_end"));
