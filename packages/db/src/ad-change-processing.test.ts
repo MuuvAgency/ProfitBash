@@ -242,6 +242,18 @@ describe('prepareAdChangeSubmission', () => {
     expect(await changeRow(changeIds[0]!)).toMatchObject({ oldAmount: '0.65', newAmount: '0.75' });
   });
 
+  it('behält „vorher“, wenn der Stand schon dem neuen Wert entspricht (Wiederaufnahme nach einem Sync)', async () => {
+    const { submissionId, changeIds } = await submit([update('target', f.keyword, 'bid', '0.75')]);
+    await testDb.db
+      .update(amazonAdsTargets)
+      .set({ bid: '0.75' })
+      .where(eq(amazonAdsTargets.id, f.keyword));
+
+    await prepareAdChangeSubmission(testDb.db, { organizationId: f.org, submissionId });
+
+    expect(await changeRow(changeIds[0]!)).toMatchObject({ oldAmount: '0.50', newAmount: '0.75' });
+  });
+
   it('meldet entfernte Entities und liest nur Übermittlungen der Organisation', async () => {
     const { submissionId } = await submit([update('target', f.keyword, 'bid', '0.75')]);
     await testDb.db
@@ -442,7 +454,7 @@ describe('finishAdChangeSubmission', () => {
       now: NOW,
     });
 
-    expect(result).toEqual({ status: 'finished', open: 0 });
+    expect(result).toEqual({ status: 'finished', open: 0, failed: 0 });
     expect(await submissionRow(submissionId)).toMatchObject({
       status: 'finished',
       finishedAt: NOW,
@@ -461,7 +473,7 @@ describe('finishAdChangeSubmission', () => {
       error: 'Amazon drosselt, neuer Versuch folgt.',
     });
 
-    expect(result).toEqual({ status: 'pending', open: 1 });
+    expect(result).toEqual({ status: 'pending', open: 1, failed: 0 });
     expect(await submissionRow(submissionId)).toMatchObject({
       status: 'pending',
       finishedAt: null,
@@ -487,7 +499,7 @@ describe('finishAdChangeSubmission', () => {
       failRemaining: { code: 'NOT_SENT', message: 'Nicht gesendet: kein Zugriff.' },
     });
 
-    expect(result).toEqual({ status: 'failed', open: 0 });
+    expect(result).toEqual({ status: 'failed', open: 0, failed: 1 });
     expect(await changeRow(changeIds[0]!)).toMatchObject({ status: 'applied' });
     expect(await changeRow(changeIds[1]!)).toMatchObject({
       status: 'failed',
@@ -533,6 +545,27 @@ describe('offene Übermittlungen je Connection', () => {
       errorCode: 'NOT_SENT',
     });
     expect(await submissionRow(foreign.submissionId)).toMatchObject({ status: 'pending' });
+  });
+});
+
+describe('failOpenAdChangeSubmissions: unterbrochene Übermittlung', () => {
+  it('wertet die offenen Änderungen einer laufenden Übermittlung als unklar, nicht als ungesendet', async () => {
+    const { changeIds } = await submit([update('target', f.keyword, 'bid', '0.75')]);
+    await claim();
+
+    await failOpenAdChangeSubmissions(testDb.db, {
+      organizationId: f.org,
+      connectionId: f.connection,
+      now: NOW,
+      error: 'Die Connection muss neu verbunden werden.',
+      code: 'NOT_SENT',
+      message: 'Nicht gesendet.',
+    });
+
+    expect(await changeRow(changeIds[0]!)).toMatchObject({
+      status: 'failed',
+      errorCode: 'UNKNOWN_OUTCOME',
+    });
   });
 });
 

@@ -390,7 +390,8 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     `continued`). `applied` → angewendet (bei Anlagen mit neuer ID), `failed` → fehlgeschlagen mit Code und Text von
     Amazon, `unknown` → fehlgeschlagen mit `UNKNOWN_OUTCOME` (nicht blind wiederholen; der erneute Versuch liest den
     Stand neu und entfällt, wenn der Wert schon stimmt), `unsent` → bleibt `submitted`: Die Übermittlung geht zurück auf
-    `pending`, der Job plant sich nach `Retry-After` (mindestens 60 s, höchstens 1 h) neu ein und endet. Nach
+    `pending`, der Job plant sich nach `Retry-After` (mindestens 60 s, höchstens 10 Min., weil er den einzigen Warteplatz der
+    Connection belegt) neu ein und arbeitet die übrigen Übermittlungen noch ab. Nach
     `MAX_SUBMISSION_ATTEMPTS` (5) scheitert der Rest als `NOT_SENT`. **Abbruch** (`AmazonAdsWriteAbortedError`): erst
     die Teilergebnisse festhalten, dann scheitert der Rest als `NOT_SENT` und die Übermittlung als `failed`; bei
     abgelehntem Refresh-Token zusätzlich alle offenen Übermittlungen der Connection, die Connection geht auf
@@ -413,7 +414,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     entstehen **direkt als neue Übermittlung** des handelnden Nutzers (nicht über dessen Warenkorb), mit `origin`
     `retry` bzw. `revert` und `origin_change_id`; das Original bleibt stehen. Übersprungenes kommt mit Grund zurück
     (`notFound`, `notFailed`, `notApplied`, `alreadyRetried`, `alreadyReverted`, `archiveNotRevertible`,
-    `noPreviousValue`, `nothingToChange` und die Gründe aus 3.1). **Revert:** Ziel ist „vorher“ (Platzierung ohne
+    `noPreviousValue`, `nothingToChange`, `superseded`, `outcomeUnknown`, `alreadySubmitted` und die Gründe aus 3.1). **Revert:** Ziel ist „vorher“ (Platzierung ohne
     Eintrag: 0 %); ein angelegtes Negative wird archiviert (gefunden über die Amazon-ID, sonst über denselben Inhalt
     an derselben Stelle). Weicht der Stand vom „nachher“ ab, kommt `{ status: 'conflict', conflicts }` zurück und
     nichts wird übermittelt; erst mit `overwriteChanged` wird überschrieben (F8). Audit:
@@ -425,6 +426,29 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     `ad-changes-submit.test.ts` (Client als Stub), `ad-changes-flow.test.ts` (Ende-zu-Ende gegen den Mock-Anbieter:
     Warenkorb → Übermittlung → Job → Sync → Revert → Sync), dazu Bulk-Import, Entity-Import, Auslöser und Mock.
     Stammdaten für diese Tests: `seedAdChangeFixture` (`@profitbash/db/testing`).
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung, CHECK-Constraints, Decimal-Behandlung und Audit
+    bestätigt. Übernommen: doppelte Felder einer Entity in einer Übermittlung (es gilt die letzte Angabe, frühere
+    scheitern als `SUPERSEDED`; vorher blieb eine ohne Ergebnis und ging später allein raus), Retry nur für den
+    jüngsten Fehlschlag je Stelle und Revert mehrerer Änderungen an einer Stelle gemeinsam (Ziel „vorher“ der
+    ältesten, Vergleich mit „nachher“ der jüngsten); eine Anlage mit unklarem Ausgang ist erst nach dem nächsten Sync
+    bzw. Import der Kampagne wiederholbar (`outcomeUnknown`), dasselbe Negative nie zweimal gleichzeitig
+    (`alreadySubmitted`); Sperre je Profil (`lockProfileAdChanges`) am Anfang von Import und Abschließen von Hand
+    (vorher umgekehrte Sperrreihenfolge, Deadlock möglich); nach Drosselung gehen die übrigen Übermittlungen noch
+    raus, Wartezeit höchstens 10 Min.; unterbrochene Übermittlungen einer Connection ohne Einwilligung scheitern als
+    `UNKNOWN_OUTCOME` statt `NOT_SENT`; „vorher“ bleibt bei der Wiederaufnahme, wenn der Stand schon dem neuen Wert
+    entspricht, und wird beim Abschließen von Hand auf den Stand davor gesetzt; Lease auch zwischen den Aufrufen
+    verlängert; nach mehr als 5 Abholungen scheitert der Rest als unklar (kein endloses Neu-Senden); Negatives mit
+    anderem Zustand als archiviert werden abgelehnt (`NOT_SUPPORTED`); neue IDs des Mocks tragen den Startzeitpunkt
+    (kein Zusammenstoß nach Neustart); IDs sortiert gesperrt.
+  - **Offen (aus dem Review, nicht umgesetzt):** Ein vor dem Anwenden angeforderter Entity-Export überschreibt den
+    nachgezogenen Stand bis zum nächsten Sync (Revert meldet dann eine Abweichung). Bulk-Änderungen an inzwischen
+    archivierten oder entfernten Entities und überholte Bulk-Änderungen bleiben offen, bis jemand von Hand abschließt;
+    „als erledigt“ schreibt dabei den überholten Wert lokal zurück (der nächste Import korrigiert). Eine ältere
+    Bulk-Datei, die zufällig den neuen Wert trägt, bestätigt die Änderung. Fehlgeschlagenes Archivieren wird nicht
+    gegen den nächsten Sync geprüft (Vorgabe aus 3.2a; der erneute Versuch lehnt archivierte Entities ab). Mit
+    `failRemaining` heißt die Übermittlung `failed`, auch wenn keine Änderung mehr offen war. Bei langer Drosselung
+    (über 10 Min.) zählt jeder Lauf als Versuch. Der Mock archiviert Kinder nicht mit. Nicht getestet: gleichzeitige
+    Aufrufe (Doppelklick, Abschließen während eines Imports), Zeitbudget des Jobs.
   - **Für 3.4:** `enqueue` an `jobs.enqueueAdChangesSubmit` hängen (Connection je Übermittlung über das Profil);
     Endpunkte für erneut versuchen, verwerfen, Revert (erst ohne, nach Rückfrage mit `overwriteChanged`), Abschließen
     von Hand; `channel` für Retry und Revert wählt der Nutzer (Standard: Weg der ursprünglichen Übermittlung). Beim
@@ -435,8 +459,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Übermitteln (der Import überschreibt die Entity, bevor er bestätigt). Eine fehlgeschlagene Änderung mit
     Folgeversuch bleibt `failed` (die Oberfläche liest `followUp`). Revert und erneuter Versuch prüfen weder die
     Grenzen von Amazon noch die Warnungen nach F6 (Amazon entscheidet; 3.4 kann die Grenzen davor hängen). Der Job
-    arbeitet die Übermittlungen einer Connection nacheinander ab und hört bei Drosselung ganz auf, obwohl die Pause
-    nur das Profil betrifft.
+    arbeitet die Übermittlungen einer Connection nacheinander ab.
 
 ### 3.4 API (`apps/api`)
 - [ ] Endpunkte für Warenkorb, Übermittlungen (inkl. Download der Bulk-Datei) und Verlauf hinter

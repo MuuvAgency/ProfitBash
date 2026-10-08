@@ -52,6 +52,8 @@ const REJECTIONS = {
   ENTITY_ARCHIVED: 'Dieselbe Übermittlung archiviert die Entity; weitere Änderungen entfallen.',
   BIDDING_STRATEGY_NOT_SUPPORTED:
     'Platzierungen lassen sich nur ändern, wenn die Kampagne eine feste oder dynamische Gebotsstrategie trägt.',
+  SUPERSEDED: 'Dieselbe Übermittlung ändert dieses Feld noch einmal; es gilt die spätere Angabe.',
+  NOT_SUPPORTED: 'Negatives lassen sich nur archivieren.',
 } as const;
 
 const isStrategy = (value: string | null): value is AmazonAdsBiddingStrategy =>
@@ -151,7 +153,11 @@ export function buildWriteOperations(changes: readonly SubmissionChange[]): Writ
     }
   }
 
-  for (const [ref, group] of groups) {
+  for (const [ref, all] of groups) {
+    // Je Feld gilt die letzte Angabe; frühere blieben sonst ohne Ergebnis offen und gingen später allein raus.
+    const lastByField = new Map(all.map((change) => [change.field, change]));
+    const group = all.filter((change) => lastByField.get(change.field) === change);
+    for (const change of all) if (!group.includes(change)) reject(change, 'SUPERSEDED');
     const first = group[0]!;
     const amazonId = first.amazonEntityId!;
     const archive = group.find((change) => change.field === 'state' && change.after === 'ARCHIVED');
@@ -160,6 +166,11 @@ export function buildWriteOperations(changes: readonly SubmissionChange[]): Writ
       add(first.adProduct, { ref, type: 'archive', entity: archiveEntity(first), amazonId }, [
         archive,
       ]);
+      continue;
+    }
+    if (first.entityType === 'negative_target') {
+      for (const change of group) reject(change, 'NOT_SUPPORTED');
+      changeIdsByRef.delete(ref);
       continue;
     }
 

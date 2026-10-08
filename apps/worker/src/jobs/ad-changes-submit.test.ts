@@ -328,6 +328,44 @@ describe('submitConnectionAdChanges', () => {
     expect(enqueued).toEqual([]);
   });
 
+  it('arbeitet nach einer Drosselung die übrigen Übermittlungen weiter ab und wartet höchstens 10 Minuten', async () => {
+    const first = await submit([update('target', f.keyword, 'bid', '0.75')]);
+    const second = await submit([update('campaign', f.campaign, 'budget', '25')]);
+    answer = (input) =>
+      input.operations[0]!.ref.startsWith('target:')
+        ? {
+            results: [{ ref: input.operations[0]!.ref, status: 'unsent' }],
+            throttled: true,
+            retryAfterMs: 3_600_000,
+          }
+        : allApplied(input);
+
+    await run();
+
+    expect(calls).toHaveLength(2);
+    expect(await submissionRow(first.submissionId)).toMatchObject({ status: 'pending' });
+    expect(await submissionRow(second.submissionId)).toMatchObject({ status: 'finished' });
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0]).toMatchObject({ startAfterSeconds: 600 });
+  });
+
+  it('nimmt eine immer wieder unterbrochene Übermittlung nicht endlos wieder auf', async () => {
+    const { submissionId, changeIds } = await submit([update('target', f.keyword, 'bid', '0.75')]);
+    await testDb.db
+      .update(adChangeSubmissions)
+      .set({ status: 'running', attempts: MAX_SUBMISSION_ATTEMPTS })
+      .where(eq(adChangeSubmissions.id, submissionId));
+
+    await expect(run()).rejects.toBeInstanceOf(JobFailure);
+
+    expect(calls).toHaveLength(0);
+    expect(await changeRow(changeIds[0]!)).toMatchObject({
+      status: 'failed',
+      errorCode: 'UNKNOWN_OUTCOME',
+    });
+    expect(await submissionRow(submissionId)).toMatchObject({ status: 'failed' });
+  });
+
   it('hält bei einem Abbruch die Teilergebnisse fest und lässt den Rest scheitern', async () => {
     const { submissionId, changeIds } = await submit([
       update('target', f.keyword, 'bid', '0.75'),
