@@ -1093,6 +1093,9 @@ describe('Datei-Importe (1.11f)', () => {
       expect(files.get(START).attributes('type')).toBe('date');
       // Heute in der Zeitzone des Profils als spätester Tag.
       expect(files.get(END).attributes('max')).toBe('2026-10-07');
+      // Frühestens 365 Tage davor (2b.2d).
+      expect(files.get(START).attributes('min')).toBe('2025-10-07');
+      expect(files.get(END).attributes('min')).toBe('2025-10-07');
       expect(files.text()).toContain(
         'Ohne Angabe werden die Suchbegriffe der Datei nicht importiert',
       );
@@ -1159,6 +1162,12 @@ describe('Datei-Importe (1.11f)', () => {
       await check('', '2026-09-30', 'Bitte beide Tage angeben oder keinen.');
       await check('2026-09-30', '2026-09-01', '„Zeitraum von“ liegt nach „Zeitraum bis“.');
       await check('2026-10-01', '2026-10-08', 'Der Zeitraum darf nicht in der Zukunft enden.');
+      // Heute ist der 07.10.2026: Der 06.10.2025 liegt 366 Tage zurück (2b.2d).
+      await check(
+        '2025-10-06',
+        '2025-10-31',
+        'Der Zeitraum darf höchstens ein Jahr zurückliegen.',
+      );
       await check(
         '2026-07-01',
         '2026-09-30',
@@ -1171,6 +1180,16 @@ describe('Datei-Importe (1.11f)', () => {
       expect(files.find('#file-import-period-error').exists()).toBe(false);
       await submit();
       expect(posts()).toHaveLength(1);
+    });
+
+    it('lässt einen Zeitraum zu, der genau 365 Tage vor heute beginnt (2b.2d)', async () => {
+      const { files, posts, submit } = await openUpload();
+      await chooseFile(files, new File(['xlsx'], 'kunde-oktober-2025.xlsx'));
+      await files.get(START).setValue('2025-10-07');
+      await files.get(END).setValue('2025-10-31');
+      await submit();
+      expect(files.find('#file-import-period-error').exists()).toBe(false);
+      expect(posts()).toMatchObject([{ periodStart: '2025-10-07', periodEnd: '2025-10-31' }]);
     });
 
     it('zeigt die Ablehnung des Zeitraums durch die API', async () => {

@@ -308,6 +308,7 @@ export const de = {
             future: 'Der Zeitraum darf nicht in der Zukunft enden.',
             tooLong:
               'Beginn und Ende dürfen höchstens {days} Tage auseinanderliegen (mehr exportiert die Werbekonsole nicht).',
+            tooOld: 'Der Zeitraum darf höchstens ein Jahr zurückliegen.',
           },
         },
         submit: 'Hochladen',

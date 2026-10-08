@@ -1,5 +1,11 @@
 import { schema } from '@profitbash/db';
-import { FILE_IMPORT_MAX_BYTES, type ErrorResponse, type FileImport } from '@profitbash/shared';
+import {
+  FILE_IMPORT_MAX_BYTES,
+  oldestBulkPeriodStart,
+  todayInTimezone,
+  type ErrorResponse,
+  type FileImport,
+} from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -172,21 +178,51 @@ describe('POST /api/profiles/:id/file-imports', () => {
       return upload(ids.profile, data);
     };
 
+    /** Kalendertag `days` Tage vor `day` (`YYYY-MM-DD`). */
+    const daysBefore = (day: string, days: number) =>
+      new Date(Date.parse(`${day}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+
     it('speichert den angegebenen Zeitraum, nennt ihn im Audit-Event und in der Liste', async () => {
-      const res = await withPeriod('kunde-september.xlsx', '2026-09-01', '2026-09-30');
+      // Relativ zu heute: Feste Tage wären irgendwann „zu alt“ (2b.2d).
+      const today = todayInTimezone('Europe/Berlin', new Date());
+      const period = { periodStart: daysBefore(today, 37), periodEnd: daysBefore(today, 8) };
+      const res = await withPeriod('kunde-september.xlsx', period.periodStart, period.periodEnd);
       expect(res.status).toBe(201);
-      expect(await readJson<FileImport>(res)).toMatchObject({
-        periodStart: '2026-09-01',
-        periodEnd: '2026-09-30',
-      });
+      expect(await readJson<FileImport>(res)).toMatchObject(period);
       const [event] = await ctx.testDb.db.select().from(auditEvents);
-      expect(event?.target).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2026-09-30' });
+      expect(event?.target).toMatchObject(period);
       const list = await request(ctx, `/api/profiles/${ids.profile}/file-imports`, {
         cookie: admin,
       });
       expect((await readJson<{ fileImports: FileImport[] }>(list)).fileImports).toMatchObject([
-        { periodStart: '2026-09-01', periodEnd: '2026-09-30' },
+        period,
       ]);
+    });
+
+    it('lehnt Zeiträume ab, die mehr als 365 Tage vor heute (Zeitzone des Profils) beginnen (2b.2d)', async () => {
+      // Das Profil liegt in Europe/Berlin; genau 365 Tage zurück ist noch erlaubt.
+      const oldest = oldestBulkPeriodStart(todayInTimezone('Europe/Berlin', new Date()));
+      expect(oldest).toBe(daysBefore(todayInTimezone('Europe/Berlin', new Date()), 365));
+      const allowed = await withPeriod('kunde.xlsx', oldest, oldest);
+      expect(allowed.status).toBe(201);
+      expect(await readJson<FileImport>(allowed)).toMatchObject({ periodStart: oldest });
+
+      const tooOld = await withPeriod('kunde.xlsx', daysBefore(oldest, 1), oldest);
+      expect(tooOld.status).toBe(400);
+      expect((await readJson<ErrorResponse>(tooOld)).error).toEqual({
+        code: 'INVALID_PERIOD',
+        message: 'Der Zeitraum darf höchstens ein Jahr zurückliegen.',
+      });
+      expect(await ctx.testDb.db.select().from(fileImports)).toHaveLength(1);
+
+      // Der Dateiname gewinnt: Die zu alte Angabe wird verworfen und nicht geprüft.
+      const named = await withPeriod(
+        'bulk-a1b2c3-20260801-20260831-1.xlsx',
+        daysBefore(oldest, 30),
+        daysBefore(oldest, 1),
+      );
+      expect(named.status).toBe(201);
+      expect(await readJson<FileImport>(named)).toMatchObject({ periodStart: null });
     });
 
     it('bleibt ohne Angabe leer', async () => {

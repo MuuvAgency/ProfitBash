@@ -1125,9 +1125,9 @@ export interface paths {
                         file: string;
                         /** @enum {string} */
                         complete?: "true" | "false";
-                        /** @description Erster Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
+                        /** @description Erster Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft, höchstens ein Jahr zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
                         periodStart?: string | "";
-                        /** @description Letzter Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
+                        /** @description Letzter Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft, höchstens ein Jahr zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
                         periodEnd?: string | "";
                     };
                 };

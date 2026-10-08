@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BULK_PERIOD_MAX_AGE_DAYS,
   BULK_PERIOD_MAX_DAYS,
   bulkPeriodIssue,
   fileDataStaleness,
@@ -74,6 +75,23 @@ describe('bulkPeriodIssue', () => {
     expect(issue('2026-08-01', '2026-10-01')).toBe('tooLong');
     // Über die Umstellung auf Winterzeit hinweg zählen Kalendertage, nicht Stunden.
     expect(issue('2026-10-01', '2026-11-30', '2026-12-31')).toBeNull();
+  });
+
+  it(`lässt den ersten Tag höchstens ${BULK_PERIOD_MAX_AGE_DAYS} Tage vor „heute“ liegen, ohne „heute“ prüft es das nicht`, () => {
+    expect(BULK_PERIOD_MAX_AGE_DAYS).toBe(365);
+    // Heute ist der 07.10.2026: Genau 365 Tage zurück liegt der 07.10.2025, der Tag selbst ist erlaubt.
+    expect(issue('2025-10-07', '2025-10-31')).toBeNull();
+    expect(issue('2025-10-06', '2025-10-31')).toBe('tooOld');
+    // Der Tippfehler im Jahr.
+    expect(issue('2025-09-01', '2025-09-30')).toBe('tooOld');
+    expect(bulkPeriodIssue({ startDate: '2025-09-01', endDate: '2025-09-30' })).toBeNull();
+    // Über einen Schalttag hinweg zählen Kalendertage: 365 Tage vor dem 01.03.2028 ist der 02.03.2027.
+    expect(issue('2027-03-02', '2027-03-31', '2028-03-01')).toBeNull();
+    expect(issue('2027-03-01', '2027-03-31', '2028-03-01')).toBe('tooOld');
+  });
+
+  it('meldet bei zu langem und zu altem Zeitraum die Länge (die prüft auch die API ohne „heute“)', () => {
+    expect(issue('2025-09-01', '2026-09-30')).toBe('tooLong');
   });
 });
 
