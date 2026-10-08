@@ -1,4 +1,4 @@
-import { tokenizeSearchTerm } from '@profitbash/engine';
+import { comparableSearchTerm } from '@profitbash/engine';
 import { DEFAULT_SEARCH_TERM_RULES, type SearchTermRulesInput } from '@profitbash/shared';
 import { and, asc, desc, eq, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { getOrgRole, visibleProfilesScope } from './access';
@@ -203,13 +203,10 @@ export async function querySearchTermPeriod(
     rows: rows.map(({ importedAt: _importedAt, ...row }) => ({
       ...row,
       expression: row.expression ?? null,
-      alreadyTargeted: exact.has(comparableTerm(row.searchTerm)),
+      alreadyTargeted: exact.has(comparableSearchTerm(row.searchTerm)),
     })),
   };
 }
-
-/** Vergleichsform eines Begriffs: klein, NFC, Leerraum zusammengefasst (wie die Wörter der N-Gramme). */
-const comparableTerm = (term: string) => tokenizeSearchTerm(term).join(' ');
 
 /**
  * Begriffe, die im Profil schon exakt gebucht sind (in Vergleichsform): exakte Keywords und ASINs exakter
@@ -234,7 +231,7 @@ async function exactTargetTerms(db: Db, profileId: string): Promise<Set<string>>
   const terms = new Set<string>();
   for (const target of targets) {
     const term = target.keywordText ?? target.asin;
-    if (term) terms.add(comparableTerm(term));
+    if (term) terms.add(comparableSearchTerm(term));
   }
   return terms;
 }
