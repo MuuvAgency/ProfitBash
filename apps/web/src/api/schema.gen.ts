@@ -2271,6 +2271,904 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/changes/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Warenkorb des Nutzers mit den Prüfungen vor dem Übermitteln */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Warenkorb. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PendingAdChangesResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Änderungen in den Warenkorb legen (Recht „write“)
+         * @description Gültige Änderungen werden übernommen, auch wenn andere derselben Anfrage abgelehnt werden. Den Wert „vorher“ liest der Server aus der Entity. Derselbe Wert wie der Stand nimmt eine vorgemerkte Änderung zurück.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["StageAdChangesRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis je Änderung. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StageAdChangesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/pending/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Eigene vorgemerkte Änderungen verwerfen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DiscardAdChangesRequest"];
+                };
+            };
+            responses: {
+                /** @description Verworfen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DiscardAdChangesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Warenkorb übermitteln: über die API oder als Bulk-Datei (Recht „write“)
+         * @description Je Profil entsteht eine Übermittlung. Liegt ein Wert außerhalb der Grenzen von Amazon, wird nichts übermittelt (`limitsExceeded`). Warnungen (Gebot oder Budget um mehr als 50 % geändert, mehr als 200 Änderungen) brauchen `confirmWarnings` (`needsConfirmation`). Als Bulk-Datei: Änderungen, die nicht in die Datei passen, scheitern sofort (`bulkFileSkipped`).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SubmitAdChangesRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SubmitAdChangesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Ein Profil ohne Connection lässt sich nur als Bulk-Datei übermitteln. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis), für die Anzeige je Entity */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Offene Änderungen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OpenAdChangesResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verlauf: übermittelte Änderungen einer Entity, eines Profils oder aller sichtbaren Profile */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdChangeHistoryRequest"];
+                };
+            };
+            responses: {
+                /** @description Verlauf, neueste zuerst. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdChangeHistoryResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Übermittlungen der Organisation, neueste zuerst (höchstens 100) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Übermittlungen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdChangeSubmissionsResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/submissions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Eine Übermittlung mit dem Ergebnis je Änderung */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Übermittlung. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdChangeSubmissionDetail"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Übermittlung nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/submissions/{id}/bulk-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk-Datei einer Übermittlung zum Hochladen in der Werbekonsole (Recht „write“)
+         * @description Enthält die Änderungen, die als übermittelt oder angewendet gelten. Portfolio und Enddatum der Kampagnenzeilen stammen vom letzten Sync bzw. Import (`entitiesSyncedAt` der Übermittlung).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Die Datei (.xlsx). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Übermittlung nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Übermittlung per Bulk-Datei oder keine Zeile für die Datei. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/submissions/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Übermittlung per Bulk-Datei von Hand abschließen: hochgeladen oder verworfen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CloseAdChangeSubmissionRequest"];
+                };
+            };
+            responses: {
+                /** @description Abgeschlossen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CloseAdChangeSubmissionResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Übermittlung nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine offene Übermittlung per Bulk-Datei. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fehlgeschlagene Änderungen erneut versuchen, als neue Übermittlung (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RetryAdChangesRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RetryAdChangesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Ein Profil ohne Connection lässt sich nur als Bulk-Datei übermitteln. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fehlgeschlagene Änderungen verwerfen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DismissAdChangesRequest"];
+                };
+            };
+            responses: {
+                /** @description Verworfen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DismissAdChangesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/changes/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Angewendete Änderungen zurücknehmen, als neue Übermittlung (Recht „write“)
+         * @description Eine ganze Übermittlung oder einzelne Änderungen. Weicht der Stand vom Wert nach der Übermittlung ab, kommt `conflict` zurück und nichts wird übermittelt; erst mit `overwriteChanged` wird überschrieben.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RevertAdChangesRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RevertAdChangesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Ein Profil ohne Connection lässt sich nur als Bulk-Datei übermitteln. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/members": {
         parameters: {
             query?: never;
@@ -3544,6 +4442,493 @@ export interface components {
             /** Format: uuid */
             profileId: string;
             overrides: components["schemas"]["SearchTermRuleOverrides"];
+        };
+        PendingAdChangesResponse: {
+            changes: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                profileId: string;
+                accountName: string;
+                countryCode: string;
+                adProduct: string;
+                /** @enum {string} */
+                status: "pending" | "submitted" | "applied" | "failed" | "dismissed";
+                /** @enum {string} */
+                origin: "explorer" | "search_terms" | "revert" | "retry";
+                /** Format: uuid */
+                originChangeId: string | null;
+                /** @enum {string} */
+                operation: "update" | "create";
+                /** @enum {string} */
+                entityType: "campaign" | "ad_group" | "target" | "product_ad" | "negative_target";
+                /** Format: uuid */
+                entityId: string | null;
+                /** Format: uuid */
+                campaignId: string;
+                campaignName: string | null;
+                /** Format: uuid */
+                adGroupId: string | null;
+                adGroupName: string | null;
+                /** @enum {string|null} */
+                field: "state" | "budget" | "bidding_strategy" | "placement_top" | "placement_rest_of_search" | "placement_product_page" | "placement_amazon_business" | "default_bid" | "bid" | null;
+                before: string | null;
+                after: string | null;
+                currencyCode: string | null;
+                negative: {
+                    /** @enum {string} */
+                    type: "keyword";
+                    keywordText: string;
+                    /** @enum {string} */
+                    matchType: "EXACT" | "PHRASE";
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                } | null;
+                entity: {
+                    targetType: string | null;
+                    keywordText: string | null;
+                    matchType: string | null;
+                    expression?: unknown;
+                    asin: string | null;
+                    sku: string | null;
+                } | null;
+                /** Format: uuid */
+                submissionId: string | null;
+                amazonEntityId: string | null;
+                errorCode: string | null;
+                errorMessage: string | null;
+                /** Format: date-time */
+                resolvedAt: string | null;
+                /** Format: uuid */
+                createdBy: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+                otherUsers: {
+                    /** Format: uuid */
+                    userId: string;
+                    name: string;
+                }[];
+            }[];
+            check: components["schemas"]["AdChangeCheck"];
+        };
+        AdChangeCheck: {
+            violations: ({
+                /** Format: uuid */
+                changeId: string;
+                /** @enum {string} */
+                code: "belowMinimum" | "aboveMaximum";
+                min: string;
+                max: string;
+            } | {
+                /** Format: uuid */
+                changeId: string;
+                /** @enum {string} */
+                code: "tooLong" | "tooManyWords";
+                max: number;
+            })[];
+            largeChanges: {
+                /** Format: uuid */
+                changeId: string;
+                changePercent: string;
+            }[];
+            tooMany: {
+                count: number;
+                limit: number;
+            } | null;
+        };
+        StageAdChangesResponse: {
+            results: ({
+                /** @enum {string} */
+                outcome: "created" | "updated";
+                /** Format: uuid */
+                changeId: string;
+                otherUsers: number;
+            } | {
+                /** @enum {string} */
+                outcome: "removed" | "unchanged";
+            } | {
+                /** @enum {string} */
+                outcome: "rejected";
+                /** @enum {string} */
+                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+            })[];
+            counts: {
+                created: number;
+                updated: number;
+                removed: number;
+                unchanged: number;
+                rejected: number;
+            };
+        };
+        StageAdChangesRequest: {
+            /** @enum {string} */
+            origin: "explorer" | "search_terms";
+            changes: components["schemas"]["AdChangeInput"][];
+        };
+        AdChangeInput: {
+            /** @enum {string} */
+            operation: "update";
+            /** @enum {string} */
+            entityType: "campaign" | "ad_group" | "target" | "product_ad" | "negative_target";
+            /** Format: uuid */
+            entityId: string;
+            /** @enum {string} */
+            field: "state" | "budget" | "bidding_strategy" | "placement_top" | "placement_rest_of_search" | "placement_product_page" | "placement_amazon_business" | "default_bid" | "bid";
+            value: string;
+        } | {
+            /** @enum {string} */
+            operation: "create_negative";
+            /** Format: uuid */
+            campaignId: string;
+            /** Format: uuid */
+            adGroupId: string | null;
+            negative: {
+                /** @enum {string} */
+                type: "keyword";
+                keywordText: string;
+                /** @enum {string} */
+                matchType: "EXACT" | "PHRASE";
+            } | {
+                /** @enum {string} */
+                type: "product";
+                asin: string;
+            };
+        };
+        DiscardAdChangesResponse: {
+            discarded: number;
+        };
+        DiscardAdChangesRequest: {
+            changeIds?: string[];
+        };
+        SubmitAdChangesResponse: {
+            /** @enum {string} */
+            status: "submitted";
+            submissions: components["schemas"]["AdChangeSubmission"][];
+            dropped: number;
+            blocked: {
+                /** Format: uuid */
+                changeId: string;
+                /** @enum {string} */
+                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+            }[];
+            bulkFileSkipped: {
+                /** Format: uuid */
+                changeId: string;
+                code: string;
+                message: string;
+            }[];
+        } | {
+            /** @enum {string} */
+            status: "needsConfirmation";
+            check: components["schemas"]["AdChangeCheck"];
+        } | {
+            /** @enum {string} */
+            status: "limitsExceeded";
+            check: components["schemas"]["AdChangeCheck"];
+        };
+        AdChangeSubmission: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            profileId: string;
+            accountName: string;
+            countryCode: string;
+            /** @enum {string} */
+            channel: "api" | "bulk_file";
+            /** @enum {string} */
+            status: "pending" | "running" | "finished" | "failed";
+            error: string | null;
+            /** Format: uuid */
+            createdBy: string | null;
+            createdByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            finishedAt: string | null;
+            changes: number;
+            counts: {
+                submitted: number;
+                applied: number;
+                failed: number;
+                dismissed: number;
+            };
+        };
+        SubmitAdChangesRequest: {
+            /** @enum {string} */
+            channel: "api" | "bulk_file";
+            /** Format: uuid */
+            profileId?: string;
+            changeIds?: string[];
+            confirmWarnings?: boolean;
+        };
+        OpenAdChangesResponse: {
+            changes: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                profileId: string;
+                /** @enum {string} */
+                status: "pending" | "submitted";
+                /** @enum {string|null} */
+                channel: "api" | "bulk_file" | null;
+                /** Format: uuid */
+                submissionId: string | null;
+                /** @enum {string} */
+                operation: "update" | "create";
+                /** @enum {string} */
+                entityType: "campaign" | "ad_group" | "target" | "product_ad" | "negative_target";
+                /** Format: uuid */
+                entityId: string | null;
+                /** Format: uuid */
+                campaignId: string;
+                /** Format: uuid */
+                adGroupId: string | null;
+                /** @enum {string|null} */
+                field: "state" | "budget" | "bidding_strategy" | "placement_top" | "placement_rest_of_search" | "placement_product_page" | "placement_amazon_business" | "default_bid" | "bid" | null;
+                after: string | null;
+                mine: boolean;
+                userName: string | null;
+            }[];
+            truncated: boolean;
+        };
+        AdChangeHistoryResponse: {
+            changes: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                profileId: string;
+                accountName: string;
+                countryCode: string;
+                adProduct: string;
+                /** @enum {string} */
+                status: "pending" | "submitted" | "applied" | "failed" | "dismissed";
+                /** @enum {string} */
+                origin: "explorer" | "search_terms" | "revert" | "retry";
+                /** Format: uuid */
+                originChangeId: string | null;
+                /** @enum {string} */
+                operation: "update" | "create";
+                /** @enum {string} */
+                entityType: "campaign" | "ad_group" | "target" | "product_ad" | "negative_target";
+                /** Format: uuid */
+                entityId: string | null;
+                /** Format: uuid */
+                campaignId: string;
+                campaignName: string | null;
+                /** Format: uuid */
+                adGroupId: string | null;
+                adGroupName: string | null;
+                /** @enum {string|null} */
+                field: "state" | "budget" | "bidding_strategy" | "placement_top" | "placement_rest_of_search" | "placement_product_page" | "placement_amazon_business" | "default_bid" | "bid" | null;
+                before: string | null;
+                after: string | null;
+                currencyCode: string | null;
+                negative: {
+                    /** @enum {string} */
+                    type: "keyword";
+                    keywordText: string;
+                    /** @enum {string} */
+                    matchType: "EXACT" | "PHRASE";
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                } | null;
+                entity: {
+                    targetType: string | null;
+                    keywordText: string | null;
+                    matchType: string | null;
+                    expression?: unknown;
+                    asin: string | null;
+                    sku: string | null;
+                } | null;
+                /** Format: uuid */
+                submissionId: string | null;
+                amazonEntityId: string | null;
+                errorCode: string | null;
+                errorMessage: string | null;
+                /** Format: date-time */
+                resolvedAt: string | null;
+                /** Format: uuid */
+                createdBy: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+                /** @enum {string|null} */
+                channel: "api" | "bulk_file" | null;
+                createdByName: string | null;
+            }[];
+        };
+        AdChangeHistoryRequest: {
+            /** @enum {string} */
+            entityType?: "campaign" | "ad_group" | "target" | "product_ad" | "negative_target";
+            /** Format: uuid */
+            entityId?: string;
+            /** Format: uuid */
+            profileId?: string;
+            limit?: number;
+        };
+        AdChangeSubmissionsResponse: {
+            submissions: components["schemas"]["AdChangeSubmission"][];
+        };
+        AdChangeSubmissionDetail: {
+            submission: components["schemas"]["AdChangeSubmission"];
+            changes: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                profileId: string;
+                accountName: string;
+                countryCode: string;
+                adProduct: string;
+                /** @enum {string} */
+                status: "pending" | "submitted" | "applied" | "failed" | "dismissed";
+                /** @enum {string} */
+                origin: "explorer" | "search_terms" | "revert" | "retry";
+                /** Format: uuid */
+                originChangeId: string | null;
+                /** @enum {string} */
+                operation: "update" | "create";
+                /** @enum {string} */
+                entityType: "campaign" | "ad_group" | "target" | "product_ad" | "negative_target";
+                /** Format: uuid */
+                entityId: string | null;
+                /** Format: uuid */
+                campaignId: string;
+                campaignName: string | null;
+                /** Format: uuid */
+                adGroupId: string | null;
+                adGroupName: string | null;
+                /** @enum {string|null} */
+                field: "state" | "budget" | "bidding_strategy" | "placement_top" | "placement_rest_of_search" | "placement_product_page" | "placement_amazon_business" | "default_bid" | "bid" | null;
+                before: string | null;
+                after: string | null;
+                currencyCode: string | null;
+                negative: {
+                    /** @enum {string} */
+                    type: "keyword";
+                    keywordText: string;
+                    /** @enum {string} */
+                    matchType: "EXACT" | "PHRASE";
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                } | null;
+                entity: {
+                    targetType: string | null;
+                    keywordText: string | null;
+                    matchType: string | null;
+                    expression?: unknown;
+                    asin: string | null;
+                    sku: string | null;
+                } | null;
+                /** Format: uuid */
+                submissionId: string | null;
+                amazonEntityId: string | null;
+                errorCode: string | null;
+                errorMessage: string | null;
+                /** Format: date-time */
+                resolvedAt: string | null;
+                /** Format: uuid */
+                createdBy: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+                followUp: {
+                    /** Format: uuid */
+                    changeId: string;
+                    /** @enum {string} */
+                    origin: "retry" | "revert";
+                    /** @enum {string} */
+                    status: "pending" | "submitted" | "applied" | "failed" | "dismissed";
+                    /** Format: uuid */
+                    submissionId: string | null;
+                } | null;
+            }[];
+            /** Format: date-time */
+            entitiesSyncedAt: string | null;
+        };
+        CloseAdChangeSubmissionResponse: {
+            changes: number;
+        };
+        CloseAdChangeSubmissionRequest: {
+            /** @enum {string} */
+            outcome: "applied" | "discarded";
+        };
+        RetryAdChangesResponse: {
+            submissions: components["schemas"]["AdChangeSubmission"][];
+            skipped: {
+                /** Format: uuid */
+                changeId: string;
+                /** @enum {string} */
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+            }[];
+            bulkFileSkipped: {
+                /** Format: uuid */
+                changeId: string;
+                code: string;
+                message: string;
+            }[];
+        };
+        RetryAdChangesRequest: {
+            changeIds: string[];
+            /** @enum {string} */
+            channel: "api" | "bulk_file";
+        };
+        DismissAdChangesResponse: {
+            dismissed: number;
+        };
+        DismissAdChangesRequest: {
+            changeIds: string[];
+        };
+        RevertAdChangesResponse: {
+            /** @enum {string} */
+            status: "conflict";
+            conflicts: {
+                /** Format: uuid */
+                changeId: string;
+                expected: string;
+                current: string | null;
+            }[];
+            skipped: {
+                /** Format: uuid */
+                changeId: string;
+                /** @enum {string} */
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+            }[];
+        } | {
+            /** @enum {string} */
+            status: "submitted";
+            submissions: components["schemas"]["AdChangeSubmission"][];
+            skipped: {
+                /** Format: uuid */
+                changeId: string;
+                /** @enum {string} */
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+            }[];
+            bulkFileSkipped: {
+                /** Format: uuid */
+                changeId: string;
+                code: string;
+                message: string;
+            }[];
+        };
+        RevertAdChangesRequest: {
+            /** Format: uuid */
+            submissionId?: string;
+            changeIds?: string[];
+            /** @enum {string} */
+            channel: "api" | "bulk_file";
+            overwriteChanged?: boolean;
         };
         MemberList: {
             members: components["schemas"]["Member"][];

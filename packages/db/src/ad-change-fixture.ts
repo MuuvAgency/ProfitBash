@@ -43,19 +43,31 @@ export interface AdChangeFixture {
 
 const SP = 'SPONSORED_PRODUCTS';
 
-export async function seedAdChangeFixture(db: Db, slug = 'muuv'): Promise<AdChangeFixture> {
-  const org = await createTestOrganization(db, slug);
-  const [ada, emil] = await db
-    .insert(users)
-    .values([
-      { name: 'Ada', email: `ada@${slug}.test` },
-      { name: 'Emil', email: `emil@${slug}.test` },
-    ])
-    .returning({ id: users.id });
-  await db.insert(members).values([
-    { organizationId: org, userId: ada!.id, role: 'admin', createdAt: new Date() },
-    { organizationId: org, userId: emil!.id, role: 'editor', createdAt: new Date() },
-  ]);
+/**
+ * `existing`: eine vorhandene Organisation mit zwei Mitgliedern statt neu angelegter (z. B. die Seed-Organisation
+ * der API-Tests mit echten Logins).
+ */
+export async function seedAdChangeFixture(
+  db: Db,
+  slug = 'muuv',
+  existing?: { org: string; ada: string; emil: string },
+): Promise<AdChangeFixture> {
+  const org = existing?.org ?? (await createTestOrganization(db, slug));
+  let ada: { id: string } | undefined = existing && { id: existing.ada };
+  let emil: { id: string } | undefined = existing && { id: existing.emil };
+  if (!existing) {
+    [ada, emil] = await db
+      .insert(users)
+      .values([
+        { name: 'Ada', email: `ada@${slug}.test` },
+        { name: 'Emil', email: `emil@${slug}.test` },
+      ])
+      .returning({ id: users.id });
+    await db.insert(members).values([
+      { organizationId: org, userId: ada!.id, role: 'admin', createdAt: new Date() },
+      { organizationId: org, userId: emil!.id, role: 'editor', createdAt: new Date() },
+    ]);
+  }
   const connection = await createTestConnection(db, org, `amzn1.account.${slug}`);
   const base = {
     organizationId: org,

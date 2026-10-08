@@ -3701,6 +3701,2258 @@
         ],
         "additionalProperties": false
       },
+      "PendingAdChangesResponse": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "profileId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "accountName": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string"
+                },
+                "adProduct": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "submitted",
+                    "applied",
+                    "failed",
+                    "dismissed"
+                  ]
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "explorer",
+                    "search_terms",
+                    "revert",
+                    "retry"
+                  ]
+                },
+                "originChangeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "update",
+                    "create"
+                  ]
+                },
+                "entityType": {
+                  "type": "string",
+                  "enum": [
+                    "campaign",
+                    "ad_group",
+                    "target",
+                    "product_ad",
+                    "negative_target"
+                  ]
+                },
+                "entityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "campaignId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "campaignName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "adGroupId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "adGroupName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "state",
+                    "budget",
+                    "bidding_strategy",
+                    "placement_top",
+                    "placement_rest_of_search",
+                    "placement_product_page",
+                    "placement_amazon_business",
+                    "default_bid",
+                    "bid",
+                    null
+                  ]
+                },
+                "before": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "currencyCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "negative": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "keyword"
+                          ]
+                        },
+                        "keywordText": {
+                          "type": "string"
+                        },
+                        "matchType": {
+                          "type": "string",
+                          "enum": [
+                            "EXACT",
+                            "PHRASE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "keywordText",
+                        "matchType"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "product"
+                          ]
+                        },
+                        "asin": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "asin"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "entity": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "targetType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "keywordText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "matchType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expression": {},
+                    "asin": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sku": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "targetType",
+                    "keywordText",
+                    "matchType",
+                    "asin",
+                    "sku"
+                  ]
+                },
+                "submissionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "amazonEntityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resolvedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "otherUsers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "userId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "userId",
+                      "name"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "profileId",
+                "accountName",
+                "countryCode",
+                "adProduct",
+                "status",
+                "origin",
+                "originChangeId",
+                "operation",
+                "entityType",
+                "entityId",
+                "campaignId",
+                "campaignName",
+                "adGroupId",
+                "adGroupName",
+                "field",
+                "before",
+                "after",
+                "currencyCode",
+                "negative",
+                "entity",
+                "submissionId",
+                "amazonEntityId",
+                "errorCode",
+                "errorMessage",
+                "resolvedAt",
+                "createdBy",
+                "createdAt",
+                "updatedAt",
+                "otherUsers"
+              ]
+            }
+          },
+          "check": {
+            "$ref": "#/components/schemas/AdChangeCheck"
+          }
+        },
+        "required": [
+          "changes",
+          "check"
+        ]
+      },
+      "AdChangeCheck": {
+        "type": "object",
+        "properties": {
+          "violations": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "belowMinimum",
+                        "aboveMaximum"
+                      ]
+                    },
+                    "min": {
+                      "type": "string"
+                    },
+                    "max": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "code",
+                    "min",
+                    "max"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "tooLong",
+                        "tooManyWords"
+                      ]
+                    },
+                    "max": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "code",
+                    "max"
+                  ]
+                }
+              ]
+            }
+          },
+          "largeChanges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "changeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "changePercent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "changeId",
+                "changePercent"
+              ]
+            }
+          },
+          "tooMany": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "count",
+              "limit"
+            ]
+          }
+        },
+        "required": [
+          "violations",
+          "largeChanges",
+          "tooMany"
+        ]
+      },
+      "StageAdChangesResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "created",
+                        "updated"
+                      ]
+                    },
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "otherUsers": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "outcome",
+                    "changeId",
+                    "otherUsers"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "removed",
+                        "unchanged"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "outcome"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "rejected"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "notFound",
+                        "entityRemoved",
+                        "entityArchived",
+                        "budgetNotDaily",
+                        "adProductNotSupported",
+                        "alreadyExists"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "outcome",
+                    "reason"
+                  ]
+                }
+              ]
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "created": {
+                "type": "integer"
+              },
+              "updated": {
+                "type": "integer"
+              },
+              "removed": {
+                "type": "integer"
+              },
+              "unchanged": {
+                "type": "integer"
+              },
+              "rejected": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "created",
+              "updated",
+              "removed",
+              "unchanged",
+              "rejected"
+            ]
+          }
+        },
+        "required": [
+          "results",
+          "counts"
+        ]
+      },
+      "StageAdChangesRequest": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "enum": [
+              "explorer",
+              "search_terms"
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdChangeInput"
+            },
+            "minItems": 1,
+            "maxItems": 5000
+          }
+        },
+        "required": [
+          "origin",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "AdChangeInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "update"
+                ]
+              },
+              "entityType": {
+                "type": "string",
+                "enum": [
+                  "campaign",
+                  "ad_group",
+                  "target",
+                  "product_ad",
+                  "negative_target"
+                ]
+              },
+              "entityId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "state",
+                  "budget",
+                  "bidding_strategy",
+                  "placement_top",
+                  "placement_rest_of_search",
+                  "placement_product_page",
+                  "placement_amazon_business",
+                  "default_bid",
+                  "bid"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "entityType",
+              "entityId",
+              "field",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "create_negative"
+                ]
+              },
+              "campaignId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "adGroupId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "negative": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "keyword"
+                        ]
+                      },
+                      "keywordText": {
+                        "type": "string"
+                      },
+                      "matchType": {
+                        "type": "string",
+                        "enum": [
+                          "EXACT",
+                          "PHRASE"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "keywordText",
+                      "matchType"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "product"
+                        ]
+                      },
+                      "asin": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "asin"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": [
+              "operation",
+              "campaignId",
+              "adGroupId",
+              "negative"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "DiscardAdChangesResponse": {
+        "type": "object",
+        "properties": {
+          "discarded": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "discarded"
+        ]
+      },
+      "DiscardAdChangesRequest": {
+        "type": "object",
+        "properties": {
+          "changeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 5000
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubmitAdChangesResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "submitted"
+                ]
+              },
+              "submissions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AdChangeSubmission"
+                }
+              },
+              "dropped": {
+                "type": "integer"
+              },
+              "blocked": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "notFound",
+                        "entityRemoved",
+                        "entityArchived",
+                        "budgetNotDaily",
+                        "adProductNotSupported",
+                        "alreadyExists"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "reason"
+                  ]
+                }
+              },
+              "bulkFileSkipped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "status",
+              "submissions",
+              "dropped",
+              "blocked",
+              "bulkFileSkipped"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "needsConfirmation"
+                ]
+              },
+              "check": {
+                "$ref": "#/components/schemas/AdChangeCheck"
+              }
+            },
+            "required": [
+              "status",
+              "check"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "limitsExceeded"
+                ]
+              },
+              "check": {
+                "$ref": "#/components/schemas/AdChangeCheck"
+              }
+            },
+            "required": [
+              "status",
+              "check"
+            ]
+          }
+        ]
+      },
+      "AdChangeSubmission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "api",
+              "bulk_file"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "finished",
+              "failed"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "createdByName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "changes": {
+            "type": "integer"
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "submitted": {
+                "type": "integer"
+              },
+              "applied": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "dismissed": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "submitted",
+              "applied",
+              "failed",
+              "dismissed"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "accountName",
+          "countryCode",
+          "channel",
+          "status",
+          "error",
+          "createdBy",
+          "createdByName",
+          "createdAt",
+          "startedAt",
+          "finishedAt",
+          "changes",
+          "counts"
+        ]
+      },
+      "SubmitAdChangesRequest": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "api",
+              "bulk_file"
+            ]
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 5000
+          },
+          "confirmWarnings": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "additionalProperties": false
+      },
+      "OpenAdChangesResponse": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "profileId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "submitted"
+                  ]
+                },
+                "channel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "api",
+                    "bulk_file",
+                    null
+                  ]
+                },
+                "submissionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "update",
+                    "create"
+                  ]
+                },
+                "entityType": {
+                  "type": "string",
+                  "enum": [
+                    "campaign",
+                    "ad_group",
+                    "target",
+                    "product_ad",
+                    "negative_target"
+                  ]
+                },
+                "entityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "campaignId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "adGroupId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "state",
+                    "budget",
+                    "bidding_strategy",
+                    "placement_top",
+                    "placement_rest_of_search",
+                    "placement_product_page",
+                    "placement_amazon_business",
+                    "default_bid",
+                    "bid",
+                    null
+                  ]
+                },
+                "after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mine": {
+                  "type": "boolean"
+                },
+                "userName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "profileId",
+                "status",
+                "channel",
+                "submissionId",
+                "operation",
+                "entityType",
+                "entityId",
+                "campaignId",
+                "adGroupId",
+                "field",
+                "after",
+                "mine",
+                "userName"
+              ]
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "changes",
+          "truncated"
+        ]
+      },
+      "AdChangeHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "profileId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "accountName": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string"
+                },
+                "adProduct": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "submitted",
+                    "applied",
+                    "failed",
+                    "dismissed"
+                  ]
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "explorer",
+                    "search_terms",
+                    "revert",
+                    "retry"
+                  ]
+                },
+                "originChangeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "update",
+                    "create"
+                  ]
+                },
+                "entityType": {
+                  "type": "string",
+                  "enum": [
+                    "campaign",
+                    "ad_group",
+                    "target",
+                    "product_ad",
+                    "negative_target"
+                  ]
+                },
+                "entityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "campaignId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "campaignName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "adGroupId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "adGroupName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "state",
+                    "budget",
+                    "bidding_strategy",
+                    "placement_top",
+                    "placement_rest_of_search",
+                    "placement_product_page",
+                    "placement_amazon_business",
+                    "default_bid",
+                    "bid",
+                    null
+                  ]
+                },
+                "before": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "currencyCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "negative": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "keyword"
+                          ]
+                        },
+                        "keywordText": {
+                          "type": "string"
+                        },
+                        "matchType": {
+                          "type": "string",
+                          "enum": [
+                            "EXACT",
+                            "PHRASE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "keywordText",
+                        "matchType"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "product"
+                          ]
+                        },
+                        "asin": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "asin"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "entity": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "targetType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "keywordText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "matchType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expression": {},
+                    "asin": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sku": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "targetType",
+                    "keywordText",
+                    "matchType",
+                    "asin",
+                    "sku"
+                  ]
+                },
+                "submissionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "amazonEntityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resolvedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "channel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "api",
+                    "bulk_file",
+                    null
+                  ]
+                },
+                "createdByName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "profileId",
+                "accountName",
+                "countryCode",
+                "adProduct",
+                "status",
+                "origin",
+                "originChangeId",
+                "operation",
+                "entityType",
+                "entityId",
+                "campaignId",
+                "campaignName",
+                "adGroupId",
+                "adGroupName",
+                "field",
+                "before",
+                "after",
+                "currencyCode",
+                "negative",
+                "entity",
+                "submissionId",
+                "amazonEntityId",
+                "errorCode",
+                "errorMessage",
+                "resolvedAt",
+                "createdBy",
+                "createdAt",
+                "updatedAt",
+                "channel",
+                "createdByName"
+              ]
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "AdChangeHistoryRequest": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "campaign",
+              "ad_group",
+              "target",
+              "product_ad",
+              "negative_target"
+            ]
+          },
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdChangeSubmissionsResponse": {
+        "type": "object",
+        "properties": {
+          "submissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdChangeSubmission"
+            }
+          }
+        },
+        "required": [
+          "submissions"
+        ]
+      },
+      "AdChangeSubmissionDetail": {
+        "type": "object",
+        "properties": {
+          "submission": {
+            "$ref": "#/components/schemas/AdChangeSubmission"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "profileId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "accountName": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string"
+                },
+                "adProduct": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "submitted",
+                    "applied",
+                    "failed",
+                    "dismissed"
+                  ]
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "explorer",
+                    "search_terms",
+                    "revert",
+                    "retry"
+                  ]
+                },
+                "originChangeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "update",
+                    "create"
+                  ]
+                },
+                "entityType": {
+                  "type": "string",
+                  "enum": [
+                    "campaign",
+                    "ad_group",
+                    "target",
+                    "product_ad",
+                    "negative_target"
+                  ]
+                },
+                "entityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "campaignId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "campaignName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "adGroupId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "adGroupName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "state",
+                    "budget",
+                    "bidding_strategy",
+                    "placement_top",
+                    "placement_rest_of_search",
+                    "placement_product_page",
+                    "placement_amazon_business",
+                    "default_bid",
+                    "bid",
+                    null
+                  ]
+                },
+                "before": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "after": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "currencyCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "negative": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "keyword"
+                          ]
+                        },
+                        "keywordText": {
+                          "type": "string"
+                        },
+                        "matchType": {
+                          "type": "string",
+                          "enum": [
+                            "EXACT",
+                            "PHRASE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "keywordText",
+                        "matchType"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "product"
+                          ]
+                        },
+                        "asin": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "asin"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "entity": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "targetType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "keywordText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "matchType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expression": {},
+                    "asin": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sku": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "targetType",
+                    "keywordText",
+                    "matchType",
+                    "asin",
+                    "sku"
+                  ]
+                },
+                "submissionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "amazonEntityId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resolvedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "createdBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "followUp": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "origin": {
+                      "type": "string",
+                      "enum": [
+                        "retry",
+                        "revert"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "submitted",
+                        "applied",
+                        "failed",
+                        "dismissed"
+                      ]
+                    },
+                    "submissionId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "origin",
+                    "status",
+                    "submissionId"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "profileId",
+                "accountName",
+                "countryCode",
+                "adProduct",
+                "status",
+                "origin",
+                "originChangeId",
+                "operation",
+                "entityType",
+                "entityId",
+                "campaignId",
+                "campaignName",
+                "adGroupId",
+                "adGroupName",
+                "field",
+                "before",
+                "after",
+                "currencyCode",
+                "negative",
+                "entity",
+                "submissionId",
+                "amazonEntityId",
+                "errorCode",
+                "errorMessage",
+                "resolvedAt",
+                "createdBy",
+                "createdAt",
+                "updatedAt",
+                "followUp"
+              ]
+            }
+          },
+          "entitiesSyncedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "submission",
+          "changes",
+          "entitiesSyncedAt"
+        ]
+      },
+      "CloseAdChangeSubmissionResponse": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "CloseAdChangeSubmissionRequest": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "discarded"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "additionalProperties": false
+      },
+      "RetryAdChangesResponse": {
+        "type": "object",
+        "properties": {
+          "submissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdChangeSubmission"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "changeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "notFound",
+                    "notFailed",
+                    "notApplied",
+                    "alreadyRetried",
+                    "alreadyReverted",
+                    "archiveNotRevertible",
+                    "noPreviousValue",
+                    "nothingToChange",
+                    "superseded",
+                    "outcomeUnknown",
+                    "alreadySubmitted",
+                    "entityRemoved",
+                    "entityArchived",
+                    "budgetNotDaily",
+                    "adProductNotSupported",
+                    "alreadyExists"
+                  ]
+                }
+              },
+              "required": [
+                "changeId",
+                "reason"
+              ]
+            }
+          },
+          "bulkFileSkipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "changeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "changeId",
+                "code",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "submissions",
+          "skipped",
+          "bulkFileSkipped"
+        ]
+      },
+      "RetryAdChangesRequest": {
+        "type": "object",
+        "properties": {
+          "changeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 5000
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "api",
+              "bulk_file"
+            ]
+          }
+        },
+        "required": [
+          "changeIds",
+          "channel"
+        ],
+        "additionalProperties": false
+      },
+      "DismissAdChangesResponse": {
+        "type": "object",
+        "properties": {
+          "dismissed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dismissed"
+        ]
+      },
+      "DismissAdChangesRequest": {
+        "type": "object",
+        "properties": {
+          "changeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 5000
+          }
+        },
+        "required": [
+          "changeIds"
+        ],
+        "additionalProperties": false
+      },
+      "RevertAdChangesResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "conflict"
+                ]
+              },
+              "conflicts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "expected": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "expected",
+                    "current"
+                  ]
+                }
+              },
+              "skipped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "notFound",
+                        "notFailed",
+                        "notApplied",
+                        "alreadyRetried",
+                        "alreadyReverted",
+                        "archiveNotRevertible",
+                        "noPreviousValue",
+                        "nothingToChange",
+                        "superseded",
+                        "outcomeUnknown",
+                        "alreadySubmitted",
+                        "entityRemoved",
+                        "entityArchived",
+                        "budgetNotDaily",
+                        "adProductNotSupported",
+                        "alreadyExists"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "reason"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "status",
+              "conflicts",
+              "skipped"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "submitted"
+                ]
+              },
+              "submissions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AdChangeSubmission"
+                }
+              },
+              "skipped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "notFound",
+                        "notFailed",
+                        "notApplied",
+                        "alreadyRetried",
+                        "alreadyReverted",
+                        "archiveNotRevertible",
+                        "noPreviousValue",
+                        "nothingToChange",
+                        "superseded",
+                        "outcomeUnknown",
+                        "alreadySubmitted",
+                        "entityRemoved",
+                        "entityArchived",
+                        "budgetNotDaily",
+                        "adProductNotSupported",
+                        "alreadyExists"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "reason"
+                  ]
+                }
+              },
+              "bulkFileSkipped": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "changeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "changeId",
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "status",
+              "submissions",
+              "skipped",
+              "bulkFileSkipped"
+            ]
+          }
+        ]
+      },
+      "RevertAdChangesRequest": {
+        "type": "object",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 5000
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "api",
+              "bulk_file"
+            ]
+          },
+          "overwriteChanged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "additionalProperties": false
+      },
       "MemberList": {
         "type": "object",
         "properties": {
@@ -6136,6 +8388,822 @@
           },
           "404": {
             "description": "Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/pending": {
+      "get": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Warenkorb des Nutzers mit den Prüfungen vor dem Übermitteln",
+        "responses": {
+          "200": {
+            "description": "Warenkorb.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingAdChangesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Änderungen in den Warenkorb legen (Recht „write“)",
+        "description": "Gültige Änderungen werden übernommen, auch wenn andere derselben Anfrage abgelehnt werden. Den Wert „vorher“ liest der Server aus der Entity. Derselbe Wert wie der Stand nimmt eine vorgemerkte Änderung zurück.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageAdChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis je Änderung.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StageAdChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/pending/discard": {
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Eigene vorgemerkte Änderungen verwerfen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscardAdChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verworfen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscardAdChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/submit": {
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Warenkorb übermitteln: über die API oder als Bulk-Datei (Recht „write“)",
+        "description": "Je Profil entsteht eine Übermittlung. Liegt ein Wert außerhalb der Grenzen von Amazon, wird nichts übermittelt (`limitsExceeded`). Warnungen (Gebot oder Budget um mehr als 50 % geändert, mehr als 200 Änderungen) brauchen `confirmWarnings` (`needsConfirmation`). Als Bulk-Datei: Änderungen, die nicht in die Datei passen, scheitern sofort (`bulkFileSkipped`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAdChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitAdChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ein Profil ohne Connection lässt sich nur als Bulk-Datei übermitteln.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/open": {
+      "get": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis), für die Anzeige je Entity",
+        "responses": {
+          "200": {
+            "description": "Offene Änderungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAdChangesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/history": {
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Verlauf: übermittelte Änderungen einer Entity, eines Profils oder aller sichtbaren Profile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdChangeHistoryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verlauf, neueste zuerst.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdChangeHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/submissions": {
+      "get": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Übermittlungen der Organisation, neueste zuerst (höchstens 100)",
+        "responses": {
+          "200": {
+            "description": "Übermittlungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdChangeSubmissionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/submissions/{id}": {
+      "get": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Eine Übermittlung mit dem Ergebnis je Änderung",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Übermittlung.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdChangeSubmissionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Übermittlung nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/submissions/{id}/bulk-file": {
+      "get": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Bulk-Datei einer Übermittlung zum Hochladen in der Werbekonsole (Recht „write“)",
+        "description": "Enthält die Änderungen, die als übermittelt oder angewendet gelten. Portfolio und Enddatum der Kampagnenzeilen stammen vom letzten Sync bzw. Import (`entitiesSyncedAt` der Übermittlung).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die Datei (.xlsx).",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Übermittlung nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Keine Übermittlung per Bulk-Datei oder keine Zeile für die Datei.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/submissions/{id}/close": {
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Übermittlung per Bulk-Datei von Hand abschließen: hochgeladen oder verworfen (Recht „write“)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseAdChangeSubmissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Abgeschlossen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseAdChangeSubmissionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Übermittlung nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Keine offene Übermittlung per Bulk-Datei.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/retry": {
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Fehlgeschlagene Änderungen erneut versuchen, als neue Übermittlung (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryAdChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryAdChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ein Profil ohne Connection lässt sich nur als Bulk-Datei übermitteln.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/dismiss": {
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Fehlgeschlagene Änderungen verwerfen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissAdChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verworfen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DismissAdChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/changes/revert": {
+      "post": {
+        "tags": [
+          "Änderungen"
+        ],
+        "summary": "Angewendete Änderungen zurücknehmen, als neue Übermittlung (Recht „write“)",
+        "description": "Eine ganze Übermittlung oder einzelne Änderungen. Weicht der Stand vom Wert nach der Übermittlung ab, kommt `conflict` zurück und nichts wird übermittelt; erst mit `overwriteChanged` wird überschrieben.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevertAdChangesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevertAdChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ein Profil ohne Connection lässt sich nur als Bulk-Datei übermitteln.",
             "content": {
               "application/json": {
                 "schema": {
