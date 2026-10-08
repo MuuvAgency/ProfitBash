@@ -25,6 +25,10 @@ Rechner. `AMAZON_ADS_MOCK_SCALE` wählt den Datenumfang:
 | `default` (Standard) | 4 EU-Profile + 1 US-Profil, 3 SP-Kampagnen je Profil, SB und SD nur beim DE-Profil | Tests, schnelle Prüfung der Logik |
 | `large` | 6 Demo-Profile (EUR, GBP, SEK, PLN), 300 Kampagnen (SP, SB, SD), rund 12 200 Targets (ohne Negatives), Kennzahlen für 95 Tage | Layout, Filter und Tempo von Dashboard und Explorer |
 
+Der Mock nimmt auch Änderungen an (Phase 3, Sponsored Products): Updates, Archivieren und neue Negatives enden mit
+einem Ergebnis je Eintrag wie bei Amazon; Gebote und Budgets außerhalb der Grenzen des Marktplatzes lehnt er je Eintrag
+ab (Teilfehler). Er merkt sich die Änderungen nicht: Der nächste Export liefert wieder die erzeugten Daten.
+
 `large` ist nur für die Entwicklung (mit `AMAZON_ADS_USE_MOCK=true`, nie in Produktion). Die Daten sind
 deterministisch (fester Seed je Profil) und erfunden (`packages/amazon-ads/src/mock-large.ts`). Enthalten sind auch
 die Sonderfälle: SB-Kampagnen ohne Kennzahlen (v3-Preview-Lücke), Negatives auf Kampagnen- und Ad-Group-Ebene,

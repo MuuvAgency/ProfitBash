@@ -16,6 +16,7 @@ import {
   type MockProfile,
 } from './mock-data';
 import { LARGE_MOCK_PROFILES, largeMockAccount } from './mock-large';
+import { createMockWrites, type MockWriteSimulation } from './mock-writes';
 import { PORTFOLIOS_CONTENT_TYPE } from './portfolios';
 import {
   REPORT_CREATE_CONTENT_TYPE,
@@ -98,7 +99,7 @@ export interface MockAmazonAdsClientOptions {
 
 export type MockAmazonAdsScale = 'default' | 'large';
 
-export interface MockAmazonAdsSimulation {
+export interface MockAmazonAdsSimulation extends MockWriteSimulation {
   /** Uhr des Mocks (Tests). Standard `Date.now`. */
   now?: () => number;
   /** So lange sind Reports und Exports in Arbeit. Standard 5 s. */
@@ -139,7 +140,7 @@ export function createMockAmazonAdsClient(options: MockAmazonAdsClientOptions): 
 
 /**
  * Simulierte Amazon-Endpunkte für alle Regionen: LWA-Token, LWA-Profil, `/v2/profiles`, Portfolios, Exports,
- * Reporting v3 und die S3-Downloads.
+ * Reporting v3, die S3-Downloads und die Schreib-Endpunkte für Sponsored Products (`mock-writes.ts`).
  */
 function createMockFetch(
   redirectUri: string,
@@ -152,6 +153,7 @@ function createMockFetch(
   }
   const data = MOCK_DATA[scale];
   const jobs = createMockJobs(simulation, data);
+  const handleWrite = createMockWrites(simulation);
 
   return async (input, init) => {
     const request = new Request(input, init);
@@ -212,7 +214,9 @@ function createMockFetch(
       const profile = data.profiles[region].find(
         (p) => p.amazonProfileId === request.headers.get('amazon-advertising-api-scope'),
       );
-      const response = await jobs.handleApi(request, url, region, profile);
+      const response =
+        (await handleWrite(request, url, profile)) ??
+        (await jobs.handleApi(request, url, region, profile));
       if (response) return response;
     }
 

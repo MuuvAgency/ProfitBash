@@ -180,18 +180,61 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     der Verlauf je Entity kommen mit 3.4.
 
 ### 3.2 Schreib-Client (`packages/amazon-ads`), geteilt in 3.2a und 3.2b
-#### 3.2a Schreib-Client gegen den Mock
-- [ ] ADR 005 (F10): Endpunkte je Anzeigentyp nach Doku-Stand, eigenes normalisiertes Modell für Schreibaufträge.
-- [ ] Updates für Status, Budget, Gebote, Gebotsstrategie und Platzierungen je Ad-Typ, Negatives anlegen und archivieren;
-      Ergebnis **je Änderung** (Erfolg, Fehler mit Code und Text von Amazon, neue ID bei Anlage), Teilfehler, Rate-Limits
-      (`Retry-After`, Anfrage-Budget wie beim Lesen); msw-Tests. Mock-Anbieter (`mock.ts`) nimmt Änderungen an.
-- [ ] Grenzen von Amazon je Ad-Typ und Marktplatz (Mindest- und Höchstgebot, Mindestbudget, Platzierung 0–900 %) als Daten mit
-      einer Prüffunktion ohne I/O; Test je Grenze.
+#### 3.2a Schreib-Client gegen den Mock (Sponsored Products)
+- [x] ADR 005 (F10): Endpunkte je Anzeigentyp nach Doku-Stand, eigenes normalisiertes Modell für Schreibaufträge.
+- [x] Updates für Status, Budget, Gebote, Gebotsstrategie und Platzierungen, Negatives anlegen und archivieren für
+      **Sponsored Products**; Ergebnis **je Änderung** (Erfolg, Fehler mit Code und Text von Amazon, neue ID bei Anlage),
+      Teilfehler, Rate-Limits (`Retry-After`, Anfrage-Budget wie beim Lesen); msw-Tests. Mock-Anbieter nimmt Änderungen an.
+- [x] Grenzen von Amazon je Marktplatz für SP (Mindest- und Höchstgebot, Tagesbudget, Platzierung 0–900 %, Länge und
+      Wortzahl negativer Keywords) als Daten mit einer Prüffunktion ohne I/O; Test je Grenze.
+- [x] Umsetzung (Stand für 3.2b, 3.3 und später):
+  - **Doku-Stand** (2026-10-08, über den Browser gelesen): OpenAPI-Spec `SponsoredProducts_prod_3p.json` (Endpunkte,
+    Content-Types, 1000 Einträge je Aufruf, Antwort `207` mit Erfolg und Fehler je `index`) und die Seite „Limits,
+    constraints, and quotas“ (Gebote und Budgets je Marktplatz, Keywords). Einzelheiten in
+    `docs/decisions/005-amazon-ads-write-api.md`.
+  - **Modell** (`packages/amazon-ads/src/writes.ts`): `AmazonAdsWriteOperation` mit `ref` des Aufrufers und drei Arten:
+    `update` (Entity `campaign` mit `state`, `dailyBudget`, `bidding` = Strategie **und** alle Platzierungen; `adGroup`
+    mit `state`, `defaultBid`; `keyword` bzw. `target` mit `state`, `bid`; `productAd` mit `state`), `archive` (neun
+    Entities, auch die vier Arten von Negatives) und `createNegative` (Keyword exakt/Wortgruppe oder ASIN, in Ad Group
+    oder Kampagne). `client.applyChanges(connection, { amazonProfileId, adProduct, operations }, { meter })` →
+    `{ results, retryAfterMs }`, je Änderung `applied` (mit ID) | `failed` (Code und Text) | `unsent` | `unknown`, in
+    der Reihenfolge der Eingabe.
+  - **Ablauf:** je Endpunkt Stücke zu 1000 (`MAX_WRITE_BATCH_SIZE`), erst Updates (Kampagne vor ihren Kindern), dann
+    Archivieren, zuletzt Anlagen. Zuordnung der Antwort über `index`; fehlt ein Eintrag in der Antwort: `unknown`. Ein
+    abgelehnter Aufruf (400) macht sein Stück `failed`, die übrigen Endpunkte laufen weiter. Hält die Drosselung an
+    (429 nach den Wiederholungen bzw. `Retry-After` über 60 s), hört der Client auf: alles Weitere ist `unsent`,
+    `retryAfterMs` nennt die Wartezeit. 5xx und Netzwerkfehler: Updates und Archivieren werden wiederholt, Anlagen nicht
+    (`unknown`). 401, 403 und Re-Auth werden geworfen.
+  - **Beträge** gehen als JSON-Zahl mit den Ziffern des Decimal-Strings raus (`jsonDecimal`/`stringifyJsonLossless` in
+    `json.ts`, `JSON.rawJSON`); IDs bleiben Strings, neue IDs kommen verlustfrei zurück.
+  - **Grenzen** (`limits.ts`): `SP_BID_LIMITS`, `SP_DAILY_BUDGET_LIMITS` für die 13 Marktplätze aus
+    `AMAZON_MARKETPLACES`, `PLACEMENT_PERCENTAGE_LIMIT`, `amazonAdsValueLimitIssue({ adProduct, countryCode, field,
+    value })` → `belowMinimum` | `aboveMaximum` mit den Grenzen, `negativeKeywordLimitIssue` (80 Zeichen; 4 Wörter bei
+    Wortgruppe, 10 bei exakt). Ohne bekannte Grenze (anderer Ad-Typ, anderer Marktplatz) `null`: Amazon entscheidet.
+  - **Mock** (`mock-writes.ts`): alle SP-Schreib-Endpunkte mit Content-Type-Prüfung und `207`-Antwort; Gebote und
+    Budgets außerhalb der Grenzen werden je Eintrag abgelehnt (Teilfehler vorführbar), neue Negatives bekommen IDs,
+    `simulation.throttledWrites` drosselt die ersten Aufrufe. **Der Mock merkt sich Änderungen nicht:** Nach einer
+    Übermittlung liefert der nächste Entity-Sync wieder die alten Werte. Für 3.3 entscheiden (Überlagerung im Mock
+    oder Hinweis in der Demo).
+  - **Für 3.3:** `state = ARCHIVED` aus 3.1 wird zu `archive`; ein Target mit `target_type = keyword` ist `keyword`,
+    sonst `target`; Negatives je Ebene und Art auf die vier Entities; Änderungen an Strategie oder einer Platzierung
+    schicken immer `bidding` mit dem vollständigen Stand (Strategie und alle Platzierungen aus der Entity plus die
+    Änderungen); mehrere Felder einer Entity gehören in **eine** Operation (scheitert sie, scheitern alle ihre Felder).
+    `unknown` nicht blind wiederholen: erst den Stand per Sync prüfen. Die Prüfung der Grenzen vor dem Übermitteln
+    hängt 3.4 ein (`amazonAdsValueLimitIssue` mit dem Land des Profils).
+  - **Nicht enthalten:** Sponsored Brands und Sponsored Display (3.2c; bis dahin `AD_PRODUCT_NOT_SUPPORTED` je Änderung,
+    die Bulk-Datei geht trotzdem), Bulk-Datei (3.2b).
+
 #### 3.2b Bulk-Datei erzeugen (F2)
 - [ ] XLSX-Schreiber in `@profitbash/sheets` (fflate, schmal wie der Leser) und Abbildung der Änderungen eines Profils auf die
       Blätter und Spalten der Werbekonsole (Operation `Update`/`Create`, IDs als Text, Kopfzeilen in der Sprache des Kontos,
       Werte englisch, zentrale Abbildung wie im Import, Ideen-Dokument C.3). Rundlauf-Test: erzeugte Datei mit dem Import-Leser
       lesen.
+
+#### 3.2c Schreib-Client für Sponsored Brands und Sponsored Display
+- [ ] Abbildung von `AmazonAdsWriteOperation` auf SB v4 (Keywords und Targets v3) und SD samt deren Antwortformen, Grenzen
+      je Kostenart (CPC, vCPM) und Marktplatz; Doku-Stand prüfen und ADR 005 ergänzen. Kann nach 3.3 kommen: Die Kunden
+      nutzen heute fast nur SP, und die Bulk-Datei deckt SB und SD ab.
 
 ### 3.3 Übermitteln, Wiederholen, Revert (`apps/worker`, `packages/db`)
 - [ ] Job über `runJob` mit Lease je Connection (wie die Datenjobs): Übermittlung abholen, über den Schreib-Client senden,
@@ -236,6 +279,6 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
 
 ## Reihenfolge für Claude Code
 
-3.1 → 3.2a → 3.2b → 3.3 → 3.4 → 3.5 → 3.6 → 3.8 → 3.7 (die Suchbegriff-Aktionen vor den Tags: Sie schließen die tägliche
+3.1 → 3.2a → 3.2b → 3.3 → 3.4 → 3.5 → 3.6 → 3.8 → 3.7 → 3.2c (die Suchbegriff-Aktionen vor den Tags: Sie schließen die tägliche
 Arbeit aus 2b ab, Tags sind unabhängig). Bis zu drei Aufgaben je Session (`CLAUDE.md`), nach jedem Schritt Tests grün, Commit,
 Häkchen und „Umsetzung“-Notiz.

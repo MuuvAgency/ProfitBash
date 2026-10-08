@@ -35,6 +35,7 @@ Amazon betreibt zwei API-Generationen parallel (Details und Quellen: `docs/tasks
 - Historie ist auf die v3-Aufbewahrung begrenzt (SP 95, SB 60, SD 65 Tage). Unsere DB wird ab dem ersten Sync die einzige längere Historie.
 - Schreiben (Phase 3) ist hiermit nicht entschieden. Naheliegend ist Campaign Management v1; die Exports nutzen Amazons gemeinsames Modell,
   das nah an v1 liegt. Beim Start von Phase 3 als eigene Entscheidung prüfen.
+  **Entschieden am 2026-10-08 in ADR 005:** produktspezifische APIs, SP v3 zuerst.
 - **Wiedervorlage:** Option „(a) plus einmaliger Rückgriff über Reporting v1“ (bis 24 Monate Historie beim ersten Sync, getrennt markiert,
   nie mit v3-Werten vermischt), sobald Reporting v1 GA ist oder ältere Historie gebraucht wird. Ebenso, falls Amazon Exports oder
   Reporting v3 abkündigt.
