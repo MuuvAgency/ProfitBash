@@ -8,6 +8,7 @@ import {
 } from '@profitbash/amazon-ads';
 import {
   confirmBulkFileAdChanges,
+  lockProfileAdChanges,
   findAdGroupCampaignIds,
   markEntitiesRemoved,
   markMetricsImportedThrough,
@@ -147,6 +148,7 @@ async function importEntityBatch(
     throw new Error('Die Exports des Batches gehören zu verschiedenen Profilen oder Ad-Typen.');
   }
   const scope: EntityWriteScope = { organizationId, profileId, now: options.now() };
+  await lockProfileAdChanges(tx, profileId);
 
   const campaigns = campaignsFile.rows as AmazonAdsCampaign[];
   const adGroups = adGroupsFile.rows as AmazonAdsAdGroup[];

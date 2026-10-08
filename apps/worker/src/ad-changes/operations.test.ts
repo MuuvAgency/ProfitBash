@@ -339,6 +339,36 @@ describe('buildWriteOperations', () => {
     ]);
   });
 
+  it('nimmt bei doppelten Feldern einer Entity die letzte Angabe und lehnt die früheren ab', () => {
+    const first = change({ field: 'bid', after: '0.60' });
+    const second = change({ field: 'bid', after: '0.90' });
+    const { operations, changeIdsByRef, rejected } = build([first, second]);
+    expect(operations).toEqual([
+      { ref: 'target:target-1', type: 'update', entity: 'keyword', amazonId: '300', bid: '0.90' },
+    ]);
+    expect(changeIdsByRef.get('target:target-1')).toEqual([second.id]);
+    expect(rejected).toEqual([
+      { changeId: first.id, code: 'SUPERSEDED', message: expect.any(String) },
+    ]);
+  });
+
+  it('lehnt eine Zustandsänderung an einem Negative ab, die kein Archivieren ist', () => {
+    const enable = change({
+      entityType: 'negative_target',
+      entityId: 'n1',
+      amazonEntityId: '900',
+      targetType: 'keyword',
+      negativeLevel: 'ad_group',
+      field: 'state',
+      after: 'ENABLED',
+    });
+    const { operations, rejected } = build([enable]);
+    expect(operations).toEqual([]);
+    expect(rejected).toEqual([
+      { changeId: enable.id, code: 'NOT_SUPPORTED', message: expect.any(String) },
+    ]);
+  });
+
   it('trennt die Operationen nach Ad-Typ', () => {
     const { batches } = buildWriteOperations([
       change({ entityId: 't1', amazonEntityId: '301' }),

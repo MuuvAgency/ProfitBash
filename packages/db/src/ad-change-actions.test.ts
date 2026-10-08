@@ -255,6 +255,86 @@ describe('retryAdChanges', () => {
     });
   });
 
+  it('wiederholt von mehreren Fehlschlägen an derselben Stelle nur den jüngsten', async () => {
+    const older = await processed([update('target', f.keyword, 'bid', '0.75')], [0]);
+    const newer = await processed([update('target', f.keyword, 'bid', '0.80')], [0]);
+
+    const result = await retryAdChanges(testDb.db, {
+      ...ada(),
+      changeIds: [...newer.changeIds, ...older.changeIds],
+      channel: 'api',
+      enqueue,
+    });
+
+    expect(result!.skipped).toEqual([{ changeId: older.changeIds[0], reason: 'superseded' }]);
+    const retries = await changesOf(result!.submissions[0]!.id);
+    expect(retries).toHaveLength(1);
+    expect(retries[0]).toMatchObject({ originChangeId: newer.changeIds[0], newAmount: '0.80' });
+  });
+
+  it('wiederholt eine Anlage mit unklarem Ausgang erst nach dem nächsten Sync', async () => {
+    const { submissionId, changeIds } = await submit([negative('gratis')]);
+    await recordAdChangeResults(testDb.db, {
+      organizationId: f.org,
+      submissionId,
+      now: NOW,
+      results: [
+        { changeId: changeIds[0]!, outcome: 'failed', code: 'UNKNOWN_OUTCOME', message: 'unklar' },
+      ],
+    });
+    const retry = () => retryAdChanges(testDb.db, { ...ada(), changeIds, channel: 'api', enqueue });
+
+    expect(await retry()).toEqual({
+      submissions: [],
+      skipped: [{ changeId: changeIds[0], reason: 'outcomeUnknown' }],
+    });
+
+    // Der Sync nach dem Fehlschlag hat das Negative nicht geliefert: Es wurde nicht angelegt.
+    await testDb.db
+      .update(amazonAdsCampaigns)
+      .set({ syncedAt: new Date(NOW.getTime() + 60_000) })
+      .where(eq(amazonAdsCampaigns.id, f.campaign));
+    expect((await retry())!.submissions).toHaveLength(1);
+    await testDb.db.update(amazonAdsCampaigns).set({ syncedAt: null });
+  });
+
+  it('legt dasselbe Negative nicht zweimal gleichzeitig an (Kette von Versuchen)', async () => {
+    const first = await processed([negative('gratis')], [0]);
+    const second = await retryAdChanges(testDb.db, {
+      ...ada(),
+      changeIds: first.changeIds,
+      channel: 'api',
+      enqueue,
+    });
+    const [secondChange] = await changesOf(second!.submissions[0]!.id);
+    await recordAdChangeResults(testDb.db, {
+      organizationId: f.org,
+      submissionId: second!.submissions[0]!.id,
+      now: NOW,
+      results: [{ changeId: secondChange!.id, outcome: 'failed', code: 'X', message: 'x' }],
+    });
+
+    // Original und gescheiterter Versuch sind beide wiederholbar, meinen aber dasselbe Negative.
+    const result = await retryAdChanges(testDb.db, {
+      ...ada(),
+      changeIds: [first.changeIds[0]!, secondChange!.id],
+      channel: 'api',
+      enqueue,
+    });
+
+    expect(await changesOf(result!.submissions[0]!.id)).toHaveLength(1);
+    expect(result!.skipped).toHaveLength(1);
+    expect(result!.skipped[0]).toMatchObject({ reason: 'alreadySubmitted' });
+    expect(
+      (await retryAdChanges(testDb.db, {
+        ...ada(),
+        changeIds: [result!.skipped[0]!.changeId],
+        channel: 'api',
+        enqueue,
+      }))!.skipped,
+    ).toEqual([{ changeId: result!.skipped[0]!.changeId, reason: 'alreadySubmitted' }]);
+  });
+
   it('sieht keine Änderungen fremder Organisationen oder ausgeblendeter Profile', async () => {
     const { changeIds } = await processed([update('target', f.keyword, 'bid', '0.75')], [0]);
     const input = { changeIds, channel: 'api' as const, enqueue };
@@ -420,6 +500,29 @@ describe('revertAdChanges', () => {
     });
   });
 
+  it('nimmt mehrere Änderungen an derselben Stelle gemeinsam auf den ältesten Wert zurück', async () => {
+    const older = await processed([update('target', f.keyword, 'bid', '0.75')]);
+    const newer = await processed([update('target', f.keyword, 'bid', '0.90')]);
+
+    const result = await revertAdChanges(testDb.db, {
+      ...ada(),
+      changeIds: [...newer.changeIds, ...older.changeIds],
+      channel: 'api',
+      enqueue,
+    });
+
+    // Kein Konflikt: Der Stand entspricht dem „nachher“ der jüngsten Änderung.
+    if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
+    expect(result.skipped).toEqual([{ changeId: newer.changeIds[0], reason: 'superseded' }]);
+    const reverts = await changesOf(result.submissions[0]!.id);
+    expect(reverts).toHaveLength(1);
+    expect(reverts[0]).toMatchObject({
+      originChangeId: older.changeIds[0],
+      oldAmount: '0.90',
+      newAmount: '0.50',
+    });
+  });
+
   it('archiviert ein angelegtes Negative wieder (gefunden über die Amazon-ID)', async () => {
     const { changeIds } = await processed([negative('gratis')]);
     const [created] = await testDb.db
@@ -573,6 +676,23 @@ describe('closeBulkFileSubmission', () => {
       .where(eq(adChangeSubmissions.id, submissionId));
     expect(submission).toMatchObject({ status: 'finished', finishedAt: NOW });
     expect(await auditActions()).toEqual(['ad_change_submission.close']);
+  });
+
+  it('setzt beim Abschließen „vorher“ auf den Stand davor (zwei Übermittlungen an derselben Stelle)', async () => {
+    const first = await submit([update('target', f.fileKeyword, 'bid', '0.75')], 'bulk_file');
+    const second = await submit([update('target', f.fileKeyword, 'bid', '0.90')], 'bulk_file');
+    expect(await changeRow(second.changeIds[0]!)).toMatchObject({ oldAmount: '0.50' });
+    const close = (submissionId: string) =>
+      closeBulkFileSubmission(testDb.db, { ...ada(), submissionId, outcome: 'applied', now: NOW });
+
+    await close(first.submissionId);
+    await close(second.submissionId);
+
+    expect(await changeRow(second.changeIds[0]!)).toMatchObject({
+      status: 'applied',
+      oldAmount: '0.75',
+      newAmount: '0.90',
+    });
   });
 
   it('verwirft eine nicht hochgeladene Bulk-Übermittlung, ohne die Entities anzufassen', async () => {

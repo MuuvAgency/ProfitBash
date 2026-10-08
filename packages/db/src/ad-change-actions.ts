@@ -14,6 +14,7 @@ import {
   chunks,
   currentValue,
   loadEntities,
+  negativeKey,
   sameValue,
   valueColumns,
   type EntitySnapshot,
@@ -21,8 +22,10 @@ import {
 } from './ad-change-entities';
 import {
   applyAdChangeToEntity,
+  AD_CHANGE_UNKNOWN_OUTCOME,
   closeAdChangeSubmission,
   findMatchingNegative,
+  lockProfileAdChanges,
 } from './ad-change-processing';
 import {
   AdChangeError,
@@ -35,6 +38,7 @@ import type { Db } from './client';
 import {
   adChangeSubmissions,
   adChanges,
+  amazonAdsCampaigns,
   amazonAdsNegativeTargets,
   amazonAdsProfiles,
 } from './schema';
@@ -65,6 +69,12 @@ export type AdChangeFollowUpSkipReason =
   | 'noPreviousValue'
   /** Der Stand entspricht schon dem Zielwert. */
   | 'nothingToChange'
+  /** Dieselbe Anfrage nennt eine weitere Änderung an derselben Stelle, die gilt (Retry: die jüngste, Revert: die älteste). */
+  | 'superseded'
+  /** Anlage mit unklarem Ausgang: erst nach dem nächsten Sync bzw. Import wiederholbar (sonst doppelte Negatives). */
+  | 'outcomeUnknown'
+  /** Dasselbe Negative wird an derselben Stelle gerade schon angelegt. */
+  | 'alreadySubmitted'
   | AdChangeRejection;
 
 export interface SkippedAdChange {
@@ -119,7 +129,8 @@ async function loadVisibleChanges(
       .for('update');
   }
   const rows: ChangeRow[] = [];
-  for (const part of chunks([...new Set(filter.changeIds)])) {
+  // Sortiert: Zwei Aufrufe mit denselben IDs sperren die Zeilen in derselben Reihenfolge.
+  for (const part of chunks([...new Set(filter.changeIds)].sort())) {
     rows.push(
       ...(await tx
         .select()
@@ -137,7 +148,56 @@ async function loadVisibleChanges(
         .for('update')),
     );
   }
-  return rows;
+  return rows.sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
+  );
+}
+
+const placeKey = (row: ChangeRow) => `${row.entityType}:${row.entityId}:${row.field}`;
+
+const negativePlaceKey = (row: Pick<ChangeRow, 'campaignId' | 'adGroupId' | 'payload'>) =>
+  `${row.campaignId}:${row.adGroupId}:${negativeKey(row.payload!)}`;
+
+/** Anlagen, die gerade übermittelt werden (noch ohne Ergebnis), nach Stelle und Inhalt. */
+async function submittedNegativeKeys(tx: DbOrTx, rows: readonly ChangeRow[]): Promise<Set<string>> {
+  const keys = new Set<string>();
+  const campaignIds = [
+    ...new Set(rows.flatMap((row) => (row.operation === 'create' ? [row.campaignId] : []))),
+  ];
+  for (const part of chunks(campaignIds)) {
+    const open = await tx
+      .select({
+        campaignId: adChanges.campaignId,
+        adGroupId: adChanges.adGroupId,
+        payload: adChanges.payload,
+      })
+      .from(adChanges)
+      .where(
+        and(
+          inArray(adChanges.campaignId, part),
+          eq(adChanges.operation, 'create'),
+          eq(adChanges.status, 'submitted'),
+        ),
+      );
+    for (const row of open) if (row.payload) keys.add(negativePlaceKey(row));
+  }
+  return keys;
+}
+
+/** Letzter Sync bzw. Import je Kampagne (`synced_at`). */
+async function campaignSyncedAt(
+  tx: DbOrTx,
+  campaignIds: readonly string[],
+): Promise<Map<string, Date | null>> {
+  const found = new Map<string, Date | null>();
+  for (const part of chunks([...new Set(campaignIds)])) {
+    const rows = await tx
+      .select({ id: amazonAdsCampaigns.id, syncedAt: amazonAdsCampaigns.syncedAt })
+      .from(amazonAdsCampaigns)
+      .where(inArray(amazonAdsCampaigns.id, part));
+    for (const row of rows) found.set(row.id, row.syncedAt);
+  }
+  return found;
 }
 
 async function loadSnapshots(
@@ -283,6 +343,21 @@ export async function retryAdChanges(
       rows.map((row) => row.id),
     );
     const snapshots = await loadSnapshots(tx, scope, rows);
+    const retryable = (row: ChangeRow) => row.status === 'failed' && !retried.has(row.id);
+    // Mehrere Fehlschläge an derselben Stelle: Es gilt der jüngste (die Zeilen sind nach Alter sortiert).
+    const newestAtPlace = new Map<string, string>();
+    for (const row of rows) {
+      if (row.operation === 'update' && retryable(row)) newestAtPlace.set(placeKey(row), row.id);
+    }
+    const creating = await submittedNegativeKeys(tx, rows);
+    const syncedAt = await campaignSyncedAt(
+      tx,
+      rows.flatMap((row) =>
+        row.operation === 'create' && row.errorCode === AD_CHANGE_UNKNOWN_OUTCOME
+          ? [row.campaignId]
+          : [],
+      ),
+    );
 
     const changes: NewChange[] = [];
     for (const row of rows) {
@@ -294,7 +369,25 @@ export async function retryAdChanges(
         skip(row.id, 'alreadyRetried');
         continue;
       }
+      if (row.operation === 'update' && newestAtPlace.get(placeKey(row)) !== row.id) {
+        skip(row.id, 'superseded');
+        continue;
+      }
       if (row.operation === 'create') {
+        // Unklarer Ausgang: Erst ein Sync nach dem Fehlschlag zeigt, ob Amazon das Negative angelegt hat.
+        const synced = syncedAt.get(row.campaignId) ?? null;
+        if (
+          row.errorCode === AD_CHANGE_UNKNOWN_OUTCOME &&
+          (synced === null || row.resolvedAt === null || synced <= row.resolvedAt)
+        ) {
+          skip(row.id, 'outcomeUnknown');
+          continue;
+        }
+        const key = negativePlaceKey(row);
+        if (creating.has(key)) {
+          skip(row.id, 'alreadySubmitted');
+          continue;
+        }
         const parent = await checkNegative(tx, scope, {
           campaignId: row.campaignId,
           adGroupId: row.adGroupId,
@@ -304,6 +397,7 @@ export async function retryAdChanges(
           skip(row.id, parent);
           continue;
         }
+        creating.add(key);
         changes.push({ ...samePlace(row), payload: row.payload });
         continue;
       }
@@ -429,6 +523,17 @@ export async function revertAdChanges(
     );
     const snapshots = await loadSnapshots(tx, scope, rows);
 
+    // Mehrere Änderungen an derselben Stelle gehen gemeinsam zurück: Ziel ist „vorher“ der ältesten, verglichen
+    // wird der Stand mit „nachher“ der jüngsten (die Zeilen sind nach Alter sortiert).
+    const atPlace = new Map<string, ChangeRow[]>();
+    for (const row of rows) {
+      if (row.operation !== 'update' || row.status !== 'applied' || reverted.has(row.id)) continue;
+      if (row.field === 'state' && row.newValue === 'ARCHIVED') continue;
+      const list = atPlace.get(placeKey(row)) ?? [];
+      list.push(row);
+      atPlace.set(placeKey(row), list);
+    }
+
     const conflicts: AdChangeRevertConflict[] = [];
     const changes: NewChange[] = [];
     for (const row of rows) {
@@ -440,6 +545,11 @@ export async function revertAdChanges(
         skip(row.id, 'alreadyReverted');
         continue;
       }
+      const together = atPlace.get(placeKey(row));
+      if (together && together[0] !== row) {
+        skip(row.id, 'superseded');
+        continue;
+      }
       if (row.operation === 'create') {
         const archive = await archiveCreatedNegative(tx, scope, row);
         if (typeof archive === 'string') skip(row.id, archive);
@@ -448,7 +558,8 @@ export async function revertAdChanges(
       }
       const field = row.field as AdChangeField;
       const entityType = row.entityType as AdChangeEntityType;
-      const after = (row.newValue ?? row.newAmount)!;
+      const newest = together?.at(-1) ?? row;
+      const after = (newest.newValue ?? newest.newAmount)!;
       if (field === 'state' && after === 'ARCHIVED') {
         skip(row.id, 'archiveNotRevertible');
         continue;
@@ -549,11 +660,12 @@ export async function closeBulkFileSubmission(
   const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
     const s = adChangeSubmissions;
-    const [submission] = await tx
-      .select()
-      .from(s)
-      .where(and(eq(s.id, input.submissionId), inArray(s.profileId, scope.ids)))
-      .for('update');
+    const visible = and(eq(s.id, input.submissionId), inArray(s.profileId, scope.ids));
+    const [found] = await tx.select({ profileId: s.profileId }).from(s).where(visible);
+    if (!found) return null;
+    // Vor allen Zeilensperren, wie der Import (sonst Deadlock mit dessen Bestätigung).
+    await lockProfileAdChanges(tx, found.profileId);
+    const [submission] = await tx.select().from(s).where(visible).for('update');
     if (!submission) return null;
     if (submission.channel !== 'bulk_file' || !['pending', 'running'].includes(submission.status)) {
       throw new AdChangeError(
@@ -573,6 +685,21 @@ export async function closeBulkFileSubmission(
         .where(inArray(adChanges.id, part));
     }
     if (input.outcome === 'applied') {
+      // „Vorher“ endgültig: der Stand unmittelbar vor dem Nachziehen (eine frühere Bulk-Übermittlung an derselben
+      // Stelle kann inzwischen abgeschlossen sein).
+      const snapshots = await loadSnapshots(tx, scope, open);
+      for (const row of open) {
+        if (row.operation !== 'update') continue;
+        const field = row.field as AdChangeField;
+        const after = (row.newValue ?? row.newAmount)!;
+        const current = currentValue(snapshots.get(`${row.entityType}:${row.entityId}`), field);
+        if (typeof current === 'string' || sameValue(field, current.value, after)) continue;
+        if ((row.oldValue ?? row.oldAmount) === current.value) continue;
+        await tx
+          .update(adChanges)
+          .set({ ...valueColumns(field, current.value, after), currencyCode: current.currencyCode })
+          .where(eq(adChanges.id, row.id));
+      }
       // Die Amazon-ID eines neuen Negatives kennt erst der nächste Import.
       for (const row of open) await applyAdChangeToEntity(tx, row, null);
     }

@@ -148,8 +148,9 @@ const text = (value: unknown): string | undefined =>
 
 export function createMockWrites(simulation: MockWriteSimulation) {
   let throttled = simulation.throttledWrites ?? 0;
-  /** Laufende Nummer für neue IDs, nur in diesem Prozess. */
+  /** Laufende Nummer für neue IDs; mit dem Startzeitpunkt, damit ein neuer Prozess keine früheren IDs vergibt. */
   let created = 0;
+  const idPrefix = `88${Date.now()}`;
   const overlays = new Map<string, ProfileOverlay>();
 
   function overlayOf(profile: MockProfile): ProfileOverlay {
@@ -351,7 +352,7 @@ export function createMockWrites(simulation: MockWriteSimulation) {
       const entry = item as Record<string, unknown>;
       if (route.kind === 'create') {
         created += 1;
-        const id = String(880_000_000_000 + created);
+        const id = `${idPrefix}${String(created).padStart(4, '0')}`;
         success.push({ index, [route.idKey]: id });
         rememberNegative(profile, id, entry);
         return;

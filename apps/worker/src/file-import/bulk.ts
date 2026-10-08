@@ -1,5 +1,6 @@
 import {
   confirmBulkFileAdChanges,
+  lockProfileAdChanges,
   campaignOwnership,
   findAdGroupCampaignIds,
   markEntitiesRemoved,
@@ -121,6 +122,7 @@ export const importBulkFile: FileImporter = async (input) => {
   const period = parseBulkPeriod(input.fileName) ?? input.period ?? null;
 
   return input.db.transaction(async (tx) => {
+    await lockProfileAdChanges(tx, input.profileId);
     const records = await collector.finish(async (adGroupIds) =>
       findAdGroupCampaignIds(tx, scope, adGroupIds),
     );

@@ -36,11 +36,14 @@ export const MAX_SUBMISSION_ATTEMPTS = 5;
 export const SUBMIT_TIME_BUDGET_MS = 5 * 60_000;
 /** Wartezeit nach einer Drosselung: mindestens, höchstens und ohne Angabe von Amazon. */
 const MIN_RETRY_SECONDS = 60;
-const MAX_RETRY_SECONDS = 60 * 60;
+/** Länger wartet der Job nie: Er belegt den einzigen Warteplatz der Connection (auch für andere Profile). */
+const MAX_RETRY_SECONDS = 10 * 60;
 
 const UNKNOWN_HINT =
   'Ob Amazon die Änderung angewendet hat, ist unklar; nach dem nächsten Sync prüfen.';
 const THROTTLED_NOTE = 'Amazon hat gedrosselt; der Rest wird automatisch erneut gesendet.';
+const INTERRUPTED_GIVE_UP =
+  'Die Übermittlung wurde wiederholt unterbrochen. Ob Amazon die offenen Änderungen angewendet hat, ist unklar; nach dem nächsten Sync prüfen.';
 const THROTTLED_GIVE_UP = 'Amazon hat wiederholt gedrosselt; die Änderungen wurden nicht gesendet.';
 
 /**
@@ -79,6 +82,8 @@ export async function submitConnectionAdChanges(
   const startedAt = now().getTime();
   const done: string[] = [];
   let failure: string | null = null;
+  /** Wartezeit bis zum nächsten Lauf, wenn Amazon gedrosselt hat. */
+  let retrySeconds: number | null = null;
   for (;;) {
     if (done.length > 0 && now().getTime() - startedAt > SUBMIT_TIME_BUDGET_MS) {
       await deps.enqueue(QUEUE, ref);
@@ -107,6 +112,19 @@ export async function submitConnectionAdChanges(
       return recorded.applied + recorded.failed;
     };
 
+    if (submission.attempts > MAX_SUBMISSION_ATTEMPTS) {
+      // Immer wieder unterbrochen (z. B. ein Fehler beim Festhalten): nicht endlos neu senden.
+      const closed = await finishAdChangeSubmission(deps.db, {
+        ...submissionRef,
+        now: now(),
+        error: INTERRUPTED_GIVE_UP,
+        failRemaining: { code: AD_CHANGE_UNKNOWN_OUTCOME, message: INTERRUPTED_GIVE_UP },
+      });
+      counters.changesFailed! += closed?.failed ?? 0;
+      failure = INTERRUPTED_GIVE_UP;
+      continue;
+    }
+
     const rows = await prepareAdChangeSubmission(deps.db, submissionRef);
     const plan = buildWriteOperations(rows);
     let open = rows.length;
@@ -122,6 +140,8 @@ export async function submitConnectionAdChanges(
     let retryAfterMs: number | null = null;
     let aborted: { cause: unknown } | null = null;
     for (const batch of plan.batches) {
+      // Große Übermittlungen (viele Stücke, Wartezeiten des Anfrage-Budgets) können die Lease überdauern.
+      await run.extendLease();
       let results: readonly AmazonAdsWriteResult[];
       let throttled = false;
       try {
@@ -195,16 +215,18 @@ export async function submitConnectionAdChanges(
       });
       counters.changesUnsent! += open;
       const seconds = Math.ceil((retryAfterMs ?? MIN_RETRY_SECONDS * 1000) / 1000);
-      await deps.enqueue(QUEUE, ref, {
-        startAfterSeconds: Math.min(MAX_RETRY_SECONDS, Math.max(MIN_RETRY_SECONDS, seconds)),
-      });
-      // Die Pause gilt für das Profil; der eingeplante Lauf holt auch die übrigen Übermittlungen ab.
-      break;
+      retrySeconds = Math.max(
+        retrySeconds ?? 0,
+        Math.min(MAX_RETRY_SECONDS, Math.max(MIN_RETRY_SECONDS, seconds)),
+      );
+      // Die Pause gilt für das Profil: Die Übermittlungen anderer Profile gehen in diesem Lauf noch raus.
+      continue;
     }
 
     await finishAdChangeSubmission(deps.db, { ...submissionRef, now: now() });
   }
 
+  if (retrySeconds !== null) await deps.enqueue(QUEUE, ref, { startAfterSeconds: retrySeconds });
   if (failure !== null) throw new JobFailure(failure, counters);
   return { counters };
 }

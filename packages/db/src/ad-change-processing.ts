@@ -49,6 +49,20 @@ export const AD_CHANGE_UNKNOWN_OUTCOME = 'UNKNOWN_OUTCOME';
 /** Nicht an Amazon gesendet (Abbruch, anhaltende Drosselung). */
 export const AD_CHANGE_NOT_SENT = 'NOT_SENT';
 
+const INTERRUPTED_MESSAGE =
+  'Der Lauf wurde unterbrochen. Ob Amazon die Änderung angewendet hat, ist unklar; nach dem nächsten Sync prüfen.';
+
+/**
+ * Sperre je Profil für alles, was offene Übermittlungen per Bulk-Datei **und** Entities desselben Profils in
+ * einer Transaktion anfasst (Import mit Bestätigung, Abschließen von Hand). Am Anfang der Transaktion nehmen:
+ * Sonst sperrt der Import erst Entities und dann die Übermittlung, das Abschließen umgekehrt (Deadlock).
+ */
+export async function lockProfileAdChanges(tx: DbOrTx, profileId: string): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`ad_changes_profile:${profileId}`}, 0))`,
+  );
+}
+
 const INTERRUPTED_CREATE_MESSAGE =
   'Der Lauf wurde unterbrochen. Ob Amazon das Negative angelegt hat, ist unklar; nach dem nächsten Sync prüfen.';
 
@@ -361,6 +375,9 @@ export async function prepareAdChangeSubmission(
         const before = change.oldValue ?? change.oldAmount;
         if (
           typeof current !== 'string' &&
+          // Steht der Stand schon auf dem neuen Wert (ein unterbrochener Lauf hat gewirkt und der Sync lief
+          // dazwischen), bleibt das bisherige „vorher“: Sonst ginge der Wert davor für den Revert verloren.
+          !sameValue(field, current.value, after) &&
           (before !== current.value || change.currencyCode !== current.currencyCode)
         ) {
           await tx
@@ -613,6 +630,14 @@ export async function recordAdChangeResults(
 // Abschließen
 // ---------------------------------------------------------------------------
 
+export interface AdChangeSubmissionClosed {
+  status: AdChangeSubmissionStatus;
+  /** Änderungen, die weiter auf ein Ergebnis warten. */
+  open: number;
+  /** Änderungen, die dieser Aufruf über `failRemaining` hat scheitern lassen. */
+  failed: number;
+}
+
 /** Setzt den Status der Übermittlung nach dem Stand ihrer Änderungen (in der Transaktion des Aufrufers). */
 export async function closeAdChangeSubmission(
   tx: DbOrTx,
@@ -622,13 +647,14 @@ export async function closeAdChangeSubmission(
     error?: string | undefined;
     failRemaining?: { code: string; message: string } | undefined;
   },
-): Promise<{ status: AdChangeSubmissionStatus; open: number }> {
+): Promise<AdChangeSubmissionClosed> {
   const stillSubmitted = and(
     eq(adChanges.submissionId, input.submissionId),
     eq(adChanges.status, 'submitted'),
   );
+  let failed = 0;
   if (input.failRemaining) {
-    await tx
+    const rows = await tx
       .update(adChanges)
       .set({
         status: 'failed',
@@ -636,7 +662,9 @@ export async function closeAdChangeSubmission(
         errorMessage: input.failRemaining.message,
         resolvedAt: input.now,
       })
-      .where(stillSubmitted);
+      .where(stillSubmitted)
+      .returning({ id: adChanges.id });
+    failed = rows.length;
   }
   const [{ open } = { open: 0 }] = await tx
     .select({ open: sql<number>`count(*)::int` })
@@ -652,7 +680,7 @@ export async function closeAdChangeSubmission(
       finishedAt: open > 0 ? null : input.now,
     })
     .where(eq(adChangeSubmissions.id, input.submissionId));
-  return { status, open };
+  return { status, open, failed };
 }
 
 /**
@@ -669,7 +697,7 @@ export async function finishAdChangeSubmission(
     error?: string;
     failRemaining?: { code: string; message: string };
   },
-): Promise<{ status: AdChangeSubmissionStatus; open: number } | null> {
+): Promise<AdChangeSubmissionClosed | null> {
   return db.transaction(async (tx) => {
     const [submission] = await tx
       .select({ id: adChangeSubmissions.id })
@@ -705,7 +733,7 @@ export async function failOpenAdChangeSubmissions(
   const p = amazonAdsProfiles;
   return db.transaction(async (tx) => {
     const open = await tx
-      .select({ id: s.id })
+      .select({ id: s.id, status: s.status })
       .from(s)
       .innerJoin(p, and(eq(p.id, s.profileId), eq(p.organizationId, s.organizationId)))
       .where(
@@ -722,7 +750,12 @@ export async function failOpenAdChangeSubmissions(
         submissionId: submission.id,
         now: input.now,
         error: input.error,
-        failRemaining: { code: input.code, message: input.message },
+        // Eine laufende Übermittlung stammt von einem unterbrochenen Lauf: Was davon schon bei Amazon ankam, ist
+        // unklar (kein „nicht gesendet“, sonst legte ein erneuter Versuch ein Negative doppelt an).
+        failRemaining:
+          submission.status === 'running'
+            ? { code: AD_CHANGE_UNKNOWN_OUTCOME, message: INTERRUPTED_MESSAGE }
+            : { code: input.code, message: input.message },
       });
     }
     return open.length;
