@@ -1042,6 +1042,7 @@ describe('submitAdChanges', () => {
         submissions: [],
         dropped: 0,
         blocked: [{ changeId, reason: 'alreadyExists' }],
+        review: null,
       });
     } finally {
       await testDb.db
@@ -1122,7 +1123,7 @@ describe('submitAdChanges', () => {
       enqueue: noEnqueue,
     });
 
-    expect(result).toEqual({ submissions: [], dropped: 0, blocked: [] });
+    expect(result).toEqual({ submissions: [], dropped: 0, blocked: [], review: null });
     expect(await listPendingAdChanges(testDb.db, as(ids.emil))).toHaveLength(1);
   });
 
@@ -1326,5 +1327,94 @@ describe('Schema', () => {
         .from(adChangeSubmissions)
         .where(eq(adChangeSubmissions.organizationId, org)),
     ).toHaveLength(0);
+  });
+});
+
+describe('submitAdChanges: Prüfung in der Transaktion (3.4)', () => {
+  it('prüft mit dem neu gelesenen „vorher“ und übermittelt nichts, wenn die Prüfung etwas meldet', async () => {
+    const staged = await stage(ids.ada, [
+      update('target', ids.target, 'bid', '0.75'),
+      negativeKeyword('ganz neu'),
+    ]);
+    // Seit dem Vormerken hat ein Sync das Gebot geändert.
+    await testDb.db
+      .update(amazonAdsTargets)
+      .set({ bid: '0.30' })
+      .where(eq(amazonAdsTargets.id, ids.target));
+    try {
+      const seen: unknown[] = [];
+      const result = await submitAdChanges(testDb.db, {
+        ...as(ids.ada),
+        channel: 'api',
+        enqueue: noEnqueue,
+        review: (rows) => {
+          seen.push(...rows);
+          return 'abgelehnt';
+        },
+      });
+
+      expect(result).toMatchObject({ submissions: [], review: 'abgelehnt' });
+      expect(seen).toHaveLength(2);
+      expect(seen).toContainEqual({
+        id: (staged.results[0] as { changeId: string }).changeId,
+        profileId: ids.de,
+        field: 'bid',
+        before: '0.30',
+        after: '0.75',
+        adProduct: SP,
+        countryCode: 'DE',
+        negative: null,
+      });
+      expect(seen).toContainEqual(
+        expect.objectContaining({
+          field: null,
+          adProduct: SP,
+          countryCode: 'DE',
+          negative: { type: 'keyword', keywordText: 'ganz neu', matchType: 'EXACT' },
+        }),
+      );
+      // Alles zurückgerollt: Der Warenkorb ist unverändert, es gibt keine Übermittlung.
+      const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+      expect(cart).toHaveLength(2);
+      expect(cart!.find((change) => change.field === 'bid')).toMatchObject({ before: '0.50' });
+      expect(await testDb.db.select().from(adChangeSubmissions)).toEqual([]);
+    } finally {
+      await testDb.db
+        .update(amazonAdsTargets)
+        .set({ bid: '0.50' })
+        .where(eq(amazonAdsTargets.id, ids.target));
+    }
+  });
+
+  it('übermittelt, wenn die Prüfung nichts meldet, und prüft nur, was übermittelt wird', async () => {
+    await stage(ids.ada, [
+      update('target', ids.target, 'bid', '0.75'),
+      update('campaign', ids.campaign, 'budget', '25'),
+    ]);
+    // Das Budget steht inzwischen auf dem Wunschwert: Die Änderung entfällt und wird nicht geprüft.
+    await testDb.db
+      .update(amazonAdsCampaigns)
+      .set({ budgetAmount: '25' })
+      .where(eq(amazonAdsCampaigns.id, ids.campaign));
+    try {
+      let count = 0;
+      const result = await submitAdChanges(testDb.db, {
+        ...as(ids.ada),
+        channel: 'api',
+        enqueue: noEnqueue,
+        review: (rows) => {
+          count = rows.length;
+          return null;
+        },
+      });
+      expect(count).toBe(1);
+      expect(result).toMatchObject({ dropped: 1, review: null });
+      expect(result!.submissions).toHaveLength(1);
+    } finally {
+      await testDb.db
+        .update(amazonAdsCampaigns)
+        .set({ budgetAmount: '20' })
+        .where(eq(amazonAdsCampaigns.id, ids.campaign));
+    }
   });
 });

@@ -2,9 +2,10 @@ import type {
   AdChangeChannel,
   AdChangeEntityType,
   AdChangeField,
+  AdChangeNegative,
   AdChangeStatus,
 } from '@profitbash/shared';
-import { and, asc, desc, eq, inArray, isNotNull, max } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, min } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { chunks } from './ad-change-entities';
 import { loadAdChangeJobRows, type AdChangeJobRow } from './ad-change-processing';
@@ -51,19 +52,22 @@ export interface OpenAdChange {
   adGroupId: string | null;
   field: AdChangeField | null;
   after: string | null;
+  /** Das neue Negative beim Anlegen. */
+  negative: AdChangeNegative | null;
   /** Vom anfragenden Nutzer vorgemerkt bzw. übermittelt. */
   mine: boolean;
   userName: string | null;
 }
 
 /**
- * Offene Änderungen in sichtbaren Profilen: der Warenkorb aller Nutzer (F4) und übermittelte Änderungen ohne
- * Ergebnis, älteste zuerst, höchstens `AD_CHANGE_OPEN_LIST_LIMIT`. `null` für Nicht-Mitglieder.
+ * Offene Änderungen in sichtbaren Profilen (auf Wunsch nur eines): der Warenkorb aller Nutzer (F4) und übermittelte
+ * Änderungen ohne Ergebnis, neueste zuerst, höchstens `AD_CHANGE_OPEN_LIST_LIMIT` (`truncated`, wenn es mehr gibt:
+ * Dann fehlen die ältesten). `null` für Nicht-Mitglieder.
  */
 export async function listOpenAdChanges(
   db: Db,
-  input: AdChangeActor,
-): Promise<OpenAdChange[] | null> {
+  input: AdChangeActor & { profileId?: string },
+): Promise<{ changes: OpenAdChange[]; truncated: boolean } | null> {
   const scope = await visibleProfilesScope(db, input);
   if (scope === null) return null;
   const rows = await db
@@ -81,6 +85,7 @@ export async function listOpenAdChanges(
       field: adChanges.field,
       newValue: adChanges.newValue,
       newAmount: adChanges.newAmount,
+      payload: adChanges.payload,
       createdBy: adChanges.createdBy,
       userName: users.name,
     })
@@ -91,11 +96,33 @@ export async function listOpenAdChanges(
       and(
         inArray(adChanges.status, ['pending', 'submitted']),
         inArray(adChanges.profileId, scope.ids),
+        input.profileId === undefined ? undefined : eq(adChanges.profileId, input.profileId),
       ),
     )
-    .orderBy(asc(adChanges.createdAt), asc(adChanges.id))
-    .limit(AD_CHANGE_OPEN_LIST_LIMIT);
-  return rows.map(({ newValue, newAmount, createdBy, ...row }) => ({
+    .orderBy(desc(adChanges.createdAt), desc(adChanges.id))
+    .limit(AD_CHANGE_OPEN_LIST_LIMIT + 1);
+  const changes = rows.slice(0, AD_CHANGE_OPEN_LIST_LIMIT).map(toOpenChange(input.userId));
+  return { changes, truncated: rows.length > AD_CHANGE_OPEN_LIST_LIMIT };
+}
+
+interface OpenRow extends Omit<
+  OpenAdChange,
+  'after' | 'negative' | 'mine' | 'status' | 'channel' | 'operation' | 'entityType' | 'field'
+> {
+  status: string;
+  channel: string | null;
+  operation: string;
+  entityType: string;
+  field: string | null;
+  newValue: string | null;
+  newAmount: string | null;
+  payload: AdChangeNegative | null;
+  createdBy: string | null;
+}
+
+const toOpenChange =
+  (userId: string) =>
+  ({ newValue, newAmount, payload, createdBy, ...row }: OpenRow): OpenAdChange => ({
     ...row,
     status: row.status as OpenAdChange['status'],
     channel: row.channel as AdChangeChannel | null,
@@ -103,9 +130,9 @@ export async function listOpenAdChanges(
     entityType: row.entityType as AdChangeEntityType,
     field: row.field as AdChangeField | null,
     after: newValue ?? newAmount,
-    mine: createdBy === input.userId,
-  }));
-}
+    negative: payload,
+    mine: createdBy === userId,
+  });
 
 export interface AdChangeHistoryEntry extends AdChangeRecord {
   channel: AdChangeChannel | null;
@@ -227,16 +254,25 @@ export async function listSubmissionConnections(
 }
 
 /**
- * Letzter Sync bzw. Import der Kampagnen eines Profils (`max(synced_at)`), `null` ohne synchronisierte Kampagne.
- * Der Aufrufer hat die Sichtbarkeit des Profils schon geprüft (über die Übermittlung).
+ * Ältester Stand (`synced_at`) der Kampagnen, die eine Übermittlung berührt: Von ihm stammen Portfolio und
+ * Enddatum der Bulk-Datei. `null`, wenn keine davon je synchronisiert wurde. Der Aufrufer hat die Sichtbarkeit
+ * der Übermittlung schon geprüft.
  */
-export async function getProfileEntitiesSyncedAt(
+export async function getSubmissionEntitiesSyncedAt(
   db: DbOrTx,
-  profileId: string,
+  submissionId: string,
 ): Promise<Date | null> {
   const [row] = await db
-    .select({ syncedAt: max(amazonAdsCampaigns.syncedAt) })
+    .select({ syncedAt: min(amazonAdsCampaigns.syncedAt) })
     .from(amazonAdsCampaigns)
-    .where(eq(amazonAdsCampaigns.profileId, profileId));
+    .where(
+      inArray(
+        amazonAdsCampaigns.id,
+        db
+          .select({ id: adChanges.campaignId })
+          .from(adChanges)
+          .where(eq(adChanges.submissionId, submissionId)),
+      ),
+    );
   return row?.syncedAt ?? null;
 }

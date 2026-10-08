@@ -5,7 +5,11 @@ import {
   type BulkFileChange,
   type BulkFileSkipReason,
 } from '@profitbash/amazon-ads';
-import { AD_CHANGE_PLACEMENTS, isAdChangePlacementField } from '@profitbash/shared';
+import {
+  AD_CHANGE_BIDDING_STRATEGIES,
+  AD_CHANGE_PLACEMENTS,
+  isAdChangePlacementField,
+} from '@profitbash/shared';
 import { writeXlsx } from '@profitbash/sheets';
 import type { RejectedChange, SubmissionChange } from './operations';
 
@@ -22,6 +26,8 @@ const REJECTIONS = {
   ENTITY_ARCHIVED: 'Dieselbe Übermittlung archiviert die Entity; weitere Änderungen entfallen.',
   SUPERSEDED: 'Dieselbe Übermittlung ändert dieses Feld noch einmal; es gilt die spätere Angabe.',
   NOT_SUPPORTED: 'Negatives lassen sich nur archivieren.',
+  BIDDING_STRATEGY_NOT_SUPPORTED:
+    'Platzierungen lassen sich nur ändern, wenn die Kampagne eine feste oder dynamische Gebotsstrategie trägt.',
 } as const;
 
 /** Gründe, aus denen `buildSpBulkSheet` eine Zeile auslässt, als Code und Text der Änderung. */
@@ -163,14 +169,22 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
           fields,
         );
       }
+      // Die Zeile der Platzierung nennt die geltende Strategie: die neue dieser Übermittlung, sonst die der Kampagne.
+      const strategy = biddingStrategy ?? first.campaignBiddingStrategy;
+      const settable =
+        strategy !== null && (AD_CHANGE_BIDDING_STRATEGIES as readonly string[]).includes(strategy);
       for (const row of group) {
         if (row.field === null || !isAdChangePlacementField(row.field)) continue;
+        if (!settable) {
+          reject(row, 'BIDDING_STRATEGY_NOT_SUPPORTED');
+          continue;
+        }
         add(
           {
             ref: `placement:${row.id}`,
             type: 'placement',
             amazonCampaignId,
-            biddingStrategy: first.campaignBiddingStrategy,
+            biddingStrategy: strategy,
             placement: AD_CHANGE_PLACEMENTS[row.field],
             percentage: row.after!,
           },

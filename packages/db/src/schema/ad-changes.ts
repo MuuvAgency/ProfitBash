@@ -177,6 +177,11 @@ export const adChanges = pgTable(
     index('ad_changes_submission_idx').on(t.submissionId),
     index('ad_changes_campaign_idx').on(t.campaignId),
     index('ad_changes_ad_group_idx').on(t.adGroupId),
+    // Offene Änderungen je Profil (Anzeige im Grid) und Verlauf je Profil, jeweils neueste zuerst (3.4).
+    index('ad_changes_open_profile_idx')
+      .on(t.profileId, t.createdAt.desc())
+      .where(sql`${t.status} in ('pending', 'submitted')`),
+    index('ad_changes_profile_created_idx').on(t.profileId, t.createdAt.desc()),
     index('ad_changes_pending_user_idx')
       .on(t.createdBy)
       .where(sql`${t.status} = 'pending'`),

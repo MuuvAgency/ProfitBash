@@ -183,6 +183,13 @@
       "when": 1791467527704,
       "tag": "0025_ad_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791484427374,
+      "tag": "0026_ad_changes_profile_indexes",
+      "breakpoints": true
     }
   ]
 }

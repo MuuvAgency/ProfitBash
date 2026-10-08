@@ -4805,6 +4805,59 @@
                     "null"
                   ]
                 },
+                "negative": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "keyword"
+                          ]
+                        },
+                        "keywordText": {
+                          "type": "string"
+                        },
+                        "matchType": {
+                          "type": "string",
+                          "enum": [
+                            "EXACT",
+                            "PHRASE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "keywordText",
+                        "matchType"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "product"
+                          ]
+                        },
+                        "asin": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "asin"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "mine": {
                   "type": "boolean"
                 },
@@ -4828,6 +4881,7 @@
                 "adGroupId",
                 "field",
                 "after",
+                "negative",
                 "mine",
                 "userName"
               ]
@@ -8635,6 +8689,17 @@
           "Änderungen"
         ],
         "summary": "Offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis), für die Anzeige je Entity",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "profileId",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Offene Änderungen.",
@@ -8642,6 +8707,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OpenAdChangesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

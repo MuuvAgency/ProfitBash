@@ -27,6 +27,8 @@ export const AD_CHANGE_WARNING_COUNT = 200;
 export const NEGATIVE_KEYWORD_MAX_WORDS = { EXACT: 10, PHRASE: 4 } as const;
 export const NEGATIVE_KEYWORD_MAX_LENGTH = 80;
 
+const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
+
 export type AdChangeLimitField = 'bid' | 'default_bid' | 'budget' | 'placement';
 
 export type AdChangeLimitLookup = (input: {
@@ -45,6 +47,8 @@ export interface AdChangeCheckInput {
   adProduct: string;
   countryCode: string;
   negative: AdChangeNegative | null;
+  /** Für „mehr als 200 Änderungen“ je Übermittlung (eine je Profil); ohne Angabe zählen alle zusammen. */
+  profileId?: string;
 }
 
 export type AdChangeLimitViolation =
@@ -63,13 +67,17 @@ export function checkAdChanges(
   changes: readonly AdChangeCheckInput[],
   options: { limitFor: AdChangeLimitLookup },
 ): AdChangeCheckResult {
+  // Eine Übermittlung bündelt die Änderungen eines Profils: gezählt wird je Profil.
+  const perProfile = new Map<string | undefined, number>();
+  for (const change of changes) {
+    perProfile.set(change.profileId, (perProfile.get(change.profileId) ?? 0) + 1);
+  }
+  const largest = Math.max(0, ...perProfile.values());
   const result: AdChangeCheckResult = {
     violations: [],
     largeChanges: [],
     tooMany:
-      changes.length > AD_CHANGE_WARNING_COUNT
-        ? { count: changes.length, limit: AD_CHANGE_WARNING_COUNT }
-        : null,
+      largest > AD_CHANGE_WARNING_COUNT ? { count: largest, limit: AD_CHANGE_WARNING_COUNT } : null,
   };
   for (const change of changes) {
     if (change.negative?.type === 'keyword') {
@@ -88,7 +96,8 @@ export function checkAdChanges(
     }
     if (change.field === null || change.after === null) continue;
     const kind = adChangeFieldKind(change.field);
-    if (kind === 'enum') continue;
+    // Nur einfache Dezimalzahlen (wie `numeric` sie liefert): `Decimal` nähme sonst auch `NaN`, Hex und Exponenten.
+    if (kind === 'enum' || !PLAIN_DECIMAL.test(change.after)) continue;
 
     const limit = options.limitFor({
       adProduct: change.adProduct,
@@ -104,7 +113,7 @@ export function checkAdChanges(
       result.violations.push({ changeId: change.id, code: 'aboveMaximum', ...limit });
     }
 
-    if (kind !== 'money' || change.before === null) continue;
+    if (kind !== 'money' || change.before === null || !PLAIN_DECIMAL.test(change.before)) continue;
     const before = new Dec(change.before);
     if (before.lessThanOrEqualTo(0)) continue;
     const percent = after.minus(before).dividedBy(before).times(100);

@@ -22,6 +22,7 @@ import {
   sameValue,
   valueColumns,
   type EntitySnapshot,
+  type ProfileScope,
 } from './ad-change-entities';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
@@ -705,6 +706,33 @@ export interface SubmitAdChangesInput extends AdChangeActor {
    * mindestens einer Übermittlung aufgerufen: Bulk-Dateien brauchen keinen Job.
    */
   enqueue: (tx: DbOrTx, submissions: readonly AdChangeSubmissionSummary[]) => Promise<unknown>;
+  /**
+   * Prüfung unmittelbar vor dem Übermitteln (3.4: Grenzen von Amazon, Warnungen nach F6), in der Transaktion und
+   * mit dem neu gelesenen „vorher“, über genau die Änderungen, die übermittelt würden. Liefert sie etwas anderes
+   * als `null`, wird nichts übermittelt (alles zurückgerollt) und der Wert kommt als `review` zurück.
+   */
+  review?: (changes: readonly AdChangeReviewRow[]) => unknown;
+}
+
+/** Eine Änderung, wie sie übermittelt würde. */
+export interface AdChangeReviewRow {
+  id: string;
+  profileId: string;
+  /** Leer beim Anlegen eines Negatives. */
+  field: AdChangeField | null;
+  before: string | null;
+  after: string | null;
+  /** Ad-Typ der Kampagne und Land des Profils. */
+  adProduct: string;
+  countryCode: string;
+  negative: AdChangeNegative | null;
+}
+
+/** Bricht die Transaktion ab, wenn die Prüfung etwas meldet. */
+class ReviewRejected extends Error {
+  constructor(public readonly verdict: unknown) {
+    super('Prüfung vor dem Übermitteln hat etwas gemeldet.');
+  }
 }
 
 export interface SubmitAdChangesResult {
@@ -714,6 +742,8 @@ export interface SubmitAdChangesResult {
   dropped: number;
   /** Bleiben im Warenkorb, weil sie sich nicht mehr übermitteln lassen. */
   blocked: { changeId: string; reason: AdChangeRejection }[];
+  /** Ergebnis von `review`, wenn deshalb nichts übermittelt wurde; sonst `null`. */
+  review: unknown;
 }
 
 /**
@@ -730,6 +760,21 @@ export async function submitAdChanges(
   const scope = await visibleProfilesScope(db, input);
   if (scope === null) return null;
 
+  try {
+    return await submitInTransaction(db, scope, input);
+  } catch (error) {
+    if (error instanceof ReviewRejected) {
+      return { submissions: [], dropped: 0, blocked: [], review: error.verdict };
+    }
+    throw error;
+  }
+}
+
+async function submitInTransaction(
+  db: Db,
+  scope: ProfileScope,
+  input: SubmitAdChangesInput,
+): Promise<SubmitAdChangesResult> {
   return db.transaction(async (tx) => {
     const pending = await tx
       .select()
@@ -745,7 +790,12 @@ export async function submitAdChanges(
       )
       .orderBy(asc(adChanges.createdAt), asc(adChanges.id))
       .for('update');
-    const result: SubmitAdChangesResult = { submissions: [], dropped: 0, blocked: [] };
+    const result: SubmitAdChangesResult = {
+      submissions: [],
+      dropped: 0,
+      blocked: [],
+      review: null,
+    };
     if (pending.length === 0) return result;
 
     if (input.channel === 'api') {
@@ -785,7 +835,11 @@ export async function submitAdChanges(
 
     const dropped: string[] = [];
     const byProfile = new Map<string, { organizationId: string; changeIds: string[] }>();
+    const reviewed: Array<
+      Omit<AdChangeReviewRow, 'adProduct' | 'countryCode'> & { campaignId: string }
+    > = [];
     for (const row of pending) {
+      let before: string | null = null;
       if (row.operation === 'update') {
         const field = row.field as AdChangeField;
         const after = (row.newValue ?? row.newAmount)!;
@@ -798,8 +852,9 @@ export async function submitAdChanges(
           dropped.push(row.id);
           continue;
         }
-        const before = row.oldValue ?? row.oldAmount;
-        if (before !== current.value || row.currencyCode !== current.currencyCode) {
+        before = current.value;
+        const staged = row.oldValue ?? row.oldAmount;
+        if (staged !== current.value || row.currencyCode !== current.currencyCode) {
           await tx
             .update(adChanges)
             .set({
@@ -825,6 +880,42 @@ export async function submitAdChanges(
       };
       group.changeIds.push(row.id);
       byProfile.set(row.profileId, group);
+      reviewed.push({
+        id: row.id,
+        profileId: row.profileId,
+        campaignId: row.campaignId,
+        field: row.field as AdChangeField | null,
+        before,
+        after: row.newValue ?? row.newAmount,
+        negative: row.payload,
+      });
+    }
+
+    if (input.review && reviewed.length > 0) {
+      const countries = new Map<string, string>();
+      for (const profile of await tx
+        .select({ id: p.id, countryCode: p.countryCode })
+        .from(p)
+        .where(inArray(p.id, [...byProfile.keys()]))) {
+        countries.set(profile.id, profile.countryCode);
+      }
+      const adProducts = new Map<string, string>();
+      for (const part of chunks([...new Set(reviewed.map((row) => row.campaignId))])) {
+        for (const campaign of await tx
+          .select({ id: amazonAdsCampaigns.id, adProduct: amazonAdsCampaigns.adProduct })
+          .from(amazonAdsCampaigns)
+          .where(inArray(amazonAdsCampaigns.id, part))) {
+          adProducts.set(campaign.id, campaign.adProduct);
+        }
+      }
+      const verdict: unknown = input.review(
+        reviewed.map(({ campaignId, ...row }) => ({
+          ...row,
+          adProduct: adProducts.get(campaignId) ?? '',
+          countryCode: countries.get(row.profileId) ?? '',
+        })),
+      );
+      if (verdict !== null && verdict !== undefined) throw new ReviewRejected(verdict);
     }
 
     for (const part of chunks(dropped)) {
