@@ -785,11 +785,30 @@ export const de = {
       purchases: 'ab {n} Kauf | ab {n} Käufen',
       clicks: 'ab {n} Klick | ab {n} Klicks',
       defaults: 'Das sind die vorläufigen Startwerte. Du kannst sie für die Organisation ändern.',
+      overridden: 'Für dieses Profil weicht ab: {fields}.',
+      organization: 'Für alle Profile gilt: {values}.',
+      field: {
+        harvestMinPurchases: 'Käufe',
+        harvestMaxAcos: 'ACoS',
+        negateMinClicks: 'Klicks',
+        negateMinCost: 'Spend',
+      },
+      organizationValue: {
+        harvestMinPurchases: 'Käufe ab {value}',
+        harvestMaxAcos: 'ACoS bis {value}',
+        negateMinClicks: 'Klicks ab {value}',
+        negateMinCost: 'Spend ab {value}',
+      },
     },
     rulesDialog: {
       title: 'Regeln der Einstufung',
       intro:
-        'Die Regeln gelten für alle Profile der Organisation. Alles, was weder geerntet noch negiert wird, bleibt bei „Beobachten“.',
+        'Alles, was weder geerntet noch negiert wird, bleibt bei „Beobachten“. Die Regeln gelten für alle Profile; einzelne Werte kannst du für das gewählte Profil abweichend festlegen.',
+      allProfiles: 'Für alle Profile',
+      thisProfile: 'Nur für {profile}',
+      thisProfileHint:
+        'Leer heißt: wie für alle Profile (der graue Wert). Der Betrag gilt in {currency}.',
+      reset: 'Abweichung zurücknehmen',
       harvestMinPurchases: 'Käufe mindestens',
       harvestMaxAcos: 'ACoS höchstens (in %)',
       negateMinClicks: 'Klicks ohne Kauf mindestens',

@@ -1,81 +1,169 @@
 <script setup lang="ts">
-import { searchTermRulesSchema } from '@profitbash/shared';
+import { searchTermRuleOverridesSchema, searchTermRulesSchema } from '@profitbash/shared';
 import { useMutation } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
-import { ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, ApiError } from '../api';
-import type { SearchTermRulesData } from '../api/client';
+import type { SearchTermRuleOverridesData, SearchTermRulesData } from '../api/client';
 import InlineError from '../components/common/InlineError.vue';
 import { errorMessageKey } from '../i18n';
 import { fractionToPercent, parseDecimalInput, percentToFraction } from './decimal-input';
 
 /**
- * Regeln der Einstufung ändern (je Organisation, Recht „write“ im Explorer). ACoS wird in Prozent eingegeben und als
- * Bruch gespeichert; die Spend-Grenze gilt in der Währung des jeweiligen Profils.
+ * Regeln der Einstufung ändern (Recht „write“ im Explorer): oben die Regeln der Organisation für alle Profile,
+ * darunter abweichende Werte nur für das gewählte Profil (2b.2g; leer = wie für alle). ACoS wird in Prozent
+ * eingegeben und als Bruch gespeichert; die Spend-Grenze gilt in der Währung des jeweiligen Profils.
  */
-const props = defineProps<{ visible: boolean; rules: SearchTermRulesData; currency: string }>();
+const props = defineProps<{
+  visible: boolean;
+  /** Regeln der Organisation (nicht die geltenden des Profils). */
+  rules: SearchTermRulesData;
+  /** Abweichende Werte des Profils; `null` je Feld = wie die Organisation. */
+  overrides: SearchTermRuleOverridesData;
+  profileId: string;
+  profileLabel: string;
+  currency: string;
+}>();
 const emit = defineEmits<{ close: []; saved: [] }>();
 
 const { t } = useI18n();
 
-const purchases = ref('');
-const acos = ref('');
-const clicks = ref('');
-const cost = ref('');
+const FIELDS = [
+  { key: 'harvestMinPurchases', id: 'harvest-purchases', group: 'harvest', kind: 'whole' },
+  { key: 'harvestMaxAcos', id: 'harvest-acos', group: 'harvest', kind: 'percent' },
+  { key: 'negateMinClicks', id: 'negate-clicks', group: 'negate', kind: 'whole' },
+  { key: 'negateMinCost', id: 'negate-cost', group: 'negate', kind: 'amount' },
+] as const;
+type Field = (typeof FIELDS)[number];
+type Key = Field['key'];
+type Texts = Record<Key, string>;
+const GROUPS = ['harvest', 'negate'] as const;
+
+const blank = (): Texts => ({
+  harvestMinPurchases: '',
+  harvestMaxAcos: '',
+  negateMinClicks: '',
+  negateMinCost: '',
+});
+/** Eingaben als Text: für alle Profile und nur für dieses Profil; `initial` ist der Stand beim Öffnen. */
+const all = reactive(blank());
+const own = reactive(blank());
+let initial = { all: blank(), own: blank() };
 const errorKey = ref<string | null>(null);
+/** Die Regeln für alle sind schon gespeichert, die des Profils noch nicht (Fehler dazwischen). */
+const partlySaved = ref(false);
+
+const WHOLE = /^\d{1,7}$/;
+const comma = (value: string) => value.replace('.', ',');
+
+function display(field: Field, value: number | string | null): string {
+  if (value === null) return '';
+  if (field.kind === 'percent') return comma(fractionToPercent(String(value)));
+  return comma(String(value));
+}
+
+/** Eingabe → Wert für die API; `undefined`, wenn sie keine gültige Zahl ist. */
+function parse(field: Field, text: string): number | string | undefined {
+  if (field.kind === 'whole') return WHOLE.test(text.trim()) ? Number(text.trim()) : undefined;
+  const decimal = parseDecimalInput(text);
+  if (decimal === null) return undefined;
+  return field.kind === 'percent' ? percentToFraction(decimal) : decimal;
+}
+
+const changed = (now: Texts, before: Texts) =>
+  FIELDS.some((field) => now[field.key].trim() !== before[field.key]);
+const hasOwn = computed(() => FIELDS.some((field) => own[field.key].trim() !== ''));
+
+function parsedRules(): SearchTermRulesData | null {
+  const values = Object.fromEntries(
+    FIELDS.map((field) => [field.key, parse(field, all[field.key])]),
+  );
+  const result = searchTermRulesSchema.safeParse(values);
+  return result.success ? result.data : null;
+}
+
+function parsedOverrides(): SearchTermRuleOverridesData | null {
+  const values = Object.fromEntries(
+    FIELDS.map((field) => [
+      field.key,
+      own[field.key].trim() === '' ? null : parse(field, own[field.key]),
+    ]),
+  );
+  const result = searchTermRuleOverridesSchema.safeParse(values);
+  return result.success ? result.data : null;
+}
 
 const save = useMutation({
-  mutationFn: (rules: SearchTermRulesData) => api.searchTerms.saveRules(rules),
+  mutationFn: async (input: {
+    rules: SearchTermRulesData | null;
+    overrides: SearchTermRuleOverridesData | null;
+  }) => {
+    if (input.rules) {
+      await api.searchTerms.saveRules(input.rules);
+      partlySaved.value = true;
+      initial.all = { ...all };
+    }
+    if (input.overrides) {
+      await api.searchTerms.saveProfileRules({
+        profileId: props.profileId,
+        overrides: input.overrides,
+      });
+    }
+  },
 });
-
-const comma = (value: string) => value.replace('.', ',');
 
 watch(
   () => props.visible,
   (visible) => {
     if (!visible) return;
-    purchases.value = String(props.rules.harvestMinPurchases);
-    acos.value = comma(fractionToPercent(props.rules.harvestMaxAcos));
-    clicks.value = String(props.rules.negateMinClicks);
-    cost.value = comma(props.rules.negateMinCost);
+    for (const field of FIELDS) {
+      all[field.key] = display(field, props.rules[field.key]);
+      own[field.key] = display(field, props.overrides[field.key]);
+    }
+    initial = { all: { ...all }, own: { ...own } };
     errorKey.value = null;
+    partlySaved.value = false;
     save.reset();
   },
   { immediate: true },
 );
 
-const WHOLE = /^\d{1,7}$/;
-
-function parsed(): SearchTermRulesData | null {
-  const percent = parseDecimalInput(acos.value);
-  const minCost = parseDecimalInput(cost.value);
-  if (!WHOLE.test(purchases.value.trim()) || !WHOLE.test(clicks.value.trim())) return null;
-  if (percent === null || minCost === null) return null;
-  const result = searchTermRulesSchema.safeParse({
-    harvestMinPurchases: Number(purchases.value.trim()),
-    harvestMaxAcos: percentToFraction(percent),
-    negateMinClicks: Number(clicks.value.trim()),
-    negateMinCost: minCost,
-  });
-  return result.success ? result.data : null;
-}
-
 async function submit() {
-  const rules = parsed();
-  if (!rules) {
+  const rules = parsedRules();
+  const overrides = parsedOverrides();
+  if (!rules || !overrides) {
     errorKey.value = 'searchTerms.rulesDialog.invalid';
     return;
   }
   errorKey.value = null;
+  const allChanged = changed(all, initial.all);
+  const ownChanged = changed(own, initial.own);
+  if (!allChanged && !ownChanged) {
+    close();
+    return;
+  }
   try {
-    await save.mutateAsync(rules);
+    await save.mutateAsync({
+      rules: allChanged ? rules : null,
+      overrides: ownChanged ? overrides : null,
+    });
     emit('saved');
   } catch (error) {
     errorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
   }
+}
+
+/** Nach einem halb gelungenen Speichern lädt die Seite trotzdem neu. */
+function close() {
+  if (partlySaved.value) emit('saved');
+  else emit('close');
+}
+
+function resetOwn() {
+  Object.assign(own, blank());
 }
 </script>
 
@@ -87,81 +175,86 @@ async function submit() {
     :close-on-escape="!save.isPending.value"
     :header="t('searchTerms.rulesDialog.title')"
     :style="{ width: 'min(34rem, calc(100vw - 2rem))' }"
-    @update:visible="(next) => !next && emit('close')"
+    @update:visible="(next) => !next && close()"
   >
     <form class="flex flex-col gap-space-lg" novalidate @submit.prevent="submit">
       <p class="text-body-sm text-ink-secondary">{{ t('searchTerms.rulesDialog.intro') }}</p>
       <InlineError v-if="errorKey" :message="t(errorKey)" />
 
-      <fieldset class="flex flex-col gap-space-sm">
+      <fieldset
+        v-for="scope in ['all', 'own'] as const"
+        :key="scope"
+        class="flex flex-col gap-space-sm"
+      >
         <legend class="text-body-md font-semibold text-ink">
-          {{ t('searchTerms.class.harvest') }}
+          {{
+            scope === 'all'
+              ? t('searchTerms.rulesDialog.allProfiles')
+              : t('searchTerms.rulesDialog.thisProfile', { profile: profileLabel })
+          }}
         </legend>
-        <div class="grid gap-space-md sm:grid-cols-2">
-          <div class="flex flex-col gap-space-xs">
-            <label for="rules-harvest-purchases" class="text-body-sm font-semibold text-ink">
-              {{ t('searchTerms.rulesDialog.harvestMinPurchases') }}
-            </label>
-            <InputText
-              id="rules-harvest-purchases"
-              v-model="purchases"
-              inputmode="numeric"
-              autocomplete="off"
-              class="font-data"
-              fluid
-            />
-          </div>
-          <div class="flex flex-col gap-space-xs">
-            <label for="rules-harvest-acos" class="text-body-sm font-semibold text-ink">
-              {{ t('searchTerms.rulesDialog.harvestMaxAcos') }}
-            </label>
-            <InputText
-              id="rules-harvest-acos"
-              v-model="acos"
-              inputmode="decimal"
-              autocomplete="off"
-              class="font-data"
-              fluid
-            />
+        <div
+          v-for="group in GROUPS"
+          :key="group"
+          role="group"
+          :aria-labelledby="`rules-${scope}-${group}`"
+          class="flex flex-col gap-space-xs"
+        >
+          <p :id="`rules-${scope}-${group}`" class="text-label-eyebrow uppercase text-ink-tertiary">
+            {{ t(`searchTerms.class.${group}`) }}
+          </p>
+          <div class="grid gap-space-md sm:grid-cols-2">
+            <div
+              v-for="field in FIELDS.filter((f) => f.group === group)"
+              :key="field.key"
+              class="flex flex-col gap-space-xs"
+            >
+              <label
+                :for="scope === 'all' ? `rules-${field.id}` : `rules-profile-${field.id}`"
+                class="text-body-sm font-semibold text-ink"
+              >
+                {{ t(`searchTerms.rulesDialog.${field.key}`) }}
+              </label>
+              <InputText
+                v-if="scope === 'all'"
+                :id="`rules-${field.id}`"
+                v-model="all[field.key]"
+                :inputmode="field.kind === 'whole' ? 'numeric' : 'decimal'"
+                autocomplete="off"
+                class="font-data"
+                fluid
+              />
+              <InputText
+                v-else
+                :id="`rules-profile-${field.id}`"
+                v-model="own[field.key]"
+                :placeholder="all[field.key]"
+                :inputmode="field.kind === 'whole' ? 'numeric' : 'decimal'"
+                autocomplete="off"
+                class="font-data"
+                fluid
+              />
+            </div>
           </div>
         </div>
-      </fieldset>
-
-      <fieldset class="flex flex-col gap-space-sm">
-        <legend class="text-body-md font-semibold text-ink">
-          {{ t('searchTerms.class.negate') }}
-        </legend>
-        <div class="grid gap-space-md sm:grid-cols-2">
-          <div class="flex flex-col gap-space-xs">
-            <label for="rules-negate-clicks" class="text-body-sm font-semibold text-ink">
-              {{ t('searchTerms.rulesDialog.negateMinClicks') }}
-            </label>
-            <InputText
-              id="rules-negate-clicks"
-              v-model="clicks"
-              inputmode="numeric"
-              autocomplete="off"
-              class="font-data"
-              fluid
-            />
-          </div>
-          <div class="flex flex-col gap-space-xs">
-            <label for="rules-negate-cost" class="text-body-sm font-semibold text-ink">
-              {{ t('searchTerms.rulesDialog.negateMinCost') }}
-            </label>
-            <InputText
-              id="rules-negate-cost"
-              v-model="cost"
-              inputmode="decimal"
-              autocomplete="off"
-              class="font-data"
-              fluid
-            />
-          </div>
-        </div>
-        <p class="text-body-sm text-ink-secondary">
+        <p v-if="scope === 'all'" class="text-body-sm text-ink-secondary">
           {{ t('searchTerms.rulesDialog.costHint', { currency }) }}
         </p>
+        <div v-else class="flex flex-wrap items-start justify-between gap-space-sm">
+          <p class="min-w-0 flex-1 text-body-sm text-ink-secondary">
+            {{ t('searchTerms.rulesDialog.thisProfileHint', { currency }) }}
+          </p>
+          <Button
+            v-if="hasOwn"
+            type="button"
+            :label="t('searchTerms.rulesDialog.reset')"
+            size="small"
+            severity="secondary"
+            variant="text"
+            :disabled="save.isPending.value"
+            @click="resetOwn"
+          />
+        </div>
       </fieldset>
 
       <div class="flex justify-end gap-space-sm">
@@ -171,7 +264,7 @@ async function submit() {
           severity="secondary"
           variant="text"
           :disabled="save.isPending.value"
-          @click="emit('close')"
+          @click="close"
         />
         <Button type="submit" :label="t('common.save')" :loading="save.isPending.value" />
       </div>

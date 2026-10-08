@@ -273,23 +273,56 @@ const metric = (key: 'cost' | 'sales' | 'acos' | 'cvr') =>
     currency: currency.value,
   });
 
+// Erlaubt sind zwei Nachkommastellen: nicht auf eine runden (25,55 % bliebe sonst „25,6 %“).
+const acosText = (fraction: string) =>
+  formatPercent(fraction, locale.value, {
+    fractionDigits: Math.max(1, (fractionToPercent(fraction).split('.')[1] ?? '').length),
+  });
+
+/** Die geltenden Regeln des Profils (Regeln der Organisation, je Feld vom Profil überschrieben). */
 const rulesText = computed(() => {
   const rules = meta.value?.rules;
   if (!rules) return null;
   return {
     harvest: t('searchTerms.rules.harvest', {
       purchases: t('searchTerms.rules.purchases', rules.harvestMinPurchases),
-      // Erlaubt sind zwei Nachkommastellen: nicht auf eine runden (25,55 % bliebe sonst „25,6 %“).
-      acos: formatPercent(rules.harvestMaxAcos, locale.value, {
-        fractionDigits: Math.max(
-          1,
-          (fractionToPercent(rules.harvestMaxAcos).split('.')[1] ?? '').length,
-        ),
-      }),
+      acos: acosText(rules.harvestMaxAcos),
     }),
     negate: t('searchTerms.rules.negate', {
       clicks: t('searchTerms.rules.clicks', rules.negateMinClicks),
       cost: formatCurrency(rules.negateMinCost, currency.value, locale.value),
+    }),
+  };
+});
+
+const RULE_KEYS = [
+  'harvestMinPurchases',
+  'harvestMaxAcos',
+  'negateMinClicks',
+  'negateMinCost',
+] as const;
+
+/** Welche Werte für dieses Profil abweichen (2b.2g) und was dafür sonst für alle Profile gilt. */
+const overrideText = computed(() => {
+  const m = meta.value;
+  if (!m) return null;
+  const keys = RULE_KEYS.filter((key) => m.ruleOverrides[key] !== null);
+  if (keys.length === 0) return null;
+  const org = m.organizationRules;
+  const value = {
+    harvestMinPurchases: count(org.harvestMinPurchases),
+    harvestMaxAcos: acosText(org.harvestMaxAcos),
+    negateMinClicks: count(org.negateMinClicks),
+    negateMinCost: formatCurrency(org.negateMinCost, currency.value, locale.value),
+  };
+  return {
+    overridden: t('searchTerms.rules.overridden', {
+      fields: keys.map((key) => t(`searchTerms.rules.field.${key}`)).join(', '),
+    }),
+    organization: t('searchTerms.rules.organization', {
+      values: keys
+        .map((key) => t(`searchTerms.rules.organizationValue.${key}`, { value: value[key] }))
+        .join(', '),
     }),
   };
 });
@@ -576,6 +609,9 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
               <p class="text-body-sm text-ink">{{ rulesText.harvest }}</p>
               <p class="text-body-sm text-ink">{{ rulesText.negate }}</p>
             </template>
+            <p v-if="overrideText" class="text-body-sm text-ink-secondary">
+              {{ overrideText.overridden }} {{ overrideText.organization }}
+            </p>
             <p v-if="meta?.rulesAreDefault" class="text-body-sm text-ink-secondary">
               {{ t('searchTerms.rules.defaults') }}
             </p>
@@ -705,7 +741,10 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
       <RulesDialog
         v-if="meta && canWrite"
         :visible="rulesOpen"
-        :rules="meta.rules"
+        :rules="meta.organizationRules"
+        :overrides="meta.ruleOverrides"
+        :profile-id="meta.profileId"
+        :profile-label="`${meta.accountName} · ${meta.countryCode}`"
         :currency="currency"
         @close="rulesOpen = false"
         @saved="onRulesSaved"

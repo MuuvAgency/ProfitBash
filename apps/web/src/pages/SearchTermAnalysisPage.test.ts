@@ -95,6 +95,13 @@ const rules = {
   negateMinCost: '20',
 };
 
+const noOverrides = {
+  harvestMinPurchases: null,
+  harvestMaxAcos: null,
+  negateMinClicks: null,
+  negateMinCost: null,
+};
+
 function analysisResponse(
   patch: Partial<SearchTermAnalysisResponse> = {},
   meta: Partial<SearchTermAnalysisResponse['meta']> = {},
@@ -116,6 +123,8 @@ function analysisResponse(
       importedAt: '2026-10-01T08:00:00.000Z',
       rules,
       rulesAreDefault: true,
+      organizationRules: rules,
+      ruleOverrides: noOverrides,
       protectedTerms: ['nordwind'],
       totalRows: rows.length,
       truncated: false,
@@ -611,6 +620,158 @@ describe('Regeln ändern', () => {
     await flushPromises();
     expect(requests.some((r) => r.method === 'PUT')).toBe(false);
     expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
+  });
+});
+
+describe('Abweichende Regeln je Profil (2b.2g)', () => {
+  const PROFILE_PUT = 'PUT /api/ads/search-terms/rules/profile';
+  const input = (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)!;
+  const type = (id: string, value: string) => {
+    input(id).value = value;
+    input(id).dispatchEvent(new Event('input'));
+  };
+  const puts = (requests: RecordedRequest[]) => requests.filter((r) => r.method === 'PUT');
+  const overrides = { ...noOverrides, harvestMaxAcos: '0.4', negateMinCost: '200' };
+  const withOverrides = {
+    'POST /api/ads/search-terms/analysis': json(
+      analysisResponse(
+        {},
+        {
+          rules: { ...rules, harvestMaxAcos: '0.4', negateMinCost: '200' },
+          ruleOverrides: overrides,
+          rulesAreDefault: false,
+        },
+      ),
+    ),
+  };
+
+  it('zeigt im Dialog die Regeln für alle Profile und leere Felder für das Profil (Platzhalter = Wert für alle)', async () => {
+    await mountPage();
+    await waitForRow('led lampe warmweiß');
+    expect(document.body.textContent).not.toContain('Für dieses Profil weicht ab');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    expect(document.body.textContent).toContain('Nur für Demo DE · DE');
+    expect(input('rules-negate-cost').value).toBe('20');
+    expect(input('rules-profile-negate-cost').value).toBe('');
+    expect(input('rules-profile-negate-cost').placeholder).toBe('20');
+    expect(input('rules-profile-harvest-acos').placeholder).toBe('25');
+    expect(input('rules-profile-harvest-purchases').placeholder).toBe('3');
+    expect(input('rules-profile-negate-clicks').placeholder).toBe('25');
+  });
+
+  it('speichert nur die Abweichung des Profils, wenn die Regeln für alle unverändert sind, und lädt neu', async () => {
+    const { requests } = await mountPage(PATH, {
+      [PROFILE_PUT]: json({
+        profileId: P1,
+        overrides: { ...noOverrides, negateMinCost: '200', harvestMaxAcos: '0.305' },
+        updatedAt: '2026-10-08T12:00:00.000Z',
+      }),
+    });
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    type('rules-profile-negate-cost', '200');
+    type('rules-profile-harvest-acos', '30,5');
+    await flushPromises();
+    button('Speichern')!.click();
+    await flushPromises();
+
+    expect(puts(requests)).toHaveLength(1);
+    expect(puts(requests)[0]!.path).toBe('/api/ads/search-terms/rules/profile');
+    expect(puts(requests)[0]!.body).toEqual({
+      profileId: P1,
+      overrides: { ...noOverrides, negateMinCost: '200', harvestMaxAcos: '0.305' },
+    });
+    await vi.waitFor(() => expect(analysisRequests(requests)).toHaveLength(2));
+    expect(document.querySelector('#rules-profile-negate-cost')).toBeNull();
+  });
+
+  it('nennt in der Kachel, welche Werte für das Profil abweichen, und füllt den Dialog damit', async () => {
+    await mountPage(PATH, withOverrides);
+    await waitForRow('led lampe warmweiß');
+    const text = document.body.textContent!;
+    expect(text).toContain('einem ACoS bis 40,0\u00a0%');
+    expect(text).toContain('mindestens 200,00\u00a0€ Spend');
+    expect(text).toContain('Für dieses Profil weicht ab: ACoS, Spend.');
+    expect(text).toContain('Für alle Profile gilt: ACoS bis 25,0\u00a0%, Spend ab 20,00\u00a0€.');
+
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    // Oben stehen die Regeln der Organisation, nicht die geltenden des Profils.
+    expect(input('rules-harvest-acos').value).toBe('25');
+    expect(input('rules-negate-cost').value).toBe('20');
+    expect(input('rules-profile-harvest-acos').value).toBe('40');
+    expect(input('rules-profile-negate-cost').value).toBe('200');
+    expect(input('rules-profile-negate-clicks').value).toBe('');
+  });
+
+  it('nimmt die Abweichung zurück, wenn alle Felder des Profils geleert werden', async () => {
+    const { requests } = await mountPage(PATH, {
+      ...withOverrides,
+      [PROFILE_PUT]: json({ profileId: P1, overrides: noOverrides, updatedAt: null }),
+    });
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    button('Abweichung zurücknehmen')!.click();
+    await flushPromises();
+    expect(input('rules-profile-harvest-acos').value).toBe('');
+    button('Speichern')!.click();
+    await flushPromises();
+    expect(puts(requests).map((r) => r.body)).toEqual([{ profileId: P1, overrides: noOverrides }]);
+  });
+
+  it('speichert beides, wenn sich die Regeln für alle und die des Profils ändern', async () => {
+    const { requests } = await mountPage(PATH, {
+      'PUT /api/ads/search-terms/rules': json({
+        rules: { ...rules, negateMinClicks: 30 },
+        isDefault: false,
+        updatedAt: '2026-10-08T12:00:00.000Z',
+      }),
+      [PROFILE_PUT]: json({
+        profileId: P1,
+        overrides: { ...noOverrides, harvestMinPurchases: 2 },
+        updatedAt: '2026-10-08T12:00:00.000Z',
+      }),
+    });
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    type('rules-negate-clicks', '30');
+    type('rules-profile-harvest-purchases', '2');
+    await flushPromises();
+    button('Speichern')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(puts(requests)).toHaveLength(2));
+    expect(puts(requests).map((r) => r.body)).toEqual([
+      { ...rules, negateMinClicks: 30 },
+      { profileId: P1, overrides: { ...noOverrides, harvestMinPurchases: 2 } },
+    ]);
+  });
+
+  it('lehnt ungültige Werte für das Profil ab, ohne zu senden', async () => {
+    const { requests } = await mountPage();
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    type('rules-profile-harvest-acos', '0');
+    await flushPromises();
+    button('Speichern')!.click();
+    await flushPromises();
+    expect(puts(requests)).toHaveLength(0);
+    expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
+  });
+
+  it('schließt ohne Anfrage, wenn nichts geändert wurde', async () => {
+    const { requests } = await mountPage();
+    await waitForRow('led lampe warmweiß');
+    button('Regeln ändern')!.click();
+    await flushPromises();
+    button('Speichern')!.click();
+    await flushPromises();
+    expect(puts(requests)).toHaveLength(0);
+    expect(document.querySelector('#rules-harvest-acos')).toBeNull();
   });
 });
 
