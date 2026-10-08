@@ -193,9 +193,39 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     werden geladen; echte Dateien haben einige hundert Zeilen).
 
 #### 2b.2b Oberfläche
-- [ ] Reiter bzw. Ansicht im Explorer (`sp-explorer`): Auswahl Profil und Datei-Zeitraum (kein freier Zeitraum, Hinweis im
+- [x] Reiter bzw. Ansicht im Explorer (`sp-explorer`): Auswahl Profil und Datei-Zeitraum (kein freier Zeitraum, Hinweis im
       UI), Grid der Suchbegriffe mit Einstufung und Grund, Grid der N-Gramme, Summen; Regeln ändern (Dialog, Recht `write`);
       geschützte Begriffe je Client bei Clients & Connections. Skeleton, Empty- und Error-Zustand, Browser-Pane.
+- [x] Umsetzung (Stand für 2b.2c und später):
+  - **Seite** `pages/SearchTermAnalysisPage.vue`, Route `/ads/explorer/search-term-analysis` (Feature `sp-explorer`, vor den
+    Unterpfaden des Explorers), als achter Reiter „Suchbegriff-Analyse“ im Explorer verlinkt (`explorer/ExplorerTabs.vue`,
+    aus der Explorer-Seite herausgelöst). Eigene Auswahl statt Filterleiste: **Profil** (nur Profile mit Suchbegriffen) und
+    **Zeitraum der Datei** (Zeiträume des Profils mit Zeilenzahl, neuester zuerst). URL: `profile`, `from`, `to`, `view`
+    (`ngrams`), `class` (Filter der Einstufung). Unbekannte Angaben ersetzt die Seite per `replace` durch die erste gültige
+    Auswahl. Hinweis fest im UI: Summen über den Download-Zeitraum, Zeiträume werden nie addiert.
+  - **Inhalt:** Kachel „Einstufung“ (Ernten, Negieren, Beobachten als Knöpfe mit Zählern, zugleich Filter; darunter Spend,
+    Umsatz, ACoS, CVR des Zeitraums in der Währung des Profils), Kachel „Regeln“ (geltende Regeln als Satz, Kennzeichnung der
+    Startwerte, geschützte Begriffe des Clients, „Regeln ändern“ nur mit Recht `write`), darunter die Ansichten
+    **Suchbegriffe** (Grid: Suchbegriff fest links, Einstufung mit Grund und Farbe, Kampagne, Ad Group, Target über
+    `targetLabel`, Kennzahlen; Summenzeile unten) und **Wortbausteine** (Baustein, Wörter, Anzahl Suchbegriffe, Kennzahlen;
+    Umschalter Alle / 1 / 2 / 3 Wörter; Hinweis, dass sich Bausteine überschneiden). Sortieren und Filtern im Browser
+    (`compareDecimalNullsLast`, `DecimalFilter`). Hinweise bei gekürzten Zeilen bzw. Bausteinen.
+  - **Zustände:** Skeleton, Leerzustand ohne Datei-Zeiträume (dann keine Analyse-Anfrage), Fehler mit „Erneut versuchen“
+    je Abfrage (Zeiträume, Analyse); beim Wechsel bleiben die alten Werte blass stehen (`aria-busy`).
+  - **Regeln ändern** (`search-terms/RulesDialog.vue`): vier Felder mit Labels; ACoS in Prozent eingegeben und als Bruch
+    gesendet (`search-terms/decimal-input.ts`, Komma oder Punkt, ohne `number`), Prüfung mit `searchTermRulesSchema` vor dem
+    Senden, danach lädt die Analyse neu.
+  - **Geschützte Begriffe** (Dominik: bei Clients & Connections): Kachel „Clients“ (`connections/ClientsCard.vue`) listet
+    die Clients mit ihren Begriffen; Dialog `ProtectedTermsDialog.vue` (ein Begriff je Zeile, höchstens 200 mit je 80
+    Zeichen, Fehler im Dialog). Nach dem Speichern übernimmt die Liste den Stand des Servers, die Analyse lädt neu.
+  - **Texte** unter `searchTerms.*` und `connections.clients.*`/`connections.protectedTerms.*`; eigene Bezeichnungen
+    („Ernten“, „Negieren“, „Beobachten“, „Wortbausteine“).
+  - **Browser-Pane geprüft (2026-10-08)** mit erfundenen Suchbegriffen für zwei Demo-Profile in der lokalen Dev-DB (EUR und
+    SEK, zwei Zeiträume; kein Kundeninhalt): Leerzustand, Auswahl und URL, Zähler und Summen, Wortbausteine mit Umschalter,
+    Regel-Dialog mit Startwerten, Clients-Kachel mit Dialog, 1440 px und Handy ohne waagerechtes Scrollen der Seite, Hell und
+    Dunkel, Konsole ohne Fehler. Befund behoben: Die Zeitraum-Auswahl schnitt ihren Text ab (breiter).
+  - **Nicht enthalten:** CSV-Export, Spaltenauswahl und gespeicherte Ansichten für diese Seite; Filter nach Ad-Typ (die API
+    kann ihn schon); Sprung von einer Zeile in den Explorer (Kampagne, Ad Group).
 
 #### 2b.2c Zeitraum im Upload-Dialog (Ausweich-Feld)
 - [ ] Trägt der Dateiname keinen Zeitraum, erscheinen zwei Datumsfelder (von/bis); der Import nutzt sie für die
