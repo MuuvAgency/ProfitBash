@@ -12,9 +12,10 @@ import { errorMessageKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 
 /**
- * Einen Datei-Zeitraum der Suchbegriff-Analyse löschen (`phase-2b.md` 2b.2d, Recht „write“ im Explorer): Ein beim
+ * Einen Datei-Zeitraum der Suchbegriff-Analyse löschen (`phase-2b.md` 2b.2d, nur Org-Admins wie der Upload): Ein beim
  * Upload falsch angegebener Zeitraum bliebe sonst für immer in der Auswahl. Gelöscht werden nur die Suchbegriffe
- * dieses Zeitraums; die Datei lässt sich erneut hochladen.
+ * dieses Zeitraums; die Dateien lassen sich erneut hochladen. Nach dem Löschen meldet der Dialog `deleted` und bleibt
+ * gesperrt, bis die Seite ihn schließt (sie lädt erst die Zeiträume neu): Ein zweiter Klick liefe sonst ins Leere.
  */
 const props = defineProps<{ visible: boolean; period: SearchTermPeriodData | null }>();
 const emit = defineEmits<{ close: []; deleted: [period: SearchTermPeriodData] }>();
@@ -23,6 +24,8 @@ const { t } = useI18n();
 const session = useSessionStore();
 const locale = computed(() => session.preferences.locale);
 const errorKey = ref<string | null>(null);
+/** Gelöscht, die Seite lädt noch neu. */
+const done = ref(false);
 
 const remove = useMutation({
   mutationFn: (period: SearchTermPeriodData) =>
@@ -32,12 +35,14 @@ const remove = useMutation({
       periodEnd: period.periodEnd,
     }),
 });
+const locked = computed(() => remove.isPending.value || done.value);
 
 watch(
   () => props.visible,
   (visible) => {
     if (!visible) return;
     errorKey.value = null;
+    done.value = false;
     remove.reset();
   },
   { immediate: true },
@@ -45,10 +50,11 @@ watch(
 
 async function confirm() {
   const period = props.period;
-  if (!period) return;
+  if (!period || locked.value) return;
   errorKey.value = null;
   try {
     await remove.mutateAsync(period);
+    done.value = true;
     emit('deleted', period);
   } catch (error) {
     errorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
@@ -60,8 +66,8 @@ async function confirm() {
   <Dialog
     :visible="visible"
     modal
-    :closable="!remove.isPending.value"
-    :close-on-escape="!remove.isPending.value"
+    :closable="!locked"
+    :close-on-escape="!locked"
     :header="t('searchTerms.deletePeriod.title')"
     :style="{ width: 'min(32rem, calc(100vw - 2rem))' }"
     @update:visible="(next) => !next && emit('close')"
@@ -83,9 +89,11 @@ async function confirm() {
             {{ formatDay(period.periodStart, locale) }} – {{ formatDay(period.periodEnd, locale) }}
             ·
             {{
-              t('searchTerms.deletePeriod.rows', {
-                rows: formatNumber(String(period.rows), locale),
-              })
+              t(
+                'searchTerms.deletePeriod.rows',
+                { rows: formatNumber(String(period.rows), locale) },
+                period.rows,
+              )
             }}
           </dd>
         </div>
@@ -97,14 +105,14 @@ async function confirm() {
           :label="t('common.cancel')"
           severity="secondary"
           variant="text"
-          :disabled="remove.isPending.value"
+          :disabled="locked"
           @click="emit('close')"
         />
         <Button
           type="button"
           :label="t('searchTerms.deletePeriod.confirm')"
           severity="danger"
-          :loading="remove.isPending.value"
+          :loading="locked"
           @click="confirm"
         />
       </div>

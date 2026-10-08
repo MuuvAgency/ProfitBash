@@ -647,10 +647,58 @@ describe('Zeitraum löschen (2b.2d)', () => {
     await flushPromises();
   }
 
-  it('bietet Viewern keinen Knopf an', async () => {
-    await mountPage(PATH, { 'GET /api/me': json(meFixture({ orgRole: 'viewer' })) });
+  it('bietet den Knopf nur Org-Admins an (wie der Upload der Dateien), nicht Editoren und Viewern', async () => {
+    for (const orgRole of ['viewer', 'editor'] as const) {
+      await mountPage(PATH, { 'GET /api/me': json(meFixture({ orgRole })) });
+      await waitForRow('led lampe warmweiß');
+      expect(button('Zeitraum löschen'), orgRole).toBeUndefined();
+      cleanupMounted();
+    }
+    await mountPage();
     await waitForRow('led lampe warmweiß');
-    expect(button('Zeitraum löschen')).toBeUndefined();
+    expect(button('Zeitraum löschen')).toBeDefined();
+  });
+
+  it('nennt eine einzelne Zeile in der Einzahl', async () => {
+    await mountPage(PATH, deletable([period({ rows: 1 })]));
+    await waitForRow('led lampe warmweiß');
+    await openDialog();
+    const text = dialog()?.textContent ?? '';
+    expect(text).toContain('1 Zeile');
+    expect(text).not.toContain('1 Zeilen');
+  });
+
+  it('sendet bei einem zweiten Klick während des Neuladens keine zweite Anfrage', async () => {
+    // Das Löschen ist durch, die Zeiträume laden noch: Der Dialog bleibt bis dahin gesperrt.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let periodCalls = 0;
+    const routesWithDelete = deletable(periods());
+    const { requests } = await mountPage(PATH, {
+      ...routesWithDelete,
+      'POST /api/ads/search-terms/periods': async () => {
+        periodCalls += 1;
+        if (periodCalls > 1) await held;
+        return routesWithDelete['POST /api/ads/search-terms/periods']();
+      },
+    });
+    await waitForRow('led lampe warmweiß');
+    await openDialog();
+    inDialog('Zeitraum löschen')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(periodRequests(requests)).toHaveLength(2));
+
+    expect(dialog()).not.toBeNull();
+    expect(inDialog('Zeitraum löschen')!.disabled).toBe(true);
+    expect(inDialog('Abbrechen')!.disabled).toBe(true);
+    inDialog('Zeitraum löschen')!.click();
+    await flushPromises();
+    expect(deleteRequests(requests)).toHaveLength(1);
+    expect(dialog()?.querySelector('[role="alert"]')).toBeNull();
+
+    release();
+    await vi.waitFor(() => expect(dialog()).toBeNull());
+    expect(deleteRequests(requests)).toHaveLength(1);
   });
 
   it('nennt im Dialog Profil, Zeitraum und Zeilenzahl und was erhalten bleibt; Abbrechen löscht nichts', async () => {
@@ -665,7 +713,9 @@ describe('Zeitraum löschen (2b.2d)', () => {
     expect(text).toContain('2 Zeilen');
     expect(text).toContain('nur die Suchbegriffe dieses Zeitraums');
     expect(text).toContain('Kampagnen, der Verlauf der Datei-Importe und andere Zeiträume bleiben');
-    expect(text).toContain('erneut hochladen');
+    expect(text).toContain('die Datei bzw. die Dateien dieses Zeitraums danach erneut hochladen');
+    // Ein Import, der noch läuft oder wartet, bringt den Zeitraum zurück.
+    expect(text).toContain('noch läuft oder wartet');
     // Die Zahlen stehen in der Zahlenschrift.
     expect(dialog()?.querySelector('.font-data')?.textContent).toContain('01.09.2026');
 
