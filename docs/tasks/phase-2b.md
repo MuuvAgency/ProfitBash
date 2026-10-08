@@ -151,8 +151,8 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     Division (Spend ≤ Ziel × Umsatz); Käufe ohne Umsatz sind kein Harvest. Geschützte Begriffe werden nie negiert, dürfen aber
     geerntet werden. Negieren gilt auch für schon exakt gebuchte Begriffe.
   - **Einstufung je Zeile** (Suchbegriff je Target, wie das Blatt): Negativ-Vorschläge gehören in die Quellkampagne. Folge:
-    Ein Begriff, dessen Käufe sich auf mehrere Targets verteilen, erreicht die Harvest-Grenze später. Bei Bedarf in 2b.2b
-    bzw. Phase 3 zusätzlich je Suchbegriff über das Profil einstufen (offen).
+    Ein Begriff, dessen Käufe sich auf mehrere Targets verteilen, erreicht die Harvest-Grenze später. Seit 2b.2f
+    zusätzlich je Suchbegriff über alle Targets des Profils eingestuft.
   - **Schema** (Migration `0022_search_term_rules`): `search_term_rules` (eine Zeile je Organisation: `harvest_min_purchases`,
     `harvest_max_acos` als Bruch, `negate_min_clicks`, `negate_min_cost`, `updated_by`, `updated_at`) und
     `clients.protected_terms` (`text[]`, normalisiert gespeichert). Ohne Zeile gelten die Startwerte
@@ -285,6 +285,50 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     angegebene Zeiträume noch nicht. Bewusst so: Ablehnungen der API erscheinen oben im Dialog (nur wenn Browser- und
     Server-Prüfung auseinanderlaufen); `max` der Datumsfelder wird bei der Dateiwahl bestimmt (die Prüfung beim Senden
     rechnet frisch).
+
+#### Offene Punkte aus 2b.2 (2b.2d–2b.2f)
+
+**Entschieden (Dominik, 2026-10-08):** alle vier offenen Punkte aus 2b.2 werden umgesetzt: Suchbegriff-Zeitraum löschen und
+Untergrenze für von Hand angegebene Zeiträume (**2b.2d**), CSV-Export und Sprung in den Explorer (**2b.2e**), Einstufung je
+Suchbegriff über das Profil (**2b.2f**), Regeln je Client/Marktplatz (**2b.2g**, noch offen, eigene Session: Migration und
+Oberfläche; vorher klären, ob je Client, je Marktplatz oder je Währung). SQP-CSVs und der Bericht
+„Suchbegriff-Impression-Share“ liegen weiter nicht vor (2b.3 wartet). **SQP-Zuordnung:** über das Profil, im bestehenden
+Upload-Dialog mit Datei-Art SQP wie die Bulk-Datei; Client und Marktplatz kommen vom Profil.
+
+#### 2b.2f Einstufung je Suchbegriff über alle Targets
+- [x] Zusätzlich zur Einstufung je Zeile (Suchbegriff je Target) eine Einstufung je Suchbegriff über alle seine Zeilen im
+      Profil und Datei-Zeitraum, damit Kandidaten sichtbar werden, deren Käufe oder Klicks sich auf Targets verteilen.
+- [x] Umsetzung:
+  - **Engine** (`packages/engine/src/search-terms.ts`): `comparableSearchTerm` (Vergleichsform: klein, NFC, Leerraum
+    zusammengefasst; dieselbe Funktion nutzt jetzt `@profitbash/db` für „schon exakt gebucht“) und
+    `classifySearchTermsAcrossTargets(rows, rules)`: Zeilen desselben Begriffs summieren (Decimal), die Summe läuft durch
+    `classifySearchTerm` mit denselben Regeln; `protected` und `alreadyTargeted` gelten, sobald eine Zeile sie meldet.
+    Ergebnis je Begriff: Einstufung, Grund, `targets` (zählt **Zeilen**, nicht verschiedene Targets: zwei Schreibweisen auf
+    einem Target oder eine SP- und eine SB-Zeile zählen doppelt), `onlyAcrossTargets` (Ernten bzw. Negieren, das keine
+    Zeile allein erreicht), Summen. Die Einstufung der Zeile bleibt unverändert (Negativ-Vorschläge gehören in die
+    Quellkampagne).
+  - **API** (`POST /api/ads/search-terms/analysis`): je Zeile `termClassification`, `termReason`, `termTargets`,
+    `termOnlyAcrossTargets`; in der Antwort `termCounts` (verschiedene Suchbegriffe je Einstufung) und
+    `termCountsOnlyAcrossTargets` (`harvest`, `negate`). Gerechnet über alle Zeilen des Zeitraums vor dem Kürzen, im
+    Ausschnitt der `adProducts`.
+  - **Web:** Die Zelle „Einstufung“ zeigt eine zweite Zeile „Über alle Targets: Ernten (3 Zeilen)“, bei Beobachten mit
+    Grund, nur wenn die Einstufung des Begriffs von der der Zeile abweicht. Der Text steckt im Wert der Spalte (Filter
+    und Sortierung sehen ihn; das Grid zeichnet die Zelle nach einem Neuladen mit gleichen Zeilen-IDs neu). Kachel
+    „Einstufung“: Zeile „Erst über alle Targets zusammen: n Suchbegriffe zum Ernten / zum Negieren“ als Filter
+    (`class=harvest-across` bzw. `negate-across`). Texte unter `searchTerms.acrossTargets.*`.
+  - Review (unabhängig): keine kritischen Befunde; Decimal-Rechnung, `onlyAcrossTargets`, Mandantentrennung, Rechnen vor
+    dem Kürzen und XSS-Sicherheit der Zelle bestätigt. Übernommen: zweite Zeile im Spaltenwert (vorher blieb sie nach dem
+    Ändern der Regeln veraltet stehen, mit AG Grid nachgestellt), Grund in der zweiten Zeile, „Zeilen“ statt „Targets“
+    und Zahl über `formatNumber`, Tests für Negieren-Zeile mit Ernte-Begriff, leere Begriffe, Kürzung mit mehrzeiligem
+    Begriff, Neuladen in beide Richtungen, Summenzeile, `view=ngrams` mit dem neuen Filter. Im vollen Lauf fiel ein neuer
+    Test an der Reihenfolge bei gleichem Spend (zufällige Zeilen-ID): Prüfung nach Target geordnet.
+  - **Bewusst so bzw. bekannte Grenzen:** Die drei Kacheln zählen Zeilen, die neue Zeile zählt Suchbegriffe (ein Klick
+    zeigt deren Zeilen). Eine Zeile kann allein „Negieren“ sein, während der Begriff über alle Targets ein
+    Ernte-Kandidat ist; beides wird gezeigt. Bei gekürzter Antwort (mehr als 10 000 Zeilen) kann der Filter weniger
+    Zeilen zeigen, als der Zähler nennt (Kandidaten haben oft wenig Spend je Zeile). `termCounts` wird geliefert, aber
+    noch nicht angezeigt; die Oberfläche sendet keine `adProducts`.
+  - **Offen:** Blick in die Browser-Pane (zweite Zeile bei schmaler Spalte, Mindestbreite 300 px, Dunkel-Modus): in dieser
+    Session war der Zugriff auf die Browser-Pane gesperrt.
 
 #### Später (nur mit Datei)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt
