@@ -82,6 +82,27 @@ describe('buildBulkFileChanges', () => {
     expect(changeIdsByRef.get(`placement:${placement.id}`)).toEqual([placement.id]);
   });
 
+  it('nimmt für Platzierungen die neue Strategie derselben Übermittlung und lehnt nicht setzbare ab', () => {
+    const strategy = campaign('bidding_strategy', 'NONE');
+    const placement = campaign('placement_top', '40');
+    const withNew = buildBulkFileChanges([strategy, placement]);
+    expect(withNew.rejected).toEqual([]);
+    expect(withNew.changes.find((c) => c.type === 'placement')).toMatchObject({
+      biddingStrategy: 'NONE',
+    });
+
+    const ruleBased = { ...campaign('placement_top', '40'), campaignBiddingStrategy: 'RULE_BASED' };
+    const { changes, rejected } = buildBulkFileChanges([ruleBased]);
+    expect(changes).toEqual([]);
+    expect(rejected).toEqual([
+      {
+        changeId: ruleBased.id,
+        code: 'BIDDING_STRATEGY_NOT_SUPPORTED',
+        message: expect.any(String),
+      },
+    ]);
+  });
+
   it('bildet Ad Group, Keyword, Produkt-Target und Product Ad mit den IDs der Eltern ab', () => {
     const { changes } = buildBulkFileChanges([
       change({

@@ -5,7 +5,6 @@ import {
   SP_DAILY_BUDGET_LIMITS,
 } from '@profitbash/amazon-ads';
 import {
-  AD_CHANGE_OPEN_LIST_LIMIT,
   AdChangeError,
   closeBulkFileSubmission,
   discardPendingAdChanges,
@@ -13,7 +12,7 @@ import {
   finishAdChangeSubmission,
   getAdChangeSubmission,
   getBulkFileSubmissionRows,
-  getProfileEntitiesSyncedAt,
+  getSubmissionEntitiesSyncedAt,
   listAdChangeHistory,
   listAdChangeSubmissions,
   listOpenAdChanges,
@@ -25,6 +24,7 @@ import {
   stageAdChanges,
   submitAdChanges,
   type AdChangeRecord,
+  type AdChangeReviewRow,
   type AdChangeSubmissionSummary,
   type DbOrTx,
   type PendingAdChange,
@@ -43,6 +43,7 @@ import {
   dismissAdChangesResponseSchema,
   errorResponseSchema,
   idParamSchema,
+  openAdChangesQuerySchema,
   openAdChangesResponseSchema,
   pendingAdChangesResponseSchema,
   retryAdChangesRequestSchema,
@@ -163,7 +164,9 @@ const openRoute = createRoute({
   tags: TAGS,
   summary:
     'Offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis), für die Anzeige je Entity',
+  request: { query: openAdChangesQuerySchema },
   responses: {
+    400: errors[400],
     200: { description: 'Offene Änderungen.', content: json(openAdChangesResponseSchema) },
     401: errors[401],
     403: errors[403],
@@ -330,7 +333,7 @@ const limitFor: AdChangeLimitLookup = ({ adProduct, countryCode, field }) => {
   return Object.hasOwn(table, countryCode) ? table[countryCode]! : null;
 };
 
-function check(changes: readonly PendingAdChange[]): AdChangeCheck {
+function check(changes: readonly (PendingAdChange | AdChangeReviewRow)[]): AdChangeCheck {
   return checkAdChanges(changes, { limitFor });
 }
 
@@ -376,36 +379,49 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
     }
   };
 
+  type Skipped = { changeId: string; code: string; message: string };
+
   /**
-   * Bulk-Datei: Änderungen, die nicht in die Datei passen, gelten nicht als übermittelt. Sie scheitern gleich
-   * nach dem Übermitteln mit Grund; die Zusammenfassungen kommen danach frisch aus der Datenbank.
+   * Bulk-Datei: Änderungen, die nicht in die Datei passen, gelten nicht als übermittelt und scheitern mit Grund;
+   * ist danach nichts mehr offen, ist die Übermittlung abgeschlossen. Wiederholbar: läuft nach dem Übermitteln,
+   * vor jedem Download und vor dem Abschließen als „hochgeladen“ (eine Entity kann inzwischen entfernt oder
+   * archiviert sein). `null`, wenn der Nutzer die Übermittlung nicht sehen darf.
    */
+  async function settleBulkFile(
+    who: { userId: string; orgId: string },
+    submissionId: string,
+  ): Promise<Skipped[] | null> {
+    const found = await getBulkFileSubmissionRows(db, { ...who, submissionId });
+    if (!found) return null;
+    const { skipped } = buildSubmissionBulkFile(found.rows);
+    if (skipped.length > 0) {
+      const scope = { organizationId: who.orgId, submissionId, now: new Date() };
+      await recordAdChangeResults(db, {
+        ...scope,
+        results: skipped.map((skip) => ({ ...skip, outcome: 'failed' })),
+      });
+      // Nur offene Übermittlungen ändern ihren Status (eine abgeschlossene bleibt, wie sie ist).
+      if (found.submission.status === 'pending' || found.submission.status === 'running') {
+        await finishAdChangeSubmission(db, scope);
+      }
+    }
+    return skipped;
+  }
+
   async function settleBulkFiles(
     who: { userId: string; orgId: string },
     submissions: readonly AdChangeSubmissionSummary[],
   ) {
-    const skipped: { changeId: string; code: string; message: string }[] = [];
+    const skipped: Skipped[] = [];
     const settled: AdChangeSubmissionSummary[] = [];
     for (const submission of submissions) {
-      if (submission.channel !== 'bulk_file') {
+      const found =
+        submission.channel === 'bulk_file' ? await settleBulkFile(who, submission.id) : null;
+      if (!found || found.length === 0) {
         settled.push(submission);
         continue;
       }
-      const found = await getBulkFileSubmissionRows(db, { ...who, submissionId: submission.id });
-      const file = found ? buildSubmissionBulkFile(found.rows) : null;
-      if (!file || file.skipped.length === 0) {
-        settled.push(submission);
-        continue;
-      }
-      const now = new Date();
-      const scope = { organizationId: who.orgId, submissionId: submission.id, now };
-      await recordAdChangeResults(db, {
-        ...scope,
-        results: file.skipped.map((skip) => ({ ...skip, outcome: 'failed' })),
-      });
-      // Ist nichts mehr offen, ist die Übermittlung damit abgeschlossen.
-      await finishAdChangeSubmission(db, scope);
-      skipped.push(...file.skipped);
+      skipped.push(...found);
       const fresh = await getAdChangeSubmission(db, { ...who, submissionId: submission.id });
       settled.push(fresh?.submission ?? submission);
     }
@@ -447,31 +463,27 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
   app.openapi({ ...submitRoute, middleware: [largeBody, ...write] }, async (c) => {
     const who = actor(c);
     const body = c.req.valid('json');
-    const cart = await listPendingAdChanges(db, who);
-    if (cart === null) throw noMember();
-    const wanted = body.changeIds && new Set(body.changeIds);
-    const selected = cart.filter(
-      (change) =>
-        (body.profileId === undefined || change.profileId === body.profileId) &&
-        (wanted === undefined || wanted.has(change.id)),
-    );
-    const result = check(selected);
-    if (result.violations.length > 0) {
-      return c.json({ status: 'limitsExceeded' as const, check: result }, 200);
-    }
-    if ((result.largeChanges.length > 0 || result.tooMany) && !body.confirmWarnings) {
-      return c.json({ status: 'needsConfirmation' as const, check: result }, 200);
-    }
+    type Stopped = { status: 'limitsExceeded' | 'needsConfirmation'; check: AdChangeCheck };
     try {
       const submitted = await submitAdChanges(db, {
         ...who,
         channel: body.channel,
         ...(body.profileId && { profileId: body.profileId }),
-        // Genau die geprüften Änderungen: Was seit der Prüfung dazukam, bleibt im Warenkorb.
-        changeIds: selected.map((change) => change.id),
+        ...(body.changeIds && { changeIds: body.changeIds }),
         enqueue,
+        // In der Transaktion, mit dem gerade gelesenen „vorher“ und genau den Änderungen, die rausgingen: Ein
+        // Sync oder ein zweites Vormerken zwischen Prüfung und Übermitteln kann so nichts vorbeischieben.
+        review: (changes): Stopped | null => {
+          const result = check(changes);
+          if (result.violations.length > 0) return { status: 'limitsExceeded', check: result };
+          if ((result.largeChanges.length > 0 || result.tooMany) && !body.confirmWarnings) {
+            return { status: 'needsConfirmation', check: result };
+          }
+          return null;
+        },
       });
       if (submitted === null) throw noMember();
+      if (submitted.review !== null) return c.json(submitted.review as Stopped, 200);
       return c.json(
         {
           status: 'submitted' as const,
@@ -487,9 +499,10 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
   });
 
   app.openapi({ ...openRoute, middleware: view }, async (c) => {
-    const changes = await listOpenAdChanges(db, actor(c));
-    if (changes === null) throw noMember();
-    return c.json({ changes, truncated: changes.length >= AD_CHANGE_OPEN_LIST_LIMIT }, 200);
+    const { profileId } = c.req.valid('query');
+    const open = await listOpenAdChanges(db, { ...actor(c), ...(profileId && { profileId }) });
+    if (open === null) throw noMember();
+    return c.json(open, 200);
   });
 
   app.openapi({ ...historyRoute, middleware: view }, async (c) => {
@@ -533,19 +546,22 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
           ...serializeChange(change),
           followUp,
         })),
-        entitiesSyncedAt: toIso(await getProfileEntitiesSyncedAt(db, found.submission.profileId)),
+        entitiesSyncedAt: toIso(await getSubmissionEntitiesSyncedAt(db, found.submission.id)),
       },
       200,
     );
   });
 
   app.openapi({ ...bulkFileRoute, middleware: write }, async (c) => {
+    const who = actor(c);
+    const submissionId = c.req.valid('param').id;
     let found: Awaited<ReturnType<typeof getBulkFileSubmissionRows>>;
     try {
-      found = await getBulkFileSubmissionRows(db, {
-        ...actor(c),
-        submissionId: c.req.valid('param').id,
-      });
+      // Was inzwischen nicht mehr in die Datei passt, scheitert jetzt; die Datei enthält nur den Rest.
+      found =
+        (await settleBulkFile(who, submissionId)) === null
+          ? null
+          : await getBulkFileSubmissionRows(db, { ...who, submissionId });
     } catch (error) {
       throw toApiError(error);
     }
@@ -562,7 +578,7 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
     const name = [
       'profitbash-aenderungen',
       slugify(accountName) || 'konto',
-      countryCode.toLowerCase(),
+      slugify(countryCode) || 'xx',
       createdAt.toISOString().slice(0, 10),
     ].join('-');
     // Kopie in einen eigenen Puffer: `Response` nimmt keine Sicht auf einen geteilten.
@@ -574,12 +590,13 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
   });
 
   app.openapi({ ...closeRoute, middleware: write }, async (c) => {
+    const who = actor(c);
+    const submissionId = c.req.valid('param').id;
+    const { outcome } = c.req.valid('json');
     try {
-      const closed = await closeBulkFileSubmission(db, {
-        ...actor(c),
-        submissionId: c.req.valid('param').id,
-        outcome: c.req.valid('json').outcome,
-      });
+      // „Hochgeladen“ gilt nur für das, was in der Datei steht.
+      if (outcome === 'applied') await settleBulkFile(who, submissionId);
+      const closed = await closeBulkFileSubmission(db, { ...who, submissionId, outcome });
       if (!closed) throw submissionNotFound();
       return c.json(closed, 200);
     } catch (error) {

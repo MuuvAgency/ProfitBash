@@ -28,6 +28,7 @@ function change(patch: Partial<AdChangeCheckInput>): AdChangeCheckInput {
     adProduct: 'SPONSORED_PRODUCTS',
     countryCode: 'DE',
     negative: null,
+    profileId: 'p',
     ...patch,
   };
 }
@@ -86,6 +87,32 @@ describe('checkAdChanges: Grenzen von Amazon', () => {
     });
     const result = checkAdChanges([words, fine, asin], { limitFor: noLimits });
     expect(result.violations).toEqual([{ changeId: words.id, code: 'tooManyWords', max: 4 }]);
+  });
+});
+
+describe('checkAdChanges: Eingaben', () => {
+  it('übergeht Werte, die keine einfache Dezimalzahl sind, statt zu werfen oder falsch zu rechnen', () => {
+    const result = checkAdChanges(
+      [
+        change({ after: 'abc' }),
+        change({ after: '1e3' }),
+        change({ after: 'NaN' }),
+        change({ before: '0x10', after: '100' }),
+      ],
+      { limitFor: limits },
+    );
+    expect(result.violations).toEqual([]);
+    expect(result.largeChanges).toEqual([]);
+  });
+
+  it('zählt „mehr als 200“ je Profil, wenn die Änderungen ihr Profil nennen', () => {
+    const many = [
+      ...Array.from({ length: 150 }, () => change({ profileId: 'a' })),
+      ...Array.from({ length: 150 }, () => change({ profileId: 'b' })),
+    ];
+    expect(checkAdChanges(many, { limitFor: noLimits }).tooMany).toBeNull();
+    const one = [...many, ...Array.from({ length: 51 }, () => change({ profileId: 'a' }))];
+    expect(checkAdChanges(one, { limitFor: noLimits }).tooMany).toEqual({ count: 201, limit: 200 });
   });
 });
 

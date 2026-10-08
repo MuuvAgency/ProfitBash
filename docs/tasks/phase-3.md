@@ -462,11 +462,80 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     arbeitet die Übermittlungen einer Connection nacheinander ab.
 
 ### 3.4 API (`apps/api`)
-- [ ] Endpunkte für Warenkorb, Übermittlungen (inkl. Download der Bulk-Datei) und Verlauf hinter
+- [x] Endpunkte für Warenkorb, Übermittlungen (inkl. Download der Bulk-Datei) und Verlauf hinter
       `requireFeature('changes', 'write')` bzw. `'view'`; zod; OpenAPI; Test je Endpunkt (fremde Organisation, ausgeblendetes
       Profil, Recht `write`).
-- [ ] Prüfungen vor dem Übermitteln: Grenzen von Amazon (hart, 3.2a) und Warnungen nach F6 (Gebot oder Budget über ±50 %, mehr
+- [x] Prüfungen vor dem Übermitteln: Grenzen von Amazon (hart, 3.2a) und Warnungen nach F6 (Gebot oder Budget über ±50 %, mehr
       als 200 Änderungen; Übermitteln erst mit Bestätigung), als Engine-Funktion ohne I/O.
+- [x] Umsetzung (Stand für 3.5, 3.6 und später):
+  - **Endpunkte** (`apps/api/src/routes/ad-changes.ts`, alle unter `/api/ads/changes`, Schemas in
+    `packages/shared/src/ad-changes-api.ts`). Lesen mit `view`, alles andere mit `write`:
+
+    | Methode und Pfad | Zweck |
+    |---|---|
+    | `GET /pending` | eigener Warenkorb mit `otherUsers` (F4) und `check` (Prüfungen) |
+    | `POST /pending` | vormerken (`stageAdChangesRequestSchema`), Ergebnis je Änderung |
+    | `POST /pending/discard` | genannte oder alle eigenen Änderungen verwerfen |
+    | `POST /submit` | übermitteln: `channel`, optional `profileId`, `changeIds`, `confirmWarnings` |
+    | `GET /open?profileId=` | offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis) für das Grid, neueste zuerst |
+    | `POST /history` | Verlauf einer Entity, eines Profils oder aller sichtbaren Profile (höchstens 200) |
+    | `GET /submissions`, `GET /submissions/{id}` | Übermittlungen der Organisation; eine mit Änderungen, `followUp` und `entitiesSyncedAt` |
+    | `GET /submissions/{id}/bulk-file` | die `.xlsx` für die Werbekonsole (`write`) |
+    | `POST /submissions/{id}/close` | Bulk-Übermittlung von Hand abschließen (`applied` \| `discarded`) |
+    | `POST /retry`, `POST /dismiss`, `POST /revert` | Folgeschritte aus 3.3 |
+
+  - **Übermitteln:** Die Antwort hat einen `status`: `limitsExceeded` (ein Wert liegt außerhalb der Grenzen von
+    Amazon, nichts wird übermittelt), `needsConfirmation` (Warnungen nach F6, erneut mit `confirmWarnings` senden) oder
+    `submitted` (Übermittlungen je Profil, `dropped`, `blocked`, `bulkFileSkipped`). Die Prüfung läuft **in der
+    Transaktion des Übermittelns** (`review` von `submitAdChanges`): mit dem dabei neu gelesenen „vorher“ und über
+    genau die Zeilen, die übermittelt würden; meldet sie etwas, wird alles zurückgerollt. Für den Weg `api`
+    plant `enqueue` je Connection `ad-changes-submit` in der Transaktion der Übermittlung ein. Revert antwortet mit
+    `conflict` (Rückfrage, F8) oder `submitted`.
+  - **Prüfungen** (`packages/engine/src/ad-changes.ts`, `checkAdChanges`, ohne I/O): `violations` (unter Minimum,
+    über Maximum mit den Grenzen; negatives Keyword zu lang oder mit zu vielen Wörtern), `largeChanges` (Gebot,
+    Standardgebot oder Budget ändert sich um mehr als 50 %, genau 50 % nicht; ohne Wert vorher keine Warnung;
+    Platzierungen und Zustände nie), `tooMany` (mehr als 200 Änderungen für ein Profil, also in einer Übermittlung). Werte, die keine einfache
+    Dezimalzahl sind, werden übergangen. Die Grenzen selbst kommen
+    aus `limits.ts` (`@profitbash/amazon-ads`) über `limitFor`; für andere Ad-Typen und unbekannte Marktplätze gibt
+    es keine (Amazon entscheidet). Die Engine liest `@profitbash/shared/ad-changes` (eigener Einstiegspunkt).
+  - **Bulk-Datei** (`apps/worker/src/ad-changes/bulk-file.ts`): `buildBulkFileChanges` führt wie beim API-Weg je
+    Entity zusammen (Kampagnenzeile mit Portfolio, Enddatum und Zustand aus dem Stand; jede Platzierung als eigene
+    Zeile mit der Strategie der Kampagne; Archivieren je Entity; Negatives je Ebene und Art), `buildSubmissionBulkFile`
+    liefert die `.xlsx` und die übersprungenen Änderungen mit Code und Text (`AD_PRODUCT_NOT_SUPPORTED` für SB und SD
+    bis 3.2c, `ENTITY_NOT_FOUND`, `SUPERSEDED`, `BULK_FILE_NOT_SUPPORTED`, `BULK_FILE_PARENT_ARCHIVED` …).
+    **Übersprungene Änderungen scheitern mit diesem Code** (`settleBulkFile`, wiederholbar): gleich nach dem
+    Übermitteln (auch bei Retry und Revert als Bulk-Datei), vor jedem Download und vor dem Abschließen als
+    „hochgeladen“ (eine Entity kann inzwischen entfernt oder archiviert sein); bleibt nichts offen, ist die
+    Übermittlung abgeschlossen. Der Download ist damit ein `GET`, das den Status von Änderungen ändern kann.
+    Der Download baut die Datei jedes Mal neu aus den Änderungen, die als übermittelt oder angewendet gelten
+    (Dateiname `profitbash-aenderungen-<konto>-<land>-<datum>.xlsx`); ohne Zeile `409 BULK_FILE_EMPTY`.
+    `entitiesSyncedAt` der Übermittlung nennt den ältesten Stand ihrer Kampagnen (von ihm stammen Portfolio und
+    Enddatum).
+  - **Datenbank** (`packages/db/src/ad-change-queries.ts`): `listOpenAdChanges` (höchstens 5000, neueste zuerst,
+    `truncated`; `mine`, `userName`, Weg der Übermittlung, bei Anlagen das Negative), `listAdChangeHistory`,
+    `getBulkFileSubmissionRows`, `listSubmissionConnections`, `getSubmissionEntitiesSyncedAt`; Migration
+    `0026_ad_changes_profile_indexes` (offene Änderungen und Verlauf je Profil); `loadAdChangeJobRows` liest die Zeilen für Job und
+    Bulk-Datei (nur der Job setzt dabei „vorher“).
+  - **Body-Limit:** Die schreibenden Sammel-Endpunkte (`pending`, `pending/discard`, `submit`, `retry`, `dismiss`,
+    `revert`) nehmen bis 2 MB an (bis 5000 Änderungen je Anfrage), alle anderen bleiben bei 64 KB.
+  - Review (unabhängig): keine kritischen Befunde; Rechte, Mandantentrennung (auch `settleBulkFile`), Body-Limit vor
+    Session und zod, Dateiname und Decimal-Behandlung bestätigt. Übernommen: Prüfung in der Transaktion statt davor
+    (vorher rechnete die Warnung mit dem „vorher“ vom Vormerken, und ein zweites Vormerken zwischen Prüfung und
+    Übermitteln kam ungeprüft durch), „mehr als 200“ je Profil, Bulk-Schritt auch bei Download und Abschließen,
+    `/open` neueste zuerst mit Filter nach Profil, Negative und zwei Indizes, `truncated` erst über der Grenze,
+    Platzierung bei nicht setzbarer Strategie mit eigenem Code (`BIDDING_STRATEGY_NOT_SUPPORTED`),
+    `entitiesSyncedAt` je Übermittlung, Schutz vor Nicht-Dezimalwerten in der Engine, Tests für ausgeblendete
+    Profile und fremde Organisation je Endpunkt, 413, leeren Warenkorb, Auswahl per `changeIds`.
+  - **Offen bzw. bewusst so (aus dem Review):** `confirmWarnings` bestätigt pauschal, auch Warnungen, die seit der
+    Rückfrage dazukamen (3.6 kann die bestätigten Änderungen mitsenden). Ein Target ohne eigenes Gebot bekommt
+    keine ±50-%-Warnung (kein Vergleichswert; möglich wäre das Standardgebot der Ad Group). Ein leerer Warenkorb
+    antwortet mit `submitted` und leerer Liste. `limitFor` und die Grenzen negativer Keywords stehen doppelt
+    (Route bzw. Engine und `limits.ts`). Der Verlauf je Entity zeigt neue Negatives nicht (ohne `entityId`; über
+    Profil oder Übermittlung sichtbar). Ein Warenkorb mit mehr als rund 65 000 Änderungen sprengt die
+    Parametergrenze beim Übermitteln (bisher keine Obergrenze). Nicht getestet: „mehr als 200“ über die API
+    (die Engine testet es), Retry und Revert als Bulk-Datei mit übersprungenen Änderungen.
+  - **Fehler:** `404 SUBMISSION_NOT_FOUND` (auch fremd oder ausgeblendet), `409 PROFILE_HAS_NO_CONNECTION`,
+    `409 SUBMISSION_NOT_OPEN`, `409 SUBMISSION_NOT_BULK_FILE`, `409 BULK_FILE_EMPTY`.
 
 ### 3.5 Bearbeiten im Explorer
 - [ ] Inline-Bearbeitung (Status, Budget, Gebot), Dialog für Gebotsstrategie und Platzierungen der Kampagne, Bulk-Dialoge für

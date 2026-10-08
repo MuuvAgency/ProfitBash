@@ -333,6 +333,53 @@ describe('Übermitteln', () => {
     expect(cart.body.changes).toHaveLength(1);
   });
 
+  it('prüft mit dem Stand beim Übermitteln, nicht mit dem beim Vormerken', async () => {
+    // +40 % beim Vormerken; ein Sync senkt das Gebot danach, übermittelt würden +133 %.
+    await stage(editor, [update('target', f.keyword, 'bid', '0.70')]);
+    await ctx.testDb.db
+      .update(amazonAdsTargets)
+      .set({ bid: '0.30' })
+      .where(eq(amazonAdsTargets.id, f.keyword));
+
+    const res = await call<SubmitAdChangesResponse>('POST', '/submit', editor, { channel: 'api' });
+
+    expect(res.body).toMatchObject({
+      status: 'needsConfirmation',
+      check: { largeChanges: [{ changePercent: '133.33' }] },
+    });
+    expect(await ctx.testDb.db.select().from(adChangeSubmissions)).toEqual([]);
+    expect(
+      (await call<PendingAdChangesResponse>('GET', '/pending', editor)).body.changes,
+    ).toHaveLength(1);
+  });
+
+  it('übermittelt nur die genannten Änderungen und meldet einen leeren Warenkorb als leere Übermittlung', async () => {
+    const staged = await stage(editor, [
+      update('target', f.keyword, 'bid', '0.55'),
+      update('campaign', f.campaign, 'budget', '25'),
+    ]);
+    const res = await call<SubmitAdChangesResponse>('POST', '/submit', editor, {
+      channel: 'api',
+      changeIds: [staged.body.results[0]!.changeId],
+    });
+    expect(res.body).toMatchObject({ status: 'submitted', submissions: [{ changes: 1 }] });
+    expect(
+      (await call<PendingAdChangesResponse>('GET', '/pending', editor)).body.changes,
+    ).toHaveLength(1);
+    const audit = await ctx.testDb.db.select({ action: auditEvents.action }).from(auditEvents);
+    expect(audit.map((event) => event.action)).toContain('ad_change_submission.create');
+
+    expect(
+      (await call<SubmitAdChangesResponse>('POST', '/submit', admin, { channel: 'api' })).body,
+    ).toEqual({
+      status: 'submitted',
+      submissions: [],
+      dropped: 0,
+      blocked: [],
+      bulkFileSkipped: [],
+    });
+  });
+
   it('nimmt Profile ohne Connection nur als Bulk-Datei', async () => {
     await stage(editor, [update('target', f.fileKeyword, 'bid', '0.55')]);
     const res = await call('POST', '/submit', editor, { channel: 'api' });
@@ -398,6 +445,80 @@ describe('Bulk-Datei', () => {
       status: 'failed',
       errorCode: 'BULK_FILE_NOT_SUPPORTED',
     });
+  });
+
+  it('lässt beim Download und beim Abschließen scheitern, was inzwischen nicht mehr in die Datei passt', async () => {
+    const { submissionId, changeIds } = await submit(
+      [
+        update('target', f.fileKeyword, 'bid', '0.55'),
+        update('campaign', f.fileCampaign, 'budget', '25'),
+      ],
+      'bulk_file',
+    );
+    // Ein Import hat das Target seit dem Übermitteln als entfernt markiert.
+    await ctx.testDb.db
+      .update(amazonAdsTargets)
+      .set({ removedAt: NOW })
+      .where(eq(amazonAdsTargets.id, f.fileKeyword));
+    try {
+      const closed = await call('POST', `/submissions/${submissionId}/close`, editor, {
+        outcome: 'applied',
+      });
+      // Nur das Budget gilt als hochgeladen; das Gebot stand nie in der Datei.
+      expect(closed.body).toEqual({ changes: 1 });
+      const detail = await call<AdChangeSubmissionDetail>(
+        'GET',
+        `/submissions/${submissionId}`,
+        editor,
+      );
+      expect(detail.body.changes.find((change) => change.id === changeIds[0])).toMatchObject({
+        status: 'failed',
+        errorCode: 'ENTITY_NOT_FOUND',
+      });
+      expect(detail.body.changes.find((change) => change.id === changeIds[1])).toMatchObject({
+        status: 'applied',
+      });
+    } finally {
+      await ctx.testDb.db.update(amazonAdsTargets).set({ removedAt: null });
+    }
+  });
+
+  it('liefert keine Datei mehr, wenn keine Änderung übrig ist', async () => {
+    const { submissionId, changeIds } = await submit(
+      [update('target', f.fileKeyword, 'bid', '0.55')],
+      'bulk_file',
+    );
+    await ctx.testDb.db
+      .update(amazonAdsTargets)
+      .set({ removedAt: NOW })
+      .where(eq(amazonAdsTargets.id, f.fileKeyword));
+    try {
+      const res = await call('GET', `/submissions/${submissionId}/bulk-file`, editor);
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('BULK_FILE_EMPTY');
+      const detail = await call<AdChangeSubmissionDetail>(
+        'GET',
+        `/submissions/${submissionId}`,
+        editor,
+      );
+      expect(detail.body.submission.status).toBe('finished');
+      expect(detail.body.changes[0]).toMatchObject({ id: changeIds[0], status: 'failed' });
+    } finally {
+      await ctx.testDb.db.update(amazonAdsTargets).set({ removedAt: null });
+    }
+
+    const discarded = await submit([update('target', f.fileKeyword, 'bid', '0.55')], 'bulk_file');
+    expect(
+      (
+        await call('POST', `/submissions/${discarded.submissionId}/close`, editor, {
+          outcome: 'discarded',
+        })
+      ).body,
+    ).toEqual({ changes: 1 });
+    expect(
+      (await call('GET', `/submissions/${discarded.submissionId}/bulk-file`, editor)).body.error
+        .code,
+    ).toBe('BULK_FILE_EMPTY');
   });
 
   it('gibt es nur für Übermittlungen per Bulk-Datei in sichtbaren Profilen', async () => {
@@ -565,27 +686,139 @@ describe('Erneut versuchen, verwerfen, Revert', () => {
   });
 });
 
-describe('Offene Änderungen und Verlauf', () => {
-  it('nennt offene Änderungen aller Nutzer für die Anzeige im Grid', async () => {
-    await submit([update('target', f.keyword, 'bid', '0.55')]);
-    await stage(editor, [update('campaign', f.campaign, 'budget', '25')]);
+describe('Fremde Organisation und ausgeblendete Profile', () => {
+  it('nimmt Änderungen einer anderen Organisation nicht zurück', async () => {
+    const { submissionId, changeIds } = await processed([
+      update('target', f.keyword, 'bid', '0.55'),
+    ]);
 
-    const open = await call<{
-      changes: Array<{ status: string; mine: boolean; userName: string | null }>;
+    const byChange = await call<RevertAdChangesResponse>('POST', '/revert', foreign, {
+      changeIds,
+      channel: 'api',
+    });
+    expect(byChange.body).toEqual({
+      status: 'submitted',
+      submissions: [],
+      skipped: [{ changeId: changeIds[0], reason: 'notFound' }],
+      bulkFileSkipped: [],
+    });
+    const bySubmission = await call<RevertAdChangesResponse>('POST', '/revert', foreign, {
+      submissionId,
+      channel: 'api',
+    });
+    expect(bySubmission.body).toMatchObject({ status: 'submitted', submissions: [], skipped: [] });
+    expect(await ctx.testDb.db.select().from(adChangeSubmissions)).toHaveLength(1);
+  });
+
+  it('zeigt und ändert nichts in ausgeblendeten Profilen', async () => {
+    const done = await processed(
+      [update('target', f.keyword, 'bid', '0.55'), update('campaign', f.campaign, 'budget', '25')],
+      [0],
+    );
+    const bulk = await submit([update('target', f.fileKeyword, 'bid', '0.55')], 'bulk_file');
+    const staged = await stage(editor, [update('ad_group', f.adGroup, 'default_bid', '0.45')]);
+    const pendingId = staged.body.results[0]!.changeId!;
+    await ctx.testDb.db.update(amazonAdsProfiles).set({ isHidden: true });
+
+    expect((await call<PendingAdChangesResponse>('GET', '/pending', editor)).body.changes).toEqual(
+      [],
+    );
+    expect(
+      (await call('POST', '/pending/discard', editor, { changeIds: [pendingId] })).body,
+    ).toEqual({ discarded: 0 });
+    expect(
+      (await call<SubmitAdChangesResponse>('POST', '/submit', editor, { channel: 'api' })).body,
+    ).toMatchObject({ status: 'submitted', submissions: [] });
+    expect((await call<{ changes: unknown[] }>('GET', '/open', editor)).body.changes).toEqual([]);
+    expect(
+      (await call<{ changes: unknown[] }>('POST', '/history', editor, {})).body.changes,
+    ).toEqual([]);
+    expect(
+      (await call<{ submissions: unknown[] }>('GET', '/submissions', editor)).body.submissions,
+    ).toEqual([]);
+    expect(
+      (
+        await call('POST', `/submissions/${bulk.submissionId}/close`, editor, {
+          outcome: 'applied',
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await call<{ skipped: unknown[] }>('POST', '/retry', editor, {
+          changeIds: [done.changeIds[0]],
+          channel: 'api',
+        })
+      ).body.skipped,
+    ).toEqual([{ changeId: done.changeIds[0], reason: 'notFound' }]);
+    expect(
+      (await call('POST', '/dismiss', editor, { changeIds: [done.changeIds[0]] })).body,
+    ).toEqual({ dismissed: 0 });
+    expect(
+      (
+        await call<RevertAdChangesResponse>('POST', '/revert', editor, {
+          changeIds: [done.changeIds[1]],
+          channel: 'api',
+        })
+      ).body,
+    ).toMatchObject({ skipped: [{ changeId: done.changeIds[1], reason: 'notFound' }] });
+  });
+
+  it('verlangt auch für eine einzelne Übermittlung eine Anmeldung und begrenzt den Body', async () => {
+    expect((await call('GET', '/submissions/00000000-0000-4000-8000-000000000001')).status).toBe(
+      401,
+    );
+    const tooLarge = await call('POST', '/pending', undefined, {
+      origin: 'explorer',
+      changes: [],
+      padding: 'x'.repeat(2 * 1024 * 1024),
+    });
+    expect(tooLarge.status).toBe(413);
+  });
+});
+
+describe('Offene Änderungen und Verlauf', () => {
+  it('nennt offene Änderungen aller Nutzer für die Anzeige im Grid, neueste zuerst', async () => {
+    await submit([update('target', f.keyword, 'bid', '0.55')]);
+    await ctx.testDb.db.update(adChanges).set({ createdAt: new Date('2026-10-01T00:00:00Z') });
+    await stage(editor, [
+      {
+        operation: 'create_negative',
+        campaignId: f.campaign,
+        adGroupId: f.adGroup,
+        negative: { type: 'keyword', keywordText: 'gratis', matchType: 'EXACT' },
+      },
+    ]);
+    await stage(editor, [update('target', f.fileKeyword, 'bid', '0.60')]);
+
+    type Open = {
+      changes: Array<{ status: string; mine: boolean; userName: string | null; profileId: string }>;
       truncated: boolean;
-    }>('GET', '/open', viewer);
+    };
+    const open = await call<Open>('GET', '/open', viewer);
 
     expect(open.body.truncated).toBe(false);
-    expect(open.body.changes).toEqual([
+    expect(open.body.changes).toHaveLength(3);
+    expect(open.body.changes.at(-1)).toMatchObject({
+      status: 'submitted',
+      channel: 'api',
+      entityId: f.keyword,
+      mine: false,
+    });
+    expect(open.body.changes).toContainEqual(
       expect.objectContaining({
-        status: 'submitted',
-        channel: 'api',
-        entityId: f.keyword,
-        mine: false,
+        status: 'pending',
+        operation: 'create',
+        userName: 'editor@muuv.test',
+        negative: { type: 'keyword', keywordText: 'gratis', matchType: 'EXACT' },
       }),
-      expect.objectContaining({ status: 'pending', after: '25', userName: 'editor@muuv.test' }),
-    ]);
-    expect((await call<{ changes: unknown[] }>('GET', '/open', foreign)).body.changes).toEqual([]);
+    );
+    const onlyFile = await call<Open>('GET', `/open?profileId=${f.fileProfile}`, viewer);
+    expect(onlyFile.body.changes.map((change) => change.profileId)).toEqual([f.fileProfile]);
+    expect((await call<Open>('GET', '/open', foreign)).body.changes).toEqual([]);
+    expect((await call<Open>('GET', `/open?profileId=${f.profile}`, foreign)).body.changes).toEqual(
+      [],
+    );
   });
 
   it('liefert den Verlauf einer Entity', async () => {

@@ -82,7 +82,7 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
 - **Änderungen an Amazon-Werbung** (ab Phase 3, 3.1 und 3.3): `ad_changes` und `ad_change_submissions` gehören der
   Organisation des Profils. Nutzer lesen und schreiben nur über `visibleProfilesScope()` (`ad-changes.ts`: Warenkorb je
   Nutzer, Übermittlungen für die ganze Organisation; `ad-change-actions.ts`: erneut versuchen, verwerfen, Revert,
-  Abschließen von Hand), mit Audit-Event; das Recht `write` im Feature `changes` prüft die API. Der Job
+  Abschließen von Hand; `ad-change-queries.ts`: offene Änderungen, Verlauf, Zeilen der Bulk-Datei), mit Audit-Event; das Recht `write` im Feature `changes` prüft die API. Der Job
   `ad-changes-submit` und die Bestätigung durch den Import arbeiten als Systemzugriff (`ad-change-processing.ts`),
   gebunden an Organisation und Connection bzw. Profil.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;

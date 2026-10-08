@@ -1,0 +1,2 @@
+CREATE INDEX "ad_changes_open_profile_idx" ON "ad_changes" USING btree ("profile_id","created_at" DESC NULLS LAST) WHERE "ad_changes"."status" in ('pending', 'submitted');--> statement-breakpoint
+CREATE INDEX "ad_changes_profile_created_idx" ON "ad_changes" USING btree ("profile_id","created_at" DESC NULLS LAST);

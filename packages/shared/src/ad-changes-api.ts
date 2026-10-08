@@ -249,8 +249,8 @@ export const adChangeSubmissionDetailSchema = z
       }),
     ),
     /**
-     * Letzter Sync bzw. Import der Kampagnen des Profils: Portfolio und Enddatum in der Bulk-Datei stammen von
-     * diesem Stand (`null`: noch nie).
+     * Ältester Sync bzw. Import der Kampagnen dieser Übermittlung: Portfolio und Enddatum in der Bulk-Datei
+     * stammen von diesem Stand (`null`: noch nie).
      */
     entitiesSyncedAt: timestamp.nullable(),
   })
@@ -367,14 +367,23 @@ export const openAdChangesResponseSchema = z
         adGroupId: z.uuid().nullable(),
         field: z.enum(AD_CHANGE_FIELDS).nullable(),
         after: z.string().nullable(),
+        /** Das neue Negative beim Anlegen. */
+        negative: adChangeNegativeSchema.nullable(),
         mine: z.boolean(),
         userName: z.string().nullable(),
       }),
     ),
-    /** Die Liste ist bei 5000 Einträgen gekappt. */
+    /** Es gibt mehr als 5000 offene Änderungen: Die ältesten fehlen (nach Profil filtern). */
     truncated: z.boolean(),
   })
   .meta({ id: 'OpenAdChangesResponse' });
+
+export const openAdChangesQuerySchema = z
+  .object({
+    /** Nur die offenen Änderungen dieses Profils. */
+    profileId: z.uuid().optional(),
+  })
+  .meta({ id: 'OpenAdChangesQuery' });
 
 export const MAX_AD_CHANGE_HISTORY = 200;
 

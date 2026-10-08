@@ -77,7 +77,7 @@ describe('listOpenAdChanges', () => {
 
     const open = await listOpenAdChanges(testDb.db, ada());
 
-    const byId = new Map(open!.map((change) => [change.id, change]));
+    const byId = new Map(open!.changes.map((change) => [change.id, change]));
     expect(byId.get(submitted.changeIds[0]!)).toMatchObject({
       status: 'submitted',
       channel: 'api',
@@ -97,15 +97,24 @@ describe('listOpenAdChanges', () => {
       userName: 'Emil',
     });
     // Die angewendete Änderung fehlt.
-    expect(open).toHaveLength(3);
+    expect(open!.changes).toHaveLength(3);
+    expect(open!.truncated).toBe(false);
+    // Neueste zuerst.
+    expect(open!.changes.at(-1)!.id).toBe(submitted.changeIds[0]);
+    expect(
+      (await listOpenAdChanges(testDb.db, { ...ada(), profileId: f.fileProfile }))!.changes,
+    ).toEqual([]);
   });
 
   it('zeigt nur sichtbare Profile und null für Nicht-Mitglieder', async () => {
     await submit([update('target', f.keyword, 'bid', '0.75')]);
-    expect(await listOpenAdChanges(testDb.db, { userId: other.ada, orgId: other.org })).toEqual([]);
+    expect(await listOpenAdChanges(testDb.db, { userId: other.ada, orgId: other.org })).toEqual({
+      changes: [],
+      truncated: false,
+    });
     expect(await listOpenAdChanges(testDb.db, { userId: f.ada, orgId: other.org })).toBeNull();
     await testDb.db.update(amazonAdsProfiles).set({ isHidden: true });
-    expect(await listOpenAdChanges(testDb.db, emil())).toEqual([]);
+    expect((await listOpenAdChanges(testDb.db, emil()))!.changes).toEqual([]);
   });
 });
 

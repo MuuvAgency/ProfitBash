@@ -2535,7 +2535,9 @@ export interface paths {
         /** Offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis), für die Anzeige je Entity */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    profileId?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -2549,6 +2551,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["OpenAdChangesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description Nicht angemeldet. */
@@ -4692,6 +4703,17 @@ export interface components {
                 /** @enum {string|null} */
                 field: "state" | "budget" | "bidding_strategy" | "placement_top" | "placement_rest_of_search" | "placement_product_page" | "placement_amazon_business" | "default_bid" | "bid" | null;
                 after: string | null;
+                negative: {
+                    /** @enum {string} */
+                    type: "keyword";
+                    keywordText: string;
+                    /** @enum {string} */
+                    matchType: "EXACT" | "PHRASE";
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                } | null;
                 mine: boolean;
                 userName: string | null;
             }[];
