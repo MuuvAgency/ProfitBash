@@ -240,6 +240,9 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/search-terms/analysis', { body: input })),
       saveRules: (rules: SearchTermRulesData) =>
         unwrap(client.PUT('/api/ads/search-terms/rules', { body: rules })),
+      /** Löscht die Suchbegriffe genau eines Datei-Zeitraums (2b.2d), über alle Ad-Typen. */
+      deletePeriod: (input: { profileId: string; periodStart: string; periodEnd: string }) =>
+        unwrap(client.POST('/api/ads/search-terms/periods/delete', { body: input })),
     },
 
     /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */
