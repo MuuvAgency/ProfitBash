@@ -1,4 +1,5 @@
 import {
+  adChangeFieldKind,
   adChangeValueIssue,
   isAdChangePlacementField,
   type AdChangeChannel,
@@ -454,8 +455,14 @@ export async function revertAdChanges(
       }
       const before =
         row.oldValue ?? row.oldAmount ?? (isAdChangePlacementField(field) ? '0' : null);
-      // Auch ein „vorher“, das sich nicht setzen lässt (z. B. regelbasierte Gebote), ist kein Ziel für den Revert.
-      if (before === null || adChangeValueIssue(entityType, field, before) !== null) {
+      // Auch ein Zustand oder eine Strategie, die sich nicht setzen lässt (z. B. regelbasierte Gebote), ist kein
+      // Ziel für den Revert. Beträge gehen so zurück, wie sie waren (auch mit mehr Nachkommastellen, als der
+      // Warenkorb annimmt).
+      if (
+        before === null ||
+        (adChangeFieldKind(field) === 'enum' &&
+          adChangeValueIssue(entityType, field, before) !== null)
+      ) {
         skip(row.id, 'noPreviousValue');
         continue;
       }

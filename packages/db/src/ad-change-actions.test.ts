@@ -382,6 +382,44 @@ describe('revertAdChanges', () => {
     });
   });
 
+  it('setzt auch auf einen Betrag zurück, den der Warenkorb so nicht annähme (drei Nachkommastellen)', async () => {
+    await testDb.db
+      .update(amazonAdsCampaigns)
+      .set({ budgetAmount: '10.005' })
+      .where(eq(amazonAdsCampaigns.id, f.campaign));
+    const { changeIds } = await processed([update('campaign', f.campaign, 'budget', '25')]);
+
+    const result = await revertAdChanges(testDb.db, {
+      ...ada(),
+      changeIds,
+      channel: 'api',
+      enqueue,
+    });
+
+    if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
+    expect(result.skipped).toEqual([]);
+    const [revert] = await changesOf(result.submissions[0]!.id);
+    expect(revert).toMatchObject({ oldAmount: '25', newAmount: '10.005' });
+  });
+
+  it('nimmt eine Gebotsstrategie nicht zurück, die sich nicht setzen lässt (regelbasiert)', async () => {
+    await testDb.db
+      .update(amazonAdsCampaigns)
+      .set({ biddingStrategy: 'RULE_BASED' })
+      .where(eq(amazonAdsCampaigns.id, f.campaign));
+    const { changeIds } = await processed([
+      update('campaign', f.campaign, 'bidding_strategy', 'NONE'),
+    ]);
+
+    expect(
+      await revertAdChanges(testDb.db, { ...ada(), changeIds, channel: 'api', enqueue }),
+    ).toEqual({
+      status: 'submitted',
+      submissions: [],
+      skipped: [{ changeId: changeIds[0], reason: 'noPreviousValue' }],
+    });
+  });
+
   it('archiviert ein angelegtes Negative wieder (gefunden über die Amazon-ID)', async () => {
     const { changeIds } = await processed([negative('gratis')]);
     const [created] = await testDb.db
