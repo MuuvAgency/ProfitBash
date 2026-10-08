@@ -16,6 +16,8 @@ import { createAmazonImport } from './import';
 import type { AmazonRequestFile } from './state-machine';
 
 const {
+  adChangeSubmissions,
+  adChanges,
   amazonAdsAdGroupDailyMetrics,
   amazonAdsAdGroups,
   amazonAdsCampaignDailyMetrics,
@@ -224,6 +226,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await testDb.db.delete(adChanges);
+  await testDb.db.delete(adChangeSubmissions);
   await testDb.db.delete(amazonAdsAdGroupDailyMetrics);
   await testDb.db.delete(amazonAdsCampaignDailyMetrics);
   await testDb.db.delete(amazonAdsProductAds);
@@ -279,6 +283,44 @@ describe('Import eines Entity-Batches', () => {
       placeholdersFilled: 0,
       placeholdersCreated: 0,
     });
+  });
+
+  it('bestätigt offene Übermittlungen per Bulk-Datei, deren neuen Wert der Export jetzt trägt (3.3)', async () => {
+    await importBatch(fullBatch());
+    const [existing] = await testDb.db
+      .select({ id: amazonAdsCampaigns.id })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.amazonCampaignId, 'c-1'));
+    const [submission] = await testDb.db
+      .insert(adChangeSubmissions)
+      .values({ organizationId, profileId, channel: 'bulk_file' })
+      .returning({ id: adChangeSubmissions.id });
+    await testDb.db.insert(adChanges).values({
+      organizationId,
+      profileId,
+      status: 'submitted',
+      submissionId: submission!.id,
+      origin: 'explorer',
+      operation: 'update',
+      entityType: 'campaign',
+      entityId: existing!.id,
+      campaignId: existing!.id,
+      field: 'state',
+      oldValue: 'ENABLED',
+      newValue: 'PAUSED',
+    });
+
+    const paused = fullBatch();
+    paused.campaigns[0] = { ...paused.campaigns[0]!, state: 'PAUSED' };
+    const counters = await importBatch(paused, {}, new Date('2026-09-28T06:10:00Z'));
+
+    expect(counters).toMatchObject({ updated: 1, changesConfirmed: 1 });
+    expect(await testDb.db.select({ status: adChanges.status }).from(adChanges)).toEqual([
+      { status: 'applied' },
+    ]);
+    expect(
+      await testDb.db.select({ status: adChangeSubmissions.status }).from(adChangeSubmissions),
+    ).toEqual([{ status: 'finished' }]);
   });
 
   it('markiert fehlende Entities als entfernt, die vor dem Anfordern existierten', async () => {
