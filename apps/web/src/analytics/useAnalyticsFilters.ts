@@ -35,6 +35,19 @@ export const filterOptionsQueryKey = ['analytics', 'filter-options'] as const;
 const HISTORY_STATE_KEY = 'analyticsFilters';
 
 /**
+ * Link auf eine Auswertung (Dashboard, Explorer) mit der Auswahl `state`: kurzer Zustand in der URL, der ganze (auch die
+ * Profile) im Verlaufseintrag. In einem neuen Tab fehlt der Verlaufseintrag: Dort gelten die Profile der letzten
+ * eigenen Auswahl (Merker `pf=1`).
+ */
+export function filterLink(path: string, state: FilterState) {
+  return {
+    path,
+    query: filterStateToQuery(state),
+    state: { [HISTORY_STATE_KEY]: toHistoryValue(state) },
+  };
+}
+
+/**
  * Filterleiste von Dashboard und Explorer (`phase-2.md` F2–F5): Zustand aus der URL, ohne Filter-Parameter die letzte
  * Auswahl aus `ui_state`. Änderungen erzeugen einen Verlaufseintrag (Zurück-Taste) und werden gespeichert.
  * `ready` wird wahr, sobald gespeicherte Auswahl (auch fehlgeschlagen) und Filteroptionen da sind; erst dann sollen
@@ -154,12 +167,7 @@ export function useAnalyticsFilters() {
    * (auch die Profile) im Verlaufseintrag.
    */
   function linkTo(path: string, patch: Partial<FilterState>): RouteLocationRaw {
-    const next: FilterState = { ...state.value, ...patch };
-    return {
-      path,
-      query: filterStateToQuery(next),
-      state: { [HISTORY_STATE_KEY]: toHistoryValue(next) },
-    };
+    return filterLink(path, { ...state.value, ...patch });
   }
 
   return { state, options, ready, update, query, today, linkTo };

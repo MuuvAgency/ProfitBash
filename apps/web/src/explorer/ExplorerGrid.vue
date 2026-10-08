@@ -2,7 +2,6 @@
 import type {
   CellKeyDownEvent,
   ColDef,
-  ProcessCellForExportParams,
   RowSelectionOptions,
   SelectionColumnDef,
   GetRowIdParams,
@@ -14,9 +13,10 @@ import type {
 } from 'ag-grid-community';
 import { AgGridVue } from 'ag-grid-vue3';
 import { computed, markRaw, shallowRef } from 'vue';
+import { gridCsv } from '../grid/csv';
 import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
-import { csvSafe, type GridRow } from './columns';
-import { MISSING_VALUE } from '@profitbash/shared';
+import { activateCellControlOnEnter } from '../grid/keyboard';
+import type { GridRow } from './columns';
 import NameCell, { type NameCellContext } from './NameCell.vue';
 
 /**
@@ -59,18 +59,6 @@ const rowSelection: RowSelectionOptions = {
 };
 const selectionColumnDef: SelectionColumnDef = { pinned: 'left', lockPinned: true };
 
-/**
- * Zellen im CSV: Beträge und Zähler roh (Decimal-String), Texte formatiert und gegen Formeln entschärft; fehlende Werte
- * leer (nicht „–“).
- */
-function processCell(params: ProcessCellForExportParams<GridRow>): string {
-  const colDef = params.column.getColDef();
-  if (colDef.useValueFormatterForExport === false) return params.value ?? '';
-  const formatted = params.formatValue(params.value) as unknown;
-  const text = formatted === null || formatted === undefined ? '' : String(formatted);
-  return text === MISSING_VALUE ? '' : csvSafe(text);
-}
-
 const getRowId = ({ data }: GetRowIdParams<GridRow>) => data.id;
 const getRowClass = ({ data }: RowClassParams<GridRow>) =>
   data?.isTotal ? 'font-bold' : data?.removed ? 'text-ink-tertiary' : undefined;
@@ -86,21 +74,9 @@ function onSelectionChanged({ api: gridApi }: SelectionChangedEvent<GridRow>) {
   );
 }
 
-/**
- * Tastatur (2.13): Zellen sind fokussierbar (Pfeiltasten, Leertaste markiert die Zeile). Enter auf einer Zelle mit Link
- * oder Knopf (Name mit Drill-Down, „teilt sich n ASINs“) löst ihn aus; ist das Element selbst fokussiert, handelt es
- * ohnehin selbst.
- */
+/** Tastatur (2.13): Pfeiltasten, Leertaste markiert die Zeile, Enter löst den Link oder Knopf der Zelle aus. */
 function onCellKeyDown({ event }: CellKeyDownEvent<GridRow>) {
-  if (!(event instanceof KeyboardEvent) || event.key !== 'Enter') return;
-  // Gehaltenes Enter klickte wiederholt (Popover flackert, Route doppelt); Modifikatoren bleiben dem Browser.
-  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-  const cell = event.target;
-  if (!(cell instanceof HTMLElement) || !cell.classList.contains('ag-cell')) return;
-  const control = cell.querySelector<HTMLElement>('a[href], button');
-  if (!control) return;
-  event.preventDefault();
-  control.click();
+  activateCellControlOnEnter(event);
 }
 
 function onSortChanged({ api: gridApi, source }: SortChangedEvent<GridRow>) {
@@ -114,21 +90,7 @@ function onSortChanged({ api: gridApi, source }: SortChangedEvent<GridRow>) {
  * `useValueFormatterForExport: false`), dazu die Währung; ohne Summenzeile (sie gilt für alle Zeilen der Auswahl).
  */
 function csv(prependContent?: string): string {
-  const gridApi = api.value;
-  if (!gridApi) return '';
-  const columnKeys = gridApi
-    .getAllGridColumns()
-    .filter((column) => column.isVisible() || column.getColId() === 'currency')
-    .map((column) => column.getColId())
-    .filter((id) => !id.startsWith('ag-Grid-'));
-  return (
-    gridApi.getDataAsCsv({
-      columnKeys,
-      skipPinnedBottom: true,
-      processCellCallback: processCell,
-      ...(prependContent && { prependContent }),
-    }) ?? ''
-  );
+  return api.value ? gridCsv(api.value, prependContent) : '';
 }
 
 defineExpose({ csv });
