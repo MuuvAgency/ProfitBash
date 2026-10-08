@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SEARCH_TERM_RULES,
   MAX_PROTECTED_TERMS,
+  NO_SEARCH_TERM_RULE_OVERRIDES,
   normalizeProtectedTerms,
   protectedTermsSchema,
+  resolveSearchTermRules,
   searchTermAnalysisRequestSchema,
+  searchTermRuleOverridesSchema,
   searchTermRulesSchema,
 } from './search-terms';
 
@@ -80,5 +83,50 @@ describe('searchTermAnalysisRequestSchema', () => {
     expect(
       searchTermAnalysisRequestSchema.safeParse({ ...base, profileId: undefined }).success,
     ).toBe(false);
+  });
+});
+
+describe('Abweichende Regeln je Profil (2b.2g)', () => {
+  const org = {
+    harvestMinPurchases: 3,
+    harvestMaxAcos: '0.25',
+    negateMinClicks: 25,
+    negateMinCost: '20',
+  };
+
+  it('nimmt je Feld den Wert des Profils, sonst den der Organisation', () => {
+    expect(
+      resolveSearchTermRules(org, {
+        harvestMinPurchases: null,
+        harvestMaxAcos: '0.4',
+        negateMinClicks: null,
+        negateMinCost: '200',
+      }),
+    ).toEqual({ ...org, harvestMaxAcos: '0.4', negateMinCost: '200' });
+  });
+
+  it('ohne Abweichung gelten die Regeln der Organisation', () => {
+    expect(resolveSearchTermRules(org, null)).toEqual(org);
+    expect(resolveSearchTermRules(org, NO_SEARCH_TERM_RULE_OVERRIDES)).toEqual(org);
+  });
+
+  it('eine Abweichung von 0 Spend zählt als Wert, nicht als leer', () => {
+    expect(
+      resolveSearchTermRules(org, { ...NO_SEARCH_TERM_RULE_OVERRIDES, negateMinCost: '0' })
+        .negateMinCost,
+    ).toBe('0');
+  });
+
+  it('prüft abweichende Werte wie die Regeln der Organisation, leer ist erlaubt', () => {
+    const parse = (patch: Record<string, unknown>) =>
+      searchTermRuleOverridesSchema.safeParse({ ...NO_SEARCH_TERM_RULE_OVERRIDES, ...patch })
+        .success;
+    expect(parse({})).toBe(true);
+    expect(parse({ negateMinCost: '200.50', harvestMinPurchases: 1 })).toBe(true);
+    expect(parse({ harvestMaxAcos: '0' })).toBe(false);
+    expect(parse({ harvestMinPurchases: 0 })).toBe(false);
+    expect(parse({ negateMinCost: '1.234' })).toBe(false);
+    expect(parse({ fremd: 1 })).toBe(false);
+    expect(searchTermRuleOverridesSchema.safeParse({ negateMinCost: '5' }).success).toBe(false);
   });
 });
