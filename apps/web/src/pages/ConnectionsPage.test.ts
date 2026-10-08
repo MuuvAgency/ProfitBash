@@ -1162,7 +1162,7 @@ describe('Datei-Importe (1.11f)', () => {
       await check(
         '2026-07-01',
         '2026-09-30',
-        'Der Zeitraum darf höchstens 60 Tage umfassen (so viel exportiert die Werbekonsole).',
+        'Beginn und Ende dürfen höchstens 60 Tage auseinanderliegen (mehr exportiert die Werbekonsole nicht).',
       );
       expect(posts()).toEqual([]);
 

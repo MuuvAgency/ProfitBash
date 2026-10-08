@@ -300,14 +300,14 @@ export const de = {
           start: 'Zeitraum von',
           end: 'Zeitraum bis',
           /** `{days}` aus `BULK_PERIOD_MAX_DAYS`. */
-          hint: 'Der Dateiname nennt keinen Zeitraum (Datei umbenannt). Gib an, über welche Tage die Datei ihre Kennzahlen summiert: den Zeitraum, den du beim Download in der Werbekonsole gewählt hast, höchstens {days} Tage. Ohne Angabe werden die Suchbegriffe der Datei nicht importiert.',
+          hint: 'Der Dateiname nennt keinen Zeitraum (Datei umbenannt). Gib an, über welche Tage die Datei ihre Kennzahlen summiert: den Zeitraum, den du beim Download in der Werbekonsole gewählt hast, Beginn und Ende höchstens {days} Tage auseinander. Ohne Angabe werden die Suchbegriffe der Datei nicht importiert. Liegen für genau diesen Zeitraum schon Suchbegriffe vor, ersetzt die Datei sie für ihre Kampagnen: Bitte den Zeitraum genau prüfen.',
           error: {
             incomplete: 'Bitte beide Tage angeben oder keinen.',
             invalidDate: 'Bitte gültige Tage angeben.',
             startAfterEnd: '„Zeitraum von“ liegt nach „Zeitraum bis“.',
             future: 'Der Zeitraum darf nicht in der Zukunft enden.',
             tooLong:
-              'Der Zeitraum darf höchstens {days} Tage umfassen (so viel exportiert die Werbekonsole).',
+              'Beginn und Ende dürfen höchstens {days} Tage auseinanderliegen (mehr exportiert die Werbekonsole nicht).',
           },
         },
         submit: 'Hochladen',
