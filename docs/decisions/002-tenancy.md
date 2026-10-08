@@ -3,7 +3,8 @@
 - **Status:** angenommen
 - **Datum:** 2026-09-25, Geltungsbereich von Punkt 5 am 2026-09-26 dokumentiert (Stand Code Phase 0, vor dem ersten Deploy),
   am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt, am 2026-09-29 um gespeicherte Ansichten (`saved_views`),
-  am 2026-10-07 um die Suchbegriff-Regeln (`search_term_rules`) und geschützte Begriffe
+  am 2026-10-07 um die Suchbegriff-Regeln (`search_term_rules`) und geschützte Begriffe, am 2026-10-08 um die
+  abweichenden Regeln je Profil (`search_term_rule_overrides`)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -75,6 +76,9 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   für andere Client-Daten.
   Einen Datei-Zeitraum der Suchbegriffe löschen (2b.2d, `deleteSearchTermPeriod`) dürfen nur Org-Admins für ein
   sichtbares Profil (`orgAdminOnly` wie der Datei-Upload, dazu Feature `sp-explorer`), mit Audit-Event.
+  Abweichende Regeln je Profil (2b.2g, `search_term_rule_overrides`) gehören der Organisation des Profils; gelesen
+  werden sie nur mit einem sichtbaren Profil (`querySearchTermPeriod`), geschrieben über `saveSearchTermRuleOverrides`
+  nach `visibleProfilesScope()` mit Recht `write` im Feature `sp-explorer` (prüft die API), mit Audit-Event.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

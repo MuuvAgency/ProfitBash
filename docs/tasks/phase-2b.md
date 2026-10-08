@@ -157,8 +157,8 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     `harvest_max_acos` als Bruch, `negate_min_clicks`, `negate_min_cost`, `updated_by`, `updated_at`) und
     `clients.protected_terms` (`text[]`, normalisiert gespeichert). Ohne Zeile gelten die Startwerte
     `DEFAULT_SEARCH_TERM_RULES` (`packages/shared/src/search-terms.ts`), die Antwort kennzeichnet das (`isDefault`,
-    `rulesAreDefault`). **Offen:** Overrides je Client/Marktplatz (DoD): Die Spend-Grenze ist ein Betrag in der Währung des
-    Profils, dieselbe Zahl bedeutet in SEK oder PLN viel weniger als in EUR.
+    `rulesAreDefault`). Overrides je Profil seit 2b.2g (die Spend-Grenze ist ein Betrag in der Währung des Profils,
+    dieselbe Zahl bedeutet in SEK oder PLN viel weniger als in EUR).
   - **Leseschicht** (`packages/db/src/search-terms.ts`, nur über `visibleProfilesScope()`): `listSearchTermPeriods` (je
     sichtbarem Profil die Datei-Zeiträume mit Ad-Typen, Zeilenzahl, letztem Import; neuester zuerst),
     `querySearchTermPeriod` (Profil + **ein** Zeitraum, optional Ad-Typen; `null`, wenn das Profil nicht sichtbar ist; Zeilen
@@ -289,8 +289,8 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
 
 **Entschieden (Dominik, 2026-10-08):** alle vier offenen Punkte aus 2b.2 werden umgesetzt: Suchbegriff-Zeitraum löschen und
 Untergrenze für von Hand angegebene Zeiträume (**2b.2d**), CSV-Export und Sprung in den Explorer (**2b.2e**), Einstufung je
-Suchbegriff über das Profil (**2b.2f**), Regeln je Client/Marktplatz (**2b.2g**, noch offen, eigene Session: Migration und
-Oberfläche; vorher klären, ob je Client, je Marktplatz oder je Währung). SQP-CSVs und der Bericht
+Suchbegriff über das Profil (**2b.2f**), Regeln je Client/Marktplatz (**2b.2g**, umgesetzt als Regeln je Profil, siehe
+unten). SQP-CSVs und der Bericht
 „Suchbegriff-Impression-Share“ liegen weiter nicht vor (2b.3 wartet). **SQP-Zuordnung:** über das Profil, im bestehenden
 Upload-Dialog mit Datei-Art SQP wie die Bulk-Datei; Client und Marktplatz kommen vom Profil.
 
@@ -326,8 +326,57 @@ Upload-Dialog mit Datei-Art SQP wie die Bulk-Datei; Client und Marktplatz kommen
     Ernte-Kandidat ist; beides wird gezeigt. Bei gekürzter Antwort (mehr als 10 000 Zeilen) kann der Filter weniger
     Zeilen zeigen, als der Zähler nennt (Kandidaten haben oft wenig Spend je Zeile). `termCounts` wird geliefert, aber
     noch nicht angezeigt; die Oberfläche sendet keine `adProducts`.
-  - **Offen:** Blick in die Browser-Pane (zweite Zeile bei schmaler Spalte, Mindestbreite 300 px, Dunkel-Modus): in dieser
-    Session war der Zugriff auf die Browser-Pane gesperrt.
+  - **Browser-Pane nachgeholt (2026-10-08, Demo-Daten, Profil SEK, Dunkel-Modus):** Die zweite Zeile „Über alle Targets:
+    Negieren (3 Zeilen)“ steht bei 300 px Spaltenbreite vollständig in der Zelle (nichts abgeschnitten), der Filter „1
+    Suchbegriff zum Negieren“ zeigt die drei Zeilen des Begriffs. Für 2b.2d: Knopf „Zeitraum löschen“ und Dialog mit
+    Profil, Zeitraum und Zeilenzahl geprüft (nicht bestätigt, die Demo-Daten bleiben). Für 2b.2e: Der Sprung von der
+    Kampagne landet im Explorer auf den Ad Groups der richtigen Kampagne, mit dem Client, dem Datei-Zeitraum als eigenem
+    Zeitraum und „Entfernte anzeigen“; „CSV exportieren“ ist sichtbar. Nicht im Browser geprüft: der Download selbst und
+    die Währung der Kennzahl-Spalten nach dem Sprung (die Spalten lagen im schmalen Fenster außerhalb des gezeichneten
+    Bereichs); beides decken die Tests ab.
+
+#### 2b.2g Regeln je Profil
+
+**Entschieden (Dominik, 2026-10-08):** Abweichende Regeln gelten **je Profil** (ein Profil ist ein Client auf einem
+Marktplatz; nicht je Client, je Marktplatz oder je Währung). **Alle vier Werte** lassen sich einzeln abweichend festlegen,
+leer heißt „wie für alle Profile“. Gepflegt wird im **Regel-Dialog der Suchbegriff-Analyse** (Recht `write`, also Admins
+und Editoren). „Zeitraum löschen“ (2b.2d) bleibt bei Org-Admins.
+
+- [x] Abweichende Regeln je Profil speichern und in der Einstufung anwenden (Migration, Leseschicht, API).
+- [x] Regel-Dialog mit Bereich „Nur für dieses Profil“; die Kachel „Regeln“ nennt die geltenden Regeln und die Abweichung.
+- [x] Umsetzung:
+  - **Shared** (`packages/shared/src/search-terms.ts`): `searchTermRuleOverridesSchema` (die vier Felder der Regeln, je
+    Feld `null` erlaubt, gleiche Wertebereiche), `NO_SEARCH_TERM_RULE_OVERRIDES`, `resolveSearchTermRules(organisation,
+    overrides)` (je Feld der Wert des Profils, sonst der der Organisation; `0` ist ein Wert).
+  - **Schema** (Migration `0024_search_term_rule_overrides`): `search_term_rule_overrides` (eine Zeile je Profil:
+    `profile_id` als Schlüssel, `organization_id`, die vier Werte leer erlaubt, `updated_by`, `updated_at`).
+    Fremdschlüssel (Profil, Organisation) auf `amazon_ads_profiles` mit `on delete cascade`; Check: mindestens ein Wert
+    (eine Zeile ohne Wert gibt es nicht).
+  - **DB** (`packages/db/src/search-terms.ts`): `querySearchTermPeriod` liefert `ruleOverrides` des Profils mit;
+    `saveSearchTermRuleOverrides` (nur sichtbare Profile über `visibleProfilesScope()`, sonst `null`; alle Felder `null`
+    löscht die Zeile; Audit `search_term_rule_overrides.update` mit `before`/`after` in derselben Transaktion, nicht bei
+    „nichts gespeichert und nichts abweichend“).
+  - **API:** `PUT /api/ads/search-terms/rules/profile` (`profileId`, `overrides`; Recht `write` im Feature `sp-explorer`,
+    nicht sichtbares Profil `404 PROFILE_NOT_FOUND`). `POST …/analysis` stuft nach den **geltenden** Regeln ein
+    (`meta.rules`), dazu `meta.organizationRules` und `meta.ruleOverrides`; `meta.rulesAreDefault` sagt weiter nur, ob die
+    Organisation noch die Startwerte hat. `GET`/`PUT …/rules` bleiben die Regeln der Organisation.
+  - **Web** (`search-terms/RulesDialog.vue`): zwei Bereiche „Für alle Profile“ und „Nur für <Profil>“ mit je vier Feldern;
+    die Felder des Profils sind leer oder tragen den abweichenden Wert, der Platzhalter zeigt den Wert für alle.
+    „Abweichung zurücknehmen“ leert sie. Gesendet wird nur, was sich geändert hat (Regeln für alle, Abweichung des
+    Profils oder beides nacheinander); ohne Änderung schließt der Dialog ohne Anfrage. Die Kachel „Regeln“ zeigt die
+    geltenden Regeln des Profils und darunter „Für dieses Profil weicht ab: … Für alle Profile gilt: …“.
+  - **Browser-Pane (2026-10-08, Demo-Profil SE):** Dialog mit beiden Bereichen und Platzhaltern geprüft; Spend-Grenze
+    200 SEK nur für das Profil gespeichert: „Negieren“ fiel von 312 auf 0 Zeilen, die Kachel nennt die Abweichung. Die
+    Abweichung steht noch in der lokalen Dev-DB. Kein Screenshot des Dialogs (die Pane war zuletzt nicht eingeblendet).
+  - **Bewusst so bzw. bekannte Grenzen:** Abweichungen gibt es nur je Profil; wer denselben Wert für alle Profile eines
+    Clients oder Marktplatzes will, trägt ihn je Profil ein. Eine Übersicht aller Abweichungen (z. B. bei Clients &
+    Connections) gibt es nicht, man sieht sie beim jeweiligen Profil. Profile ohne Suchbegriffe erreicht der Dialog
+    nicht (die Analyse braucht einen Datei-Zeitraum).
+
+**Entschieden (Dominik, 2026-10-08): Themen ohne Berichte bleiben bis zum Ende offen.** 2b.3 bis 2b.6 (SQP-Import,
+Organic-Indikator, Oberfläche „Organic (SQP)“, Kalibrierung) und der Impression-Share je Suchbegriff werden erst
+entwickelt, wenn das übrige Projekt durch ist und die Berichte vorliegen (SQP-CSVs, „Suchbegriff-Impression-Share“). Phase 2b
+ist damit bis auf diese Punkte abgeschlossen; weiter geht es mit Phase 3.
 
 #### 2b.2d Suchbegriff-Zeitraum löschen, Untergrenze für von Hand angegebene Zeiträume
 - [x] Ein Datei-Zeitraum der Suchbegriffe lässt sich löschen; von Hand angegebene Zeiträume dürfen höchstens 365 Tage
@@ -402,11 +451,12 @@ Upload-Dialog mit Datei-Art SQP wie die Bulk-Datei; Client und Marktplatz kommen
   - **Offen:** Blick in die Browser-Pane (Knopf, Links, Sprung in den Explorer mit echten Daten): in dieser Session war
     der Zugriff auf die Browser-Pane gesperrt. Gerade der Sprung sollte einmal mit den Demo-Daten geklickt werden.
 
-#### Später (nur mit Datei)
+#### Später (nur mit Datei, am Ende des Projekts)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt
       (eigene Datei-Art, optional).
 
 ### 2b.3 SQP-Import (`packages/db`, `apps/worker`)
+> Zurückgestellt bis zum Ende des Projekts (Dominik, 2026-10-08): wartet auf echte SQP-CSVs. Gilt auch für 2b.4–2b.6.
 - [ ] Feature-Key `organic`, Navigationseintrag „Organic (SQP)“ (`/ads/organic`).
 - [ ] Tabellen für SQP-Perioden (Client, Marktplatz, Ansicht, ASIN bzw. Marke, Periodentyp, Beginn/Ende in der Zeitzone des
       Marktplatzes, Quelle, Import) und Kennzahlen je Periode und Suchbegriff (Zählwerte gesamt und eigene, Preise `numeric` mit
