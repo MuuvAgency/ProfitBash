@@ -461,3 +461,131 @@ describe('Mock-Anbieter: Entities und Reports', () => {
     expect(error).toMatchObject({ status: 415 });
   });
 });
+
+describe('Mock-Anbieter: Änderungen (3.2a)', () => {
+  const DE_PROFILE = '9007199254740993';
+  const SP = 'SPONSORED_PRODUCTS';
+
+  function setupWrites(simulation: MockAmazonAdsSimulation = {}) {
+    return createMockAmazonAdsClient({
+      redirectUri: REDIRECT_URI,
+      consentUrl: CONSENT_URL,
+      store: storeWith('Atzr|mock-refresh-test'),
+      simulation,
+      rateLimit: { requestsPerSecond: 1000 },
+    });
+  }
+
+  it('nimmt Änderungen aller Arten an und vergibt für neue Negatives IDs', async () => {
+    const outcome = await setupWrites().applyChanges(connection, {
+      amazonProfileId: DE_PROFILE,
+      adProduct: SP,
+      operations: [
+        {
+          ref: 'c',
+          type: 'update',
+          entity: 'campaign',
+          amazonId: '101',
+          dailyBudget: '25',
+          state: 'PAUSED',
+        },
+        { ref: 'k', type: 'update', entity: 'keyword', amazonId: '201', bid: '0.75' },
+        { ref: 'a', type: 'archive', entity: 'negativeKeyword', amazonId: '301' },
+        {
+          ref: 'n1',
+          type: 'createNegative',
+          amazonCampaignId: '101',
+          amazonAdGroupId: '111',
+          negative: { type: 'keyword', keywordText: 'gebraucht', matchType: 'EXACT' },
+        },
+        {
+          ref: 'n2',
+          type: 'createNegative',
+          amazonCampaignId: '101',
+          amazonAdGroupId: null,
+          negative: { type: 'product', asin: 'B0FREMD001' },
+        },
+      ],
+    });
+
+    expect(outcome.retryAfterMs).toBeNull();
+    expect(outcome.results.slice(0, 3)).toEqual([
+      { ref: 'c', status: 'applied', amazonId: '101' },
+      { ref: 'k', status: 'applied', amazonId: '201' },
+      { ref: 'a', status: 'applied', amazonId: '301' },
+    ]);
+    const created = outcome.results.slice(3);
+    expect(created.map((r) => r.status)).toEqual(['applied', 'applied']);
+    const newIds = created.map((r) => (r.status === 'applied' ? r.amazonId : null));
+    expect(newIds.every((id) => id !== null && /^\d+$/.test(id))).toBe(true);
+    expect(new Set(newIds).size).toBe(2);
+  });
+
+  it('lehnt Gebote und Budgets außerhalb der Grenzen des Marktplatzes je Änderung ab (Teilfehler)', async () => {
+    const outcome = await setupWrites().applyChanges(connection, {
+      amazonProfileId: DE_PROFILE,
+      adProduct: SP,
+      operations: [
+        { ref: 'ok', type: 'update', entity: 'keyword', amazonId: '201', bid: '0.02' },
+        { ref: 'low', type: 'update', entity: 'keyword', amazonId: '202', bid: '0.01' },
+        { ref: 'high', type: 'update', entity: 'adGroup', amazonId: '111', defaultBid: '1000.01' },
+        { ref: 'budget', type: 'update', entity: 'campaign', amazonId: '101', dailyBudget: '0.50' },
+      ],
+    });
+
+    expect(outcome.results).toEqual([
+      { ref: 'ok', status: 'applied', amazonId: '201' },
+      {
+        ref: 'low',
+        status: 'failed',
+        code: 'BID_OUT_OF_MARKET_PLACE_RANGE',
+        message: expect.any(String),
+      },
+      {
+        ref: 'high',
+        status: 'failed',
+        code: 'BID_OUT_OF_MARKET_PLACE_RANGE',
+        message: expect.any(String),
+      },
+      {
+        ref: 'budget',
+        status: 'failed',
+        code: 'BUDGET_OUT_OF_MARKET_PLACE_RANGE',
+        message: expect.any(String),
+      },
+    ]);
+  });
+
+  it('drosselt auf Wunsch die ersten Schreibaufrufe (429 mit Retry-After)', async () => {
+    const outcome = await setupWrites({ throttledWrites: 1 }).applyChanges(connection, {
+      amazonProfileId: DE_PROFILE,
+      adProduct: SP,
+      operations: [{ ref: 'k', type: 'update', entity: 'keyword', amazonId: '201', bid: '0.75' }],
+    });
+
+    expect(outcome).toEqual({ results: [{ ref: 'k', status: 'unsent' }], retryAfterMs: 120_000 });
+  });
+
+  it('verlangt den Content-Type des Endpunkts und ein Profil, auf das das Token Zugriff hat', async () => {
+    const client = setupWrites();
+    await expect(
+      client.applyChanges(connection, {
+        amazonProfileId: '42',
+        adProduct: SP,
+        operations: [{ ref: 'k', type: 'update', entity: 'keyword', amazonId: '201', bid: '0.75' }],
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+
+    await expect(
+      client.request(connection, {
+        operation: 'test',
+        method: 'PUT',
+        path: '/sp/keywords',
+        amazonProfileId: DE_PROFILE,
+        headers: { 'Content-Type': 'application/json' },
+        body: '{"keywords":[]}',
+        schema: z.unknown(),
+      }),
+    ).rejects.toMatchObject({ status: 415 });
+  });
+});
