@@ -1,4 +1,8 @@
-import { DEFAULT_SEARCH_TERM_RULES, NO_SEARCH_TERM_RULE_OVERRIDES } from '@profitbash/shared';
+import {
+  DEFAULT_SEARCH_TERM_RULES,
+  NO_SEARCH_TERM_RULE_OVERRIDES,
+  type SearchTermRuleOverrides,
+} from '@profitbash/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { replaceSearchTermPeriodMetrics, type SearchTermPeriodMetric } from './amazon-ads-metrics';
@@ -519,8 +523,12 @@ describe('Abweichende Regeln je Profil (2b.2g)', () => {
     negateMinCost: '200',
     harvestMaxAcos: '0.4',
   };
-  const save = (userId: string, profileId: string, values = overrides, orgId = ids.org) =>
-    saveSearchTermRuleOverrides(testDb.db, { userId, orgId, profileId, overrides: values });
+  const save = (
+    userId: string,
+    profileId: string,
+    values: SearchTermRuleOverrides = overrides,
+    orgId = ids.org,
+  ) => saveSearchTermRuleOverrides(testDb.db, { userId, orgId, profileId, overrides: values });
   const read = async (profileId = ids.de) =>
     (
       await querySearchTermPeriod(testDb.db, {

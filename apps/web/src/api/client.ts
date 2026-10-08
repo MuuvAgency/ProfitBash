@@ -36,6 +36,7 @@ export type SearchTermAnalysisData = Schemas['SearchTermAnalysisResponse'];
 export type SearchTermRowData = Schemas['SearchTermRow'];
 export type SearchTermNgramData = Schemas['SearchTermNgram'];
 export type SearchTermRulesData = Schemas['SearchTermRules'];
+export type SearchTermRuleOverridesData = Schemas['SearchTermRuleOverrides'];
 
 export interface ApiOptions {
   /**
@@ -240,6 +241,9 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/search-terms/analysis', { body: input })),
       saveRules: (rules: SearchTermRulesData) =>
         unwrap(client.PUT('/api/ads/search-terms/rules', { body: rules })),
+      /** Abweichende Regeln eines Profils (2b.2g); alle Felder `null` nimmt die Abweichung zurück. */
+      saveProfileRules: (input: { profileId: string; overrides: SearchTermRuleOverridesData }) =>
+        unwrap(client.PUT('/api/ads/search-terms/rules/profile', { body: input })),
       /** Löscht die Suchbegriffe genau eines Datei-Zeitraums (2b.2d), über alle Ad-Typen. */
       deletePeriod: (input: { profileId: string; periodStart: string; periodEnd: string }) =>
         unwrap(client.POST('/api/ads/search-terms/periods/delete', { body: input })),
