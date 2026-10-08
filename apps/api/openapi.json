@@ -985,6 +985,20 @@
             ],
             "format": "uuid"
           },
+          "periodStart": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -1016,6 +1030,8 @@
           "error",
           "counters",
           "uploadedBy",
+          "periodStart",
+          "periodEnd",
           "createdAt",
           "startedAt",
           "finishedAt"
@@ -4732,6 +4748,16 @@
                       "true",
                       "false"
                     ]
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Erster Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert."
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Letzter Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert."
                   }
                 },
                 "required": [
@@ -4754,7 +4780,7 @@
             }
           },
           "400": {
-            "description": "Ungültige Eingabe oder leere Datei.",
+            "description": "Ungültige Eingabe, ungültiger Zeitraum oder leere Datei.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4843,7 +4869,7 @@
             }
           },
           "400": {
-            "description": "Ungültige Eingabe oder leere Datei.",
+            "description": "Ungültige Eingabe, ungültiger Zeitraum oder leere Datei.",
             "content": {
               "application/json": {
                 "schema": {

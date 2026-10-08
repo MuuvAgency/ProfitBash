@@ -197,6 +197,83 @@ describe('createFileImport', () => {
   });
 });
 
+describe('createFileImport mit von Hand angegebenem Zeitraum (2b.2c)', () => {
+  const september = { startDate: '2026-09-01', endDate: '2026-09-30' };
+  const renamed = { kind: 'bulk' as const, fileName: 'kunde-september.xlsx' };
+
+  it('speichert den Zeitraum, nennt ihn im Audit-Event und in der Liste', async () => {
+    const created = await upload({ ...renamed, period: september });
+    expect(created).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2026-09-30' });
+    const [event] = await testDb.db.select().from(auditEvents);
+    expect(event?.target).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2026-09-30' });
+    const [listed] = await listFileImports(testDb.db, {
+      userId: ids.admin,
+      orgId: ids.org,
+      profileId: ids.profile,
+    });
+    expect(listed).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2026-09-30' });
+  });
+
+  it('bleibt ohne Angabe leer', async () => {
+    expect(await upload(renamed)).toMatchObject({ periodStart: null, periodEnd: null });
+    const [event] = await testDb.db.select().from(auditEvents);
+    expect(event?.target).toMatchObject({ periodStart: null, periodEnd: null });
+  });
+
+  it('ignoriert die Angabe, wenn der Dateiname selbst einen Zeitraum trägt (und prüft sie dann nicht)', async () => {
+    const fileName = 'bulk-a1b2c3-20260801-20260831-1.xlsx';
+    expect(await upload({ kind: 'bulk', fileName, period: september })).toMatchObject({
+      periodStart: null,
+      periodEnd: null,
+    });
+    await expect(
+      upload({
+        kind: 'bulk',
+        fileName,
+        period: { startDate: '2026-09-30', endDate: '2026-09-01' },
+      }),
+    ).resolves.toMatchObject({ periodStart: null });
+  });
+
+  it('lehnt verdrehte, zu lange und unmögliche Zeiträume ab', async () => {
+    for (const period of [
+      { startDate: '2026-09-30', endDate: '2026-09-01' },
+      { startDate: '2026-06-01', endDate: '2026-09-30' },
+      { startDate: '2026-02-30', endDate: '2026-03-01' },
+      { startDate: '2026-09-01', endDate: '' },
+    ]) {
+      await expect(upload({ ...renamed, period })).rejects.toMatchObject({
+        code: 'INVALID_PERIOD',
+      });
+    }
+    expect(await testDb.db.select().from(fileImports)).toEqual([]);
+  });
+
+  it('lehnt Tage in der Zukunft ab, gemessen am Kalendertag in der Zeitzone des Profils', async () => {
+    // 22:30 UTC ist in Berlin (Zeitzone des Profils) schon der 8. Oktober.
+    const now = new Date('2026-10-07T22:30:00Z');
+    await expect(
+      upload({ ...renamed, now, period: { startDate: '2026-10-01', endDate: '2026-10-08' } }),
+    ).resolves.toMatchObject({ periodEnd: '2026-10-08' });
+    await expect(
+      upload({ ...renamed, now, period: { startDate: '2026-10-01', endDate: '2026-10-09' } }),
+    ).rejects.toMatchObject({ code: 'INVALID_PERIOD' });
+  });
+
+  it('lässt in der Tabelle nur beide Tage oder keinen zu, von nie nach bis', async () => {
+    const created = await upload(renamed);
+    const set = (periodStart: string | null, periodEnd: string | null) =>
+      testDb.db
+        .update(fileImports)
+        .set({ periodStart, periodEnd })
+        .where(eq(fileImports.id, created.id));
+    await expect(set('2026-09-01', null)).rejects.toThrow();
+    await expect(set(null, '2026-09-30')).rejects.toThrow();
+    await expect(set('2026-09-30', '2026-09-01')).rejects.toThrow();
+    await expect(set('2026-09-01', '2026-09-01')).resolves.toBeDefined();
+  });
+});
+
 describe('listFileImports', () => {
   it('liefert die Importe des Profils, neueste zuerst, ohne Inhalt', async () => {
     const first = await upload({ fileName: 'eins.csv' });
@@ -244,11 +321,22 @@ describe('claimNextFileImport und finishFileImport', () => {
         attempts: 1,
         complete: false,
         uploadedAt: new Date(first.createdAt),
+        period: null,
       },
       abandoned: 0,
     });
     const [row] = await testDb.db.select().from(fileImports).where(eq(fileImports.id, first.id));
     expect(row).toMatchObject({ status: 'running', startedAt: now, jobRunId: runId });
+  });
+
+  it('gibt den von Hand angegebenen Zeitraum an den Import weiter', async () => {
+    await upload({
+      kind: 'bulk',
+      fileName: 'kunde.xlsx',
+      period: { startDate: '2026-09-01', endDate: '2026-09-30' },
+    });
+    const claimed = await claimAt(new Date('2026-10-07T10:00:00Z'));
+    expect(claimed.file?.period).toEqual({ startDate: '2026-09-01', endDate: '2026-09-30' });
   });
 
   it('schließt ab: Status, Zähler, Fehler, Ende, und löscht den Inhalt', async () => {

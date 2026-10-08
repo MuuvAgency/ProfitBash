@@ -13,36 +13,12 @@ import {
 /**
  * Suchbegriff-Blätter der Bulk-Datei (`phase-2b.md` 2b.1, F1): „SP Bericht „Suchbegriff““ bzw.
  * „SP Search Term Report“ und die SB-Entsprechung. Die Zeilen sind **Summen über den Download-Zeitraum**
- * (kein Datum je Zeile); der Zeitraum steht nur im Dateinamen der Werbekonsole. Abgeleitete Spalten
+ * (kein Datum je Zeile); der Zeitraum steht im Dateinamen der Werbekonsole (`parseBulkPeriod` in
+ * `@profitbash/shared`) oder wird beim Upload von Hand angegeben (2b.2c). Abgeleitete Spalten
  * (Klickrate, Conversion-Rate, ACOS, CPC, ROAS) werden nicht gelesen, sondern später berechnet.
  *
  * Logs nennen nur Blatt, Zeile und Spalte, nie Zellinhalte (Suchbegriffe sind Kundendaten).
  */
-
-export interface BulkPeriod {
-  /** Beide Tage eingeschlossen (`YYYY-MM-DD`). */
-  startDate: string;
-  endDate: string;
-}
-
-function isoDay(text: string): string | null {
-  const iso = `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`;
-  const date = new Date(`${iso}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
-}
-
-/**
- * Download-Zeitraum aus dem Dateinamen der Werbekonsole (`bulk-<konto>-<von>-<bis>-<zeitstempel>.xlsx`,
- * Tage `YYYYMMDD`); `null`, wenn die Datei umbenannt wurde oder der Zeitraum unmöglich ist.
- */
-export function parseBulkPeriod(fileName: string): BulkPeriod | null {
-  const match = /^bulk-.+?-(\d{8})-(\d{8})-\d+/i.exec(fileName.trim());
-  if (!match) return null;
-  const startDate = isoDay(match[1]!);
-  const endDate = isoDay(match[2]!);
-  if (!startDate || !endDate || startDate > endDate) return null;
-  return { startDate, endDate };
-}
 
 export type SearchTermSheetKind = 'sp' | 'sb';
 

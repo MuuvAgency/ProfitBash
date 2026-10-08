@@ -21,7 +21,7 @@ import {
   type RemovableEntity,
   type TargetRecord,
 } from '@profitbash/db';
-import type { Logger } from '@profitbash/shared';
+import { parseBulkPeriod, type Logger } from '@profitbash/shared';
 import { openXlsx, type RowInfo } from '@profitbash/sheets';
 import { FileImportRejectedError, type FileImporter } from '../jobs/file-import';
 import {
@@ -49,12 +49,7 @@ import {
   type EntityKind,
   type ValueMap,
 } from './bulk-columns';
-import {
-  isSearchTermSheet,
-  parseBulkPeriod,
-  SearchTermCollector,
-  searchTermSheetKind,
-} from './bulk-search-terms';
+import { isSearchTermSheet, SearchTermCollector, searchTermSheetKind } from './bulk-search-terms';
 
 /**
  * Bulk-Datei der Werbekonsole → Entities (`phase-1.md` 1.11d). Liest die Blätter Portfolios, SP, SB und SD
@@ -64,8 +59,9 @@ import {
  *
  * - Kennzahlen der Entity-Blätter (Summen über den gewählten Zeitraum) werden nicht übernommen.
  * - Die Suchbegriff-Blätter (SP, SB) werden als Summen je Download-Zeitraum gespeichert (`phase-2b.md` 2b.1,
- *   `bulk-search-terms.ts`), in derselben Transaktion wie die Entities. Der Zeitraum steht nur im Dateinamen;
- *   fehlt er (Datei umbenannt), bleiben die Suchbegriffe weg (`searchTermsWithoutPeriod`).
+ *   `bulk-search-terms.ts`), in derselben Transaktion wie die Entities. Der Zeitraum steht im Dateinamen;
+ *   fehlt er dort (Datei umbenannt), gilt der beim Upload von Hand angegebene (2b.2c). Fehlen beide, bleiben
+ *   die Suchbegriffe weg (`searchTermsWithoutPeriod`).
  * - `removed_at` nur bei einer laut Upload vollständigen Datei (`markMissingAsRemoved`): Die Konsole
  *   exportiert auch Teilmengen („nur bestimmte Kampagnen“), sonst hieße eine fehlende Entity nichts.
  * - Kampagnen eines anderen Profils derselben Organisation → Ablehnung; passt keine Kampagne zum Profil,
@@ -120,7 +116,8 @@ export const importBulkFile: FileImporter = async (input) => {
       });
     }
   }
-  const period = parseBulkPeriod(input.fileName);
+  // Der Dateiname der Werbekonsole gewinnt; der von Hand angegebene Zeitraum ist nur der Ausweg (2b.2c).
+  const period = parseBulkPeriod(input.fileName) ?? input.period ?? null;
 
   return input.db.transaction(async (tx) => {
     const records = await collector.finish(async (adGroupIds) =>
@@ -190,7 +187,7 @@ export const importBulkFile: FileImporter = async (input) => {
         searchTermRows += written.rows;
       }
     } else if (searchTerms.rowCount > 0) {
-      // Ohne Zeitraum wären die Summen nicht einzuordnen (Datei umbenannt).
+      // Ohne Zeitraum wären die Summen nicht einzuordnen (Datei umbenannt, beim Upload keiner angegeben).
       input.logger({
         level: 'warn',
         msg: 'bulk_import.search_terms_without_period',

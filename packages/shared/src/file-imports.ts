@@ -21,6 +21,80 @@ export const FILE_IMPORT_MAX_BYTES = 50 * 1024 * 1024;
 /** So viele Importe je Profil liefert die Liste (neueste zuerst). */
 export const FILE_IMPORT_LIST_LIMIT = 50;
 
+/**
+ * Zeitraum, über den eine Bulk-Datei ihre Kennzahlen summiert (Suchbegriffe, `phase-2b.md` 2b.1). Er steht im
+ * Dateinamen der Werbekonsole; bei umbenannten Dateien gibt man ihn beim Upload von Hand an (2b.2c).
+ */
+export interface BulkPeriod {
+  /** Beide Tage eingeschlossen (`YYYY-MM-DD`). */
+  startDate: string;
+  endDate: string;
+}
+
+/**
+ * So viele Tage dürfen höchstens zwischen erstem und letztem Tag eines von Hand angegebenen Zeitraums liegen:
+ * Die Werbekonsole exportiert höchstens 60 Tage.
+ */
+export const BULK_PERIOD_MAX_DAYS = 60;
+
+const DAY_MS = 86_400_000;
+
+/** Gültiger Kalendertag in der Schreibweise `YYYY-MM-DD` (kein 30. Februar)? */
+function isIsoDay(text: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const date = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
+
+/**
+ * Download-Zeitraum aus dem Dateinamen der Werbekonsole (`bulk-<konto>-<von>-<bis>-<zeitstempel>.xlsx`,
+ * Tage `YYYYMMDD`); `null`, wenn die Datei umbenannt wurde oder der Zeitraum unmöglich ist. Import (Worker),
+ * Upload (API) und Dialog (Web) nutzen dieselbe Funktion: Der Dialog fragt genau dann nach dem Zeitraum, wenn
+ * der Import ihn nicht aus dem Namen lesen kann.
+ */
+export function parseBulkPeriod(fileName: string): BulkPeriod | null {
+  const match = /^bulk-.+?-(\d{8})-(\d{8})-\d+/i.exec(fileName.trim());
+  if (!match) return null;
+  const [startDate, endDate] = [match[1]!, match[2]!].map(
+    (text) => `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`,
+  ) as [string, string];
+  if (!isIsoDay(startDate) || !isIsoDay(endDate) || startDate > endDate) return null;
+  return { startDate, endDate };
+}
+
+/**
+ * Was an einem von Hand angegebenen Zeitraum nicht stimmt: nur ein Tag angegeben, kein gültiger Tag, von nach
+ * bis, Tag in der Zukunft, mehr als `BULK_PERIOD_MAX_DAYS` Tage.
+ */
+export const BULK_PERIOD_ISSUES = [
+  'incomplete',
+  'invalidDate',
+  'startAfterEnd',
+  'future',
+  'tooLong',
+] as const;
+export type BulkPeriodIssue = (typeof BULK_PERIOD_ISSUES)[number];
+
+/**
+ * Prüft einen von Hand angegebenen Zeitraum (Dialog und API mit denselben Regeln). Keine Angabe (beide leer) ist
+ * erlaubt: Dann bleiben die Suchbegriffe einer Datei ohne Zeitraum im Namen weg. `today` = heutiger Kalendertag in
+ * der Zeitzone des Profils; ohne ihn entfällt die Prüfung auf Tage in der Zukunft.
+ */
+export function bulkPeriodIssue(
+  input: { startDate?: string | null; endDate?: string | null },
+  today?: string,
+): BulkPeriodIssue | null {
+  const startDate = input.startDate ?? '';
+  const endDate = input.endDate ?? '';
+  if (startDate === '' && endDate === '') return null;
+  if (startDate === '' || endDate === '') return 'incomplete';
+  if (!isIsoDay(startDate) || !isIsoDay(endDate)) return 'invalidDate';
+  if (startDate > endDate) return 'startAfterEnd';
+  if (today !== undefined && endDate > today) return 'future';
+  const days = (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / DAY_MS;
+  return days > BULK_PERIOD_MAX_DAYS ? 'tooLong' : null;
+}
+
 const timestamp = z.iso.datetime();
 
 export const fileImportSchema = z
@@ -38,6 +112,12 @@ export const fileImportSchema = z
     error: z.string().nullable(),
     counters: z.record(z.string(), z.number()),
     uploadedBy: z.uuid().nullable(),
+    /**
+     * Beim Upload von Hand angegebener Zeitraum der Kennzahlen (beide Tage eingeschlossen); `null`, wenn der
+     * Dateiname ihn trägt oder keiner angegeben wurde.
+     */
+    periodStart: z.iso.date().nullable(),
+    periodEnd: z.iso.date().nullable(),
     createdAt: timestamp,
     startedAt: timestamp.nullable(),
     finishedAt: timestamp.nullable(),
@@ -57,9 +137,8 @@ export const FILE_METRICS_STALE_AFTER_DAYS = 3;
 /** `noBulk` = noch keine Bulk-Datei importiert, `bulkStale` / `metricsStale` siehe Konstanten oben. */
 export type FileDataStaleness = 'noBulk' | 'bulkStale' | 'metricsStale';
 
-const DAY_MS = 86_400_000;
-
-function todayIn(timezone: string, now: Date): string {
+/** Heutiger Kalendertag (`YYYY-MM-DD`) in einer Zeitzone, z. B. der des Profils. */
+export function todayInTimezone(timezone: string, now: Date): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -89,7 +168,7 @@ export function fileDataStaleness(
     result.push('bulkStale');
   }
   if (input.metricsImportedThrough !== null) {
-    const today = todayIn(input.timezone, now);
+    const today = todayInTimezone(input.timezone, now);
     const days =
       (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${input.metricsImportedThrough}T00:00:00Z`)) /
       DAY_MS;

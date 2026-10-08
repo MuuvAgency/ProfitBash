@@ -164,6 +164,76 @@ describe('POST /api/profiles/:id/file-imports', () => {
     expect((await upload(ids.profile, invalid)).status).toBe(400);
   });
 
+  describe('Zeitraum von Hand (2b.2c)', () => {
+    const withPeriod = (fileName: string, periodStart?: string, periodEnd?: string) => {
+      const data = form('bulk', 'x', fileName);
+      if (periodStart !== undefined) data.set('periodStart', periodStart);
+      if (periodEnd !== undefined) data.set('periodEnd', periodEnd);
+      return upload(ids.profile, data);
+    };
+
+    it('speichert den angegebenen Zeitraum, nennt ihn im Audit-Event und in der Liste', async () => {
+      const res = await withPeriod('kunde-september.xlsx', '2026-09-01', '2026-09-30');
+      expect(res.status).toBe(201);
+      expect(await readJson<FileImport>(res)).toMatchObject({
+        periodStart: '2026-09-01',
+        periodEnd: '2026-09-30',
+      });
+      const [event] = await ctx.testDb.db.select().from(auditEvents);
+      expect(event?.target).toMatchObject({ periodStart: '2026-09-01', periodEnd: '2026-09-30' });
+      const list = await request(ctx, `/api/profiles/${ids.profile}/file-imports`, {
+        cookie: admin,
+      });
+      expect((await readJson<{ fileImports: FileImport[] }>(list)).fileImports).toMatchObject([
+        { periodStart: '2026-09-01', periodEnd: '2026-09-30' },
+      ]);
+    });
+
+    it('bleibt ohne Angabe leer', async () => {
+      expect(await readJson<FileImport>(await withPeriod('kunde.xlsx'))).toMatchObject({
+        periodStart: null,
+        periodEnd: null,
+      });
+    });
+
+    it('ignoriert die Felder, wenn der Dateiname selbst einen Zeitraum trägt', async () => {
+      const fileName = 'bulk-a1b2c3-20260801-20260831-1.xlsx';
+      const res = await withPeriod(fileName, '2026-09-01', '2026-09-30');
+      expect(res.status).toBe(201);
+      expect(await readJson<FileImport>(res)).toMatchObject({
+        fileName,
+        periodStart: null,
+        periodEnd: null,
+      });
+      // Auch ein unstimmiger Zeitraum stört dann nicht; nur die Schreibweise wird immer geprüft.
+      expect((await withPeriod(fileName, '2026-09-30', '2026-09-01')).status).toBe(201);
+      expect((await withPeriod(fileName, '30.09.2026', '01.10.2026')).status).toBe(400);
+    });
+
+    it('lehnt unvollständige, verdrehte, zu lange, unmögliche und künftige Zeiträume ab', async () => {
+      const dayAfterTomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+      const lastWeek = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+      for (const [periodStart, periodEnd] of [
+        ['2026-09-01', undefined],
+        [undefined, '2026-09-30'],
+        ['2026-09-30', '2026-09-01'],
+        ['2026-06-01', '2026-09-30'],
+        ['2026-02-30', '2026-03-01'],
+        ['01.09.2026', '30.09.2026'],
+        [lastWeek, dayAfterTomorrow],
+      ] as const) {
+        const res = await withPeriod('kunde.xlsx', periodStart, periodEnd);
+        expect(res.status, `${periodStart}–${periodEnd}`).toBe(400);
+        const body = await readJson<ErrorResponse>(res);
+        expect(['VALIDATION_ERROR', 'INVALID_PERIOD']).toContain(body.error.code);
+        expect(body.error.message).not.toBe('');
+      }
+      expect(await ctx.testDb.db.select().from(fileImports)).toEqual([]);
+      const future = await withPeriod('kunde.xlsx', lastWeek, dayAfterTomorrow);
+      expect(await errorCode(future)).toBe('INVALID_PERIOD');
+    });
+  });
+
   it('legt nichts an, wenn das Einplanen scheitert', async () => {
     ctx.jobs.failNext = true;
     const res = await upload(ids.profile, form('bulk', 'x'));
