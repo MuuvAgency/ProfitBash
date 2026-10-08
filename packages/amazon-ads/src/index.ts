@@ -132,3 +132,14 @@ export {
   type ApplyChangesInput,
   type ApplyChangesResult,
 } from './writes';
+export {
+  buildSpBulkSheet,
+  SP_BULK_COLUMNS,
+  SP_BULK_SHEET_NAME,
+  type BulkFileCampaign,
+  type BulkFileCell,
+  type BulkFileChange,
+  type BulkFileSkipReason,
+  type SpBulkColumn,
+  type SpBulkSheet,
+} from './bulk-file';
