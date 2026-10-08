@@ -5,6 +5,8 @@ import type {
   SearchTermRow,
 } from '@profitbash/shared';
 import { flushPromises } from '@vue/test-utils';
+import type { GridApi } from 'ag-grid-community';
+import { AgGridVue } from 'ag-grid-vue3';
 import Select from 'primevue/select';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch, type RecordedRequest } from '../test/fetch-stub';
@@ -166,6 +168,7 @@ const button = (label: string) =>
 afterEach(() => {
   cleanupMounted();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('Suchbegriff-Analyse', () => {
@@ -798,5 +801,347 @@ describe('Zeitraum löschen (2b.2d)', () => {
     await vi.waitFor(() => expect(dialog()).toBeNull());
     await openDialog();
     expect(dialog()?.querySelector('[role="alert"]')).toBeNull();
+  });
+});
+
+/** Fängt den Download ab: Inhalt (Blob) und Dateiname des erzeugten Links. */
+function captureDownload() {
+  const download: { blob?: Blob; fileName?: string } = {};
+  vi.spyOn(URL, 'createObjectURL').mockImplementation((value) => {
+    download.blob = value as Blob;
+    return 'blob:csv';
+  });
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    download.fileName = this.download;
+  });
+  return {
+    fileName: () => download.fileName,
+    text: async () => {
+      await vi.waitFor(() => expect(download.blob).toBeDefined());
+      return download.blob!.text();
+    },
+  };
+}
+
+const EXPORT = 'CSV exportieren';
+
+describe('CSV-Export', () => {
+  it('Suchbegriffe: Einstufung mit Grund als Text, Beträge als Decimal-String mit Währung, ohne Summenzeile', async () => {
+    const download = captureDownload();
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [
+            row('led lampe warmweiß', { classification: 'harvest', reason: null }),
+            row('=SUMME(1)', { classification: 'negate', reason: null, cost: '25.5', acos: null }),
+            row('nordwind lampe', { reason: 'protected', protected: true }),
+          ],
+        }),
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    await waitForRow('nordwind lampe');
+    expect(button(EXPORT)!.disabled).toBe(false);
+    button(EXPORT)!.click();
+    const csv = await download.text();
+    // BOM, damit Excel UTF-8 erkennt.
+    expect(csv.startsWith('\uFEFF"Suchbegriff","Einstufung","Kampagne","Ad Group","Target"')).toBe(
+      true,
+    );
+    expect(csv).toContain('"led lampe warmweiß","Ernten","SP Lampen","AG Lampen"');
+    expect(csv).toContain('"nordwind lampe","Beobachten · Geschützter Begriff"');
+    expect(csv).not.toMatch(/harvest|negate|watch|protected/);
+    // Formeln in Suchbegriffen entschärft, Betrag roh (nicht „25,50 €“), fehlender Wert leer (nicht „–“).
+    expect(csv).toContain(`"'=SUMME(1)","Negieren"`);
+    expect(csv).toContain('"25.5"');
+    expect(csv).not.toContain('€');
+    expect(csv).not.toContain('"–"');
+    expect(csv).toContain('"Währung"');
+    expect(csv).toContain('"EUR"');
+    // Die Summenzeile gilt für alle Zeilen des Zeitraums, nicht für die exportierten.
+    expect(csv).not.toContain('"Summe"');
+    expect(csv).not.toContain('"1234.5"');
+    expect(download.fileName()).toBe(
+      'profitbash-search-term-analysis-demo-de-de-2026-09-01_2026-09-30.csv',
+    );
+  });
+
+  it('entschärft Formeln auch in Namen und hält Anführungszeichen, Komma und Zeilenumbruch in einem Feld', async () => {
+    const download = captureDownload();
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [
+            row('lampe "groß", 2er\nset', { campaignName: '=Kampagne', adGroupName: '+AG' }),
+            row('leuchte', { campaignName: '-Kampagne', adGroupName: '@AG' }),
+          ],
+        }),
+      ),
+    });
+    await waitForRow('lampe "groß", 2er');
+    await waitForRow('leuchte');
+    button(EXPORT)!.click();
+    const csv = await download.text();
+    expect(csv).toContain(
+      `"lampe ""groß"", 2er\nset","Beobachten · Zu wenig Daten","'=Kampagne","'+AG"`,
+    );
+    expect(csv).toContain(`"leuchte","Beobachten · Zu wenig Daten","'-Kampagne","'@AG"`);
+    // Kopfzeile und zwei Zeilen: Der Zeilenumbruch im Suchbegriff beginnt keine neue.
+    expect(csv.split('\r\n')).toHaveLength(3);
+  });
+
+  it('Suchbegriffe: nur die Zeilen der gewählten Einstufung, die Einstufung steht im Dateinamen', async () => {
+    const download = captureDownload();
+    await mountPage(`${PATH}?class=negate`);
+    await waitForRow('lampe billig');
+    button(EXPORT)!.click();
+    const csv = await download.text();
+    expect(csv).toContain('"lampe billig","Negieren"');
+    expect(csv).not.toContain('led lampe warmweiß');
+    expect(csv).not.toContain('nordwind lampe');
+    expect(download.fileName()).toBe(
+      'profitbash-search-term-analysis-negate-demo-de-de-2026-09-01_2026-09-30.csv',
+    );
+  });
+
+  it('Suchbegriffe: Spaltenfilter und Sortierung des Grids gelten auch im Export', async () => {
+    const download = captureDownload();
+    const { wrapper } = await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [
+            row('lampe teuer', { cost: '30' }),
+            row('lampe billig', { cost: '10' }),
+            row('leuchte', { cost: '20' }),
+          ],
+        }),
+      ),
+    });
+    await waitForRow('lampe teuer');
+    await waitForRow('lampe billig');
+    await waitForRow('leuchte');
+    const { api } = wrapper.findComponent(AgGridVue).vm as unknown as { api: GridApi };
+    await api.setColumnFilterModel('searchTerm', { type: 'contains', filter: 'lampe' });
+    api.onFilterChanged();
+    api.applyColumnState({ state: [{ colId: 'cost', sort: 'asc' }] });
+    button(EXPORT)!.click();
+    const csv = await download.text();
+    expect(csv).not.toContain('leuchte');
+    expect(csv.indexOf('"lampe billig"')).toBeGreaterThan(-1);
+    expect(csv.indexOf('"lampe billig"')).toBeLessThan(csv.indexOf('"lampe teuer"'));
+  });
+
+  it('Wortbausteine: eigene Spalten, Zähler roh, Umschalter der Wortzahl gilt', async () => {
+    const download = captureDownload();
+    await mountPage(`${PATH}?view=ngrams`, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          ngrams: [ngram('lampe', { searchTerms: 7777, cost: '25.5' }), ngram('led lampe')],
+        }),
+      ),
+    });
+    await waitForRow('led lampe');
+    button(EXPORT)!.click();
+    let csv = await download.text();
+    expect(csv.startsWith('\uFEFF"Wortbaustein","Wörter","Suchbegriffe"')).toBe(true);
+    expect(csv).toContain('"lampe","1","7777"');
+    expect(csv).toContain('"led lampe","2","2"');
+    expect(csv).toContain('"25.5"');
+    expect(csv).toContain('"EUR"');
+    expect(download.fileName()).toBe(
+      'profitbash-search-term-ngrams-demo-de-de-2026-09-01_2026-09-30.csv',
+    );
+
+    button('2 Wörter')!.click();
+    await flushPromises();
+    // Der Baustein mit einem Wort (7.777 Suchbegriffe) verschwindet aus dem Grid.
+    await vi.waitFor(() => expect(document.body.textContent).not.toContain('7.777'));
+    button(EXPORT)!.click();
+    await vi.waitFor(async () => expect(await download.text()).not.toBe(csv));
+    csv = await download.text();
+    expect(csv).toContain('"led lampe","2","2"');
+    expect(csv).not.toContain('"lampe","1"');
+  });
+
+  it('nennt eine gekürzte Antwort in einer eigenen ersten Zeile (Suchbegriffe und Wortbausteine)', async () => {
+    const download = captureDownload();
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse(
+          {},
+          {
+            totalRows: 12345,
+            truncated: true,
+            totalNgrams: 6789,
+            ngramsTruncated: true,
+          },
+        ),
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    button(EXPORT)!.click();
+    const terms = (await download.text()).split(/\r?\n/);
+    // Ein Feld in Anführungszeichen: Das Komma im Text trennt keine Spalten ab, die Kopfzeile bleibt die zweite Zeile.
+    expect(terms[0]).toBe(
+      '\uFEFF"Hinweis: Die Analyse hat nur die 10.000 Zeilen mit dem höchsten Spend geliefert (von 12.345), die Datei kann deshalb unvollständig sein."',
+    );
+    expect(terms[1]!.startsWith('"Suchbegriff","Einstufung"')).toBe(true);
+    // Nicht der Hinweis der Seite: Zähler und Summe stehen nicht in der Datei.
+    expect(terms.join('\n')).not.toContain('Einstufungs-Zähler');
+
+    button('Wortbausteine')!.click();
+    await flushPromises();
+    await waitForRow('led lampe');
+    button(EXPORT)!.click();
+    await vi.waitFor(async () => expect(await download.text()).toContain('"Wortbaustein"'));
+    const ngrams = (await download.text()).split(/\r?\n/);
+    expect(ngrams[0]).toBe(
+      '\uFEFF"Hinweis: Die Analyse hat nur die 5.000 Wortbausteine mit dem höchsten Spend geliefert (von 6.789), die Datei kann deshalb unvollständig sein."',
+    );
+    expect(ngrams[1]!.startsWith('"Wortbaustein","Wörter"')).toBe(true);
+  });
+
+  it('ist ohne Zeilen gesperrt (leerer Zeitraum, Einstufung ohne Treffer, keine Wortbausteine)', async () => {
+    const { router } = await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [row('led lampe warmweiß', { classification: 'harvest', reason: null })],
+          ngrams: [],
+        }),
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    expect(button(EXPORT)!.disabled).toBe(false);
+    button('Negieren')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(router.currentRoute.value.query.class).toBe('negate'));
+    expect(button(EXPORT)!.disabled).toBe(true);
+    button('Wortbausteine')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(router.currentRoute.value.query.view).toBe('ngrams'));
+    expect(button(EXPORT)!.disabled).toBe(true);
+  });
+});
+
+describe('Sprung in den Explorer', () => {
+  const CAMPAIGN = '00000000-0000-4000-8000-0000000000d1';
+  const AD_GROUP = '00000000-0000-4000-8000-0000000000e1';
+
+  const anchor = (text: string) =>
+    [...document.querySelectorAll<HTMLAnchorElement>('.ag-root a')].find(
+      (a) => a.textContent?.trim() === text,
+    );
+  const target = (a: HTMLAnchorElement) => {
+    const url = new URL(a.getAttribute('href')!, 'http://localhost');
+    return { path: url.pathname, query: Object.fromEntries(url.searchParams) };
+  };
+
+  it('Kampagne und Ad Group verlinken in den Explorer (Client, Datei-Zeitraum, Drill-Down, auch Entfernte)', async () => {
+    const CLIENT = '00000000-0000-4000-8000-0000000000c1';
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse(
+          {
+            rows: [
+              row('led lampe warmweiß', {
+                campaignId: CAMPAIGN,
+                campaignName: 'SP Bekannt',
+                adGroupId: AD_GROUP,
+                adGroupName: 'AG Bekannt',
+              }),
+            ],
+          },
+          { clientId: CLIENT },
+        ),
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    await waitForRow('SP Bekannt');
+    await waitForRow('AG Bekannt');
+    const filter = {
+      clients: CLIENT,
+      period: 'custom',
+      from: '2026-09-01',
+      to: '2026-09-30',
+      removed: '1',
+    };
+    expect(target(anchor('SP Bekannt')!)).toEqual({
+      path: '/ads/explorer/ad-groups',
+      query: { ...filter, campaign: CAMPAIGN },
+    });
+    expect(target(anchor('AG Bekannt')!)).toEqual({
+      path: '/ads/explorer/targets',
+      query: { ...filter, campaign: CAMPAIGN, adGroup: AD_GROUP },
+    });
+  });
+
+  it('Tastatur: Enter auf der Zelle öffnet den Explorer (Profil ohne Client: „Ohne Client“)', async () => {
+    const { router } = await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [row('led lampe warmweiß', { campaignId: CAMPAIGN, campaignName: 'SP Bekannt' })],
+        }),
+      ),
+    });
+    await waitForRow('SP Bekannt');
+    const cell = document.querySelector<HTMLElement>('.ag-cell[col-id="campaign"]')!;
+    cell.focus();
+    cell.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/ads/explorer/ad-groups'));
+    expect(router.currentRoute.value.query).toMatchObject({
+      campaign: CAMPAIGN,
+      nc: '1',
+      removed: '1',
+    });
+    // Keine einzelnen Profile: Der Link gilt in jedem Tab und für jeden Leser gleich.
+    expect(router.currentRoute.value.query.pf).toBeUndefined();
+    expect(router.options.history.state.analyticsFilters).toMatchObject({ profileIds: null });
+  });
+
+  it('Link und reiner Text tragen den vollen Namen als title; die Summenzeile hat keinen Link', async () => {
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [row('led lampe warmweiß', { campaignId: CAMPAIGN, campaignName: 'SP Bekannt' })],
+        }),
+      ),
+    });
+    await waitForRow('SP Bekannt');
+    await waitForRow('AG Lampen');
+    await waitForRow('Summe');
+    expect(anchor('SP Bekannt')!.getAttribute('title')).toBe('SP Bekannt');
+    const plain = [...document.querySelectorAll('.ag-cell[col-id="adGroup"] span')].find(
+      (span) => span.textContent?.trim() === 'AG Lampen',
+    );
+    expect(plain?.getAttribute('title')).toBe('AG Lampen');
+    expect(document.querySelectorAll('.ag-root a')).toHaveLength(1);
+    expect(document.querySelectorAll('.ag-floating-bottom a')).toHaveLength(0);
+  });
+
+  it('bekannte Entity ohne Namen: Platzhalter statt eines leeren Links', async () => {
+    await mountPage(PATH, {
+      'POST /api/ads/search-terms/analysis': json(
+        analysisResponse({
+          rows: [row('led lampe warmweiß', { campaignId: CAMPAIGN, campaignName: '' })],
+        }),
+      ),
+    });
+    await waitForRow('led lampe warmweiß');
+    await waitForRow('AG Lampen');
+    const cell = () =>
+      document.querySelector('.ag-row:not(.ag-row-pinned) .ag-cell[col-id="campaign"]');
+    await vi.waitFor(() => expect(cell()?.textContent?.trim()).toBe('–'));
+    expect(cell()!.querySelector('a')).toBeNull();
+  });
+
+  it('fehlt die Entity im Profil, bleibt der Name reiner Text', async () => {
+    await mountPage();
+    await waitForRow('led lampe warmweiß');
+    await waitForRow('SP Lampen');
+    await waitForRow('AG Lampen');
+    expect(document.querySelectorAll('.ag-root a')).toHaveLength(0);
   });
 });

@@ -89,8 +89,8 @@ function onSortChanged({ api: gridApi, source }: SortChangedEvent<GridRow>) {
  * CSV der geladenen Zeilen in aktueller Filterung und Sortierung (F6): Beträge als Decimal-String (Spalten mit
  * `useValueFormatterForExport: false`), dazu die Währung; ohne Summenzeile (sie gilt für alle Zeilen der Auswahl).
  */
-function csv(prependContent?: string): string {
-  return api.value ? gridCsv(api.value, prependContent) : '';
+function csv(note?: string): string {
+  return api.value ? gridCsv(api.value, note) : '';
 }
 
 defineExpose({ csv });

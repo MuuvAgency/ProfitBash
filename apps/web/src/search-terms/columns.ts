@@ -8,9 +8,12 @@ import {
 } from '@profitbash/shared';
 import type { CellClassParams, ColDef, ICellRendererParams } from 'ag-grid-community';
 import { markRaw } from 'vue';
+import type { RouteLocationRaw } from 'vue-router';
 import type { SearchTermAnalysisData, SearchTermNgramData, SearchTermRowData } from '../api/client';
 import DecimalFilter from '../explorer/DecimalFilter.vue';
 import { targetLabel, type Labels } from '../explorer/amazon-labels';
+import EntityLinkCell, { type EntityLinkCellParams } from './EntityLinkCell.vue';
+import type { ExplorerLinkLevel } from './explorer-link';
 
 /**
  * Spalten der Suchbegriff-Analyse (2b.2b): Suchbegriffe mit Einstufung und Wortbausteine (N-Gramme). Beträge in der
@@ -57,6 +60,8 @@ export type NgramGridRow = SearchTermNgramData & { id: string };
 export interface ColumnContext extends Labels {
   locale: Locale;
   currency: string;
+  /** Ziel im Explorer für Kampagne bzw. Ad Group einer Zeile (2b.2e); fehlt oder `null`: reiner Text. */
+  explorerLink?: (level: ExplorerLinkLevel, row: SearchTermRowData) => RouteLocationRaw | null;
 }
 
 export function formatSearchTermMetric(
@@ -87,12 +92,24 @@ function metricColumns<T extends Sums>(context: ColumnContext): ColDef<T>[] {
     valueFormatter: ({ value }) =>
       formatSearchTermMetric(key, value as string | null | undefined, context),
     comparator: compareDecimalNullsLast,
+    // CSV wie im Explorer: roher Decimal-String (Anteile als Bruch), die Währung in der Spalte `currency`.
+    useValueFormatterForExport: false,
     type: 'rightAligned',
     cellClass: DATA_CELL,
     filter: markRaw(DecimalFilter),
     // Anteile erscheinen in Prozent: Filtereingabe „30“ meint 30 %.
     ...(KIND[key] === 'ratio' && { filterParams: { scale: 2 } }),
   }));
+}
+
+/** Währung des Profils: nie sichtbar, aber immer im CSV-Export (`gridCsv`). */
+function currencyColumn<T>(context: ColumnContext): ColDef<T> {
+  return {
+    colId: 'currency',
+    headerName: context.t('explorer.column.currency'),
+    valueGetter: () => context.currency,
+    hide: true,
+  };
 }
 
 /** Einstufung als Text, bei „Beobachten“ mit Grund. */
@@ -195,6 +212,13 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
     filter: 'agTextColumnFilter',
     ...extra,
   });
+  /** Name als Link in den Explorer (Kampagne, Ad Group), soweit die Entity im Profil bekannt ist. */
+  const link = (level: ExplorerLinkLevel): Partial<ColDef<TermGridRow>> => ({
+    cellRenderer: markRaw(EntityLinkCell),
+    cellRendererParams: {
+      linkFor: (row) => (row.isTotal ? null : (context.explorerLink?.(level, row) ?? null)),
+    } satisfies EntityLinkCellParams,
+  });
   const defs: ColDef<TermGridRow>[] = [
     {
       colId: 'searchTerm',
@@ -209,8 +233,8 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
     text('classification', t('searchTerms.column.classification'), (row) =>
       classificationValue(row, context),
     ),
-    text('campaign', t('explorer.column.campaign'), (row) => row.campaignName),
-    text('adGroup', t('explorer.column.adGroup'), (row) => row.adGroupName),
+    text('campaign', t('explorer.column.campaign'), (row) => row.campaignName, link('campaign')),
+    text('adGroup', t('explorer.column.adGroup'), (row) => row.adGroupName, link('adGroup')),
     text('target', t('explorer.column.target'), (row) =>
       targetLabel(
         { keywordText: row.keywordText, matchType: row.matchType, expression: row.expression },
@@ -218,6 +242,7 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
       ),
     ),
     ...metricColumns<TermGridRow>(context),
+    currencyColumn<TermGridRow>(context),
   ];
   return defs.map((def) =>
     def.colId === 'classification'
@@ -258,10 +283,12 @@ export function ngramColumns(context: ColumnContext): ColDef<NgramGridRow>[] {
       headerName: t('searchTerms.column.searchTerms'),
       field: 'searchTerms',
       valueFormatter: ({ value }) => formatNumber(String(value ?? 0), locale),
+      useValueFormatterForExport: false,
       type: 'rightAligned',
       cellClass: DATA_CELL,
     },
     ...metricColumns<NgramGridRow>(context),
+    currencyColumn<NgramGridRow>(context),
   ];
 }
 
