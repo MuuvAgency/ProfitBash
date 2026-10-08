@@ -7,6 +7,7 @@ import {
   clientSchema,
   DEFAULT_SEARCH_TERM_RULES,
   MAX_PROTECTED_TERMS,
+  MAX_SEARCH_TERM_ROWS,
   searchTermAnalysisResponseSchema,
   searchTermPeriodsResponseSchema,
   searchTermRulesResponseSchema,
@@ -77,12 +78,17 @@ const term = (
   ...patch,
 });
 
-async function write(organizationId: string, profileId: string, rows: SearchTermPeriodMetric[]) {
+async function write(
+  organizationId: string,
+  profileId: string,
+  rows: SearchTermPeriodMetric[],
+  period = A,
+) {
   await replaceSearchTermPeriodMetrics(ctx.testDb.db, {
     organizationId,
     profileId,
     adProduct: SP,
-    period: { startDate: A.periodStart, endDate: A.periodEnd },
+    period: { startDate: period.periodStart, endDate: period.periodEnd },
     currencyCode: 'EUR',
     rows,
     replace: 'period',
@@ -370,6 +376,18 @@ describe('POST /api/ads/search-terms/analysis', () => {
       term('lampe rot', { ...t2, clicks: 2, cost: '1', sales: '20', purchases: 1, units: 1 }),
       // Ein Target: wie die Zeile.
       term('lampe solo', { clicks: 40, cost: '20', sales: '100', purchases: 4, units: 4 }),
+      // Allein ein Negativ-Vorschlag, mit den Käufen der anderen Targets zusammen ein Harvest (35 / 140 = 25 %).
+      term('lampe grün', { clicks: 30, cost: '30' }),
+      term('lampe grün', { ...t2, clicks: 4, cost: '2', sales: '60', purchases: 1, units: 1 }),
+      term('lampe grün', {
+        amazonAdGroupId: 'AG3',
+        amazonTargetId: 'T3',
+        clicks: 6,
+        cost: '3',
+        sales: '80',
+        purchases: 2,
+        units: 2,
+      }),
     ]);
 
     const res = await analysis(viewer, { profileId: spread!.id });
@@ -404,16 +422,65 @@ describe('POST /api/ads/search-terms/analysis', () => {
       ['T2', 'watch', 'tooFewData', 'watch', 'tooFewData', 2, false],
     ]);
     expect(byTerm('lampe solo')).toEqual([['T1', 'harvest', null, 'harvest', null, 1, false]]);
+    // Die Zeile behält ihren Negativ-Vorschlag (er gehört in die Quellkampagne) und zählt bei den Zeilen mit.
+    expect(byTerm('lampe grün')).toEqual([
+      ['T1', 'negate', null, 'harvest', null, 3, true],
+      ['T2', 'watch', 'tooFewData', 'harvest', null, 3, true],
+      ['T3', 'watch', 'tooFewData', 'harvest', null, 3, true],
+    ]);
     // Zeilen je Einstufung wie bisher; daneben verschiedene Suchbegriffe je Einstufung über alle Targets.
-    expect(res.body.counts).toEqual({ harvest: 1, negate: 1, watch: 7 });
-    expect(res.body.termCounts).toEqual({ harvest: 2, negate: 1, watch: 2 });
-    expect(res.body.termCountsOnlyAcrossTargets).toEqual({ harvest: 1, negate: 1 });
+    expect(res.body.counts).toEqual({ harvest: 1, negate: 2, watch: 9 });
+    expect(res.body.termCounts).toEqual({ harvest: 3, negate: 1, watch: 2 });
+    expect(res.body.termCountsOnlyAcrossTargets).toEqual({ harvest: 2, negate: 1 });
 
     // Der Ausschnitt nach Ad-Typ gilt auch für die Einstufung je Begriff.
     const sb = await analysis(viewer, { profileId: spread!.id, adProducts: ['SPONSORED_BRANDS'] });
     expect(sb.body.rows).toEqual([]);
     expect(sb.body.termCounts).toEqual({ harvest: 0, negate: 0, watch: 0 });
     expect(sb.body.termCountsOnlyAcrossTargets).toEqual({ harvest: 0, negate: 0 });
+  });
+
+  it('rechnet die Einstufung je Begriff auch über Zeilen, die die Antwort kürzt', async () => {
+    const B = { periodStart: '2026-07-01', periodEnd: '2026-07-31' };
+    const split = (target: string, patch: Partial<SearchTermPeriodMetric>) =>
+      term('geteilt lampe', {
+        amazonTargetId: target,
+        sales: '150',
+        purchases: 1,
+        units: 1,
+        ...patch,
+      });
+    await write(
+      orgId,
+      ids.big,
+      [
+        // Eine Zeile des Begriffs steht ganz oben, zwei fallen mit dem kleinsten Spend aus der Antwort.
+        split('S1', { cost: '50' }),
+        ...Array.from({ length: MAX_SEARCH_TERM_ROWS }, (_, i) =>
+          term(`f${i} lampe`, { amazonTargetId: `F${i}`, cost: '2' }),
+        ),
+        split('S2', { cost: '0.5' }),
+        split('S3', { cost: '0.5' }),
+      ],
+      B,
+    );
+    const { body } = await analysis(viewer, { profileId: ids.big, ...B });
+    expect(body.meta).toMatchObject({ totalRows: MAX_SEARCH_TERM_ROWS + 3, truncated: true });
+    expect(body.rows).toHaveLength(MAX_SEARCH_TERM_ROWS);
+    expect(body.rows.filter((r) => r.searchTerm === 'geteilt lampe')).toHaveLength(1);
+    expect(body.rows[0]).toMatchObject({
+      searchTerm: 'geteilt lampe',
+      amazonTargetId: 'S1',
+      classification: 'watch',
+      reason: 'tooFewData',
+      termClassification: 'harvest',
+      termReason: null,
+      termTargets: 3,
+      termOnlyAcrossTargets: true,
+    });
+    expect(body.counts).toEqual({ harvest: 0, negate: 0, watch: MAX_SEARCH_TERM_ROWS + 3 });
+    expect(body.termCounts).toEqual({ harvest: 1, negate: 0, watch: MAX_SEARCH_TERM_ROWS });
+    expect(body.termCountsOnlyAcrossTargets).toEqual({ harvest: 1, negate: 0 });
   });
 
   it('verweigert ausgeblendete Profile (auch Admins) und fremde Organisationen mit 404', async () => {
