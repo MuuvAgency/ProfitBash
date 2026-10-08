@@ -129,6 +129,14 @@ describe('checkAdChanges: Warnungen nach F6', () => {
     ]);
   });
 
+  it('vergleicht ein Gebot ohne Wert vorher mit dem Vergleichswert (Standardgebot der Ad Group)', () => {
+    const large = change({ field: 'bid', before: null, comparisonBefore: '0.40', after: '0.61' });
+    const small = change({ field: 'bid', before: null, comparisonBefore: '0.40', after: '0.60' });
+    const own = change({ field: 'bid', before: '1.00', comparisonBefore: '0.10', after: '1.10' });
+    const result = checkAdChanges([large, small, own], { limitFor: noLimits });
+    expect(result.largeChanges).toEqual([{ changeId: large.id, changePercent: '52.5' }]);
+  });
+
   it('warnt nicht ohne Wert vorher und nicht bei Platzierungen oder Zuständen', () => {
     const result = checkAdChanges(
       [

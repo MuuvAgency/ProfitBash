@@ -17,6 +17,7 @@ import {
   checkNegative,
   chunks,
   currentValue,
+  loadComparisonBids,
   loadEntities,
   negativeKey,
   sameValue,
@@ -498,6 +499,8 @@ export async function loadAdChangeRecords(
 }
 
 export interface PendingAdChange extends AdChangeRecord {
+  /** Vergleichswert für die ±50-%-Warnung: Standardgebot der Ad Group bei einem Target ohne eigenes Gebot. */
+  comparisonBefore: string | null;
   /** Andere Nutzer mit einer offenen Änderung an derselben Stelle (F4), nach Name. */
   otherUsers: { userId: string; name: string }[];
 }
@@ -566,8 +569,10 @@ export async function listPendingAdChanges(
     list.set(row.userId, row.name);
     othersByChange.set(row.changeId, list);
   }
+  const comparisonBids = await loadComparisonBids(db, changes);
   return changes.map((change) => ({
     ...change,
+    comparisonBefore: comparisonBids.get(change.id) ?? null,
     otherUsers: [...(othersByChange.get(change.id) ?? [])].map(([userId, name]) => ({
       userId,
       name,
@@ -721,6 +726,8 @@ export interface AdChangeReviewRow {
   /** Leer beim Anlegen eines Negatives. */
   field: AdChangeField | null;
   before: string | null;
+  /** Vergleichswert für die ±50-%-Warnung: Standardgebot der Ad Group bei einem Target ohne eigenes Gebot. */
+  comparisonBefore: string | null;
   after: string | null;
   /** Ad-Typ der Kampagne und Land des Profils. */
   adProduct: string;
@@ -836,7 +843,10 @@ async function submitInTransaction(
     const dropped: string[] = [];
     const byProfile = new Map<string, { organizationId: string; changeIds: string[] }>();
     const reviewed: Array<
-      Omit<AdChangeReviewRow, 'adProduct' | 'countryCode'> & { campaignId: string }
+      Omit<AdChangeReviewRow, 'adProduct' | 'countryCode' | 'comparisonBefore'> & {
+        campaignId: string;
+        adGroupId: string | null;
+      }
     > = [];
     for (const row of pending) {
       let before: string | null = null;
@@ -884,6 +894,7 @@ async function submitInTransaction(
         id: row.id,
         profileId: row.profileId,
         campaignId: row.campaignId,
+        adGroupId: row.adGroupId,
         field: row.field as AdChangeField | null,
         before,
         after: row.newValue ?? row.newAmount,
@@ -908,9 +919,11 @@ async function submitInTransaction(
           adProducts.set(campaign.id, campaign.adProduct);
         }
       }
+      const comparisonBids = await loadComparisonBids(tx, reviewed);
       const verdict: unknown = input.review(
-        reviewed.map(({ campaignId, ...row }) => ({
+        reviewed.map(({ campaignId, adGroupId: _adGroupId, ...row }) => ({
           ...row,
+          comparisonBefore: comparisonBids.get(row.id) ?? null,
           adProduct: adProducts.get(campaignId) ?? '',
           countryCode: countries.get(row.profileId) ?? '',
         })),

@@ -435,6 +435,34 @@ describe('stageAdChanges: Feldänderungen', () => {
     expect(cart![0]).toMatchObject({ before: null, after: '0.30', currencyCode: 'EUR' });
   });
 
+  it('nennt für ein Gebot ohne bisheriges Gebot das Standardgebot der Ad Group als Vergleichswert', async () => {
+    await stage(ids.ada, [
+      update('target', ids.targetWithoutBid, 'bid', '0.30'),
+      update('target', ids.target, 'bid', '0.90'),
+    ]);
+
+    const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+    expect(cart!.map((c) => [c.entityId, c.before, c.comparisonBefore])).toEqual([
+      [ids.targetWithoutBid, null, '0.40'],
+      [ids.target, expect.any(String), null],
+    ]);
+
+    let reviewed: unknown[] = [];
+    await submitAdChanges(testDb.db, {
+      ...as(ids.ada),
+      channel: 'bulk_file',
+      enqueue: noEnqueue,
+      review: (rows) => {
+        reviewed = rows.map((row) => [row.before, row.comparisonBefore]);
+        return 'abgelehnt';
+      },
+    });
+    expect(reviewed).toEqual([
+      [null, '0.40'],
+      [expect.any(String), null],
+    ]);
+  });
+
   it('liest Zustand, Budget, Strategie und Standardgebot als „vorher“', async () => {
     await stage(ids.ada, [
       update('campaign', ids.campaign, 'state', 'PAUSED'),
@@ -499,6 +527,78 @@ describe('stageAdChanges: Feldänderungen', () => {
       placement_top: ['50', '120', null],
       placement_product_page: [null, '25', null],
     });
+  });
+});
+
+// TODO 3.5 (Session vom 2026-10-08 am Nutzungslimit beendet): `adjust` in `stageAdChanges` umsetzen, dann `.skip` entfernen.
+describe.skip('stageAdChanges: anpassen (±Prozent, ±Betrag)', () => {
+  const adjust = (
+    entityType: 'campaign' | 'ad_group' | 'target',
+    entityId: string,
+    field: 'budget' | 'default_bid' | 'bid',
+    mode: 'percent' | 'amount',
+    value: string,
+  ): AdChangeInput => ({ operation: 'adjust', entityType, entityId, field, mode, value });
+
+  it('rechnet Prozent und Betrag auf den Stand der Entity und rundet kaufmännisch auf zwei Stellen', async () => {
+    const result = await stage(ids.ada, [
+      adjust('target', ids.target, 'bid', 'percent', '-15'),
+      adjust('ad_group', ids.adGroup, 'default_bid', 'amount', '0.05'),
+      adjust('campaign', ids.campaign, 'budget', 'percent', '12.5'),
+    ]);
+
+    expect(result.counts).toMatchObject({ created: 3, rejected: 0 });
+    const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+    expect(cart!.map((c) => [c.field, c.before, c.after])).toEqual([
+      // 0.50 − 15 % = 0.425 → 0.43
+      ['bid', '0.50', '0.43'],
+      ['default_bid', '0.40', '0.45'],
+      ['budget', '20.00', '22.50'],
+    ]);
+  });
+
+  it('rechnet immer auf den Stand der Entity, nicht auf einen schon vorgemerkten Wert', async () => {
+    await stage(ids.ada, [adjust('target', ids.target, 'bid', 'percent', '10')]);
+    const again = await stage(ids.ada, [adjust('target', ids.target, 'bid', 'percent', '10')]);
+
+    expect(again.results).toEqual([{ outcome: 'unchanged' }]);
+    const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+    expect(cart!.map((c) => c.after)).toEqual(['0.55']);
+  });
+
+  it('nimmt für ein Target ohne eigenes Gebot das Standardgebot der Ad Group als Ausgangswert', async () => {
+    await stage(ids.ada, [adjust('target', ids.targetWithoutBid, 'bid', 'percent', '50')]);
+
+    const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+    expect(cart![0]).toMatchObject({ before: null, after: '0.60' });
+  });
+
+  it('lehnt ab, was keinen Ausgangswert hat oder kein Betrag über 0 wird', async () => {
+    await testDb.db
+      .update(amazonAdsAdGroups)
+      .set({ defaultBid: null })
+      .where(eq(amazonAdsAdGroups.id, ids.adGroup));
+    try {
+      const result = await stage(ids.ada, [
+        adjust('target', ids.targetWithoutBid, 'bid', 'amount', '0.10'),
+        adjust('target', ids.target, 'bid', 'amount', '-0.50'),
+        adjust('target', ids.target, 'bid', 'percent', '-99.5'),
+        adjust('campaign', ids.archivedCampaign, 'budget', 'percent', '10'),
+        adjust('campaign', ids.foreignCampaign, 'budget', 'percent', '10'),
+      ]);
+      expect(result.results).toEqual([
+        { outcome: 'rejected', reason: 'noCurrentValue' },
+        { outcome: 'rejected', reason: 'resultOutOfRange' },
+        { outcome: 'rejected', reason: 'resultOutOfRange' },
+        { outcome: 'rejected', reason: 'entityArchived' },
+        { outcome: 'rejected', reason: 'notFound' },
+      ]);
+    } finally {
+      await testDb.db
+        .update(amazonAdsAdGroups)
+        .set({ defaultBid: '0.40' })
+        .where(eq(amazonAdsAdGroups.id, ids.adGroup));
+    }
   });
 });
 
@@ -1360,6 +1460,7 @@ describe('submitAdChanges: Prüfung in der Transaktion (3.4)', () => {
         profileId: ids.de,
         field: 'bid',
         before: '0.30',
+        comparisonBefore: null,
         after: '0.75',
         adProduct: SP,
         countryCode: 'DE',

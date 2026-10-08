@@ -224,6 +224,23 @@ describe('Warenkorb', () => {
     );
   });
 
+  it('warnt bei einem Target ohne eigenes Gebot gegen das Standardgebot der Ad Group', async () => {
+    const staged = await stage(editor, [update('target', f.productTarget, 'bid', '0.90')]);
+    const changeId = staged.body.results[0]!.changeId!;
+
+    const cart = await call<PendingAdChangesResponse>('GET', '/pending', editor);
+    expect(cart.body.changes[0]).toMatchObject({ before: null, comparisonBefore: '0.40' });
+    expect(cart.body.check.largeChanges).toEqual([{ changeId, changePercent: '125' }]);
+
+    const submitted = await call<SubmitAdChangesResponse>('POST', '/submit', editor, {
+      channel: 'api',
+    });
+    expect(submitted.body).toMatchObject({
+      status: 'needsConfirmation',
+      check: { largeChanges: [{ changeId, changePercent: '125' }] },
+    });
+  });
+
   it('lehnt fremde und ausgeblendete Entities je Änderung ab und prüft die Eingabe', async () => {
     const foreignEntity = await stage(editor, [update('target', other.keyword, 'bid', '0.80')]);
     expect(foreignEntity.body.results).toEqual([{ outcome: 'rejected', reason: 'notFound' }]);

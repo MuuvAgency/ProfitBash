@@ -42,6 +42,11 @@ export interface AdChangeCheckInput {
   /** Leer beim Anlegen eines Negatives. */
   field: AdChangeField | null;
   before: string | null;
+  /**
+   * Vergleichswert für die ±50-%-Warnung, wenn es keinen Wert vorher gibt: das Standardgebot der Ad Group bei einem
+   * Target ohne eigenes Gebot (Dominik, 2026-10-08).
+   */
+  comparisonBefore?: string | null;
   after: string | null;
   /** Ad-Typ der Kampagne und Land des Profils. */
   adProduct: string;
@@ -113,8 +118,9 @@ export function checkAdChanges(
       result.violations.push({ changeId: change.id, code: 'aboveMaximum', ...limit });
     }
 
-    if (kind !== 'money' || change.before === null || !PLAIN_DECIMAL.test(change.before)) continue;
-    const before = new Dec(change.before);
+    const reference = change.before ?? change.comparisonBefore ?? null;
+    if (kind !== 'money' || reference === null || !PLAIN_DECIMAL.test(reference)) continue;
+    const before = new Dec(reference);
     if (before.lessThanOrEqualTo(0)) continue;
     const percent = after.minus(before).dividedBy(before).times(100);
     if (percent.abs().greaterThan(AD_CHANGE_WARNING_PERCENT)) {

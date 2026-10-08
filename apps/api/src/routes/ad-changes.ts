@@ -436,6 +436,7 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
         changes: changes.map((change) => ({
           ...serializeChange(change),
           otherUsers: change.otherUsers,
+          comparisonBefore: change.comparisonBefore,
         })),
         check: check(changes),
       },
