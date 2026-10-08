@@ -54,6 +54,12 @@ const COUNTER_ORDER = [
   'removalDeferred',
   'backfillsCompleted',
   'exportsWaiting',
+  // Änderungen übermitteln (3.3) und Bestätigung durch den Bulk-Import.
+  'submissions',
+  'changesApplied',
+  'changesConfirmed',
+  'changesFailed',
+  'changesUnsent',
   'failed',
   'failedSinceLastRun',
   'profileErrors',

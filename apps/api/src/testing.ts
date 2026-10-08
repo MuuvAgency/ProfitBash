@@ -9,7 +9,12 @@ import { createApp } from './app';
 import { createAuth, type Auth } from './auth';
 import type { AppDeps } from './context';
 import { AMAZON_OAUTH_CALLBACK_PATH } from './env';
-import type { FileImportJob, JobQueue, ProfilesSyncJob } from '@profitbash/worker';
+import type {
+  AdChangesSubmitJob,
+  FileImportJob,
+  JobQueue,
+  ProfilesSyncJob,
+} from '@profitbash/worker';
 import type { LogEntry } from './logger';
 import { seed, type SeedResult } from './seed';
 
@@ -22,6 +27,7 @@ export const TEST_REDIRECT_URI = `${TEST_APP_URL}${AMAZON_OAUTH_CALLBACK_PATH}`;
 export interface RecordingJobQueue extends JobQueue {
   profilesSync: ProfilesSyncJob[];
   fileImports: FileImportJob[];
+  adChangesSubmits: AdChangesSubmitJob[];
   /** Je eingeplantem Job: lief das Einplanen in der Transaktion des Aufrufers? */
   enqueuedInTransaction: boolean[];
   failNext: boolean;
@@ -40,12 +46,17 @@ function createRecordingJobQueue(): RecordingJobQueue {
   const queue: RecordingJobQueue = {
     profilesSync: [],
     fileImports: [],
+    adChangesSubmits: [],
     enqueuedInTransaction: [],
     failNext: false,
     enqueueProfilesSync: (job, options) =>
       record(queue.profilesSync, job, options?.tx !== undefined),
     enqueueFileImport: async (job, options) => {
       await record(queue.fileImports, job, options?.tx !== undefined);
+      return true;
+    },
+    enqueueAdChangesSubmit: async (job, options) => {
+      await record(queue.adChangesSubmits, job, options?.tx !== undefined);
       return true;
     },
   };

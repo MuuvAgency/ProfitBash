@@ -1,4 +1,5 @@
-import { createTestDatabase, type TestDatabase } from '@profitbash/db/testing';
+import { stageAdChanges, submitAdChanges } from '@profitbash/db';
+import { createTestDatabase, seedAdChangeFixture, type TestDatabase } from '@profitbash/db/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createConnection, createOrganization } from '../testing';
 import type { ConnectionJobData, ConnectionQueue } from './connection-job';
@@ -47,5 +48,42 @@ describe('dispatchConnectionJobs', () => {
       ]),
     );
     expect(outcome.counters).toEqual({ connections: 2, queued: 1 });
+  });
+
+  it('plant das Übermitteln von Änderungen nur für Connections mit offenen Übermittlungen ein', async () => {
+    const f = await seedAdChangeFixture(testDb.db, 'aenderungen');
+    const dispatch = async () => {
+      const sent: ConnectionJobData[] = [];
+      await dispatchConnectionJobs(
+        {
+          db: testDb.db,
+          enqueue: (_queue, job) => {
+            sent.push(job);
+            return Promise.resolve(true);
+          },
+        },
+        'ad-changes-submit',
+      );
+      return sent;
+    };
+    expect(await dispatch()).toEqual([]);
+
+    const actor = { userId: f.ada, orgId: f.org };
+    await stageAdChanges(testDb.db, {
+      ...actor,
+      origin: 'explorer',
+      changes: [
+        {
+          operation: 'update',
+          entityType: 'target',
+          entityId: f.keyword,
+          field: 'bid',
+          value: '0.75',
+        },
+      ],
+    });
+    await submitAdChanges(testDb.db, { ...actor, channel: 'api', enqueue: async () => {} });
+
+    expect(await dispatch()).toEqual([{ organizationId: f.org, connectionId: f.connection }]);
   });
 });

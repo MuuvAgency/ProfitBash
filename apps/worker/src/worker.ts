@@ -10,6 +10,7 @@ import {
   type ConnectionJobDeps,
   type ConnectionQueue,
 } from './jobs/connection-job';
+import { submitConnectionAdChanges } from './jobs/ad-changes-submit';
 import { pollAmazonRequests } from './jobs/amazon-requests-poll';
 import { fileImportJobDataSchema, importProfileFiles } from './jobs/file-import';
 import { FILE_IMPORTERS } from './file-import/importers';
@@ -47,6 +48,7 @@ const CONNECTION_JOBS: Record<ConnectionQueue, ConnectionJobDefinition> = {
   'entities-sync': { run: syncConnectionEntities, lease: true },
   'reports-sync': { run: syncConnectionReports, lease: true },
   'amazon-requests-poll': { run: pollAmazonRequests, lease: true },
+  'ad-changes-submit': { run: submitConnectionAdChanges, lease: true },
 };
 
 /** Daten eines Kursabrufs: leer (Zeitplan, Start) oder Nummer des Wiederholungsversuchs. */

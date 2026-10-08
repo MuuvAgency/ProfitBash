@@ -4832,6 +4832,7 @@
                 "entities-sync",
                 "reports-sync",
                 "amazon-requests-poll",
+                "ad-changes-submit",
                 "file-import",
                 "fx-rates-sync"
               ]

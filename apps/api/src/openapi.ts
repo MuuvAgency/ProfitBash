@@ -55,6 +55,7 @@ export async function renderOpenApiDocument(): Promise<string> {
       jobs: {
         enqueueProfilesSync: () => Promise.reject(new Error('Keine Job-Queue beim Export.')),
         enqueueFileImport: () => Promise.reject(new Error('Keine Job-Queue beim Export.')),
+        enqueueAdChangesSubmit: () => Promise.reject(new Error('Keine Job-Queue beim Export.')),
       },
     });
     const res = await app.request('/api/openapi.json');
