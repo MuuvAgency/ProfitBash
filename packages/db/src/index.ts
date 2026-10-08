@@ -20,3 +20,4 @@ export * from './fx-rates';
 export * from './saved-views';
 export * from './members';
 export * from './search-terms';
+export * from './ad-changes';
