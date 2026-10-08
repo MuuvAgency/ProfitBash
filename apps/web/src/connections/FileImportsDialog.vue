@@ -71,7 +71,7 @@ const asksForPeriod = computed(
 /** Heute in der Zeitzone des Profils: spätester Tag eines Zeitraums. */
 const today = () => (props.profile ? todayInTimezone(props.profile.timezone, new Date()) : '');
 const latestDay = ref('');
-/** Frühester erster Tag (höchstens ein Jahr zurück, `BULK_PERIOD_MAX_AGE_DAYS`). */
+/** Frühester erster Tag (höchstens 365 Tage zurück, `BULK_PERIOD_MAX_AGE_DAYS`). */
 const earliestDay = computed(() =>
   latestDay.value === '' ? '' : oldestBulkPeriodStart(latestDay.value),
 );

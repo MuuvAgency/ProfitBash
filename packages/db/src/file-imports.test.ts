@@ -272,7 +272,7 @@ describe('createFileImport mit von Hand angegebenem Zeitraum (2b.2c)', () => {
       upload({ ...renamed, now, period: { startDate: '2025-10-07', endDate: '2025-10-31' } }),
     ).rejects.toMatchObject({
       code: 'INVALID_PERIOD',
-      message: 'Der Zeitraum darf höchstens ein Jahr zurückliegen.',
+      message: 'Der erste Tag darf höchstens 365 Tage zurückliegen.',
     });
     // Der Dateiname gewinnt: Eine zu alte Angabe wird dann verworfen und nicht geprüft.
     await expect(

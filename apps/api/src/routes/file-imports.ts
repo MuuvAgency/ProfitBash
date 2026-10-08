@@ -58,7 +58,7 @@ const periodDay = (which: string) =>
     .describe(
       `${which} Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für ` +
         `Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens ${BULK_PERIOD_MAX_DAYS} Tage, ` +
-        'nicht in der Zukunft, höchstens ein Jahr zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert.',
+        'nicht in der Zukunft, erster Tag höchstens 365 Tage zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert.',
     );
 
 const uploadSchema = z
@@ -76,7 +76,7 @@ const uploadSchema = z
     // Der Dateiname der Werbekonsole gewinnt (wie im Import, `parseBulkPeriod`): Trägt er einen Zeitraum, werden
     // die Felder ignoriert und über ihre Schreibweise hinaus nicht geprüft.
     if (parseBulkPeriod(baseName(value.file.name))) return;
-    // „Kein Tag in der Zukunft“ und „höchstens ein Jahr zurück“ prüft `createFileImport` mit dem Kalendertag in
+    // „Kein Tag in der Zukunft“ und „erster Tag höchstens 365 Tage zurück“ prüft `createFileImport` mit dem Kalendertag in
     // der Zeitzone des Profils.
     const issue = bulkPeriodIssue({ startDate: value.periodStart, endDate: value.periodEnd });
     if (issue) {

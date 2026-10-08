@@ -594,18 +594,22 @@ describe('POST /api/ads/search-terms/periods/delete (2b.2d)', () => {
     await write(orgId, ids.big, [term('anderes profil')], TYPO);
   });
 
-  it('verlangt das Recht „write“: Viewer bekommen 403', async () => {
-    const res = await remove(viewer);
-    expect(res.status).toBe(403);
-    expect(res.body.error.code).toBe('FEATURE_FORBIDDEN');
+  it('dürfen nur Org-Admins (wie der Upload): Viewer und Editoren bekommen 403', async () => {
+    // Nur Admins können die Datei erneut hochladen; wer nicht hochladen darf, darf auch nicht löschen.
+    for (const cookie of [viewer, editor]) {
+      const res = await remove(cookie);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    }
     await untouched();
   });
 
   it('verweigert ausgeblendete Profile (auch Admins) und fremde Organisationen mit 404', async () => {
     for (const [cookie, profileId] of [
-      [editor, ids.hidden],
       [admin, ids.hidden],
       [foreign, ids.visible],
+      // Ein Profil, das es nicht gibt.
+      [admin, crypto.randomUUID()],
     ] as const) {
       const res = await remove(cookie, { profileId });
       expect(res.status).toBe(404);
@@ -616,12 +620,14 @@ describe('POST /api/ads/search-terms/periods/delete (2b.2d)', () => {
 
   it('prüft die Eingabe', async () => {
     for (const body of [
+      // „von“ nach „bis“.
       { periodStart: '2025-10-01' },
+      { periodStart: '2025-09-30', periodEnd: '2025-09-01' },
       { periodEnd: '30.09.2025' },
       { periodEnd: undefined },
       { profileId: 'kein-profil' },
     ]) {
-      const res = await remove(editor, body);
+      const res = await remove(admin, body);
       expect(res.status, JSON.stringify(body)).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     }
@@ -634,7 +640,7 @@ describe('POST /api/ads/search-terms/periods/delete (2b.2d)', () => {
       // Nur ein Tag passt: Gelöscht wird genau ein Datei-Zeitraum.
       { periodEnd: '2025-10-15' },
     ]) {
-      const res = await remove(editor, body);
+      const res = await remove(admin, body);
       expect(res.status).toBe(404);
       expect(res.body.error).toEqual({
         code: 'SEARCH_TERM_PERIOD_NOT_FOUND',
@@ -644,8 +650,8 @@ describe('POST /api/ads/search-terms/periods/delete (2b.2d)', () => {
     await untouched();
   });
 
-  it('Editoren löschen genau den Zeitraum des Profils, mit Audit-Event', async () => {
-    const res = await remove(editor);
+  it('Admins löschen genau den Zeitraum des Profils, mit Audit-Event', async () => {
+    const res = await remove(admin);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ deletedRows: 2 });
 
@@ -674,7 +680,7 @@ describe('POST /api/ads/search-terms/periods/delete (2b.2d)', () => {
     expect(events[0]?.actorUserId).toEqual(expect.any(String));
 
     // Ein zweites Mal gibt es den Zeitraum nicht mehr.
-    const again = await remove(editor);
+    const again = await remove(admin);
     expect(again.status).toBe(404);
     expect(again.body.error.code).toBe('SEARCH_TERM_PERIOD_NOT_FOUND');
     expect(await deleteEvents()).toHaveLength(1);

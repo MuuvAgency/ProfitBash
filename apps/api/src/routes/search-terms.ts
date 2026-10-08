@@ -33,12 +33,12 @@ import {
 } from '@profitbash/shared';
 import type { AppDeps, AppEnv } from '../context';
 import { ApiError } from '../errors';
-import { requireFeature, requireSession } from '../middleware';
+import { orgAdminOnly, requireFeature, requireSession } from '../middleware';
 
 /**
  * Suchbegriff-Analyse (`docs/tasks/phase-2b.md` 2b.2), Feature `sp-explorer`: Datei-Zeiträume je Profil, Analyse
  * **eines** Zeitraums (Zeilen mit Einstufung, N-Gramme, Summen) und die Regeln der Einstufung je Organisation.
- * Nur lesend bis auf die Regeln und das Löschen eines Datei-Zeitraums (2b.2d); Aktionen auf Suchbegriffe kommen mit
+ * Nur lesend bis auf die Regeln und das Löschen eines Datei-Zeitraums (2b.2d, nur Org-Admins); Aktionen auf Suchbegriffe kommen mit
  * dem Warenkorb (Phase 3). Gelesen wird über `@profitbash/db` (Access-Layer), gerechnet in `@profitbash/engine`.
  */
 
@@ -70,7 +70,10 @@ const deletePeriodRoute = createRoute({
   path: '/ads/search-terms/periods/delete',
   tags: ['Suchbegriffe'],
   summary:
-    'Suchbegriffe eines Profils für genau einen Datei-Zeitraum löschen, über alle Ad-Typen (Recht „write“)',
+    'Suchbegriffe eines Profils für genau einen Datei-Zeitraum löschen, über alle Ad-Typen (nur Org-Admins)',
+  description:
+    'Wie der Upload der Dateien nur für Org-Admins, dazu Recht „write“ im Feature „sp-explorer“: Der Server hebt ' +
+    'keine Dateiinhalte auf, den Zeitraum stellt nur ein erneuter Upload wieder her.',
   request: { body: { content: json(searchTermPeriodDeleteRequestSchema), required: true } },
   responses: {
     200: { description: 'Gelöscht.', content: json(searchTermPeriodDeleteResponseSchema) },
@@ -170,7 +173,9 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     );
   });
 
-  app.openapi({ ...deletePeriodRoute, middleware: guard('write') }, async (c) => {
+  // Löschen darf nur, wer die Datei auch wieder hochladen kann (Upload: `orgAdminOnly`, `routes/file-imports.ts`).
+  const deleteGuard = [...orgAdminOnly(deps), requireFeature(deps, 'sp-explorer', 'write')];
+  app.openapi({ ...deletePeriodRoute, middleware: deleteGuard }, async (c) => {
     const body = c.req.valid('json');
     const deletedRows = await deleteSearchTermPeriod(db, {
       ...visibility(c),
