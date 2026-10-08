@@ -152,8 +152,13 @@ function createMockFetch(
     hosts.set(new URL(endpoints.apiHost).host, region as AmazonAdsRegion);
   }
   const data = MOCK_DATA[scale];
-  const jobs = createMockJobs(simulation, data);
-  const handleWrite = createMockWrites(simulation);
+  const writes = createMockWrites(simulation);
+  // Exports und Reports sehen die im Prozess gemerkten Änderungen (`mock-writes.ts`).
+  const jobs = createMockJobs(simulation, {
+    ...data,
+    account: (profile) => writes.overlay(data.account(profile)),
+  });
+  const handleWrite = writes.handleWrite;
 
   return async (input, init) => {
     const request = new Request(input, init);

@@ -66,6 +66,10 @@ export interface MockCampaign {
   /** SB/SD: `CPC` | `VCPM`. */
   costType?: string;
   budget: string;
+  /** SP: Gebotsstrategie im Export; ohne Angabe `SALES_DOWN_ONLY`. */
+  bidStrategy?: string;
+  /** SP: Gebotsanpassungen je Platzierung (ganze Prozent); ohne Angabe 25 % für `PLACEMENT_TOP`. */
+  placements?: Array<{ placement: string; percentage: string }>;
   portfolioId: string | null;
   /** SB ohne Multi-Ad-Group (v3-Preview-Lücke): Entities im Export, aber keine Report-Zeilen. */
   withoutReports?: boolean;
@@ -541,8 +545,10 @@ export function mockExportRows(
           ...(c.adProduct === SP && {
             targetingSettings: c.targeting,
             optimization: {
-              bidStrategy: 'SALES_DOWN_ONLY',
-              placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 25 }],
+              bidStrategy: c.bidStrategy ?? 'SALES_DOWN_ONLY',
+              placementBidAdjustments: (
+                c.placements ?? [{ placement: 'PLACEMENT_TOP', percentage: '25' }]
+              ).map(({ placement, percentage }) => ({ placement, percentage: raw(percentage) })),
             },
           }),
           ...(c.adProduct === SB && { costType: 'CPC', brandEntityId: 'ENTITYMOCKBRAND01' }),
