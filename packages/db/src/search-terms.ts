@@ -251,8 +251,9 @@ export interface DeleteSearchTermPeriodInput extends SearchTermAccessInput {
 /**
  * Löscht die Suchbegriffe eines Profils für genau einen Datei-Zeitraum, über alle Ad-Typen (2b.2d: ein beim Upload
  * falsch angegebener Zeitraum bliebe sonst für immer in der Auswahl). Kampagnen, der Verlauf der Datei-Importe und
- * andere Zeiträume bleiben. Audit `search_term_period.delete` in derselben Transaktion. Das Recht (`write` im
- * Feature `sp-explorer`) prüft die API. `null`, wenn der Nutzer das Profil nicht sehen darf, sonst die Zahl der
+ * andere Zeiträume bleiben. Audit `search_term_period.delete` in derselben Transaktion. Das Recht prüft die API:
+ * nur Org-Admins (wie der Upload der Dateien, denn nur ein erneuter Upload stellt den Zeitraum wieder her), dazu
+ * `write` im Feature `sp-explorer`. `null`, wenn der Nutzer das Profil nicht sehen darf, sonst die Zahl der
  * gelöschten Zeilen (0 = Zeitraum unbekannt, dann ohne Audit-Event).
  */
 export async function deleteSearchTermPeriod(

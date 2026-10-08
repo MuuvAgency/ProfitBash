@@ -47,7 +47,7 @@ export const BULK_PERIOD_ISSUE_MESSAGES: Record<BulkPeriodIssue, string> = {
   startAfterEnd: 'Der erste Tag des Zeitraums liegt nach dem letzten.',
   future: 'Der Zeitraum darf nicht in der Zukunft enden.',
   tooLong: `Der Zeitraum ist länger als ${BULK_PERIOD_MAX_DAYS} Tage.`,
-  tooOld: 'Der Zeitraum darf höchstens ein Jahr zurückliegen.',
+  tooOld: 'Der erste Tag darf höchstens 365 Tage zurückliegen.',
 };
 
 export class FileImportError extends Error {
@@ -136,7 +136,7 @@ export interface CreateFileImportInput extends Actor {
    * einen, gilt der und die Angabe wird ignoriert (auch nicht geprüft).
    */
   period?: BulkPeriod | null;
-  /** Für „kein Tag in der Zukunft“ und „höchstens ein Jahr zurück“ (Standard: jetzt). */
+  /** Für „kein Tag in der Zukunft“ und „erster Tag höchstens 365 Tage zurück“ (Standard: jetzt). */
   now?: Date;
   /** Plant den Job in derselben Transaktion ein (pg-boss über `tx`). */
   enqueue: (tx: DbOrTx) => Promise<unknown>;

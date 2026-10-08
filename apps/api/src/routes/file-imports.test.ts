@@ -1,7 +1,6 @@
 import { schema } from '@profitbash/db';
 import {
   FILE_IMPORT_MAX_BYTES,
-  oldestBulkPeriodStart,
   todayInTimezone,
   type ErrorResponse,
   type FileImport,
@@ -200,26 +199,33 @@ describe('POST /api/profiles/:id/file-imports', () => {
     });
 
     it('lehnt Zeiträume ab, die mehr als 365 Tage vor heute (Zeitzone des Profils) beginnen (2b.2d)', async () => {
-      // Das Profil liegt in Europe/Berlin; genau 365 Tage zurück ist noch erlaubt.
-      const oldest = oldestBulkPeriodStart(todayInTimezone('Europe/Berlin', new Date()));
-      expect(oldest).toBe(daysBefore(todayInTimezone('Europe/Berlin', new Date()), 365));
-      const allowed = await withPeriod('kunde.xlsx', oldest, oldest);
+      // Die API hat keine feste Uhr: deutlich innerhalb und deutlich außerhalb der Grenze, damit ein Tageswechsel
+      // während des Tests nichts ändert. Die genaue Grenze (365 erlaubt, 366 nicht) prüft der DB-Test mit fester
+      // Uhr (`packages/db/src/file-imports.test.ts`).
+      const today = todayInTimezone('Europe/Berlin', new Date());
+      const allowed = await withPeriod(
+        'kunde.xlsx',
+        daysBefore(today, 300),
+        daysBefore(today, 280),
+      );
       expect(allowed.status).toBe(201);
-      expect(await readJson<FileImport>(allowed)).toMatchObject({ periodStart: oldest });
+      expect(await readJson<FileImport>(allowed)).toMatchObject({
+        periodStart: daysBefore(today, 300),
+      });
 
-      const tooOld = await withPeriod('kunde.xlsx', daysBefore(oldest, 1), oldest);
+      const tooOld = await withPeriod('kunde.xlsx', daysBefore(today, 400), daysBefore(today, 380));
       expect(tooOld.status).toBe(400);
       expect((await readJson<ErrorResponse>(tooOld)).error).toEqual({
         code: 'INVALID_PERIOD',
-        message: 'Der Zeitraum darf höchstens ein Jahr zurückliegen.',
+        message: 'Der erste Tag darf höchstens 365 Tage zurückliegen.',
       });
       expect(await ctx.testDb.db.select().from(fileImports)).toHaveLength(1);
 
       // Der Dateiname gewinnt: Die zu alte Angabe wird verworfen und nicht geprüft.
       const named = await withPeriod(
         'bulk-a1b2c3-20260801-20260831-1.xlsx',
-        daysBefore(oldest, 30),
-        daysBefore(oldest, 1),
+        daysBefore(today, 400),
+        daysBefore(today, 380),
       );
       expect(named.status).toBe(201);
       expect(await readJson<FileImport>(named)).toMatchObject({ periodStart: null });

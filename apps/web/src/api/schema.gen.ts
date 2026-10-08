@@ -1125,9 +1125,9 @@ export interface paths {
                         file: string;
                         /** @enum {string} */
                         complete?: "true" | "false";
-                        /** @description Erster Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft, höchstens ein Jahr zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
+                        /** @description Erster Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft, erster Tag höchstens 365 Tage zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
                         periodStart?: string | "";
-                        /** @description Letzter Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft, höchstens ein Jahr zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
+                        /** @description Letzter Tag des Zeitraums, über den die Datei ihre Kennzahlen summiert (YYYY-MM-DD, eingeschlossen). Nur für Dateien, deren Name keinen Zeitraum trägt: beide Tage oder keiner, höchstens 60 Tage, nicht in der Zukunft, erster Tag höchstens 365 Tage zurück. Trägt der Dateiname einen Zeitraum, gilt der und die Felder werden ignoriert. */
                         periodEnd?: string | "";
                     };
                 };
@@ -1941,7 +1941,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Suchbegriffe eines Profils für genau einen Datei-Zeitraum löschen, über alle Ad-Typen (Recht „write“) */
+        /**
+         * Suchbegriffe eines Profils für genau einen Datei-Zeitraum löschen, über alle Ad-Typen (nur Org-Admins)
+         * @description Wie der Upload der Dateien nur für Org-Admins, dazu Recht „write“ im Feature „sp-explorer“: Der Server hebt keine Dateiinhalte auf, den Zeitraum stellt nur ein erneuter Upload wieder her.
+         */
         post: {
             parameters: {
                 query?: never;

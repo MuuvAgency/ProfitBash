@@ -1163,7 +1163,7 @@ describe('Datei-Importe (1.11f)', () => {
       await check('2026-09-30', '2026-09-01', '„Zeitraum von“ liegt nach „Zeitraum bis“.');
       await check('2026-10-01', '2026-10-08', 'Der Zeitraum darf nicht in der Zukunft enden.');
       // Heute ist der 07.10.2026: Der 06.10.2025 liegt 366 Tage zurück (2b.2d).
-      await check('2025-10-06', '2025-10-31', 'Der Zeitraum darf höchstens ein Jahr zurückliegen.');
+      await check('2025-10-06', '2025-10-31', 'Der erste Tag darf höchstens 365 Tage zurückliegen.');
       await check(
         '2026-07-01',
         '2026-09-30',
