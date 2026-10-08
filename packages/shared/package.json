@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./analytics": "./src/analytics.ts",
+    "./ad-changes": "./src/ad-changes.ts",
     "./env": "./src/env.ts",
     "./crypto": "./src/crypto.ts",
     "./access-control": "./src/access-control.ts"

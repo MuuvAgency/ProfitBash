@@ -27,6 +27,7 @@ import {
   amazonAdsAdGroups,
   amazonAdsCampaigns,
   amazonAdsNegativeTargets,
+  amazonAdsPortfolios,
   amazonAdsProductAds,
   amazonAdsProfiles,
   amazonAdsTargets,
@@ -216,6 +217,10 @@ export interface AdChangeJobRow {
   campaignBiddingStrategy: string | null;
   /** `extra.placementBidAdjustments` der Kampagne, ungeprüft. */
   campaignPlacements: unknown;
+  /** Für die Kampagnenzeile der Bulk-Datei (3.2b): Zustand, Enddatum (`YYYY-MM-DD`) und Portfolio. */
+  campaignState: string | null;
+  campaignEndDate: string | null;
+  campaignAmazonPortfolioId: string | null;
 }
 
 interface EntityIdentity {
@@ -303,6 +308,20 @@ export async function prepareAdChangeSubmission(
       )
       .orderBy(asc(adChanges.createdAt), asc(adChanges.id))
       .for('update');
+    return loadAdChangeJobRows(tx, changes, { finalizeBefore: true });
+  });
+}
+
+/**
+ * Änderungen einer Übermittlung (ein Profil) mit Amazon-IDs und Kampagnenstand. `finalizeBefore` setzt dabei
+ * „vorher“ auf den Stand der Entity (nur der Job, unmittelbar vor dem Senden).
+ */
+export async function loadAdChangeJobRows(
+  tx: DbOrTx,
+  changes: readonly ChangeRow[],
+  options: { finalizeBefore: boolean },
+): Promise<AdChangeJobRow[]> {
+  {
     if (changes.length === 0) return [];
     const profileId = changes[0]!.profileId;
     const scope: ProfileScope = { ids: [profileId] };
@@ -333,6 +352,9 @@ export async function prepareAdChangeSubmission(
         adProduct: string;
         biddingStrategy: string | null;
         extra: Record<string, unknown>;
+        state: string | null;
+        endDate: string | null;
+        amazonPortfolioId: string | null;
       }
     >();
     for (const part of chunks([...new Set(changes.map((change) => change.campaignId))])) {
@@ -344,8 +366,12 @@ export async function prepareAdChangeSubmission(
           adProduct: c.adProduct,
           biddingStrategy: c.biddingStrategy,
           extra: c.extra,
+          state: c.state,
+          endDate: c.endDate,
+          amazonPortfolioId: amazonAdsPortfolios.amazonPortfolioId,
         })
         .from(c)
+        .leftJoin(amazonAdsPortfolios, eq(amazonAdsPortfolios.id, c.portfolioId))
         .where(and(inArray(c.id, part), eq(c.profileId, profileId)));
       for (const { id, ...campaign } of rows) campaigns.set(id, campaign);
     }
@@ -370,7 +396,12 @@ export async function prepareAdChangeSubmission(
       // Der FK bindet die Kampagne an das Profil der Änderung.
       const campaign = campaigns.get(change.campaignId)!;
 
-      if (change.operation === 'update' && field !== null && after !== null) {
+      if (
+        options.finalizeBefore &&
+        change.operation === 'update' &&
+        field !== null &&
+        after !== null
+      ) {
         const current = currentValue(snapshots.get(key), field);
         const before = change.oldValue ?? change.oldAmount;
         if (
@@ -409,10 +440,13 @@ export async function prepareAdChangeSubmission(
         entityRemoved: identity ? identity.removedAt !== null : false,
         campaignBiddingStrategy: campaign.biddingStrategy,
         campaignPlacements: campaign.extra.placementBidAdjustments ?? null,
+        campaignState: campaign.state,
+        campaignEndDate: campaign.endDate,
+        campaignAmazonPortfolioId: campaign.amazonPortfolioId,
       });
     }
     return rows;
-  });
+  }
 }
 
 // ---------------------------------------------------------------------------
