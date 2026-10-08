@@ -251,6 +251,9 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
           // Platz für die zweite Zeile „Über alle Targets: … (n Zeilen)“; längere Texte kürzt die Zelle (Titel).
           minWidth: 300,
           cellRenderer: classificationCell,
+          // Nur für den CSV-Export (die Zelle zeichnet der Renderer aus dem Wert): beide Teile in einer Zeile.
+          valueFormatter: ({ value }: { value: unknown }) =>
+            typeof value === 'string' ? value.replace(ACROSS_SEPARATOR, '; ') : '',
           cellClass: ({ data }: CellClassParams<TermGridRow>) =>
             `flex items-center ${data && !data.isTotal ? CLASS_TONE[data.classification] : ''}`,
         }
