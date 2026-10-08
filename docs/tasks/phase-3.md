@@ -250,7 +250,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     die Bulk-Datei geht trotzdem), Bulk-Datei (3.2b).
 
 #### 3.2b Bulk-Datei erzeugen (F2)
-- [ ] XLSX-Schreiber in `@profitbash/sheets` (fflate, schmal wie der Leser) und Abbildung der Änderungen eines Profils auf das
+- [x] XLSX-Schreiber in `@profitbash/sheets` (fflate, schmal wie der Leser) und Abbildung der Änderungen eines Profils auf das
       Blatt und die Spalten der Werbekonsole für **Sponsored Products** (Operation `Update`/`Create`/`Archive`, IDs als
       Text, Beträge ohne Umweg über `number`). Rundlauf-Test: erzeugte Datei mit dem Import-Leser lesen.
 - **Befund aus der Amazon-Doku** (Bulksheets-Guides unter `advertising.amazon.com/API/docs/en-us/no-code-tools/bulksheets/…`,
@@ -286,6 +286,46 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Zeile). **Offen:** ob eine bisher nicht gesetzte Platzierung `Update` oder `Create` braucht (die heruntergeladene
     Datei zeigt je Platzierung eine Zeile, deshalb zunächst `Update`); mit einer echten Datei von Dominik prüfen.
   - Die IDs der Bulk-Datei sind laut Doku nicht die der Werbekonsole (URL); sie stammen aus unserem Bulk-Import (1.11d).
+- [x] Umsetzung (Stand für 3.3, 3.4 und später):
+  - **Schreiber** (`packages/sheets/src/write-xlsx.ts`): `writeXlsx([{ name, rows }])` → Bytes einer `.xlsx`. Zellen:
+    Text (`inlineStr`, wie in den Dateien der Konsole; wird nie als Formel gelesen), `null` (leer) oder
+    `{ number: '0.75' }` (Zahlzelle mit genau den Ziffern des Decimal-Strings, nie über `number`). Enthält die fünf
+    Teile einer gültigen Arbeitsmappe (`[Content_Types].xml`, `_rels/.rels`, Arbeitsmappe, deren Beziehungen, Blätter),
+    keine Formate und keine Formeln. XML-Zeichen maskiert, in XML unzulässige Steuerzeichen entfernt. `TypeError` bei
+    ungültigen oder doppelten Blattnamen (31 Zeichen, ohne `[ ] : * ? / \`), ohne Blatt und bei Zahlen, die kein
+    einfacher Decimal-String sind.
+  - **Zeilen** (`packages/amazon-ads/src/bulk-file.ts`): `buildSpBulkSheet(changes)` → `{ sheetName, rows, skipped }`
+    für das Blatt „Sponsored Products Campaigns“ mit den 26 Spalten der Vorlage (`SP_BULK_COLUMNS`), englisch. Eigenes
+    Eingabemodell `BulkFileChange` (die Datei braucht mehr als der API-Weg: Eltern-IDs in jeder Zeile und bei der
+    Kampagne den vollständigen Stand): `campaign` (Stand `BulkFileCampaign` plus `set` mit `state`, `dailyBudget`,
+    `biddingStrategy`; die Zeile trägt Portfolio-ID, Name, Start- und Enddatum, Targeting-Typ, Zustand, Tagesbudget und
+    Strategie), `placement` (Entity `Bidding adjustment`, Operation `Update`, mit der geltenden Strategie), `adGroup`,
+    `keyword`, `productTarget`, `productAd` (nur IDs und geänderte Felder), `archive` (Operation `Archive` für acht
+    Entities), `createNegative` (Keyword `negativeExact`/`negativePhrase` in Ad Group oder Kampagne, ASIN als
+    `asin="…"` in der Ad Group). IDs als Text, Beträge und Prozente als Zahlzelle, Datum `YYYYMMDD`, Zustand
+    `enabled`/`paused`, Platzierungen in der Schreibweise der heruntergeladenen Datei („Placement Top“ …; Amazon nimmt
+    auch `placementTop` und achtet nicht auf Groß/Klein).
+  - **Übersprungen** (`skipped` mit `ref` und Grund, die Zeile fehlt in der Datei): `campaignIncomplete` (Platzhalter
+    ohne Name oder Startdatum, archivierte Kampagne, Strategie `RULE_BASED` oder leer, kein Budget: ohne vollständigen
+    Stand wäre das Update riskant), `notSupportedInBulkFile` (negative ASIN auf Kampagnenebene), `invalidValue` (ID
+    nicht nur Ziffern, Betrag kein Decimal-String oder mehr als zwei Nachkommastellen, unbekannte Platzierung,
+    Prozentsatz außerhalb 0–900), `nothingToChange`.
+  - **Rundlauf** (`apps/worker/src/file-import/bulk-export-roundtrip.test.ts`): Die erzeugte Datei wird mit `openXlsx`
+    und den Abbildungen des Bulk-Imports gelesen (Blatt als SP erkannt, alle Kopfzeilen bekannt, Entity-Namen,
+    Zustand, Targeting-Typ, Strategie, Platzierung, Match-Typ, Datum, Betrag, IDs als Text, Ausdruck `asin="…"`).
+  - **Für 3.3/3.4:** 3.4 liefert die Datei beim Download (Übermittlung mit Weg `bulk_file` → Änderungen laden, mit
+    Entity-Stand und Amazon-IDs zu `BulkFileChange` zusammenführen: mehrere Felder einer Entity in **eine** Zeile,
+    `state = ARCHIVED` zu `archive`, bei Platzierungen die Strategie nach den Änderungen der Datei). Übersprungene
+    Änderungen zeigt die Oberfläche mit Grund; sie gelten nicht als übermittelt. Dateiname frei (die Konsole verlangt
+    keinen), Vorschlag `profitbash-aenderungen-<konto>-<land>-<datum>.xlsx`. Eltern und Kinder nicht zusammen
+    archivieren (Amazon meldet sonst Fehlerzeilen für die Kinder).
+  - **Offen (braucht einen echten Upload von Dominik, sobald 3.4–3.6 stehen):** ob die Werbekonsole die Datei so annimmt
+    (nur ein Blatt, `inlineStr`-Texte, ohne Formate), ob `Bidding adjustment` für eine bisher nicht gesetzte
+    Platzierung `Update` oder `Create` braucht und ob die Strategie in der Zeile stehen darf, ob beim Kampagnen-Update
+    weitere leere Felder etwas zurücksetzen (z. B. „Sites“ bzw. Amazon Business, „Off-Amazon ad serving“; die Spalten
+    schreibt die Datei nicht), ob Vendor-Konten dieselben Zeilen annehmen.
+  - **Nicht enthalten:** Sponsored Brands und Sponsored Display (eigene Blätter und Spalten, mit 3.2c), Portfolios,
+    neue Kampagnen, Ad Groups und Keywords (Phase 4 nutzt denselben Schreiber).
 
 #### 3.2c Schreib-Client für Sponsored Brands und Sponsored Display
 - [ ] Abbildung von `AmazonAdsWriteOperation` auf SB v4 (Keywords und Targets v3) und SD samt deren Antwortformen, Grenzen
