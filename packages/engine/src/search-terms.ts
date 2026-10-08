@@ -39,6 +39,14 @@ export function tokenizeSearchTerm(term: string): string[] {
 }
 
 /**
+ * Vergleichsform eines Suchbegriffs: klein, NFC, Leerraum zusammengefasst (die Wörter der N-Gramme, mit einem
+ * Leerzeichen verbunden). Dieselbe Form für „schon exakt gebucht“ (`@profitbash/db`) und die Einstufung je Begriff.
+ */
+export function comparableSearchTerm(term: string): string {
+  return tokenizeSearchTerm(term).join(' ');
+}
+
+/**
  * N-Gramme über alle Zeilen. Jede Zeile zählt für einen Baustein höchstens einmal (auch wenn er im Begriff
  * mehrfach steht); derselbe Suchbegriff aus mehreren Targets zählt als ein Begriff, seine Zeilen werden summiert.
  * Sortiert nach Spend absteigend, dann Länge und Text.
@@ -205,4 +213,83 @@ export function classifySearchTerm(
   // ACoS ≤ Ziel ohne Division: Spend ≤ Ziel × Umsatz.
   if (cost.gt(parseDecimal(rules.harvestMaxAcos).times(sales))) return watch('acosAboveTarget');
   return { classification: 'harvest', reason: null };
+}
+
+/** Einstufung eines Suchbegriffs über alle seine Zeilen (Targets) mit den Summen, die sie begründen. */
+export interface SearchTermAcrossTargets extends SearchTermClassification, SearchTermSums {
+  /** Zeilen (Suchbegriff je Target), die in die Summen eingehen. */
+  targets: number;
+  /** Harvest bzw. Negieren, das keine Zeile des Begriffs allein erreicht (erst die Summe). */
+  onlyAcrossTargets: boolean;
+}
+
+/**
+ * Einstufung je Suchbegriff über alle übergebenen Zeilen (alle Targets und Ad-Typen eines Profils in einem
+ * Datei-Zeitraum; den Ausschnitt wählt der Aufrufer): Zeilen desselben Begriffs in Vergleichsform werden summiert,
+ * die Summe läuft durch `classifySearchTerm` mit denselben Regeln. `protected` und `alreadyTargeted` gelten für den
+ * Begriff, sobald eine Zeile sie meldet. Schlüssel der Map ist `comparableSearchTerm`, Reihenfolge wie die Zeilen.
+ */
+export function classifySearchTermsAcrossTargets(
+  rows: readonly (SearchTermSums & {
+    searchTerm: string;
+    protected: boolean;
+    alreadyTargeted: boolean;
+  })[],
+  rules: SearchTermRules,
+): Map<string, SearchTermAcrossTargets> {
+  const groups = new Map<
+    string,
+    {
+      sums: Record<keyof SearchTermSums, Dec>;
+      targets: number;
+      protected: boolean;
+      alreadyTargeted: boolean;
+      rowClasses: Set<SearchTermClass>;
+    }
+  >();
+  for (const row of rows) {
+    const key = comparableSearchTerm(row.searchTerm);
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        sums: zeroSums(),
+        targets: 0,
+        protected: false,
+        alreadyTargeted: false,
+        rowClasses: new Set(),
+      };
+      groups.set(key, group);
+    }
+    for (const sumKey of SUM_KEYS) {
+      group.sums[sumKey] = group.sums[sumKey].plus(parseDecimal(row[sumKey]));
+    }
+    group.targets += 1;
+    group.protected ||= row.protected;
+    group.alreadyTargeted ||= row.alreadyTargeted;
+    group.rowClasses.add(classifySearchTerm(row, rules).classification);
+  }
+  const result = new Map<string, SearchTermAcrossTargets>();
+  for (const [key, group] of groups) {
+    const sums: SearchTermSums = {
+      impressions: formatDecimal(group.sums.impressions),
+      clicks: formatDecimal(group.sums.clicks),
+      cost: formatDecimal(group.sums.cost),
+      sales: formatDecimal(group.sums.sales),
+      purchases: formatDecimal(group.sums.purchases),
+      units: formatDecimal(group.sums.units),
+    };
+    const classification = classifySearchTerm(
+      { ...sums, protected: group.protected, alreadyTargeted: group.alreadyTargeted },
+      rules,
+    );
+    result.set(key, {
+      ...classification,
+      targets: group.targets,
+      onlyAcrossTargets:
+        classification.classification !== 'watch' &&
+        !group.rowClasses.has(classification.classification),
+      ...sums,
+    });
+  }
+  return result;
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildNgrams,
   classifySearchTerm,
+  classifySearchTermsAcrossTargets,
+  comparableSearchTerm,
   createProtectedTermMatcher,
   isProtectedSearchTerm,
   tokenizeSearchTerm,
@@ -233,5 +235,209 @@ describe('classifySearchTerm', () => {
       classify({ clicks: '40', cost: '40', purchases: '0' }, { alreadyTargeted: true })
         .classification,
     ).toBe('negate');
+  });
+});
+
+describe('comparableSearchTerm', () => {
+  it('ist klein geschrieben, NFC und fasst Leerraum zusammen', () => {
+    expect(comparableSearchTerm('  LED\t Lampe ')).toBe('led lampe');
+    // „é“ zusammengesetzt (e + Akzent) und als ein Zeichen sind derselbe Begriff.
+    expect(comparableSearchTerm('cafe\u0301')).toBe(comparableSearchTerm('caf\u00e9'));
+    expect(comparableSearchTerm('t-shirt')).toBe('t-shirt');
+  });
+});
+
+describe('classifySearchTermsAcrossTargets', () => {
+  const target = (
+    searchTerm: string,
+    overrides: Partial<SearchTermSums> = {},
+    flags: { protected?: boolean; alreadyTargeted?: boolean } = {},
+  ) => ({
+    searchTerm,
+    protected: flags.protected ?? false,
+    alreadyTargeted: flags.alreadyTargeted ?? false,
+    ...sums(overrides),
+  });
+  const across = (rows: ReturnType<typeof target>[]) =>
+    classifySearchTermsAcrossTargets(rows, rules);
+
+  it('Harvest: Käufe 1 + 2 über zwei Targets erreichen die Grenze 3 (Summen exakt)', () => {
+    const rows = [
+      target('led lampe', { purchases: '1', cost: '0.10', sales: '40', units: '1' }),
+      target('led lampe', { purchases: '2', cost: '0.20', sales: '60.5', units: '3' }),
+    ];
+    for (const row of rows) expect(classifySearchTerm(row, rules).classification).toBe('watch');
+    expect([...across(rows)]).toEqual([
+      [
+        'led lampe',
+        {
+          classification: 'harvest',
+          reason: null,
+          targets: 2,
+          onlyAcrossTargets: true,
+          impressions: '2000',
+          clicks: '20',
+          cost: '0.3',
+          sales: '100.5',
+          purchases: '3',
+          units: '4',
+        },
+      ],
+    ]);
+  });
+
+  it('bleibt unter der Harvest-Grenze bei Beobachten (1 + 1 Käufe)', () => {
+    const result = across([
+      target('led lampe', { purchases: '1', sales: '50' }),
+      target('led lampe', { purchases: '1', sales: '50' }),
+    ]);
+    expect(result.get('led lampe')).toMatchObject({
+      classification: 'watch',
+      reason: 'tooFewData',
+      onlyAcrossTargets: false,
+    });
+  });
+
+  it('Negieren: Klicks ohne Kauf über mehrere Targets erreichen Klick- und Spend-Grenze', () => {
+    const rows = [
+      target('lampe billig', { clicks: '10', cost: '8' }),
+      target('lampe billig', { clicks: '10', cost: '7' }),
+      target('lampe billig', { clicks: '5', cost: '5' }),
+    ];
+    for (const row of rows) expect(classifySearchTerm(row, rules).classification).toBe('watch');
+    expect(across(rows).get('lampe billig')).toMatchObject({
+      classification: 'negate',
+      reason: null,
+      targets: 3,
+      onlyAcrossTargets: true,
+      clicks: '25',
+      cost: '20',
+    });
+    // Ein Cent bzw. ein Klick weniger reicht nicht.
+    expect(
+      across([
+        target('lampe billig', { clicks: '10', cost: '8' }),
+        target('lampe billig', { clicks: '15', cost: '11.99' }),
+      ]).get('lampe billig')?.classification,
+    ).toBe('watch');
+    expect(
+      across([
+        target('lampe billig', { clicks: '10', cost: '10' }),
+        target('lampe billig', { clicks: '14', cost: '10' }),
+      ]).get('lampe billig')?.classification,
+    ).toBe('watch');
+  });
+
+  it('negiert nicht, wenn der Begriff auf einem anderen Target gekauft wurde', () => {
+    const rows = [
+      target('lampe', { clicks: '30', cost: '30' }),
+      target('lampe', { clicks: '2', cost: '1', purchases: '1', sales: '20' }),
+    ];
+    expect(classifySearchTerm(rows[0]!, rules).classification).toBe('negate');
+    expect(across(rows).get('lampe')).toMatchObject({
+      classification: 'watch',
+      reason: 'tooFewData',
+      onlyAcrossTargets: false,
+    });
+  });
+
+  it('ein geschützter Begriff wird auch über alle Targets nie negiert', () => {
+    const result = across([
+      target('nordwind lampe', { clicks: '200', cost: '300' }, { protected: true }),
+      target('nordwind lampe', { clicks: '200', cost: '300' }, { protected: true }),
+    ]);
+    expect(result.get('nordwind lampe')).toMatchObject({
+      classification: 'watch',
+      reason: 'protected',
+      onlyAcrossTargets: false,
+    });
+  });
+
+  it('eine Zeile allein ergibt die Einstufung der Zeile', () => {
+    const rows = [
+      target('a', { purchases: '3', cost: '25', sales: '100' }),
+      target('b', { clicks: '25', cost: '20' }),
+      target('c', { purchases: '3', cost: '25.01', sales: '100' }),
+      target('d', { purchases: '9', cost: '1', sales: '100' }, { alreadyTargeted: true }),
+      target('e'),
+    ];
+    const result = across(rows);
+    expect(result.size).toBe(rows.length);
+    for (const row of rows) {
+      expect(result.get(row.searchTerm)).toMatchObject({
+        ...classifySearchTerm(row, rules),
+        targets: 1,
+        onlyAcrossTargets: false,
+      });
+    }
+  });
+
+  it('fasst Schreibweisen desselben Begriffs zusammen (Groß-/Kleinschreibung, Leerraum, NFC)', () => {
+    const result = across([
+      target('LED  Lampe', { purchases: '1', sales: '50' }),
+      target(' led lampe', { purchases: '1', sales: '50' }),
+      target('Led\tLampe ', { purchases: '1', sales: '50' }),
+      target('led lampen', { purchases: '1', sales: '50' }),
+    ]);
+    expect([...result.keys()]).toEqual(['led lampe', 'led lampen']);
+    expect(result.get('led lampe')).toMatchObject({
+      classification: 'harvest',
+      targets: 3,
+      purchases: '3',
+    });
+    expect(result.get(comparableSearchTerm('LED Lampe'))?.targets).toBe(3);
+  });
+
+  it('prüft den ACoS an den Summen (Grenze zählt mit)', () => {
+    // Je Zeile über dem Ziel bzw. zu wenige Käufe; zusammen genau am Ziel: 25 / 100.
+    const atTarget = across([
+      target('lampe', { purchases: '2', cost: '20', sales: '40' }),
+      target('lampe', { purchases: '1', cost: '5', sales: '60' }),
+    ]);
+    expect(atTarget.get('lampe')).toMatchObject({ classification: 'harvest', cost: '25' });
+    const above = across([
+      target('lampe', { purchases: '2', cost: '20.01', sales: '40' }),
+      target('lampe', { purchases: '1', cost: '5', sales: '60' }),
+    ]);
+    expect(above.get('lampe')).toMatchObject({
+      classification: 'watch',
+      reason: 'acosAboveTarget',
+    });
+    // Eine Zeile wäre allein ein Harvest, die Summe liegt über dem Ziel.
+    const diluted = across([
+      target('lampe', { purchases: '3', cost: '10', sales: '100' }),
+      target('lampe', { purchases: '0', cost: '40', sales: '0' }),
+    ]);
+    expect(diluted.get('lampe')).toMatchObject({
+      classification: 'watch',
+      reason: 'acosAboveTarget',
+    });
+  });
+
+  it('„schon exakt gebucht“ gilt für den Begriff, sobald eine Zeile es meldet', () => {
+    const result = across([
+      target('lampe', { purchases: '2', sales: '50' }),
+      target('lampe', { purchases: '2', sales: '50' }, { alreadyTargeted: true }),
+    ]);
+    expect(result.get('lampe')).toMatchObject({
+      classification: 'watch',
+      reason: 'alreadyTargeted',
+    });
+  });
+
+  it('„nur über alle Targets“ gilt nicht, wenn schon eine Zeile allein dieselbe Einstufung erreicht', () => {
+    const result = across([
+      target('lampe', { purchases: '3', cost: '10', sales: '100' }),
+      target('lampe', { purchases: '1', cost: '1', sales: '30' }),
+    ]);
+    expect(result.get('lampe')).toMatchObject({
+      classification: 'harvest',
+      targets: 2,
+      onlyAcrossTargets: false,
+    });
+  });
+
+  it('ergibt ohne Zeilen nichts', () => {
+    expect(across([]).size).toBe(0);
   });
 });
