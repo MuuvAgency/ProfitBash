@@ -784,8 +784,9 @@ export const de = {
       negate: 'Negieren {clicks} ohne Kauf und mindestens {cost} Spend.',
       purchases: 'ab {n} Kauf | ab {n} Käufen',
       clicks: 'ab {n} Klick | ab {n} Klicks',
-      defaults: 'Das sind die vorläufigen Startwerte. Du kannst sie für die Organisation ändern.',
-      overridden: 'Für dieses Profil weicht ab: {fields}.',
+      defaults:
+        'Für alle Profile gelten noch die vorläufigen Startwerte. Du kannst sie für die Organisation ändern.',
+      overridden: 'Eigene Werte für dieses Profil: {fields}.',
       organization: 'Für alle Profile gilt: {values}.',
       field: {
         harvestMinPurchases: 'Käufe',
