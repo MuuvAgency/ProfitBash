@@ -2,6 +2,8 @@ import {
   createFileImport,
   createFileProfile,
   schema,
+  stageAdChanges,
+  submitAdChanges,
   upsertAdGroups,
   type Db,
 } from '@profitbash/db';
@@ -18,6 +20,8 @@ import { importBulkFile } from './bulk';
 import { FILE_IMPORTERS } from './importers';
 
 const {
+  adChangeSubmissions,
+  adChanges,
   amazonAdsAdGroups,
   amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
@@ -89,6 +93,8 @@ afterAll(() => testDb?.close());
 
 beforeEach(async () => {
   for (const table of [
+    adChanges,
+    adChangeSubmissions,
     amazonAdsSearchTermPeriodMetrics,
     amazonAdsProductAds,
     amazonAdsNegativeTargets,
@@ -507,6 +513,59 @@ describe('importBulkFile', () => {
     expect(counters).toMatchObject({ created: 0, updated: 0, placeholdersFilled: 0 });
     const campaignsAfter = await db.select().from(amazonAdsCampaigns);
     expect(campaignsAfter.map((c) => c.updatedAt)).toEqual(campaignsBefore.map((c) => c.updatedAt));
+  });
+
+  it('bestätigt offene Übermittlungen per Bulk-Datei, deren neuen Wert die Datei jetzt trägt (3.3)', async () => {
+    await run(germanFile());
+    const [keyword] = await db
+      .select({ id: amazonAdsTargets.id })
+      .from(amazonAdsTargets)
+      .where(eq(amazonAdsTargets.amazonTargetId, KW1));
+    const [campaign] = await db
+      .select({ id: amazonAdsCampaigns.id })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.amazonCampaignId, C1));
+    const actor = { userId: ids.admin, orgId: ids.org };
+    await stageAdChanges(db, {
+      ...actor,
+      origin: 'explorer',
+      changes: [
+        {
+          operation: 'update',
+          entityType: 'target',
+          entityId: keyword!.id,
+          field: 'bid',
+          value: '1.35',
+        },
+        {
+          operation: 'update',
+          entityType: 'campaign',
+          entityId: campaign!.id,
+          field: 'budget',
+          value: '30',
+        },
+      ],
+    });
+    await submitAdChanges(db, { ...actor, channel: 'bulk_file', enqueue: async () => {} });
+
+    // Nach dem Hochladen in der Werbekonsole trägt die nächste Datei das neue Gebot, das Budget noch nicht.
+    const spRows = DE_SP_ROWS.map((row) =>
+      row['Keyword-ID'] === KW1 ? { ...row, Gebot: 1.35 } : row,
+    );
+    const counters = await run(germanFile({ spRows }));
+
+    expect(counters).toMatchObject({ changesConfirmed: 1 });
+    const changes = await db
+      .select({ field: adChanges.field, status: adChanges.status })
+      .from(adChanges)
+      .orderBy(asc(adChanges.field));
+    expect(changes).toEqual([
+      { field: 'bid', status: 'applied' },
+      { field: 'budget', status: 'submitted' },
+    ]);
+    const [submission] = await db.select().from(adChangeSubmissions);
+    expect(submission).toMatchObject({ status: 'pending' });
+    expect(await run(germanFile({ spRows }))).not.toHaveProperty('changesConfirmed');
   });
 
   it('liest englische Kopfzeilen und Werte, SB- und SD-Blätter', async () => {

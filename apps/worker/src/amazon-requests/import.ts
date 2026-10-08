@@ -7,6 +7,7 @@ import {
   type AmazonAdsProductAd,
 } from '@profitbash/amazon-ads';
 import {
+  confirmBulkFileAdChanges,
   findAdGroupCampaignIds,
   markEntitiesRemoved,
   markMetricsImportedThrough,
@@ -35,7 +36,12 @@ import type { AmazonImportInput, AmazonRequestFile, AmazonRequestPort } from './
  */
 
 export type ImportCounterName =
-  'created' | 'updated' | 'removed' | 'placeholdersFilled' | 'placeholdersCreated';
+  | 'created'
+  | 'updated'
+  | 'removed'
+  | 'placeholdersFilled'
+  | 'placeholdersCreated'
+  | 'changesConfirmed';
 export type ImportCounters = Partial<Record<ImportCounterName, number>>;
 
 export interface AmazonImport {
@@ -234,7 +240,16 @@ async function importEntityBatch(
     }
   }
 
+  // Übermittlungen per Bulk-Datei für ein Profil mit Connection (3.3): Der Export zeigt, ob die Datei in der
+  // Werbekonsole hochgeladen wurde.
+  const { confirmed } = await confirmBulkFileAdChanges(tx, {
+    organizationId,
+    profileId,
+    now: scope.now,
+  });
+
   return {
+    ...(confirmed > 0 && { changesConfirmed: confirmed }),
     created: sum(counts, 'created'),
     updated: sum(counts, 'updated'),
     removed,

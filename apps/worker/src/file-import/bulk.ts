@@ -1,4 +1,5 @@
 import {
+  confirmBulkFileAdChanges,
   campaignOwnership,
   findAdGroupCampaignIds,
   markEntitiesRemoved,
@@ -203,6 +204,22 @@ export const importBulkFile: FileImporter = async (input) => {
       await upsertNegativeTargets(tx, scope, records.negatives),
       await upsertProductAds(tx, scope, records.productAds),
     ];
+    const removed = await markMissingAsRemoved(
+      tx,
+      { ...input, unmatched },
+      scope,
+      records,
+      collector,
+    );
+    // Offene Übermittlungen per Bulk-Datei (3.3): Trägt der Stand jetzt den neuen Wert, gilt die Änderung als
+    // angewendet. Nach dem Entfernen, damit ein Archivieren auch über „fehlt in der Datei“ bestätigt wird.
+    const confirmed = unmatched
+      ? { confirmed: 0 }
+      : await confirmBulkFileAdChanges(tx, {
+          organizationId: input.organizationId,
+          profileId: input.profileId,
+          now: input.now,
+        });
     return {
       portfolios: uniqueCount(records.portfolios, (r) => r.amazonPortfolioId),
       campaigns: uniqueCount(records.campaigns, (r) => r.amazonCampaignId),
@@ -215,7 +232,8 @@ export const importBulkFile: FileImporter = async (input) => {
       placeholdersFilled: sum(counts, 'placeholdersFilled'),
       placeholdersCreated: sum(counts, 'placeholdersCreated'),
       invalidRows: collector.invalidRows,
-      removed: await markMissingAsRemoved(tx, { ...input, unmatched }, scope, records, collector),
+      removed,
+      ...(confirmed.confirmed > 0 && { changesConfirmed: confirmed.confirmed }),
       ...(unmatched && { unmatchedCampaigns: fileCampaignIds.length }),
       // Nur genannt, wenn die Datei Suchbegriffe enthält (Downloads ohne Leistungsdaten haben keine).
       ...(searchTermRows > 0 && { searchTerms: searchTermRows }),
