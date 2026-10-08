@@ -25,6 +25,9 @@ function change(patch: Partial<SubmissionChange>): SubmissionChange {
     entityRemoved: false,
     campaignBiddingStrategy: 'SALES_DOWN_ONLY',
     campaignPlacements: [{ placement: 'PLACEMENT_TOP', percentage: '25' }],
+    campaignState: 'ENABLED',
+    campaignEndDate: null,
+    campaignAmazonPortfolioId: null,
     ...patch,
   };
 }

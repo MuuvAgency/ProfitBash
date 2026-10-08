@@ -54,7 +54,9 @@ export interface AdChangeActor {
 export type AdChangeErrorCode =
   | 'PROFILE_HAS_NO_CONNECTION'
   /** Die Übermittlung ist keine offene Übermittlung per Bulk-Datei (3.3: von Hand abschließen). */
-  | 'SUBMISSION_NOT_OPEN';
+  | 'SUBMISSION_NOT_OPEN'
+  /** Eine Bulk-Datei gibt es nur für den Weg `bulk_file`. */
+  | 'SUBMISSION_NOT_BULK_FILE';
 
 export class AdChangeError extends Error {
   constructor(
@@ -396,7 +398,11 @@ export interface AdChangeRecord {
   updatedAt: Date;
 }
 
-async function loadChanges(db: DbOrTx, where: SQL | undefined): Promise<AdChangeRecord[]> {
+/** Änderungen mit Profil, Kampagne, Ad Group und Entity; die Bedingung begrenzt der Aufrufer auf sichtbare Profile. */
+export async function loadAdChangeRecords(
+  db: DbOrTx,
+  where: SQL | undefined,
+): Promise<AdChangeRecord[]> {
   const a = adChanges;
   const c = amazonAdsCampaigns;
   const g = amazonAdsAdGroups;
@@ -505,7 +511,7 @@ export async function listPendingAdChanges(
 ): Promise<PendingAdChange[] | null> {
   const scope = await visibleProfilesScope(db, input);
   if (scope === null) return null;
-  const changes = await loadChanges(
+  const changes = await loadAdChangeRecords(
     db,
     and(
       eq(adChanges.status, 'pending'),
@@ -911,7 +917,7 @@ export async function getAdChangeSubmission(
     ),
   );
   if (!submission) return null;
-  const changes = await loadChanges(db, eq(adChanges.submissionId, submission.id));
+  const changes = await loadAdChangeRecords(db, eq(adChanges.submissionId, submission.id));
   const followUps = new Map<string, AdChangeFollowUp>();
   for (const part of chunks(changes.map((change) => change.id))) {
     const rows = await db

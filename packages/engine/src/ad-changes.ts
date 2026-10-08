@@ -3,8 +3,11 @@ import {
   isAdChangePlacementField,
   type AdChangeField,
   type AdChangeNegative,
-} from '@profitbash/shared';
+} from '@profitbash/shared/ad-changes';
 import { Dec } from './decimal';
+
+// Aus `@profitbash/shared/ad-changes` (eigener Einstiegspunkt wie `/analytics`): Die Wurzel zöge Browser- und
+// Node-Typen in dieses Paket.
 
 /**
  * Prüfungen vor dem Übermitteln von Änderungen (`docs/tasks/phase-3.md` 3.4, ohne I/O):
