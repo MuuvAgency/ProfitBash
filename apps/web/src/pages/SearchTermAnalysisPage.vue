@@ -25,6 +25,7 @@ import {
   SEARCH_TERM_ANALYSIS_PATH,
   SEARCH_TERM_ANALYSIS_TAB,
 } from '../explorer/state';
+import { canAccess } from '../navigation/navigation';
 import {
   formatSearchTermMetric,
   ngramColumns,
@@ -54,6 +55,11 @@ const queryClient = useQueryClient();
 const id = useId();
 const locale = computed(() => session.preferences.locale);
 const canWrite = computed(() => session.me?.features['sp-explorer']?.write ?? false);
+// Einen Zeitraum löschen darf nur, wer die Datei auch wieder hochladen kann: Org-Admins (wie die Seite
+// „Clients & Connections“ mit dem Upload), so prüft es auch die API.
+const canDeletePeriod = computed(
+  () => canWrite.value && (session.me ? canAccess('orgAdmin', session.me) : false),
+);
 
 const tabs = computed(() => [
   ...EXPLORER_TABS.map((tab) => ({
@@ -293,7 +299,7 @@ function openDeletePeriod() {
   deleteOpen.value = periodToDelete.value !== null;
 }
 async function onPeriodDeleted(period: SearchTermPeriodData) {
-  // Erst die Zeiträume neu laden: Die Auswahl fällt dann auf den nächsten gültigen Zeitraum (oder den Leerzustand),
+  // Erst die Zeiträume neu laden, dann schließen (der Dialog bleibt bis dahin gesperrt): Die Auswahl fällt dann auf den nächsten gültigen Zeitraum (oder den Leerzustand),
   // die URL folgt per `replace`. Die Analyse des gelöschten Zeitraums bleibt nicht im Zwischenspeicher.
   await queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'periods'] });
   queryClient.removeQueries({
@@ -374,7 +380,7 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
             />
           </div>
           <Button
-            v-if="canWrite && selected"
+            v-if="canDeletePeriod && selected"
             :label="t('searchTerms.deletePeriod.action')"
             icon="pi pi-trash"
             size="small"
@@ -640,7 +646,7 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
 
     <!-- Außerhalb der Zustände: Nach dem letzten Zeitraum (Leerzustand) schließt der Dialog noch regulär. -->
     <DeletePeriodDialog
-      v-if="canWrite"
+      v-if="canDeletePeriod"
       :visible="deleteOpen"
       :period="periodToDelete"
       @close="deleteOpen = false"

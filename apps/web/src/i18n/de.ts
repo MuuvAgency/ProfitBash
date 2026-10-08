@@ -802,9 +802,9 @@ export const de = {
     deletePeriod: {
       action: 'Zeitraum löschen',
       title: 'Zeitraum löschen?',
-      /** `{rows}` = formatierte Zeilenzahl des Zeitraums. */
-      rows: '{rows} Zeilen',
-      text: 'Gelöscht werden nur die Suchbegriffe dieses Zeitraums. Kampagnen, der Verlauf der Datei-Importe und andere Zeiträume bleiben. Du kannst die Datei danach erneut hochladen, zum Beispiel mit dem richtigen Zeitraum.',
+      /** `{rows}` = formatierte Zeilenzahl des Zeitraums; Einzahl und Mehrzahl über die Zahl. */
+      rows: '{rows} Zeile | {rows} Zeilen',
+      text: 'Gelöscht werden nur die Suchbegriffe dieses Zeitraums. Kampagnen, der Verlauf der Datei-Importe und andere Zeiträume bleiben. Du kannst die Datei bzw. die Dateien dieses Zeitraums danach erneut hochladen, zum Beispiel mit dem richtigen Zeitraum. Ein Import einer solchen Datei, der noch läuft oder wartet, bringt den Zeitraum zurück.',
       confirm: 'Zeitraum löschen',
     },
     protected: {
