@@ -8,8 +8,10 @@ import {
   DEFAULT_SEARCH_TERM_RULES,
   MAX_PROTECTED_TERMS,
   MAX_SEARCH_TERM_ROWS,
+  NO_SEARCH_TERM_RULE_OVERRIDES,
   searchTermAnalysisResponseSchema,
   searchTermPeriodsResponseSchema,
+  searchTermProfileRulesResponseSchema,
   searchTermRulesResponseSchema,
   type Client,
   type ErrorResponse,
@@ -553,6 +555,127 @@ describe('Regeln (GET/PUT /api/ads/search-terms/rules)', () => {
   });
 });
 
+describe('Abweichende Regeln je Profil (PUT /api/ads/search-terms/rules/profile, 2b.2g)', () => {
+  type ProfileRules = z.infer<typeof searchTermProfileRulesResponseSchema>;
+  const PATH = '/ads/search-terms/rules/profile';
+  // Regeln der Organisation aus dem Test davor: 5 Käufe, ACoS 25 %, 3 Klicks, 1 Spend.
+  const orgRules = {
+    harvestMinPurchases: 5,
+    harvestMaxAcos: '0.25',
+    negateMinClicks: 3,
+    negateMinCost: '1',
+  };
+  const overrides = {
+    ...NO_SEARCH_TERM_RULE_OVERRIDES,
+    harvestMinPurchases: 4,
+    negateMinCost: '25.50',
+  };
+  const put = (cookie: string | undefined, body: unknown) =>
+    call<ProfileRules>('PUT', PATH, cookie, body);
+  const stored = () => ctx.testDb.db.select().from(schema.searchTermRuleOverrides);
+
+  it('ohne Abweichung gelten die Regeln der Organisation; die Analyse nennt beide', async () => {
+    const { body } = await analysis(viewer);
+    expect(searchTermAnalysisResponseSchema.safeParse(body).error).toBeUndefined();
+    expect(body.meta).toMatchObject({
+      rules: orgRules,
+      organizationRules: orgRules,
+      ruleOverrides: NO_SEARCH_TERM_RULE_OVERRIDES,
+    });
+  });
+
+  it('Viewer dürfen nicht ändern', async () => {
+    const res = await put(viewer, { profileId: ids.visible, overrides });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FEATURE_FORBIDDEN');
+    expect(await stored()).toEqual([]);
+  });
+
+  it('verweigert ausgeblendete Profile (auch Admins) und fremde Organisationen mit 404', async () => {
+    for (const [cookie, profileId] of [
+      [admin, ids.hidden],
+      [foreign, ids.visible],
+    ] as const) {
+      const res = await put(cookie, { profileId, overrides });
+      expect(res.status).toBe(404);
+      expect(res.body.error.code).toBe('PROFILE_NOT_FOUND');
+    }
+    expect(await stored()).toEqual([]);
+  });
+
+  it('prüft die Eingabe', async () => {
+    for (const body of [
+      { profileId: ids.visible },
+      { profileId: 'x', overrides },
+      { profileId: ids.visible, overrides: { negateMinCost: '5' } },
+      { profileId: ids.visible, overrides: { ...overrides, harvestMaxAcos: '0' } },
+      { profileId: ids.visible, overrides: { ...overrides, negateMinClicks: 0 } },
+    ]) {
+      expect((await put(editor, body)).status, JSON.stringify(body)).toBe(400);
+    }
+    expect(await stored()).toEqual([]);
+  });
+
+  it('Editoren speichern einzelne Werte; die Analyse dieses Profils stuft danach neu ein, andere Profile nicht', async () => {
+    const res = await put(editor, { profileId: ids.visible, overrides });
+    expect(res.status).toBe(200);
+    expect(searchTermProfileRulesResponseSchema.safeParse(res.body).error).toBeUndefined();
+    expect(res.body).toMatchObject({ profileId: ids.visible, overrides });
+    expect(res.body.updatedAt).toEqual(expect.any(String));
+
+    const { body } = await analysis(viewer);
+    expect(body.meta).toMatchObject({
+      rules: { ...orgRules, harvestMinPurchases: 4, negateMinCost: '25.50' },
+      organizationRules: orgRules,
+      ruleOverrides: overrides,
+      rulesAreDefault: false,
+    });
+    expect(Object.fromEntries(body.rows.map((r) => [r.searchTerm, r.classification]))).toEqual({
+      'Nordwind Lampe': 'watch',
+      'lampe billig': 'watch',
+      'led lampe': 'harvest',
+      'lampe rot': 'watch',
+    });
+    expect(body.counts).toEqual({ harvest: 1, negate: 0, watch: 3 });
+    expect(body.termCounts).toEqual({ harvest: 1, negate: 0, watch: 3 });
+
+    const other = await analysis(viewer, { profileId: ids.big });
+    expect(other.body.meta).toMatchObject({
+      rules: orgRules,
+      ruleOverrides: NO_SEARCH_TERM_RULE_OVERRIDES,
+    });
+    // Die Regeln der Organisation bleiben, wie sie waren.
+    expect((await call<Rules>('GET', '/ads/search-terms/rules', viewer)).body.rules).toEqual(
+      orgRules,
+    );
+
+    const events = await ctx.testDb.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'search_term_rule_overrides.update'));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      organizationId: orgId,
+      target: { profileId: ids.visible, before: null, after: overrides },
+    });
+  });
+
+  it('alle Felder leer nimmt die Abweichung zurück', async () => {
+    const res = await put(editor, {
+      profileId: ids.visible,
+      overrides: NO_SEARCH_TERM_RULE_OVERRIDES,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      profileId: ids.visible,
+      overrides: NO_SEARCH_TERM_RULE_OVERRIDES,
+      updatedAt: null,
+    });
+    expect(await stored()).toEqual([]);
+    expect((await analysis(viewer)).body.meta.rules).toEqual(orgRules);
+  });
+});
+
 describe('POST /api/ads/search-terms/periods/delete (2b.2d)', () => {
   // Eigener Zeitraum (Tippfehler im Jahr), damit die übrigen Tests ihren Zeitraum behalten.
   const TYPO = { periodStart: '2025-09-01', periodEnd: '2025-09-30' };
@@ -694,6 +817,11 @@ describe('Rechte je Endpunkt', () => {
     ['POST', '/ads/search-terms/analysis', { profileId: ids.visible, ...A }],
     ['GET', '/ads/search-terms/rules', undefined],
     ['PUT', '/ads/search-terms/rules', DEFAULT_SEARCH_TERM_RULES],
+    [
+      'PUT',
+      '/ads/search-terms/rules/profile',
+      { profileId: ids.visible, overrides: NO_SEARCH_TERM_RULE_OVERRIDES },
+    ],
   ];
 
   it('verlangt eine Session', async () => {

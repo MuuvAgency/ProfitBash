@@ -4,6 +4,7 @@ import {
   getSearchTermRules,
   listSearchTermPeriods,
   querySearchTermPeriod,
+  saveSearchTermRuleOverrides,
   saveSearchTermRules,
   type SearchTermRulesRecord,
 } from '@profitbash/db';
@@ -21,12 +22,15 @@ import {
   errorResponseSchema,
   MAX_SEARCH_TERM_NGRAMS,
   MAX_SEARCH_TERM_ROWS,
+  resolveSearchTermRules,
   searchTermAnalysisRequestSchema,
   searchTermAnalysisResponseSchema,
   searchTermPeriodDeleteRequestSchema,
   searchTermPeriodDeleteResponseSchema,
   searchTermPeriodsRequestSchema,
   searchTermPeriodsResponseSchema,
+  searchTermProfileRulesRequestSchema,
+  searchTermProfileRulesResponseSchema,
   searchTermRulesResponseSchema,
   searchTermRulesSchema,
   type AdProduct,
@@ -37,7 +41,8 @@ import { orgAdminOnly, requireFeature, requireSession } from '../middleware';
 
 /**
  * Suchbegriff-Analyse (`docs/tasks/phase-2b.md` 2b.2), Feature `sp-explorer`: Datei-Zeiträume je Profil, Analyse
- * **eines** Zeitraums (Zeilen mit Einstufung, N-Gramme, Summen) und die Regeln der Einstufung je Organisation.
+ * **eines** Zeitraums (Zeilen mit Einstufung, N-Gramme, Summen) und die Regeln der Einstufung je Organisation,
+ * je Profil überschreibbar (2b.2g).
  * Nur lesend bis auf die Regeln und das Löschen eines Datei-Zeitraums (2b.2d, nur Org-Admins); Aktionen auf Suchbegriffe kommen mit
  * dem Warenkorb (Phase 3). Gelesen wird über `@profitbash/db` (Access-Layer), gerechnet in `@profitbash/engine`.
  */
@@ -120,6 +125,23 @@ const putRulesRoute = createRoute({
   responses: {
     200: { description: 'Gespeicherte Regeln.', content: json(searchTermRulesResponseSchema) },
     ...errors,
+  },
+});
+
+const putProfileRulesRoute = createRoute({
+  method: 'put',
+  path: '/ads/search-terms/rules/profile',
+  tags: ['Suchbegriffe'],
+  summary: 'Abweichende Regeln eines Profils speichern (Recht „write“)',
+  description:
+    'Je Feld ein eigener Wert oder `null` = wie die Organisation; sind alle Felder `null`, gilt für das Profil ' +
+    'wieder nur die Regel der Organisation. Die geltenden Regeln nennt die Analyse (`meta.rules`, ' +
+    '`meta.organizationRules`, `meta.ruleOverrides`).',
+  request: { body: { content: json(searchTermProfileRulesRequestSchema), required: true } },
+  responses: {
+    200: { description: 'Gespeichert.', content: json(searchTermProfileRulesResponseSchema) },
+    ...errors,
+    404: { description: 'Profil nicht gefunden.', content: json(errorResponseSchema) },
   },
 });
 
@@ -210,8 +232,9 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     ]);
     if (!result) throw new ApiError(404, 'PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
     if (!rulesRecord) throw noMember();
-    const { rules } = rulesRecord;
-    const { profile, protectedTerms } = result;
+    const { profile, protectedTerms, ruleOverrides } = result;
+    // Geltende Regeln des Profils: Organisation, je Feld vom Profil überschrieben (2b.2g).
+    const rules = resolveSearchTermRules(rulesRecord.rules, ruleOverrides);
 
     // Einstufung, Zähler, Summe und N-Gramme über **alle** Zeilen; gekürzt wird erst die Antwort.
     const counts = { harvest: 0, negate: 0, watch: 0 };
@@ -263,6 +286,8 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
           importedAt: result.importedAt?.toISOString() ?? null,
           rules,
           rulesAreDefault: rulesRecord.isDefault,
+          organizationRules: rulesRecord.rules,
+          ruleOverrides,
           protectedTerms,
           totalRows: rows.length,
           truncated: rows.length > MAX_SEARCH_TERM_ROWS,
@@ -297,5 +322,23 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     });
     if (!record) throw noMember();
     return c.json(rulesResponse(record), 200);
+  });
+
+  app.openapi({ ...putProfileRulesRoute, middleware: guard('write') }, async (c) => {
+    const body = c.req.valid('json');
+    const record = await saveSearchTermRuleOverrides(db, {
+      ...visibility(c),
+      profileId: body.profileId,
+      overrides: body.overrides,
+    });
+    if (!record) throw new ApiError(404, 'PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
+    return c.json(
+      {
+        profileId: body.profileId,
+        overrides: record.overrides,
+        updatedAt: record.updatedAt?.toISOString() ?? null,
+      },
+      200,
+    );
   });
 }
