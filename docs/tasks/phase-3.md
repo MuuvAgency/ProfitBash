@@ -94,15 +94,90 @@ Tagesbudget), `biddingStrategy` und die Gebotsanpassung je Platzierung (Kampagne
 dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagnen- oder Ad-Group-Ebene).
 
 ### 3.1 Schreibschicht für Änderungen (`packages/shared`, `packages/db`)
-- [ ] Schemas und Konstanten in `@profitbash/shared` (Entity-Typen, Felder je Entity, Wertebereiche ohne Amazon-Grenzen).
-- [ ] Tabellen `ad_changes` (Warenkorb und Verlauf: Entity, Feld, vorher/nachher, Status, Fehlertext von Amazon, Herkunft) und
+- [x] Schemas und Konstanten in `@profitbash/shared` (Entity-Typen, Felder je Entity, Wertebereiche ohne Amazon-Grenzen).
+- [x] Tabellen `ad_changes` (Warenkorb und Verlauf: Entity, Feld, vorher/nachher, Status, Fehlertext von Amazon, Herkunft) und
       `ad_change_submissions` (je Profil und Weg, Status des Laufs); Migration.
-- [ ] Warenkorb über den Access-Layer: Änderungen vormerken (mehrere auf einmal, „vorher“ liest der Server aus der Entity,
+- [x] Warenkorb über den Access-Layer: Änderungen vormerken (mehrere auf einmal, „vorher“ liest der Server aus der Entity,
       nie aus der Anfrage), auflisten (mit Hinweis auf offene Änderungen anderer Nutzer an derselben Stelle, F4), verwerfen.
-- [ ] Übermitteln: Warenkorb → eine Übermittlung je Profil, „vorher“ wird dabei neu gelesen; Übermittlungen auflisten und
+- [x] Übermitteln: Warenkorb → eine Übermittlung je Profil, „vorher“ wird dabei neu gelesen; Übermittlungen auflisten und
       einzeln lesen. Audit-Events in derselben Transaktion.
 - Nicht in 3.1: Abholen und Ergebnis durch den Job, erneuter Versuch, Verwerfen fehlgeschlagener Änderungen und Revert (3.3);
   Grenzen von Amazon (3.2a); Warnungen nach F6 (3.4); Merkliste und Tags (3.8, 3.7).
+- [x] Umsetzung (Stand für 3.2a und später):
+  - **Shared** (`packages/shared/src/ad-changes.ts`, browserfähig): `AD_CHANGE_ENTITY_TYPES` (`campaign`, `ad_group`,
+    `target`, `product_ad`, `negative_target`), `AD_CHANGE_FIELDS` und `AD_CHANGE_FIELDS_BY_ENTITY` (Kampagne: `state`,
+    `budget`, `bidding_strategy`, `placement_top`/`_rest_of_search`/`_product_page`/`_amazon_business`; Ad Group: `state`,
+    `default_bid`; Target: `state`, `bid`; Product Ad und Negative: `state`), `adChangeFieldKind` (`enum` | `money` |
+    `percent`), `AD_CHANGE_PLACEMENTS` (Feld → Platzierung wie in `extra.placementBidAdjustments`), `adChangeValueIssue`
+    (Zustand `ENABLED`/`PAUSED`/`ARCHIVED`, bei Negatives nur `ARCHIVED`; Strategie `SALES_DOWN_ONLY`/`SALES_UP_AND_DOWN`/
+    `NONE`; Beträge als Decimal-String größer 0 mit höchstens zwei Nachkommastellen; Platzierung ganze Prozent 0–900),
+    `adChangeInputSchema` (`update` bzw. `create_negative` mit Keyword exakt/Wortgruppe oder ASIN; strikt, die Anfrage nennt
+    kein „vorher“), `stageAdChangesRequestSchema` (Herkunft `explorer` | `search_terms`, höchstens 5000 Änderungen je
+    Anfrage), Status (`pending` → `submitted` → `applied` | `failed`, `dismissed`), Wege (`api`, `bulk_file`), Status der
+    Übermittlung (`pending`, `running`, `finished`, `failed`), Ablehnungsgründe (`AD_CHANGE_REJECTIONS`).
+  - **Schema** (Migration `0025_ad_changes`, `packages/db/src/schema/ad-changes.ts`): `ad_changes` (eine Zeile je Feld
+    einer Entity bzw. je neuem Negative: Profil, Status, Übermittlung, Herkunft samt `origin_change_id` für Revert und
+    Retry, `entity_type`/`entity_id`, Kampagne und Ad Group, Feld, `old_value`/`new_value` für Texte, `old_amount`/
+    `new_amount` als `numeric` für Beträge und Prozente, `currency_code`, `payload` für das neue Negative,
+    `amazon_entity_id`, `error_code`/`error_message`, `resolved_at`, `created_by`) und `ad_change_submissions` (Profil,
+    Weg, Status, `attempts`, `error`, `job_run_id`, `created_by`, Zeitpunkte). Fremdschlüssel auf Profil, Kampagne,
+    Ad Group und Übermittlung jeweils zusammen mit dem Profil, `ON DELETE NO ACTION` wie die Entities (Verlauf ist nicht
+    wiederbeschaffbar; die Organisation lässt sich löschen, getestet). `entity_id` ohne Fremdschlüssel (fünf Tabellen,
+    Entities werden nie gelöscht); bei Kampagne und Ad Group erzwingt ein CHECK die Gleichheit mit `campaign_id` bzw.
+    `ad_group_id`. CHECKs für Status, Herkunft, Entity-Typ, Form je Operation, Art des Werts je Feld und „`pending` genau
+    ohne Übermittlung“. Partieller Unique-Index je Nutzer, Entity und Feld für offene Feldänderungen.
+  - **Vormerken** (`packages/db/src/ad-changes.ts`, `stageAdChanges`): je Eingabe ein Ergebnis `created` | `updated` |
+    `removed` | `unchanged` | `rejected` (mit Grund), dazu Zähler. Gültige Änderungen werden übernommen, auch wenn andere
+    derselben Anfrage abgelehnt werden. „Vorher“ und die Währung liest der Server aus der Entity (Betrag ohne eigene
+    Währung: Währung des Profils; Platzierung aus `extra.placementBidAdjustments`, ohne Eintrag gilt 0 %). Derselbe Wert
+    wie der Stand der Entity nimmt eine vorgemerkte Änderung zurück (`removed`); Beträge werden als Zahl verglichen
+    (`0.5` = `0.50`, `compareDecimal`). Nennt eine Anfrage dieselbe Stelle mehrfach, gilt die letzte Angabe. Abgelehnt
+    werden: nicht sichtbare oder unbekannte Entities (`notFound`, auch fremde Organisation und ausgeblendetes Profil),
+    entfernte und archivierte, Budgets, die kein Tagesbudget sind, Gebotsstrategie und Platzierungen außerhalb von SP,
+    Negatives, die es an der Stelle schon gibt (ohne Groß/Klein, archivierte zählen nicht). Ein Audit-Event
+    `ad_changes.stage` je Anfrage (Herkunft, Zähler, Profile), nur wenn sich der Warenkorb geändert hat.
+  - **Warenkorb** (`listPendingAdChanges`): eigene offene Änderungen in sichtbaren Profilen mit Profil, Kampagne, Ad Group,
+    Angaben zur Entity (Keyword bzw. Ausdruck, ASIN/SKU) und `otherUsers` (andere Nutzer mit offener Änderung an derselben
+    Stelle, F4; beim Vormerken als Zahl). `discardPendingAdChanges`: genannte oder alle eigenen offenen Änderungen, Audit
+    `ad_changes.discard`.
+  - **Übermitteln** (`submitAdChanges`): ganzer Warenkorb, ein Profil oder genannte Änderungen; je Profil eine
+    Übermittlung, Änderungen wechseln auf `submitted`. „Vorher“ wird neu gelesen; entspricht der Wert inzwischen dem
+    Stand, entfällt die Änderung (`dropped`); lässt sie sich nicht mehr übermitteln (z. B. inzwischen archiviert), bleibt
+    sie im Warenkorb (`blocked` mit Grund). Weg `api` nur für Profile mit Connection, sonst `AdChangeError`
+    `PROFILE_HAS_NO_CONNECTION` und nichts wird übermittelt. Audit `ad_change_submission.create` je Übermittlung;
+    `enqueue(tx, submissions)` plant in derselben Transaktion ein (3.3 übergibt pg-boss).
+  - **Lesen** (`listAdChangeSubmissions`, `getAdChangeSubmission`): Übermittlungen der sichtbaren Profile für die ganze
+    Organisation, neueste zuerst (höchstens 100), mit Zählern je Status; eine Übermittlung mit ihren Änderungen.
+  - Das Recht (`write` bzw. `view` im Feature `changes`) prüft die API (3.4), wie bei den Suchbegriff-Regeln.
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung über alle sechs Funktionen, Sperren beim
+    Übermitteln, Upsert über den partiellen Index, Migration und Decimal-Rechnung bestätigt. Übernommen: Das Zurücknehmen
+    löscht nur noch, was offen ist und dem Nutzer gehört (vorher konnte ein gleichzeitiges Vormerken eine eben
+    übermittelte Änderung löschen; Test über den `enqueue`-Hook), `created`/`updated` kommt aus dem Upsert selbst;
+    Negatives werden je Nutzer und Kampagne nacheinander geprüft und angelegt (`pg_advisory_xact_lock`, vorher zwei
+    Zeilen bei gleichzeitigen Anfragen möglich); `enqueue` wird nur für den Weg `api` aufgerufen; verwaiste Zeilen ohne
+    Nutzer zählen nicht als „anderer Nutzer“; Index `(entity_id, entity_type)`; Schema-Tests prüfen den Namen des
+    Constraints; Tests für negative ASINs, Hinweise bei Negatives, Platzierung als Zahl in `extra`, ein inzwischen
+    vorhandenes Negative beim Übermitteln.
+  - **Für 3.3 festgehalten (aus dem Review):**
+    - „Vorher“ kennt nur den Stand der Entity, nicht eine noch offene Übermittlung an derselben Stelle (Bulk-Datei wartet
+      auf den Import; zwei Übermittlungen kurz nacheinander): Die zweite Änderung trüge ein veraltetes „vorher“. Der Job
+      setzt „vorher“ deshalb beim Anwenden endgültig (API) bzw. die Bestätigung durch den Import (Bulk-Datei); bis dahin
+      weist die Oberfläche auf offene Übermittlungen an derselben Stelle hin (3.4 liefert sie mit).
+    - Ein Revert auf „kein Wert“ (Target ohne eigenes Gebot, Platzierung ohne Eintrag) lässt sich nicht als Änderung
+      abbilden (der CHECK verlangt einen neuen Wert, Amazon kann ein Gebot nicht leeren): Platzierungen gehen auf 0 %,
+      Gebote ohne „vorher“ lehnt der Revert mit Hinweis ab.
+    - Eine Anlage trägt nie `entity_id`, nach Erfolg nur `amazon_entity_id`: Der Revert eines Negatives sucht die Entity
+      über Profil und Amazon-ID.
+  - **Bewusst so bzw. offen für später:** Frühere Angaben zur selben Stelle in einer Anfrage zählen als `unchanged`, auch
+    wenn die letzte abgelehnt wird. Änderungen in einem später ausgeblendeten Profil bleiben unsichtbar offen und
+    erscheinen nach dem Einblenden wieder (beim Übermitteln wird „vorher“ neu gelesen). `changeIds` begrenzt die API
+    (3.4, `MAX_AD_CHANGES_PER_REQUEST`); Negatives werden einzeln geprüft (einige Abfragen je Negative, für eine
+    Mehrfachauswahl in 3.8 bündeln); Listen ohne Blättern (Übermittlungen höchstens 100, Verlauf und Filter mit 3.4).
+    Die Schicht vertraut auf geprüfte Eingaben (`adChangeInputSchema` an der API). Der Stand des Elternteils wird nicht geprüft (ein Gebot in einer pausierten
+    oder archivierten Kampagne lässt sich vormerken; Amazon entscheidet). Offene Änderungen eines Nutzers, der die
+    Organisation verlässt, bleiben unsichtbar liegen (3.3 bzw. die Mitgliederverwaltung räumt sie bei Bedarf ab). Ob
+    Negatives für SB und SD zulässig sind, prüft 3.2a. Eine Liste offener Änderungen je Entity für das Grid (3.5) und
+    der Verlauf je Entity kommen mit 3.4.
 
 ### 3.2 Schreib-Client (`packages/amazon-ads`), geteilt in 3.2a und 3.2b
 #### 3.2a Schreib-Client gegen den Mock

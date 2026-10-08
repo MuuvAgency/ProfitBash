@@ -66,7 +66,7 @@ ALTER TABLE "ad_changes" ADD CONSTRAINT "ad_changes_submission_fk" FOREIGN KEY (
 CREATE INDEX "ad_change_submissions_profile_created_idx" ON "ad_change_submissions" USING btree ("profile_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "ad_change_submissions_open_idx" ON "ad_change_submissions" USING btree ("profile_id","created_at") WHERE "ad_change_submissions"."status" in ('pending', 'running');--> statement-breakpoint
 CREATE UNIQUE INDEX "ad_changes_pending_uq" ON "ad_changes" USING btree ("created_by","entity_type","entity_id","field") WHERE "ad_changes"."status" = 'pending' and "ad_changes"."operation" = 'update';--> statement-breakpoint
-CREATE INDEX "ad_changes_entity_idx" ON "ad_changes" USING btree ("entity_type","entity_id");--> statement-breakpoint
+CREATE INDEX "ad_changes_entity_idx" ON "ad_changes" USING btree ("entity_id","entity_type");--> statement-breakpoint
 CREATE INDEX "ad_changes_submission_idx" ON "ad_changes" USING btree ("submission_id");--> statement-breakpoint
 CREATE INDEX "ad_changes_campaign_idx" ON "ad_changes" USING btree ("campaign_id");--> statement-breakpoint
 CREATE INDEX "ad_changes_ad_group_idx" ON "ad_changes" USING btree ("ad_group_id");--> statement-breakpoint

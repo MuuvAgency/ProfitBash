@@ -440,7 +440,7 @@ export async function stageAdChanges(
       }
     }
 
-    const toDelete: string[] = [];
+    const toDelete: { index: number; id: string; profileId: string }[] = [];
     const toUpsert: { index: number; key: string; values: typeof adChanges.$inferInsert }[] = [];
     for (const index of lastByKey.values()) {
       const change = input.changes[index] as AdChangeUpdateInput;
@@ -453,11 +453,7 @@ export async function stageAdChanges(
       }
       const existing = ownPending.get(key);
       if (sameValue(change.field, current.value, change.value)) {
-        if (existing) {
-          toDelete.push(existing.id);
-          results[index] = { outcome: 'removed' };
-          profileIds.add(entity!.profileId);
-        }
+        if (existing) toDelete.push({ index, id: existing.id, profileId: entity!.profileId });
         continue;
       }
       if (existing && sameValue(change.field, existing.after, change.value)) continue;
@@ -481,8 +477,28 @@ export async function stageAdChanges(
       });
     }
 
+    // Nur, was noch offen ist: Eine gleichzeitige Übermittlung kann die Änderung inzwischen übernommen haben, und
+    // übermittelte Änderungen sind Verlauf (nie löschen).
     for (const part of chunks(toDelete)) {
-      await tx.delete(adChanges).where(inArray(adChanges.id, part));
+      const deleted = await tx
+        .delete(adChanges)
+        .where(
+          and(
+            inArray(
+              adChanges.id,
+              part.map((item) => item.id),
+            ),
+            eq(adChanges.status, 'pending'),
+            eq(adChanges.createdBy, input.userId),
+          ),
+        )
+        .returning({ id: adChanges.id });
+      const deletedIds = new Set(deleted.map((row) => row.id));
+      for (const item of part) {
+        if (!deletedIds.has(item.id)) continue;
+        results[item.index] = { outcome: 'removed' };
+        profileIds.add(item.profileId);
+      }
     }
     // 500 Zeilen je Anweisung: rund 15 Parameter je Zeile.
     for (const part of chunks(toUpsert, 500)) {
@@ -507,14 +523,17 @@ export async function stageAdChanges(
           entityType: adChanges.entityType,
           entityId: adChanges.entityId,
           field: adChanges.field,
+          // Neu eingefügt oder vorhandene offene Änderung ersetzt (verlässlich auch bei gleichzeitigen Anfragen).
+          inserted: sql<boolean>`(xmax = 0)`,
         });
-      const idByKey = new Map(
-        rows.map((row) => [pendingKey(row.entityType, row.entityId!, row.field!), row.id]),
+      const rowByKey = new Map(
+        rows.map((row) => [pendingKey(row.entityType, row.entityId!, row.field!), row]),
       );
       for (const item of part) {
+        const row = rowByKey.get(item.key)!;
         results[item.index] = {
-          outcome: ownPending.has(item.key) ? 'updated' : 'created',
-          changeId: idByKey.get(item.key)!,
+          outcome: row.inserted ? 'created' : 'updated',
+          changeId: row.id,
           otherUsers: othersPending.get(item.key) ?? 0,
         };
         profileIds.add(item.values.profileId);
@@ -529,6 +548,11 @@ export async function stageAdChanges(
         results[index] = { outcome: 'rejected', reason: parent };
         continue;
       }
+      // Prüfen und Anlegen je Nutzer und Kampagne nacheinander: Für Anlagen gibt es keinen Unique-Index, zwei
+      // gleichzeitige Anfragen legten dasselbe Negative sonst doppelt in den Warenkorb.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`ad_changes:${input.userId}:${change.campaignId}`}, 0))`,
+      );
       const pending = await tx
         .select({ createdBy: adChanges.createdBy, payload: adChanges.payload })
         .from(adChanges)
@@ -562,7 +586,8 @@ export async function stageAdChanges(
       results[index] = {
         outcome: 'created',
         changeId: row!.id,
-        otherUsers: new Set(same.map((other) => other.createdBy)).size,
+        otherUsers: new Set(same.flatMap((other) => (other.createdBy ? [other.createdBy] : [])))
+          .size,
       };
       profileIds.add(parent.profileId);
     }
@@ -937,8 +962,8 @@ export interface SubmitAdChangesInput extends AdChangeActor {
   profileId?: string;
   changeIds?: readonly string[];
   /**
-   * Plant die Jobs in derselben Transaktion ein (pg-boss über `tx`); wird nur mit mindestens einer Übermittlung
-   * aufgerufen. Bulk-Dateien brauchen keinen Job.
+   * Plant die Jobs in derselben Transaktion ein (pg-boss über `tx`). Wird nur für den Weg `api` und nur mit
+   * mindestens einer Übermittlung aufgerufen: Bulk-Dateien brauchen keinen Job.
    */
   enqueue: (tx: DbOrTx, submissions: readonly AdChangeSubmissionSummary[]) => Promise<unknown>;
 }
@@ -1102,7 +1127,7 @@ export async function submitAdChanges(
       });
     }
     result.submissions = await loadSubmissions(tx, inArray(adChangeSubmissions.id, submissionIds));
-    await input.enqueue(tx, result.submissions);
+    if (input.channel === 'api') await input.enqueue(tx, result.submissions);
     return result;
   });
 }

@@ -1,5 +1,5 @@
 {
-  "id": "41aa38c5-b4fc-46fc-b7f9-433092dfa3ed",
+  "id": "fbc04df7-3fcb-41d5-bf26-17ffb9c054aa",
   "prevId": "e012ee75-d031-4fba-8861-3c6fdda73719",
   "version": "7",
   "dialect": "postgresql",
@@ -6332,13 +6332,13 @@
           "name": "ad_changes_entity_idx",
           "columns": [
             {
-              "expression": "entity_type",
+              "expression": "entity_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "entity_id",
+              "expression": "entity_type",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
