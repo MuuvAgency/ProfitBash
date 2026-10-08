@@ -1,11 +1,12 @@
 import { DEFAULT_SEARCH_TERM_RULES } from '@profitbash/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { replaceSearchTermPeriodMetrics, type SearchTermPeriodMetric } from './amazon-ads-metrics';
 import {
   amazonAdsAdGroups,
   amazonAdsCampaigns,
   amazonAdsProfiles,
+  amazonAdsSearchTermPeriodMetrics,
   amazonAdsTargets,
   auditEvents,
   clients,
@@ -14,6 +15,7 @@ import {
   users,
 } from './schema';
 import {
+  deleteSearchTermPeriod,
   getSearchTermRules,
   listSearchTermPeriods,
   querySearchTermPeriod,
@@ -506,5 +508,100 @@ describe('Regeln je Organisation', () => {
         rules: DEFAULT_SEARCH_TERM_RULES,
       }),
     ).toBeNull();
+  });
+});
+
+describe('deleteSearchTermPeriod (2b.2d)', () => {
+  // Eigener Zeitraum (Tippfehler im Jahr), damit die übrigen Tests ihre Zeiträume behalten.
+  const TYPO = { startDate: '2025-09-01', endDate: '2025-09-30' };
+  const remove = (patch: Partial<Parameters<typeof deleteSearchTermPeriod>[1]> = {}) =>
+    deleteSearchTermPeriod(testDb.db, {
+      ...as(ids.admin),
+      profileId: ids.de,
+      periodStart: TYPO.startDate,
+      periodEnd: TYPO.endDate,
+      ...patch,
+    });
+  /** Zeilen je Profil und Zeitraum, direkt aus der Tabelle. */
+  const stored = async (profileId: string, period: typeof A) => {
+    const m = amazonAdsSearchTermPeriodMetrics;
+    const rows = await testDb.db
+      .select({ id: m.id })
+      .from(m)
+      .where(
+        and(
+          eq(m.profileId, profileId),
+          eq(m.periodStart, period.startDate),
+          eq(m.periodEnd, period.endDate),
+        ),
+      );
+    return rows.length;
+  };
+  const deleteEvents = () =>
+    testDb.db.select().from(auditEvents).where(eq(auditEvents.action, 'search_term_period.delete'));
+
+  beforeAll(async () => {
+    await write(ids.org, ids.de, TYPO, [term('falsches jahr', '5'), term('noch einer', '4')]);
+    await write(
+      ids.org,
+      ids.de,
+      TYPO,
+      [term('sb falsches jahr', '3', { amazonTargetId: 'T-SB' })],
+      'SPONSORED_BRANDS',
+    );
+    await write(ids.org, ids.hidden, TYPO, [term('versteckt', '1')]);
+    await write(ids.otherOrg, ids.foreign, TYPO, [term('fremd', '1')]);
+  });
+
+  it('verweigert ausgeblendete und fremde Profile und Nicht-Mitglieder, ohne etwas zu löschen', async () => {
+    expect(await remove({ profileId: ids.hidden })).toBeNull();
+    expect(await remove({ profileId: ids.foreign })).toBeNull();
+    expect(await remove({ userId: ids.outsider })).toBeNull();
+    expect(await remove({ userId: ids.outsider, orgId: ids.otherOrg })).toBeNull();
+    expect(await remove({ userId: ids.stranger })).toBeNull();
+    expect(await stored(ids.de, TYPO)).toBe(3);
+    expect(await stored(ids.hidden, TYPO)).toBe(1);
+    expect(await stored(ids.foreign, TYPO)).toBe(1);
+    expect(await deleteEvents()).toEqual([]);
+  });
+
+  it('löscht nichts bei einem Zeitraum ohne Zeilen (auch nicht bei nur einem passenden Tag) und schreibt kein Audit-Event', async () => {
+    expect(await remove({ periodStart: '2025-01-01', periodEnd: '2025-01-31' })).toBe(0);
+    expect(await remove({ periodEnd: A.endDate })).toBe(0);
+    expect(await remove({ periodStart: A.startDate })).toBe(0);
+    expect(await stored(ids.de, TYPO)).toBe(3);
+    expect(await stored(ids.de, A)).toBe(7);
+    expect(await deleteEvents()).toEqual([]);
+  });
+
+  it('löscht genau den Zeitraum des Profils über alle Ad-Typen und schreibt ein Audit-Event', async () => {
+    expect(await remove()).toBe(3);
+    expect(await stored(ids.de, TYPO)).toBe(0);
+    // Andere Zeiträume des Profils und derselbe Zeitraum anderer Profile bleiben.
+    expect(await stored(ids.de, A)).toBe(7);
+    expect(await stored(ids.de, B)).toBe(1);
+    expect(await stored(ids.hidden, TYPO)).toBe(1);
+    expect(await stored(ids.foreign, TYPO)).toBe(1);
+    const periods = await listSearchTermPeriods(testDb.db, as(ids.admin));
+    expect(periods.map((p) => p.periodStart)).toEqual([B.startDate, A.startDate]);
+
+    const events = await deleteEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      organizationId: ids.org,
+      actorUserId: ids.admin,
+      target: {
+        type: 'search_term_period',
+        id: ids.de,
+        profileId: ids.de,
+        periodStart: TYPO.startDate,
+        periodEnd: TYPO.endDate,
+        deletedRows: 3,
+      },
+    });
+
+    // Ein zweites Mal ist nichts mehr da.
+    expect(await remove()).toBe(0);
+    expect(await deleteEvents()).toHaveLength(1);
   });
 });
