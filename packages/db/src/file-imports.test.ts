@@ -52,6 +52,8 @@ const upload = (overrides: Partial<Parameters<typeof createFileImport>[1]> = {})
     fileName: 'bericht.csv',
     content,
     enqueue: noEnqueue,
+    // Fester Tag: Die Zeiträume der Tests (September 2026) sollen nicht irgendwann „zu alt“ sein.
+    now: new Date('2026-10-08T10:00:00Z'),
     ...overrides,
   });
 
@@ -258,6 +260,29 @@ describe('createFileImport mit von Hand angegebenem Zeitraum (2b.2c)', () => {
     await expect(
       upload({ ...renamed, now, period: { startDate: '2026-10-01', endDate: '2026-10-09' } }),
     ).rejects.toMatchObject({ code: 'INVALID_PERIOD' });
+  });
+
+  it('lehnt Zeiträume ab, die mehr als 365 Tage vor „heute“ in der Zeitzone des Profils beginnen (2b.2d)', async () => {
+    // 22:30 UTC ist in Berlin schon der 8. Oktober 2026: 365 Tage zurück liegt der 8. Oktober 2025.
+    const now = new Date('2026-10-07T22:30:00Z');
+    await expect(
+      upload({ ...renamed, now, period: { startDate: '2025-10-08', endDate: '2025-10-31' } }),
+    ).resolves.toMatchObject({ periodStart: '2025-10-08' });
+    await expect(
+      upload({ ...renamed, now, period: { startDate: '2025-10-07', endDate: '2025-10-31' } }),
+    ).rejects.toMatchObject({
+      code: 'INVALID_PERIOD',
+      message: 'Der Zeitraum darf höchstens ein Jahr zurückliegen.',
+    });
+    // Der Dateiname gewinnt: Eine zu alte Angabe wird dann verworfen und nicht geprüft.
+    await expect(
+      upload({
+        kind: 'bulk',
+        fileName: 'bulk-a1b2c3-20260801-20260831-1.xlsx',
+        now,
+        period: { startDate: '2025-09-01', endDate: '2025-09-30' },
+      }),
+    ).resolves.toMatchObject({ periodStart: null });
   });
 
   it('lässt in der Tabelle nur beide Tage oder keinen zu, von nie nach bis', async () => {

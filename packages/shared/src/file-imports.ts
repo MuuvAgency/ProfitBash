@@ -37,6 +37,12 @@ export interface BulkPeriod {
  */
 export const BULK_PERIOD_MAX_DAYS = 60;
 
+/**
+ * So viele Tage darf der erste Tag eines von Hand angegebenen Zeitraums höchstens vor „heute“ liegen (2b.2d): Ein
+ * Tippfehler im Jahr ergäbe sonst einen Zeitraum, der in der Suchbegriff-Analyse stehen bleibt.
+ */
+export const BULK_PERIOD_MAX_AGE_DAYS = 365;
+
 const DAY_MS = 86_400_000;
 
 /** Gültiger Kalendertag in der Schreibweise `YYYY-MM-DD` (kein 30. Februar)? */
@@ -64,7 +70,8 @@ export function parseBulkPeriod(fileName: string): BulkPeriod | null {
 
 /**
  * Was an einem von Hand angegebenen Zeitraum nicht stimmt: nur ein Tag angegeben, kein gültiger Tag, von nach
- * bis, Tag in der Zukunft, mehr als `BULK_PERIOD_MAX_DAYS` Tage.
+ * bis, Tag in der Zukunft, mehr als `BULK_PERIOD_MAX_DAYS` Tage, erster Tag mehr als `BULK_PERIOD_MAX_AGE_DAYS`
+ * Tage vor „heute“.
  */
 export const BULK_PERIOD_ISSUES = [
   'incomplete',
@@ -72,13 +79,21 @@ export const BULK_PERIOD_ISSUES = [
   'startAfterEnd',
   'future',
   'tooLong',
+  'tooOld',
 ] as const;
 export type BulkPeriodIssue = (typeof BULK_PERIOD_ISSUES)[number];
+
+/** Frühester erlaubter erster Tag eines von Hand angegebenen Zeitraums (`today` − `BULK_PERIOD_MAX_AGE_DAYS`). */
+export function oldestBulkPeriodStart(today: string): string {
+  return new Date(Date.parse(`${today}T00:00:00Z`) - BULK_PERIOD_MAX_AGE_DAYS * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+}
 
 /**
  * Prüft einen von Hand angegebenen Zeitraum (Dialog und API mit denselben Regeln). Keine Angabe (beide leer) ist
  * erlaubt: Dann bleiben die Suchbegriffe einer Datei ohne Zeitraum im Namen weg. `today` = heutiger Kalendertag in
- * der Zeitzone des Profils; ohne ihn entfällt die Prüfung auf Tage in der Zukunft.
+ * der Zeitzone des Profils; ohne ihn entfallen die Prüfungen auf Tage in der Zukunft und auf zu alte Zeiträume.
  */
 export function bulkPeriodIssue(
   input: { startDate?: string | null; endDate?: string | null },
@@ -92,7 +107,10 @@ export function bulkPeriodIssue(
   if (startDate > endDate) return 'startAfterEnd';
   if (today !== undefined && endDate > today) return 'future';
   const days = (Date.parse(`${endDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / DAY_MS;
-  return days > BULK_PERIOD_MAX_DAYS ? 'tooLong' : null;
+  if (days > BULK_PERIOD_MAX_DAYS) return 'tooLong';
+  // Nach der Länge: Die prüft die API schon ohne „heute“, so melden Dialog und API dasselbe.
+  if (today !== undefined && startDate < oldestBulkPeriodStart(today)) return 'tooOld';
+  return null;
 }
 
 const timestamp = z.iso.datetime();

@@ -6,6 +6,7 @@ import {
   formatDateTime,
   formatDay,
   formatNumber,
+  oldestBulkPeriodStart,
   parseBulkPeriod,
   todayInTimezone,
   type BulkPeriodIssue,
@@ -70,6 +71,10 @@ const asksForPeriod = computed(
 /** Heute in der Zeitzone des Profils: spätester Tag eines Zeitraums. */
 const today = () => (props.profile ? todayInTimezone(props.profile.timezone, new Date()) : '');
 const latestDay = ref('');
+/** Frühester erster Tag (höchstens ein Jahr zurück, `BULK_PERIOD_MAX_AGE_DAYS`). */
+const earliestDay = computed(() =>
+  latestDay.value === '' ? '' : oldestBulkPeriodStart(latestDay.value),
+);
 const periodDescribedBy = computed(() =>
   periodIssue.value
     ? 'file-import-period-error file-import-period-hint'
@@ -254,6 +259,7 @@ function result(fileImport: FileImport) {
                   id="file-import-period-start"
                   v-model="periodStart"
                   type="date"
+                  :min="earliestDay"
                   :max="latestDay"
                   :aria-invalid="periodIssue !== null"
                   :aria-describedby="periodDescribedBy"
@@ -268,6 +274,7 @@ function result(fileImport: FileImport) {
                   id="file-import-period-end"
                   v-model="periodEnd"
                   type="date"
+                  :min="earliestDay"
                   :max="latestDay"
                   :aria-invalid="periodIssue !== null"
                   :aria-describedby="periodDescribedBy"
