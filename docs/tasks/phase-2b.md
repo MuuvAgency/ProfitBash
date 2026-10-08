@@ -211,7 +211,8 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     Umschalter Alle / 1 / 2 / 3 Wörter; Hinweis, dass sich Bausteine überschneiden). Sortieren und Filtern im Browser
     (`compareDecimalNullsLast`, `DecimalFilter`). Hinweise bei gekürzten Zeilen bzw. Bausteinen.
   - **Zustände:** Skeleton, Leerzustand ohne Datei-Zeiträume (dann keine Analyse-Anfrage), Fehler mit „Erneut versuchen“
-    je Abfrage (Zeiträume, Analyse); beim Wechsel bleiben die alten Werte blass stehen (`aria-busy`).
+    je Abfrage (Zeiträume, Analyse), auch beim Neuladen mit vorhandenen Daten; beim Wechsel bleiben die alten Werte blass
+    stehen (`aria-busy`).
   - **Regeln ändern** (`search-terms/RulesDialog.vue`): vier Felder mit Labels; ACoS in Prozent eingegeben und als Bruch
     gesendet (`search-terms/decimal-input.ts`, Komma oder Punkt, ohne `number`), Prüfung mit `searchTermRulesSchema` vor dem
     Senden, danach lädt die Analyse neu.
@@ -224,6 +225,19 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     SEK, zwei Zeiträume; kein Kundeninhalt): Leerzustand, Auswahl und URL, Zähler und Summen, Wortbausteine mit Umschalter,
     Regel-Dialog mit Startwerten, Clients-Kachel mit Dialog, 1440 px und Handy ohne waagerechtes Scrollen der Seite, Hell und
     Dunkel, Konsole ohne Fehler. Befund behoben: Die Zeitraum-Auswahl schnitt ihren Text ab (breiter).
+  - Review (unabhängig): keine kritischen Befunde; Zahlen nie über `number`, nur registrierte Grid-Module, Rechte und
+    i18n bestätigt. Übernommen: Fehler beim Neuladen mit vorhandenen Daten wird gemeldet („möglicherweise nicht aktuell“,
+    vorher verschluckt, z. B. nach dem Speichern der Regeln); der URL-Abgleich hört auch auf die URL (ein Link ohne
+    Parameter bekommt die Auswahl zurück) und nur, solange die Seite die Route ist; beim Wechsel von Profil oder Zeitraum
+    bleiben die alten Werte blass stehen (`keepPreviousData`, auch das Grid); der Einstufungs-Filter gilt nicht in den
+    Wortbausteinen; Regel-Dialog schließt erst nach dem Neuladen; Regel-Satz zeigt bis zu zwei Nachkommastellen; Dialog der
+    geschützten Begriffe hört auf die Client-ID (eine laufende Eingabe wird nicht mehr zurückgesetzt); nach einem
+    Datei-Import lädt die Analyse neu; Hinweis bei gekürzten Zeilen ohne Treffer in einer Einstufung; Tests für Profil-
+    und Zeitraumwechsel mit Zurück-Taste, Währung des Profils, URL nach unbekannten Angaben. Bewusst so: „1.000“ gilt als
+    1,000 (kein Tausenderpunkt, der Fehlertext sagt es); die Reiter der Analyse-Seite tragen keine Explorer-Parameter (die
+    Filterleiste merkt sich ihre Auswahl selbst, ein Drill-Down geht beim Umweg verloren); die Länge der Wortbausteine
+    steht nicht in der URL; die Clients-Kachel erscheint erst mit mindestens einem Client (Ladefehler der Clients meldet
+    die Seite schon).
   - **Nicht enthalten:** CSV-Export, Spaltenauswahl und gespeicherte Ansichten für diese Seite; Filter nach Ad-Typ (die API
     kann ihn schon); Sprung von einer Zeile in den Explorer (Kampagne, Ad Group).
 

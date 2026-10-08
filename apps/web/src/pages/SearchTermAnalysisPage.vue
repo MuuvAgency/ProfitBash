@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { formatDateTime, formatDay, formatNumber, formatPercent } from '@profitbash/shared';
-import { formatCurrency } from '@profitbash/shared';
-import { useQuery, useQueryClient } from '@tanstack/vue-query';
+import {
+  formatCurrency,
+  formatDateTime,
+  formatDay,
+  formatNumber,
+  formatPercent,
+} from '@profitbash/shared';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import { computed, ref, useId, watch } from 'vue';
@@ -28,6 +33,7 @@ import {
   type NgramGridRow,
   type TermGridRow,
 } from '../search-terms/columns';
+import { fractionToPercent } from '../search-terms/decimal-input';
 import RulesDialog from '../search-terms/RulesDialog.vue';
 import SearchTermGrid from '../search-terms/SearchTermGrid.vue';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
@@ -121,12 +127,18 @@ function navigate(patch: LocationQueryRaw, replace = false) {
   return router[replace ? 'replace' : 'push']({ path: SEARCH_TERM_ANALYSIS_PATH, query });
 }
 
-// Die URL nennt immer die geltende Auswahl (auch nach unbekannten Angaben), ohne Verlaufseintrag.
+// Die URL nennt immer die geltende Auswahl (auch nach unbekannten Angaben oder einem Link ohne Parameter), ohne
+// Verlaufseintrag. Nur solange diese Seite die Route ist: Beim Verlassen darf nichts zurückleiten.
 watch(
-  selected,
-  (period) => {
-    if (!period) return;
-    const { profile, from, to } = route.query;
+  [
+    selected,
+    () => route.path,
+    () => route.query.profile,
+    () => route.query.from,
+    () => route.query.to,
+  ],
+  ([period, path, profile, from, to]) => {
+    if (!period || path !== SEARCH_TERM_ANALYSIS_PATH) return;
     if (profile !== period.profileId || from !== period.periodStart || to !== period.periodEnd) {
       void navigate(
         { profile: period.profileId, from: period.periodStart, to: period.periodEnd },
@@ -165,12 +177,15 @@ const analysis = useQuery({
   queryKey: computed(() => ['search-terms', orgId.value, 'analysis', request.value] as const),
   queryFn: () => api.searchTerms.analysis(request.value!),
   enabled: computed(() => request.value !== null),
+  // Beim Wechsel von Profil oder Zeitraum bleiben die alten Werte blass stehen, bis die neuen da sind.
+  placeholderData: keepPreviousData,
   // Bis zu 10 000 Zeilen: keine tiefen Proxys (die Zeilen werden nie verändert, nur ersetzt).
   shallow: true,
 });
+const busy = computed(() => analysis.isFetching.value);
 const data = computed(() => analysis.data.value);
 const meta = computed(() => data.value?.meta);
-const currency = computed(() => meta.value?.currency ?? selected.value?.currencyCode ?? 'EUR');
+const currency = computed(() => meta.value?.currency ?? selected.value?.currencyCode ?? '');
 
 // --- Ansicht und Filter -------------------------------------------------------------------
 
@@ -183,7 +198,9 @@ const classFilter = computed<Classification | null>(() => {
   return CLASSES.find((entry) => entry === value) ?? null;
 });
 
-const setView = (next: View) => navigate({ view: next === 'terms' ? undefined : next });
+// Die Einstufung filtert nur die Suchbegriffe: Die Wortbausteine nehmen sie nicht mit.
+const setView = (next: View) =>
+  navigate(next === 'terms' ? { view: undefined } : { view: next, class: undefined });
 const toggleClass = (next: Classification) =>
   navigate({ class: classFilter.value === next ? undefined : next, view: undefined });
 
@@ -218,7 +235,13 @@ const rulesText = computed(() => {
   return {
     harvest: t('searchTerms.rules.harvest', {
       purchases: t('searchTerms.rules.purchases', rules.harvestMinPurchases),
-      acos: formatPercent(rules.harvestMaxAcos, locale.value),
+      // Erlaubt sind zwei Nachkommastellen: nicht auf eine runden (25,55 % bliebe sonst „25,6 %“).
+      acos: formatPercent(rules.harvestMaxAcos, locale.value, {
+        fractionDigits: Math.max(
+          1,
+          (fractionToPercent(rules.harvestMaxAcos).split('.')[1] ?? '').length,
+        ),
+      }),
     }),
     negate: t('searchTerms.rules.negate', {
       clicks: t('searchTerms.rules.clicks', rules.negateMinClicks),
@@ -231,8 +254,9 @@ const rulesText = computed(() => {
 
 const rulesOpen = ref(false);
 async function onRulesSaved() {
-  rulesOpen.value = false;
+  // Erst neu laden, dann schließen: Wer den Dialog sofort wieder öffnet, sieht die gespeicherten Werte.
   await queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'analysis'] });
+  rulesOpen.value = false;
 }
 </script>
 
@@ -327,10 +351,17 @@ async function onRulesSaved() {
       </template>
 
       <template v-else>
+        <InlineError
+          v-if="analysis.isError.value"
+          :message="t('searchTerms.staleError')"
+          retryable
+          :retrying="analysis.isFetching.value"
+          @retry="analysis.refetch()"
+        />
         <section
           class="grid gap-gutter lg:grid-cols-12"
-          :aria-busy="analysis.isFetching.value"
-          :class="analysis.isFetching.value ? 'opacity-60' : ''"
+          :aria-busy="busy"
+          :class="busy ? 'opacity-60' : ''"
         >
           <div
             class="flex flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg lg:col-span-7"
@@ -338,7 +369,11 @@ async function onRulesSaved() {
             <h2 class="text-label-eyebrow uppercase text-ink-tertiary">
               {{ t('searchTerms.classification') }}
             </h2>
-            <div class="grid grid-cols-3 gap-space-sm">
+            <div
+              role="group"
+              :aria-label="t('searchTerms.classFilter')"
+              class="grid grid-cols-3 gap-space-sm"
+            >
               <button
                 v-for="entry in CLASSES"
                 :key="entry"
@@ -412,7 +447,11 @@ async function onRulesSaved() {
         </section>
 
         <section
-          class="flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
+          :class="[
+            'flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg',
+            busy ? 'opacity-60' : '',
+          ]"
+          :aria-busy="busy"
         >
           <div class="flex flex-wrap items-center gap-space-sm">
             <div role="group" :aria-label="t('searchTerms.view.label')" class="flex gap-space-xs">
@@ -473,7 +512,13 @@ async function onRulesSaved() {
               {{ t('searchTerms.noRows') }}
             </p>
             <p v-else-if="termRows.length === 0" class="text-body-md text-ink-secondary">
-              {{ t('searchTerms.noRowsInClass') }}
+              {{
+                t(
+                  meta?.truncated
+                    ? 'searchTerms.noRowsInClassTruncated'
+                    : 'searchTerms.noRowsInClass',
+                )
+              }}
             </p>
             <SearchTermGrid v-else :rows="termRows" :column-defs="termDefs" :total="total" />
           </template>

@@ -26,9 +26,12 @@ const update = useUpdateProtectedTerms();
 const text = ref('');
 const error = ref<string | null>(null);
 
+// Auf die ID hören, nicht auf das Objekt: Die Liste ersetzt den Client nach dem Speichern und beim Neuladen, das
+// darf weder eine laufende Eingabe noch eine laufende Speicherung zurücksetzen.
 watch(
-  () => props.client,
-  (client) => {
+  () => props.client?.id,
+  () => {
+    const client = props.client;
     if (!client) return;
     text.value = client.protectedTerms.join('\n');
     error.value = null;

@@ -9,6 +9,16 @@ describe('parseDecimalInput', () => {
     expect(parseDecimalInput('7')).toBe('7');
   });
 
+  it('liest führende Nullen und „0,0“ als Zahl; „1.000“ ist eins Komma null (kein Tausenderpunkt)', () => {
+    expect(parseDecimalInput('007')).toBe('007');
+    expect(percentToFraction('007')).toBe('0.07');
+    expect(parseDecimalInput('0,0')).toBe('0.0');
+    expect(parseDecimalInput('1.000')).toBe('1.000');
+    expect(percentToFraction('1.000')).toBe('0.01');
+    expect(percentToFraction('25.555')).toBe('0.25555');
+    expect(parseDecimalInput('5.')).toBeNull();
+  });
+
   it('lehnt Leeres, Vorzeichen, Exponenten und Text ab', () => {
     for (const text of ['', ' ', '-1', '1e3', 'abc', '1,2,3', '1.000,5']) {
       expect(parseDecimalInput(text), text).toBeNull();
