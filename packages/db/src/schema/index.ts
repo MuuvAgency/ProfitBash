@@ -6,3 +6,4 @@ export * from './saved-views';
 export * from './members';
 export * from './file-imports';
 export * from './search-terms';
+export * from './ad-changes';

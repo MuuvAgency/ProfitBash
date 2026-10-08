@@ -176,6 +176,13 @@
       "when": 1791464306762,
       "tag": "0024_search_term_rule_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791466851400,
+      "tag": "0025_ad_changes",
+      "breakpoints": true
     }
   ]
 }
