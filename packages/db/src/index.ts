@@ -21,3 +21,4 @@ export * from './saved-views';
 export * from './members';
 export * from './search-terms';
 export * from './ad-changes';
+export * from './ad-change-processing';
