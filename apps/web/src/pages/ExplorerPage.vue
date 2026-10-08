@@ -45,6 +45,7 @@ import {
   parseProductTerms,
   type GridSort,
 } from '../explorer/state';
+import { downloadCsv } from '../grid/csv';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
 import { explorerTarget, filtersFromView, viewState } from '../saved-views/view-state';
 import { useSessionStore } from '../stores/session';
@@ -380,17 +381,10 @@ function exportCsv() {
         total: formatNumber(d.totalRows, locale.value),
       })
     : undefined;
-  // BOM, damit Excel die Datei als UTF-8 liest (Umlaute). Trennzeichen Komma, Beträge mit Punkt (F7).
-  const content = `\uFEFF${grid.value.csv(note)}`;
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `profitbash-${level.value}-${range.value.from}_${range.value.to}.csv`;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  // Später freigeben: Manche Browser brechen den Download sonst ab.
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  downloadCsv(
+    `profitbash-${level.value}-${range.value.from}_${range.value.to}.csv`,
+    grid.value.csv(note),
+  );
 }
 
 const truncatedText = computed(() => {
