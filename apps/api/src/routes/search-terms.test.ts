@@ -386,12 +386,14 @@ describe('POST /api/ads/search-terms/analysis', () => {
           r.termReason,
           r.termTargets,
           r.termOnlyAcrossTargets,
-        ]);
+        ])
+        // Bei gleichem Spend entscheidet die zufällige Zeilen-ID über die Reihenfolge: nach Target ordnen.
+        .sort((x, y) => String(x[0]).localeCompare(String(y[0])));
     expect(byTerm('LED Lampe')).toEqual([['T1', 'watch', 'tooFewData', 'harvest', null, 2, true]]);
     expect(byTerm('led  lampe')).toEqual([['T2', 'watch', 'tooFewData', 'harvest', null, 2, true]]);
     expect(byTerm('lampe billig')).toEqual([
-      ['T2', 'watch', 'tooFewData', 'negate', null, 2, true],
       ['T1', 'watch', 'tooFewData', 'negate', null, 2, true],
+      ['T2', 'watch', 'tooFewData', 'negate', null, 2, true],
     ]);
     expect(byTerm('nordwind lampe')).toEqual([
       ['T1', 'watch', 'tooFewData', 'watch', 'protected', 2, false],
