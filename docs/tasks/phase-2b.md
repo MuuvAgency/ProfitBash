@@ -281,8 +281,7 @@ Geteilt in **2b.2a** (Engine, Leseschicht, API) und **2b.2b** (Oberfläche).
     bis − von ≤ 60). **Offen (Dominik bei Bedarf):** Ein falsch angegebener Zeitraum lässt sich nicht zurücknehmen
     (Tippfehler im Jahr ergibt einen dauerhaften Zeitraum in der Auswahl der Suchbegriff-Analyse; ein falscher, schon
     vorhandener Zeitraum wird für die Kampagnen der Datei überschrieben): Löschen eines Suchbegriff-Zeitraums und eine
-    Untergrenze (z. B. höchstens ein Jahr zurück) wären eigene kleine Aufgaben; die Analyse kennzeichnet von Hand
-    angegebene Zeiträume noch nicht. Bewusst so: Ablehnungen der API erscheinen oben im Dialog (nur wenn Browser- und
+    Untergrenze sind mit 2b.2d umgesetzt; die Analyse kennzeichnet von Hand angegebene Zeiträume noch nicht. Bewusst so: Ablehnungen der API erscheinen oben im Dialog (nur wenn Browser- und
     Server-Prüfung auseinanderlaufen); `max` der Datumsfelder wird bei der Dateiwahl bestimmt (die Prüfung beim Senden
     rechnet frisch).
 
@@ -329,6 +328,45 @@ Upload-Dialog mit Datei-Art SQP wie die Bulk-Datei; Client und Marktplatz kommen
     noch nicht angezeigt; die Oberfläche sendet keine `adProducts`.
   - **Offen:** Blick in die Browser-Pane (zweite Zeile bei schmaler Spalte, Mindestbreite 300 px, Dunkel-Modus): in dieser
     Session war der Zugriff auf die Browser-Pane gesperrt.
+
+#### 2b.2d Suchbegriff-Zeitraum löschen, Untergrenze für von Hand angegebene Zeiträume
+- [x] Ein Datei-Zeitraum der Suchbegriffe lässt sich löschen; von Hand angegebene Zeiträume dürfen höchstens 365 Tage
+      zurückliegen (offener Punkt aus 2b.2c).
+- [x] Umsetzung:
+  - **Löschen, DB** (`packages/db/src/search-terms.ts`): `deleteSearchTermPeriod` prüft das Profil über
+    `visibleProfilesScope()` und löscht in einer Transaktion alle Zeilen von Profil und exaktem Zeitraum (alle Ad-Typen),
+    dazu Audit `search_term_period.delete` (Profil, Zeitraum, `deletedRows`). `null` bei nicht sichtbarem Profil; 0 Zeilen
+    schreiben kein Audit-Event. Kampagnen, der Verlauf der Datei-Importe und andere Zeiträume bleiben.
+  - **Löschen, API:** `POST /api/ads/search-terms/periods/delete` (`profileId`, `periodStart`, `periodEnd`) →
+    `{ deletedRows }`; `404 PROFILE_NOT_FOUND`, `404 SEARCH_TERM_PERIOD_NOT_FOUND` (nur bei sichtbarem Profil erreichbar).
+    **Nur Org-Admins** mit Feature `sp-explorer` (dieselbe Prüfung wie der Upload): Der Server behält die Datei nicht, ein
+    gelöschter Zeitraum lässt sich nur durch erneutes Hochladen wiederherstellen, und hochladen dürfen nur Admins.
+    Entscheidung der Session nach dem Review (2026-10-08), Dominik kann sie auf das Recht `write` zurückstellen.
+  - **Löschen, Web:** Knopf „Zeitraum löschen“ neben der Zeitraum-Auswahl der Suchbegriff-Analyse (nur Admins), Dialog
+    `search-terms/DeletePeriodDialog.vue` mit Profil, Zeitraum und Zeilenzahl; er sagt, was bleibt, dass die Datei bzw.
+    die Dateien des Zeitraums erneut hochgeladen werden können und dass ein noch laufender Import den Zeitraum
+    zurückbringt. Fehler im Dialog; nach dem Erfolg bleibt er gesperrt, bis die Zeiträume neu geladen sind, dann fällt
+    die Auswahl auf den nächsten Zeitraum oder den Leerzustand.
+  - **Untergrenze** (`packages/shared/src/file-imports.ts`): `BULK_PERIOD_MAX_AGE_DAYS` (365), `oldestBulkPeriodStart`,
+    Befund `tooOld` in `bulkPeriodIssue` (erster Tag mehr als 365 Tage vor „heute“ in der Zeitzone des Profils, der
+    Grenztag ist erlaubt; geprüft nach `tooLong`). Wie `future` prüft das die DB-Schicht (`INVALID_PERIOD`), der Dialog
+    setzt `min` und meldet es bei den Feldern. Ein Zeitraum aus dem Dateinamen wird weiterhin nicht geprüft (alte
+    Konsolen-Dateien laufen).
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung, Löschbedingung, Audit in derselben Transaktion und
+    die Grenze (365 erlaubt, 366 abgelehnt, Schalttag) bestätigt. Übernommen: Löschen nur für Admins (vorher Recht
+    `write`, der Dialog versprach Editoren ein erneutes Hochladen, das sie nicht dürfen), kein zweites Absenden während
+    des Neuladens, „1 Zeile“, Text der Untergrenze nennt die Regel („Der erste Tag darf höchstens 365 Tage
+    zurückliegen“), API-Grenztest ohne Tageswechsel-Risiko (genaue Grenze im DB-Test mit fester Uhr), Tests für
+    unbekanntes Profil und verdrehten Zeitraum. Bestehende Tests mit festen September-2026-Zeiträumen bekamen eine feste
+    Uhr bzw. Tage relativ zu heute (sonst wären sie ab 2027 „zu alt“).
+  - **Bewusst so bzw. bekannte Grenzen:** keine Erfolgsmeldung nach dem Löschen (die App meldet Erfolge nirgends per
+    Toast; die Auswahl springt sichtbar weiter). Die Sichtbarkeit wird vor der Transaktion geprüft (wie beim Lesen).
+    Läuft gleichzeitig ein Import in denselben Zeitraum, kann das Löschen 0 Zeilen treffen (`404`) bzw. der Zeitraum
+    danach wieder erscheinen; keine Sperre. Nach dem Löschen des letzten Zeitraums fällt der Fokus auf die Seite (der
+    Knopf ist weg). Kein Test, dass Löschen und Audit-Event gemeinsam zurückrollen. Die Analyse kennzeichnet von Hand
+    angegebene Zeiträume weiter nicht.
+  - **Offen:** Blick in die Browser-Pane (Knopf neben der Auswahl, Dialog, Handy-Breite): in dieser Session war der
+    Zugriff auf die Browser-Pane gesperrt.
 
 #### Später (nur mit Datei)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt
