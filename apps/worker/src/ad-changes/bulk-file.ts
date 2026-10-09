@@ -81,7 +81,7 @@ function sdTargeting(targetType: string | null): BulkFileSdTargeting | null {
 }
 
 /** Gründe, aus denen `buildBulkSheet` eine Zeile auslässt, als Code und Text der Änderung. */
-const SKIPS: Record<BulkFileSkipReason, { code: string; message: string }> = {
+export const BULK_FILE_SKIPS: Record<BulkFileSkipReason, { code: string; message: string }> = {
   entityArchived: {
     code: 'BULK_FILE_ENTITY_ARCHIVED',
     message: 'Die Kampagne ist archiviert und lässt sich nicht mehr ändern.',
@@ -268,7 +268,7 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
       const kept = noDefaultBid ? group.filter((row) => row.field !== 'default_bid') : group;
       for (const row of group) {
         if (!kept.includes(row))
-          rejected.push({ changeId: row.id, ...SKIPS.notSupportedInBulkFile });
+          rejected.push({ changeId: row.id, ...BULK_FILE_SKIPS.notSupportedInBulkFile });
       }
       if (kept.length === 0) continue;
       const defaultBid = noDefaultBid ? undefined : value('default_bid');
@@ -377,7 +377,7 @@ export function buildSubmissionBulkFile(rows: readonly SubmissionChange[]): Subm
     const sheet = buildBulkSheet(kind, changes);
     for (const { ref, reason } of sheet.skipped) {
       for (const changeId of plan.changeIdsByRef.get(ref) ?? []) {
-        skipped.push({ changeId, ...SKIPS[reason] });
+        skipped.push({ changeId, ...BULK_FILE_SKIPS[reason] });
       }
     }
     // Ein Blatt nur mit Kopfzeile bleibt weg.

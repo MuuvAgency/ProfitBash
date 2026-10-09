@@ -1,0 +1,193 @@
+import type { CampaignSetupItemRow } from '@profitbash/db';
+import { openXlsx } from '@profitbash/sheets';
+import { describe, expect, it } from 'vitest';
+import { buildSetupBulkFile } from './bulk-file';
+
+/** Bulk-Datei einer Setup-Übermittlung (`phase-4.md` 4.4): je Anlage eine `Create`-Zeile mit Text-IDs. */
+
+const NAME = 'SP | EXACT | Flaschen';
+let position = 0;
+const item = (
+  payload: CampaignSetupItemRow['payload'],
+  overrides: Partial<CampaignSetupItemRow> = {},
+): CampaignSetupItemRow => ({
+  id: `item-${position}`,
+  submissionId: 'sub',
+  position: position++,
+  entityType: payload.entity,
+  campaignRef: NAME,
+  adGroupRef: payload.entity === 'campaign' || payload.entity === 'placement' ? null : NAME,
+  payload,
+  status: 'submitted',
+  amazonEntityId: null,
+  errorCode: null,
+  errorMessage: null,
+  ...overrides,
+});
+
+const campaign = (
+  overrides: Partial<Extract<CampaignSetupItemRow['payload'], { entity: 'campaign' }>> = {},
+) =>
+  item({
+    entity: 'campaign',
+    adProduct: 'SP',
+    name: NAME,
+    targetingType: 'manual',
+    state: 'ENABLED',
+    dailyBudget: '25.00',
+    currencyCode: 'EUR',
+    biddingStrategy: 'SALES_DOWN_ONLY',
+    offAmazon: false,
+    ...overrides,
+  });
+
+function read(content: Uint8Array) {
+  const workbook = openXlsx(content);
+  const rows: string[][] = [];
+  workbook.forEachRow('Sponsored Products Campaigns', (cells) => rows.push(cells));
+  const [header, ...data] = rows;
+  return {
+    sheets: workbook.sheets.map((sheet) => sheet.name),
+    rows: data.map((cells) =>
+      Object.fromEntries(
+        header!.flatMap((column, index) => (cells[index] ? [[column, cells[index]]] : [])),
+      ),
+    ),
+  };
+}
+
+describe('buildSetupBulkFile', () => {
+  it('schreibt eine Zeile je Anlage mit Startdatum und Text-IDs', () => {
+    const items = [
+      campaign(),
+      item({ entity: 'placement', placement: 'PLACEMENT_TOP', percentage: 20 }),
+      item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+      item({ entity: 'product_ad', asin: 'B0TEST0001', sku: 'SKU-1' }),
+      item({ entity: 'keyword', text: 'trinkflasche', matchType: 'exact', bid: '0.90' }),
+      item({
+        entity: 'product_target',
+        expression: { type: 'category', value: '12345' },
+        bid: '0.40',
+      }),
+      item({ entity: 'negative_keyword', text: 'glas', matchType: 'negativePhrase' }),
+      item({ entity: 'negative_product_target', asin: 'B0FREMD002' }),
+    ];
+    const file = buildSetupBulkFile(items, {
+      countryCode: 'DE',
+      accountType: 'seller',
+      startDate: '2026-10-09',
+    });
+    expect(file.skipped).toEqual([]);
+    expect(file.rows).toBe(8);
+    const { sheets, rows } = read(file.content!);
+    expect(sheets).toEqual(['Sponsored Products Campaigns']);
+    expect(rows.map((row) => row.Entity)).toEqual([
+      'Campaign',
+      'Bidding Adjustment',
+      'Ad Group',
+      'Product Ad',
+      'Keyword',
+      'Product Targeting',
+      'Negative Keyword',
+      'Negative Product Targeting',
+    ]);
+    expect(rows[0]).toMatchObject({
+      Operation: 'Create',
+      'Campaign ID': NAME,
+      'Campaign Name': NAME,
+      'Start Date': '20261009',
+      'Targeting Type': 'Manual',
+      State: 'enabled',
+      'Daily Budget': '25.00',
+    });
+    expect(rows[0]).not.toHaveProperty('Off-Amazon ad serving');
+    expect(rows[3]).toMatchObject({ SKU: 'SKU-1', 'Ad Group ID': NAME });
+    expect(rows[3]).not.toHaveProperty('ASIN');
+  });
+
+  it('schreibt bei Vendoren die ASIN der Anzeige', () => {
+    const file = buildSetupBulkFile(
+      [
+        campaign(),
+        item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+        item({ entity: 'product_ad', asin: 'B0TEST0001', sku: null }),
+      ],
+      { countryCode: 'DE', accountType: 'vendor', startDate: '2026-10-09' },
+    );
+    expect(read(file.content!).rows[2]).toMatchObject({ ASIN: 'B0TEST0001' });
+  });
+
+  it('sperrt Off-Amazon in den USA, wenn es nicht freigeschaltet ist (F-S7)', () => {
+    const blocked = buildSetupBulkFile([campaign()], {
+      countryCode: 'US',
+      accountType: 'seller',
+      startDate: '2026-10-09',
+    });
+    expect(read(blocked.content!).rows[0]).toMatchObject({
+      'Off-Amazon ad serving': 'Limit off-Amazon spend',
+    });
+    const unlocked = buildSetupBulkFile([campaign({ offAmazon: true })], {
+      countryCode: 'US',
+      accountType: 'seller',
+      startDate: '2026-10-09',
+    });
+    expect(read(unlocked.content!).rows[0]).toMatchObject({
+      'Off-Amazon ad serving': 'Increase reach',
+    });
+  });
+
+  it('lässt Kinder weg, deren Kampagne bzw. Ad Group nicht in die Datei kommt', () => {
+    const bad = campaign({ dailyBudget: '0' });
+    const okCampaign = item(
+      {
+        entity: 'campaign',
+        adProduct: 'SP',
+        name: 'Zweite',
+        targetingType: 'auto',
+        state: 'PAUSED',
+        dailyBudget: '10.00',
+        currencyCode: 'EUR',
+        biddingStrategy: 'NONE',
+        offAmazon: false,
+      },
+      { campaignRef: 'Zweite' },
+    );
+    const badAdGroup = item(
+      { entity: 'ad_group', name: 'Zweite', defaultBid: '0' },
+      { campaignRef: 'Zweite', adGroupRef: 'Zweite' },
+    );
+    const items = [
+      bad,
+      item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+      okCampaign,
+      badAdGroup,
+      item(
+        { entity: 'product_ad', asin: 'B0TEST0001', sku: 'SKU-1' },
+        { campaignRef: 'Zweite', adGroupRef: 'Zweite' },
+      ),
+    ];
+    const file = buildSetupBulkFile(items, {
+      countryCode: 'DE',
+      accountType: 'seller',
+      startDate: '2026-10-09',
+    });
+    expect(file.skipped.map(({ itemId, code }) => [itemId, code])).toEqual([
+      [items[0]!.id, 'BULK_FILE_INVALID_VALUE'],
+      [items[1]!.id, 'PARENT_NOT_CREATED'],
+      [items[3]!.id, 'BULK_FILE_INVALID_VALUE'],
+      [items[4]!.id, 'PARENT_NOT_CREATED'],
+    ]);
+    expect(read(file.content!).rows.map((row) => row['Campaign ID'])).toEqual(['Zweite']);
+  });
+
+  it('nimmt nur offene und angelegte Zeilen; Kinder gescheiterter Kampagnen fallen weg', () => {
+    const failed = campaign({ adProduct: 'SD' });
+    failed.status = 'failed';
+    const file = buildSetupBulkFile(
+      [failed, item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' })],
+      { countryCode: 'DE', accountType: 'seller', startDate: '2026-10-09' },
+    );
+    expect(file).toMatchObject({ content: null, rows: 0 });
+    expect(file.skipped.map((skip) => skip.code)).toEqual(['PARENT_NOT_CREATED']);
+  });
+});
