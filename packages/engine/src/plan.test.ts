@@ -117,6 +117,29 @@ describe('buildCampaignPlan: Struktur und Namen', () => {
     expect(negatives('SP-BRAND-DEF')).toEqual([]);
   });
 
+  it('prüft Namen gegen die Höchstlänge des Kontos (Vendoren 116 Zeichen)', () => {
+    const group = { name: 'g'.repeat(105), items: [{ asin: 'B0FLASCHE1', sku: null, isHero: true }] };
+    const profile = { countryCode: 'DE', currencyCode: 'EUR', accountType: 'vendor', clientName: null };
+    const vendor = buildCampaignPlan(base({ profile, productGroup: group }));
+    const seller = buildCampaignPlan(
+      base({
+        profile: { ...profile, accountType: 'seller' },
+        productGroup: { ...group, items: [{ ...group.items[0]!, sku: 'FL' }] },
+      }),
+    );
+    const tooLong = (plan: ReturnType<typeof buildCampaignPlan>) =>
+      plan.hints.filter(
+        (hint) =>
+          hint.code === 'campaignNameInvalid' &&
+          hint.issue === 'tooLong' &&
+          hint.campaign === one(plan.campaigns, 'SP-AUTO').name,
+      );
+
+    expect(one(vendor.campaigns, 'SP-AUTO').name.length).toBe(117);
+    expect(tooLong(vendor)).toHaveLength(1);
+    expect(tooLong(seller)).toEqual([]);
+  });
+
   it('bewirbt den Hero, bei Display und Marken-Anzeigen alle Produkte; Vendoren ohne SKU', () => {
     const { campaigns } = buildCampaignPlan(base());
     expect(one(campaigns, 'SP-AUTO').ads).toEqual([{ asin: 'B0FLASCHE1', sku: 'FL-750' }]);
