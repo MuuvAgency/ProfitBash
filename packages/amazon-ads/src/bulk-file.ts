@@ -48,6 +48,8 @@ export const SP_BULK_COLUMNS = [
   'Placement',
   'Percentage',
   'Product Targeting Expression',
+  // Nur für Anlagen (4.4): laut Guide „Availability: US“, Werte `Increase reach` | `Limit off-Amazon spend`.
+  'Off-Amazon ad serving',
 ] as const;
 export type SpBulkColumn = (typeof SP_BULK_COLUMNS)[number];
 
@@ -245,7 +247,77 @@ interface TargetParentIds {
 /** Sponsored Display trennt Targets in zwei Entities; bei SP und SB ohne Bedeutung. */
 export type BulkFileSdTargeting = 'contextual' | 'audience';
 
+/** Status einer neuen Entity: Amazon nimmt beim Anlegen nur `enabled` und `paused` an. */
+type CreateState = AmazonAdsWriteState;
+
+/**
+ * Text-IDs von Kampagne und Ad Group einer Anlage (`phase-4.md` 4.4): Neue Entities tragen in `Campaign ID` bzw.
+ * `Ad Group ID` eine **vorläufige Text-ID**, die Kinder nennen dieselbe. Amazon vergibt beim Hochladen die echten
+ * IDs; ProfitBash ordnet sie über den Namen zu (nächster Bulk-Import). Eine Text-ID darf nicht nur aus Ziffern
+ * bestehen (sonst wäre sie eine echte ID).
+ */
+interface CreateParents {
+  campaignId: string;
+  adGroupId: string;
+}
+
+/** Anlage einer Entity für Sponsored Products (Guide „How to create Sponsored Products campaigns“). */
+export type BulkFileCreate = { type: 'create' } & (
+  | {
+      entity: 'campaign';
+      /** Vorläufige Text-ID (der Guide nimmt den Namen). */
+      campaignId: string;
+      name: string;
+      targetingType: 'auto' | 'manual';
+      state: CreateState;
+      dailyBudget: string;
+      /** `YYYY-MM-DD`; heute oder später (Amazon lehnt vergangene Tage ab). */
+      startDate: string;
+      biddingStrategy: AmazonAdsBiddingStrategy;
+      amazonPortfolioId: string | null;
+      /** Nur in den USA einstellbar; `null` lässt Amazons Standard. */
+      offAmazon: 'increaseReach' | 'limitSpend' | null;
+    }
+  | { entity: 'placement'; campaignId: string; placement: string; percentage: string }
+  | {
+      entity: 'adGroup';
+      campaignId: string;
+      adGroupId: string;
+      name: string;
+      defaultBid: string;
+      state: CreateState;
+    }
+  | ({
+      entity: 'productAd';
+      /** Seller: SKU; Vendor: ASIN (genau eins von beiden). */
+      sku: string | null;
+      asin: string | null;
+      state: CreateState;
+    } & CreateParents)
+  | ({
+      entity: 'keyword';
+      keywordText: string;
+      matchType: 'exact' | 'phrase' | 'broad';
+      /** Ohne Gebot gilt das Standardgebot der Ad Group. */
+      bid: string | null;
+      state: CreateState;
+    } & CreateParents)
+  | ({
+      entity: 'productTarget';
+      expression: { type: 'asin' | 'asinExpanded' | 'category'; value: string };
+      bid: string | null;
+      state: CreateState;
+    } & CreateParents)
+  | ({
+      entity: 'negativeKeyword';
+      keywordText: string;
+      matchType: 'negativeExact' | 'negativePhrase';
+    } & CreateParents)
+  | ({ entity: 'negativeProductTarget'; asin: string } & CreateParents)
+);
+
 export type BulkFileChange = { ref: string } & (
+  | BulkFileCreate
   | {
       type: 'campaign';
       campaign: BulkFileCampaign;
@@ -341,6 +413,8 @@ const PLACEMENTS = new Map([
   ['PLACEMENT_PRODUCT_PAGE', 'Placement Product Page'],
   ['SITE_AMAZON_BUSINESS', 'Placement Amazon Business'],
 ]);
+const OFF_AMAZON = { increaseReach: 'Increase reach', limitSpend: 'Limit off-Amazon spend' } as const;
+const EXPRESSIONS = { asin: 'asin', asinExpanded: 'asin-expanded', category: 'category' } as const;
 const SD_TARGETING_ENTITIES = {
   contextual: 'Contextual Targeting',
   audience: 'Audience Targeting',
@@ -370,6 +444,30 @@ function mapped(map: ReadonlyMap<string, string>, value: string | null | undefin
   if (result === undefined) throw invalid();
   return result;
 }
+
+/** Text ohne Ränder, nicht leer und ohne Steuerzeichen (Namen, Keywords, SKU). */
+function text(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === '' || /\p{Cc}/u.test(trimmed)) throw invalid();
+  return trimmed;
+}
+
+/** Vorläufige Text-ID einer neuen Kampagne bzw. Ad Group: Text, aber keine Zahl (sonst eine echte ID). */
+function textId(value: string): string {
+  const result = text(value);
+  if (/^\d+$/.test(result)) throw invalid();
+  return result;
+}
+
+const asinOf = (value: string) => {
+  if (!/^[A-Z0-9]{10}$/.test(value)) throw invalid();
+  return value;
+};
+
+const percentageOf = (value: string): BulkFileCell => {
+  if (!/^(0|[1-9]\d{0,2})$/.test(value) || Number(value) > 900) throw invalid();
+  return { number: value };
+};
 
 /** `YYYY-MM-DD` → `YYYYMMDD`, nur für Tage, die es gibt. */
 function date(value: string): string {
@@ -455,9 +553,7 @@ function rowFor(change: BulkFileChange, context: Context): Row {
       return campaignRow(change, context);
     case 'placement': {
       if (kind !== 'sp') throw notSupported();
-      if (!/^(0|[1-9]\d{0,2})$/.test(change.percentage) || Number(change.percentage) > 900) {
-        throw invalid();
-      }
+      const percentage = percentageOf(change.percentage);
       return {
         Entity: 'Bidding Adjustment',
         Operation: 'Update',
@@ -467,9 +563,13 @@ function rowFor(change: BulkFileChange, context: Context): Row {
           context.strategyByCampaign.get(change.amazonCampaignId) ?? change.biddingStrategy,
         ),
         Placement: mapped(PLACEMENTS, change.placement),
-        Percentage: { number: change.percentage },
+        Percentage: percentage,
       };
     }
+    case 'create':
+      // Anlagen gibt es in Phase 4 zuerst nur für Sponsored Products (F1: SD mit 4.9, SB mit 4.10).
+      if (kind !== 'sp') throw notSupported();
+      return createRow(change);
     case 'adGroup':
       // Das ältere SB-Blatt kennt keine Ad-Group-Zeilen, SB-Ad-Groups haben kein Standardgebot.
       if (kind === 'sb' || (kind === 'sbMultiAdGroup' && change.defaultBid !== undefined)) {
@@ -558,6 +658,99 @@ function rowFor(change: BulkFileChange, context: Context): Row {
   }
 }
 
+function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
+  const create = { Operation: 'Create' } as const;
+  const state = (value: CreateState) => ({ State: mapped(STATES, value) });
+  const parents = (ids: CreateParents): Row => ({
+    'Campaign ID': textId(ids.campaignId),
+    'Ad Group ID': textId(ids.adGroupId),
+  });
+  switch (change.entity) {
+    case 'campaign':
+      return {
+        Entity: 'Campaign',
+        ...create,
+        'Campaign ID': textId(change.campaignId),
+        'Campaign Name': text(change.name),
+        'Start Date': date(change.startDate),
+        'Targeting Type': change.targetingType === 'auto' ? 'Auto' : 'Manual',
+        ...state(change.state),
+        'Daily Budget': amount(change.dailyBudget),
+        'Bidding Strategy': mapped(STRATEGIES, change.biddingStrategy),
+        ...(change.amazonPortfolioId !== null && { 'Portfolio ID': id(change.amazonPortfolioId) }),
+        ...(change.offAmazon !== null && { 'Off-Amazon ad serving': OFF_AMAZON[change.offAmazon] }),
+      };
+    case 'placement':
+      // Der Guide lässt die Strategie hier leer: Sie steht in der Kampagnenzeile.
+      return {
+        Entity: 'Bidding Adjustment',
+        ...create,
+        'Campaign ID': textId(change.campaignId),
+        Placement: mapped(PLACEMENTS, change.placement),
+        Percentage: percentageOf(change.percentage),
+      };
+    case 'adGroup':
+      return {
+        Entity: 'Ad Group',
+        ...create,
+        'Campaign ID': textId(change.campaignId),
+        'Ad Group ID': textId(change.adGroupId),
+        'Ad Group Name': text(change.name),
+        ...state(change.state),
+        'Ad Group Default Bid': amount(change.defaultBid),
+      };
+    case 'productAd':
+      // Seller nennen die SKU, Vendoren die ASIN (Guide), nie beides.
+      if ((change.sku === null) === (change.asin === null)) throw invalid();
+      return {
+        Entity: 'Product Ad',
+        ...create,
+        ...parents(change),
+        ...state(change.state),
+        ...(change.sku !== null ? { SKU: text(change.sku) } : { ASIN: asinOf(change.asin!) }),
+      };
+    case 'keyword':
+      return {
+        Entity: 'Keyword',
+        ...create,
+        ...parents(change),
+        ...state(change.state),
+        ...(change.bid !== null && { Bid: amount(change.bid) }),
+        'Keyword Text': text(change.keywordText),
+        'Match Type': change.matchType,
+      };
+    case 'productTarget': {
+      const { type, value } = change.expression;
+      if (type === 'category' ? !/^\d+$/.test(value) : asinOf(value) !== value) throw invalid();
+      return {
+        Entity: 'Product Targeting',
+        ...create,
+        ...parents(change),
+        ...state(change.state),
+        ...(change.bid !== null && { Bid: amount(change.bid) }),
+        'Product Targeting Expression': `${EXPRESSIONS[type]}="${value}"`,
+      };
+    }
+    case 'negativeKeyword':
+      return {
+        Entity: 'Negative Keyword',
+        ...create,
+        ...parents(change),
+        State: 'enabled',
+        'Keyword Text': text(change.keywordText),
+        'Match Type': change.matchType,
+      };
+    case 'negativeProductTarget':
+      return {
+        Entity: 'Negative Product Targeting',
+        ...create,
+        ...parents(change),
+        State: 'enabled',
+        'Product Targeting Expression': `asin="${asinOf(change.asin)}"`,
+      };
+  }
+}
+
 function archiveRow(
   change: Extract<BulkFileChange, { type: 'archive' }>,
   { kind, sheet }: Context,
@@ -634,11 +827,42 @@ function entityKey(change: BulkFileChange): string | null {
       return `${change.entity}:${change.amazonId}`;
     case 'createNegative':
       return null;
+    case 'create':
+      return createKey(change);
+  }
+}
+
+/** Dieselbe Anlage zweimal ergäbe eine Fehlerzeile bzw. eine doppelte Entity (ohne Groß/Klein wie Amazon). */
+function createKey(change: Extract<BulkFileChange, { type: 'create' }>): string {
+  const lower = (value: string) => value.trim().toLowerCase();
+  switch (change.entity) {
+    case 'campaign':
+      return `create:campaign:${lower(change.campaignId)}`;
+    case 'placement':
+      return `create:placement:${lower(change.campaignId)}:${change.placement}`;
+    case 'adGroup':
+      return `create:adGroup:${lower(change.campaignId)}:${lower(change.adGroupId)}`;
+  }
+  const parent = `${lower(change.campaignId)}:${lower(change.adGroupId)}`;
+  switch (change.entity) {
+    case 'productAd':
+      return `create:productAd:${parent}:${lower(change.sku ?? change.asin ?? '')}`;
+    case 'keyword':
+    case 'negativeKeyword':
+      return `create:${change.entity}:${parent}:${change.matchType}:${lower(change.keywordText)}`;
+    case 'productTarget':
+      return `create:productTarget:${parent}:${change.expression.type}:${lower(change.expression.value)}`;
+    case 'negativeProductTarget':
+      return `create:negativeProductTarget:${parent}:${lower(change.asin)}`;
   }
 }
 
 const campaignIdOf = (change: BulkFileChange) =>
-  change.type === 'campaign' ? change.campaign.amazonCampaignId : change.amazonCampaignId;
+  change.type === 'campaign'
+    ? change.campaign.amazonCampaignId
+    : change.type === 'create'
+      ? change.campaignId
+      : change.amazonCampaignId;
 
 /**
  * Zeilen eines Blatts der Bulk-Datei für die Änderungen eines Profils, in der Reihenfolge der Eingabe. Was sich

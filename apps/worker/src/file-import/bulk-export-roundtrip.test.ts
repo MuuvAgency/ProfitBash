@@ -20,6 +20,7 @@ import {
   parseTargetExpression,
   PLACEMENTS,
   STATES,
+  TARGETING_TYPES,
   type BulkColumn,
 } from './bulk-columns';
 
@@ -418,5 +419,151 @@ describe('Bulk-Datei für SB und SD: Rundlauf mit dem Leser des Bulk-Imports', (
       targetType: 'product',
       expression: { asin: 'B0FREMD003' },
     });
+  });
+});
+
+/**
+ * Rundlauf für Anlagen (`phase-4.md` 4.4): eine neue Kampagne mit allen Entities unter vorläufigen Text-IDs. Der
+ * Import liest heruntergeladene Dateien mit echten IDs; hier zählt, dass Entity-Namen, Werte und Ausdrücke dieselben
+ * sind, die er kennt (die Text-IDs selbst liest er als ungültige ID, das ist richtig so).
+ */
+describe('Bulk-Datei für Anlagen: Rundlauf mit dem Leser des Bulk-Imports', () => {
+  const ids = { campaignId: 'SP | EXACT | Lampen', adGroupId: 'SP | EXACT | Lampen' };
+  const creates: BulkFileChange[] = [
+    {
+      ref: 'c',
+      type: 'create',
+      entity: 'campaign',
+      campaignId: ids.campaignId,
+      name: 'SP | EXACT | Lampen',
+      targetingType: 'manual',
+      state: 'ENABLED',
+      dailyBudget: '30.00',
+      startDate: '2026-10-09',
+      biddingStrategy: 'SALES_DOWN_ONLY',
+      amazonPortfolioId: '9001',
+      offAmazon: null,
+    },
+    {
+      ref: 'p',
+      type: 'create',
+      entity: 'placement',
+      campaignId: ids.campaignId,
+      placement: 'PLACEMENT_TOP',
+      percentage: '25',
+    },
+    {
+      ref: 'g',
+      type: 'create',
+      entity: 'adGroup',
+      ...ids,
+      name: 'SP | EXACT | Lampen',
+      defaultBid: '0.80',
+      state: 'ENABLED',
+    },
+    {
+      ref: 'a',
+      type: 'create',
+      entity: 'productAd',
+      ...ids,
+      sku: 'LAMPE-1',
+      asin: null,
+      state: 'ENABLED',
+    },
+    {
+      ref: 'k',
+      type: 'create',
+      entity: 'keyword',
+      ...ids,
+      keywordText: 'stehlampe holz',
+      matchType: 'broad',
+      bid: '0.75',
+      state: 'ENABLED',
+    },
+    {
+      ref: 't',
+      type: 'create',
+      entity: 'productTarget',
+      ...ids,
+      expression: { type: 'asinExpanded', value: 'B0FREMD004' },
+      bid: null,
+      state: 'ENABLED',
+    },
+    {
+      ref: 'cat',
+      type: 'create',
+      entity: 'productTarget',
+      ...ids,
+      expression: { type: 'category', value: '5524098011' },
+      bid: '0.40',
+      state: 'ENABLED',
+    },
+    {
+      ref: 'n',
+      type: 'create',
+      entity: 'negativeKeyword',
+      ...ids,
+      keywordText: 'deckenlampe',
+      matchType: 'negativeExact',
+    },
+  ];
+
+  it('liest Entities, Werte und Ausdrücke einer neuen Kampagne zurück', () => {
+    const sheet = buildSpBulkSheet(creates);
+    expect(sheet.skipped).toEqual([]);
+    const workbook = openXlsx(writeXlsx([{ name: sheet.sheetName, rows: sheet.rows }]));
+    const rows: string[][] = [];
+    workbook.forEachRow(sheet.sheetName, (cells) => rows.push(cells));
+    const [header, ...data] = rows;
+    const columns = mapHeader(header!);
+    const cell = (row: number, column: BulkColumn) => data[row]![columns.get(column)!] ?? '';
+    const operation = (row: number) => data[row]![header!.indexOf('Operation')];
+
+    expect(data.map((_, row) => entityKind(cell(row, 'entity')))).toEqual([
+      'campaign',
+      'biddingAdjustment',
+      'adGroup',
+      'productAd',
+      'keyword',
+      'productTargeting',
+      'productTargeting',
+      'negativeKeyword',
+    ]);
+    expect(data.map((_, row) => operation(row))).toEqual(Array(8).fill('Create'));
+    expect(data.map((_, row) => cell(row, 'campaignId'))).toEqual(
+      Array(8).fill('SP | EXACT | Lampen'),
+    );
+    expect(parseBulkId(cell(0, 'campaignId'), false)).toBe('invalid');
+
+    expect(cell(0, 'campaignName')).toBe('SP | EXACT | Lampen');
+    expect(parseBulkDate(cell(0, 'startDate'))).toBe('2026-10-09');
+    expect(mapValue(TARGETING_TYPES, cell(0, 'targetingType'))).toEqual({
+      value: 'MANUAL',
+      known: true,
+    });
+    expect(mapValue(STATES, cell(0, 'state'))).toEqual({ value: 'ENABLED', known: true });
+    expect(parseBulkAmount(cell(0, 'dailyBudget'))).toBe('30');
+    expect(mapValue(BIDDING_STRATEGIES, cell(0, 'biddingStrategy'))).toEqual({
+      value: 'SALES_DOWN_ONLY',
+      known: true,
+    });
+    expect(mapValue(PLACEMENTS, cell(1, 'placement'))).toEqual({
+      value: 'PLACEMENT_TOP',
+      known: true,
+    });
+    expect(cell(2, 'adGroupName')).toBe('SP | EXACT | Lampen');
+    expect(parseBulkAmount(cell(2, 'adGroupDefaultBid'))).toBe('0.8');
+    expect(cell(3, 'sku')).toBe('LAMPE-1');
+    expect(mapValue(MATCH_TYPES, cell(4, 'matchType'))).toEqual({ value: 'BROAD', known: true });
+    expect(parseTargetExpression(cell(5, 'productTargetingExpression'), '')).toMatchObject({
+      targetType: 'product',
+      matchType: 'PRODUCT_SIMILAR',
+      expression: { asin: 'B0FREMD004' },
+    });
+    expect(parseTargetExpression(cell(6, 'productTargetingExpression'), '')).toMatchObject({
+      targetType: 'category',
+      expression: { productCategoryId: '5524098011' },
+    });
+    expect(mapValue(MATCH_TYPES, cell(7, 'matchType'))).toEqual({ value: 'EXACT', known: true });
   });
 });
