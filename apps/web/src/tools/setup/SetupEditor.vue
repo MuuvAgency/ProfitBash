@@ -16,6 +16,7 @@ import type {
   ProductGroupListData,
   SetupDraftData,
   SetupIssueData,
+  SourceNegativeData,
 } from '../../api/client';
 import InlineError from '../../components/common/InlineError.vue';
 import { errorMessageKey } from '../../i18n';
@@ -35,6 +36,7 @@ import {
   type SetupInputs,
   type SetupTexts,
 } from './inputs';
+import HarvestPicker from './HarvestPicker.vue';
 import { groupedIssues, issueText, sortedIssues } from './issues';
 
 /**
@@ -66,6 +68,15 @@ const productGroupId = ref<string | null>(props.draft?.productGroupId ?? null);
 const presetKey = ref<string | null>(props.draft?.presetKey ?? null);
 const texts = ref<SetupTexts>(props.draft ? inputsToTexts(props.draft.inputs) : emptyTexts());
 const unlocks = ref<SetupInputs['unlocks']>({ ...(props.draft?.inputs.unlocks ?? {}) });
+/** Gewählte Begriffe der Merkliste (4.6) und die Negativ-Vorschläge für ihre Quellen (F7). */
+const harvest = ref<SetupInputs['harvest']>(
+  (props.draft?.inputs.harvest ?? []).map((entry) => ({ ...entry })),
+);
+const sourceNegatives = ref<SourceNegativeData[]>(
+  props.draft
+    ? (JSON.parse(JSON.stringify(props.draft.sourceNegatives)) as SourceNegativeData[])
+    : [],
+);
 const useProfileBids = ref(true);
 const name = ref(props.draft?.name ?? '');
 const paused = ref(props.draft?.campaignState === 'PAUSED');
@@ -110,8 +121,12 @@ watch(productGroupId, (next) => {
 });
 // Der Plan passt nach einer Änderung der Eingaben nicht mehr: neu planen.
 const planStale = ref(false);
+// Ein anderes Profil hat eine andere Merkliste.
+watch(profileId, (next, previous) => {
+  if (previous !== null && next !== previous) harvest.value = [];
+});
 watch(
-  [profileId, productGroupId, presetKey, texts, unlocks, useProfileBids],
+  [profileId, productGroupId, presetKey, texts, unlocks, useProfileBids, harvest],
   () => (planStale.value = true),
   {
     deep: true,
@@ -122,9 +137,19 @@ watch(
 
 const planMutation = usePlanSetup();
 const planErrorKey = ref<string | null>(null);
-const canPlan = computed(
-  () => editable.value && profileId.value && productGroupId.value && presetKey.value,
+const MONEY = /^\d{1,7}(\.\d{1,2})?$/;
+const harvestValid = computed(() =>
+  harvest.value.every((entry) => entry.bid === undefined || MONEY.test(entry.bid)),
 );
+const canPlan = computed(
+  () =>
+    editable.value &&
+    profileId.value &&
+    productGroupId.value &&
+    presetKey.value &&
+    harvestValid.value,
+);
+const currentInputs = () => textsToInputs(texts.value, unlocks.value, harvest.value);
 async function plan() {
   if (!canPlan.value || planMutation.isPending.value) return;
   planErrorKey.value = null;
@@ -133,10 +158,14 @@ async function plan() {
       profileId: profileId.value!,
       productGroupId: productGroupId.value!,
       presetKey: presetKey.value!,
-      inputs: textsToInputs(texts.value, unlocks.value),
+      inputs: currentInputs(),
       useProfileBids: useProfileBids.value,
+      deselectedSources: sourceNegatives.value
+        .filter((entry) => !entry.selected)
+        .map((entry) => entry.markId),
     });
     campaigns.value = result.campaigns;
+    sourceNegatives.value = result.sourceNegatives;
     hints.value = result.hints;
     const currency = result.campaigns[0]?.currencyCode ?? 'EUR';
     rateNote.value =
@@ -171,7 +200,6 @@ async function plan() {
 
 // --- Vorschau bearbeiten -----------------------------------------------------------------
 
-const MONEY = /^\d{1,7}(\.\d{1,2})?$/;
 const money = (value: string) => formatNumber(value, locale.value, { minimumFractionDigits: 2 });
 const amountValid = (value: string) => MONEY.test(value);
 const allAmountsValid = computed(() =>
@@ -238,8 +266,9 @@ async function saveDraft(): Promise<boolean> {
         presetKey: presetKey.value!,
         name: name.value,
         campaignState: paused.value ? 'PAUSED' : 'ENABLED',
-        inputs: textsToInputs(texts.value, unlocks.value),
+        inputs: currentInputs(),
         campaigns: campaigns.value,
+        sourceNegatives: sourceNegatives.value,
       },
     });
     draftId.value = saved.id;
@@ -308,6 +337,8 @@ function snapshot() {
     campaigns.value,
     texts.value,
     unlocks.value,
+    harvest.value,
+    sourceNegatives.value,
   ]);
 }
 const savedSnapshot = ref(snapshot());
@@ -412,6 +443,12 @@ function close() {
           />
         </div>
       </div>
+      <HarvestPicker
+        v-if="profileId"
+        v-model="harvest"
+        :profile-id="profileId"
+        :disabled="!editable"
+      />
       <div v-if="unlockable.length" class="flex flex-col gap-space-xs">
         <span :class="labelClass">{{ t('setup.unlocks') }}</span>
         <p class="text-body-sm text-ink-secondary">{{ t('setup.unlockHint') }}</p>
@@ -530,11 +567,11 @@ function close() {
                   v-if="editable"
                   v-model="campaign.dailyBudget"
                   :data-campaign-budget="campaign.name"
-                  @input="amountEdited(campaign.name)"
                   inputmode="decimal"
                   :aria-label="t('setup.preview.budgetLabel', { name: campaign.name })"
                   :aria-invalid="!amountValid(campaign.dailyBudget)"
                   :class="[inputClass, 'h-9 w-24 text-right font-data tabular-nums']"
+                  @input="amountEdited(campaign.name)"
                 />
                 <span v-else class="font-data tabular-nums">{{ money(campaign.dailyBudget) }}</span>
               </td>
@@ -543,11 +580,11 @@ function close() {
                   v-if="editable"
                   v-model="campaign.adGroup.defaultBid"
                   :data-campaign-bid="campaign.name"
-                  @input="amountEdited(campaign.name)"
                   inputmode="decimal"
                   :aria-label="t('setup.preview.bidLabel', { name: campaign.name })"
                   :aria-invalid="!amountValid(campaign.adGroup.defaultBid)"
                   :class="[inputClass, 'h-9 w-24 text-right font-data tabular-nums']"
+                  @input="amountEdited(campaign.name)"
                 />
                 <span v-else class="font-data tabular-nums">{{
                   money(campaign.adGroup.defaultBid)
@@ -581,6 +618,29 @@ function close() {
       <p v-if="!allAmountsValid" role="alert" class="text-body-sm text-on-loss-wash">
         {{ t('setup.preview.invalidAmount') }}
       </p>
+
+      <!-- Negativ in der Quelle der Harvest-Begriffe (4.6, F7), abwählbar -->
+      <div v-if="sourceNegatives.length" data-source-negatives class="flex flex-col gap-space-xs">
+        <h3 :class="labelClass">{{ t('setup.sources.title') }}</h3>
+        <p class="text-body-sm text-ink-secondary">{{ t('setup.sources.hint') }}</p>
+        <ul class="flex flex-col gap-space-xs">
+          <li v-for="entry in sourceNegatives" :key="entry.markId" data-source-negative>
+            <label class="flex items-start gap-space-xs text-body-sm text-ink">
+              <input v-model="entry.selected" type="checkbox" class="mt-1" :disabled="!editable" />
+              <span class="min-w-0 break-words">
+                {{
+                  t('setup.sources.label', {
+                    term:
+                      entry.negative.type === 'keyword' ? entry.negative.text : entry.negative.asin,
+                    campaign: entry.campaignName,
+                    adGroup: entry.adGroupName,
+                  })
+                }}
+              </span>
+            </label>
+          </li>
+        </ul>
+      </div>
 
       <!-- Zustand neuer Kampagnen (F6), Name, Speichern und Übermitteln -->
       <div class="flex flex-col gap-space-sm">

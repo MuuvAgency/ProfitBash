@@ -275,6 +275,14 @@ function setupSummary(item: SetupItemData): string {
     }
     case 'negative_product_target':
       return text('asin') ?? '';
+    case 'source_negative': {
+      // Negativ in einer bestehenden Kampagne (4.6); die Spalte „Kampagne“ nennt die Quelle.
+      const negative = payload.negative as
+        { type: 'keyword'; text: string; matchType: string } | { type: 'product'; asin: string };
+      return negative.type === 'keyword'
+        ? `${negative.text} (${t(`changes.setupMatch.${negative.matchType}`)})`
+        : negative.asin;
+    }
   }
 }
 function setupError(item: SetupItemData): string | null {
