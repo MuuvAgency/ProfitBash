@@ -52,6 +52,8 @@ describe('campaignNameIssues', () => {
     expect(campaignNameIssues('   ')).toEqual(['empty']);
     expect(campaignNameIssues('x'.repeat(MAX_CAMPAIGN_NAME_LENGTH + 1))).toEqual(['tooLong']);
     expect(campaignNameIssues('SP\tAUTO')).toEqual(['invalidCharacters']);
+    // Nur Ziffern wäre in der Bulk-Datei von einer echten ID nicht zu unterscheiden.
+    expect(campaignNameIssues('2026')).toEqual(['onlyDigits']);
   });
 
   it('nimmt nur die Zeichen an, die Amazon für Namen nennt (Limits-Seite, 2026-10-09)', () => {

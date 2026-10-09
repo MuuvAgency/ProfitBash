@@ -198,4 +198,43 @@ describe('reviewCampaignPlan', () => {
       { severity: 'info', code: 'adProductLater', campaign: 'C' },
     ]);
   });
+
+  it('meldet Namen nur aus Ziffern, Auto-Kampagnen mit Zielen, doppelte Ziele und ungültige Ad-Group-Namen', () => {
+    const issues = reviewCampaignPlan(
+      input({
+        campaigns: [
+          campaign({ name: '12345' }),
+          campaign({
+            name: 'Auto',
+            targeting: 'auto',
+            targets: [{ type: 'keyword', text: 'x', matchType: 'broad', bid: '0.50' }],
+          }),
+          campaign({
+            name: 'Doppelt',
+            adGroup: { name: 'Gruppe · 1', defaultBid: '0.85' },
+            targets: [
+              { type: 'keyword', text: 'Flasche', matchType: 'exact', bid: '0.50' },
+              { type: 'keyword', text: 'flasche', matchType: 'exact', bid: '0.60' },
+            ],
+            negatives: [
+              { type: 'product', asin: 'B0FREMD002', matchType: 'negativeExact' },
+              { type: 'product', asin: 'B0FREMD002', matchType: 'negativeExact' },
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(issues).toEqual([
+      { severity: 'error', code: 'campaignNameInvalid', campaign: '12345', issue: 'onlyDigits' },
+      { severity: 'error', code: 'autoWithTargets', campaign: 'Auto' },
+      {
+        severity: 'error',
+        code: 'adGroupNameInvalid',
+        campaign: 'Doppelt',
+        issue: 'invalidCharacters',
+      },
+      { severity: 'error', code: 'duplicateTarget', campaign: 'Doppelt', target: 'flasche' },
+      { severity: 'error', code: 'duplicateTarget', campaign: 'Doppelt', target: 'B0FREMD002' },
+    ]);
+  });
 });
