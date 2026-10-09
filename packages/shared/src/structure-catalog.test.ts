@@ -156,6 +156,15 @@ describe('Prüfung eines geänderten Katalogs', () => {
     const missing = clone();
     missing.blocks.find((block) => block.key === 'SD-RT-VIEWS')!.lookbackDays = null;
     expect(found(missing)).toContainEqual({ issue: 'audienceNeedsLookback', key: 'SD-RT-VIEWS' });
+    const kind = clone();
+    kind.blocks.find((block) => block.key === 'SD-RT-VIEWS')!.audience = null;
+    kind.blocks[0]!.audience = 'views';
+    expect(found(kind)).toEqual(
+      expect.arrayContaining([
+        { issue: 'audienceKind', key: 'SD-RT-VIEWS' },
+        { issue: 'audienceKind', key: 'SP-AUTO' },
+      ]),
+    );
   });
 
   it('kennt im Namensschema nur bekannte Platzhalter', () => {

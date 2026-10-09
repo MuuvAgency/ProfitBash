@@ -27,6 +27,8 @@ export const BLOCK_SOURCES = ['generic', 'brand', 'competitor', 'own'] as const;
 export const BLOCK_BIDDING_STRATEGIES = ['SALES_DOWN_ONLY', 'SALES_UP_AND_DOWN', 'NONE'] as const;
 /** Gebotsoptimierung für SD; nur CPC-Varianten (vCPM gesperrt, F-S7). */
 export const BLOCK_SD_OPTIMIZATIONS = ['clicks', 'conversions'] as const;
+/** Zielgruppe von SD-Retargeting: wer die eigenen Produkte angesehen bzw. gekauft hat. */
+export const BLOCK_AUDIENCES = ['views', 'purchases'] as const;
 
 /** Platzhalter des Namensschemas. */
 export const NAMING_PLACEHOLDERS = [
@@ -87,6 +89,8 @@ export const catalogBlockSchema = z.strictObject({
     .default(null),
   /** Rückblick der Zielgruppe in Tagen (nur SD-Retargeting). */
   lookbackDays: z.number().int().min(1).max(365).nullable().default(null),
+  /** Art der Zielgruppe (nur bei `targeting: 'audience'`). */
+  audience: z.enum(BLOCK_AUDIENCES).nullable().default(null),
 });
 export type CatalogBlock = z.output<typeof catalogBlockSchema>;
 
@@ -205,6 +209,9 @@ export const structureCatalogSchema = z
       if (block.targeting === 'audience' && block.lookbackDays === null) {
         add('audienceNeedsLookback', { key });
       }
+      if ((block.audience !== null) !== (block.targeting === 'audience')) {
+        add('audienceKind', { key });
+      }
     }
 
     const edges = new Set<string>();
@@ -256,6 +263,7 @@ type BlockSeed = Omit<
   | 'sdOptimization'
   | 'placements'
   | 'lookbackDays'
+  | 'audience'
 > &
   Partial<CatalogBlock>;
 
@@ -266,6 +274,7 @@ const spBlock = (seed: BlockSeed): CatalogBlock => ({
   sdOptimization: null,
   placements: { topOfSearch: 0, productPages: 0, restOfSearch: 0 },
   lookbackDays: null,
+  audience: null,
   ...seed,
 });
 const otherBlock = (seed: BlockSeed): CatalogBlock => ({
@@ -275,6 +284,7 @@ const otherBlock = (seed: BlockSeed): CatalogBlock => ({
   sdOptimization: null,
   placements: null,
   lookbackDays: null,
+  audience: null,
   ...seed,
 });
 
@@ -517,6 +527,7 @@ const DEFAULT_BLOCKS: CatalogBlock[] = [
     defaultBid: '0.55',
     dailyBudget: '10',
     lookbackDays: 30,
+    audience: 'views',
   }),
   otherBlock({
     key: 'SD-RT-PURCHASE',
@@ -531,6 +542,7 @@ const DEFAULT_BLOCKS: CatalogBlock[] = [
     defaultBid: '0.50',
     dailyBudget: '10',
     lookbackDays: 60,
+    audience: 'purchases',
   }),
 ];
 
