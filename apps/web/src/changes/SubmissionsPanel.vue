@@ -2,7 +2,7 @@
 import { formatDateTime, formatNumber } from '@profitbash/shared';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
-import { computed, ref, useId, watch } from 'vue';
+import { computed, nextTick, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ApiError } from '../api';
 import type {
@@ -54,6 +54,14 @@ const selected = computed(() => detail.data.value ?? null);
 const notFound = computed(
   () => detail.error.value instanceof ApiError && detail.error.value.status === 404,
 );
+
+/** Die geöffnete Übermittlung steht unter der Liste: beim Öffnen dorthin springen (vor allem auf dem Handy). */
+const detailSection = ref<HTMLElement>();
+watch(selectedId, async (next, previous) => {
+  if (!next || previous === undefined) return;
+  await nextTick();
+  detailSection.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+});
 
 function statusText(submission: AdChangeSubmissionData): string {
   return submission.status === 'pending'
@@ -320,6 +328,7 @@ const conflictRows = computed(() =>
 
     <section
       v-if="submissionId"
+      ref="detailSection"
       data-submission-detail
       class="flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
     >

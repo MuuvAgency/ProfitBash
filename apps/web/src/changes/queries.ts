@@ -116,8 +116,13 @@ export function useSubmission(id: Ref<string | null>) {
     queryKey: computed(() => [KEY, 'submission', orgId.value, id.value] as const),
     queryFn: () => api.adChanges.submission(id.value!),
     enabled: computed(() => canView.value && id.value !== null && orgId.value !== null),
-    refetchInterval: (query) =>
-      query.state.data && awaitsJob(query.state.data.submission) ? POLL_MS : false,
+    // Auch solange ein Folgeschritt (erneuter Versuch, Revert) einer ihrer Änderungen noch läuft.
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      const followUpOpen = data.changes.some((change) => change.followUp?.status === 'submitted');
+      return awaitsJob(data.submission) || followUpOpen ? POLL_MS : false;
+    },
     retry: false,
   });
 }
