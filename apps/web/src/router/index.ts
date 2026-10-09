@@ -34,6 +34,7 @@ const PlaceholderPage = () => import('../pages/PlaceholderPage.vue');
 const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteComponent>)>> = {
   dashboard: () => import('../pages/DashboardPage.vue'),
   explorer: () => import('../pages/ExplorerPage.vue'),
+  changes: () => import('../pages/ChangesPage.vue'),
   connections: () => import('../pages/ConnectionsPage.vue'),
   members: () => import('../pages/MembersPage.vue'),
   sync: () => import('../pages/SyncStatusPage.vue'),
