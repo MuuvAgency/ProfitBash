@@ -181,7 +181,11 @@ describe('buildSetupOperations', () => {
       },
       { campaignRef: 'SP | AUTO | Flaschen', adGroupRef: 'Auto' },
     );
-    const result = buildSetupOperations([source], context);
+    const target = item(
+      { entity: 'keyword', text: 'trinkflasche 1l', matchType: 'exact', bid: '0.9' },
+      { status: 'applied', amazonEntityId: '903' },
+    );
+    const result = buildSetupOperations([target, source], context);
     expect(result.rejected).toEqual([]);
     expect(result.operations).toEqual([
       {
@@ -195,5 +199,76 @@ describe('buildSetupOperations', () => {
     ]);
     expect(result.created.get('amazon-campaign:111')).toBe('111');
     expect(result.created.get('amazon-ad-group:222')).toBe('222');
+  });
+
+  describe('Negatives in der Quelle warten auf das neue Ziel des Begriffs', () => {
+    const source = (text: string) =>
+      item(
+        {
+          entity: 'source_negative',
+          amazonCampaignId: '111',
+          amazonAdGroupId: '222',
+          negative: { type: 'keyword', text, matchType: 'negativeExact' },
+          harvestMarkId: '00000000-0000-4000-8000-000000000001',
+        },
+        { campaignRef: 'SP | AUTO | Flaschen', adGroupRef: 'Auto' },
+      );
+    const parents = (status: string) => [
+      item(campaignPayload, { status, amazonEntityId: status === 'applied' ? '901' : null }),
+      item(
+        { entity: 'ad_group', name: NAME, defaultBid: '0.85' },
+        { status, amazonEntityId: status === 'applied' ? '902' : null },
+      ),
+    ];
+
+    it('stellt sie zurück, solange das Keyword noch offen ist', () => {
+      const negative = source('Trinkflasche  Glas');
+      const result = buildSetupOperations(
+        [
+          ...parents('submitted'),
+          item({ entity: 'keyword', text: 'trinkflasche glas', matchType: 'exact', bid: '0.9' }),
+          negative,
+        ],
+        context,
+      );
+      expect(result.operations.map((op) => op.ref)).not.toContain(negative.id);
+      expect(result.deferred).toEqual([negative.id]);
+      expect(result.rejected).toEqual([]);
+    });
+
+    it('sendet sie, wenn das Keyword angelegt ist', () => {
+      const negative = source('trinkflasche glas');
+      const result = buildSetupOperations(
+        [
+          ...parents('applied'),
+          item(
+            { entity: 'keyword', text: 'trinkflasche glas', matchType: 'exact', bid: '0.9' },
+            { status: 'applied', amazonEntityId: '903' },
+          ),
+          negative,
+        ],
+        context,
+      );
+      expect(result.operations.map((op) => op.ref)).toContain(negative.id);
+      expect(result.deferred).toEqual([]);
+    });
+
+    it('lässt sie scheitern, wenn kein Ziel des Begriffs angelegt wird', () => {
+      const negative = source('trinkflasche glas');
+      const result = buildSetupOperations(
+        [
+          ...parents('applied'),
+          item(
+            { entity: 'keyword', text: 'trinkflasche glas', matchType: 'exact', bid: '0.9' },
+            { status: 'failed' },
+          ),
+          negative,
+        ],
+        context,
+      );
+      expect(result.rejected).toEqual([
+        expect.objectContaining({ itemId: negative.id, code: 'HARVEST_TARGET_NOT_CREATED' }),
+      ]);
+    });
   });
 });

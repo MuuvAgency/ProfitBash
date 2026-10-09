@@ -251,8 +251,21 @@ describe('buildSetupBulkFile', () => {
         },
         { campaignRef: 'SP | AUTO | Flaschen', adGroupRef: 'Auto' },
       );
+    const applied = { status: 'applied', amazonEntityId: '9' } as const;
     const file = buildSetupBulkFile(
       [
+        item(
+          { entity: 'keyword', text: 'trinkflasche 1l', matchType: 'exact', bid: '0.9' },
+          applied,
+        ),
+        item(
+          {
+            entity: 'product_target',
+            expression: { type: 'asin', value: 'B0FREMD001' },
+            bid: '0.5',
+          },
+          applied,
+        ),
         source({ type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' }),
         source({ type: 'product', asin: 'B0FREMD001', matchType: 'negativeExact' }),
       ],
@@ -273,5 +286,39 @@ describe('buildSetupBulkFile', () => {
       'Campaign ID': '111',
       'Ad Group ID': '222',
     });
+  });
+
+  it('schreibt das Negativ in der Quelle nur mit dem neuen Ziel des Begriffs', () => {
+    const negative = (text: string) =>
+      item(
+        {
+          entity: 'source_negative',
+          amazonCampaignId: '111',
+          amazonAdGroupId: '222',
+          negative: { type: 'keyword', text, matchType: 'negativeExact' },
+          harvestMarkId: '00000000-0000-4000-8000-000000000001',
+        },
+        { campaignRef: 'SP | AUTO | Flaschen', adGroupRef: 'Auto' },
+      );
+    const covered = negative('trinkflasche');
+    const orphan = negative('becher');
+    const file = buildSetupBulkFile(
+      [
+        campaign(),
+        item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+        item({ entity: 'keyword', text: 'Trinkflasche', matchType: 'exact', bid: '0.90' }),
+        item(
+          { entity: 'keyword', text: 'becher', matchType: 'exact', bid: '0.90' },
+          { status: 'failed' },
+        ),
+        covered,
+        orphan,
+      ],
+      { countryCode: 'DE', accountType: 'seller', startDate: '2026-10-09' },
+    );
+    expect(file.skipped).toEqual([
+      expect.objectContaining({ itemId: orphan.id, code: 'HARVEST_TARGET_NOT_CREATED' }),
+    ]);
+    expect(read(file.content!).rows.map((row) => row['Keyword Text'])).toContain('trinkflasche');
   });
 });

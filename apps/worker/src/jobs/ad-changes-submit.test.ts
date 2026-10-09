@@ -495,7 +495,17 @@ describe('submitConnectionAdChanges', () => {
 
 describe('submitConnectionAdChanges: Setups (4.4)', () => {
   const NAME = 'SP | EXACT | Flaschen';
-  async function setup() {
+  const sourceNegative = {
+    markId: '00000000-0000-4000-8000-000000000001',
+    searchTerm: 'flasche',
+    amazonCampaignId: '1001',
+    amazonAdGroupId: '2001',
+    campaignName: 'Kampagne 1001',
+    adGroupName: 'AG 2001',
+    negative: { type: 'keyword', text: 'flasche', matchType: 'negativeExact' },
+    selected: true,
+  } as const;
+  async function setup(sourceNegatives: (typeof sourceNegative)[] = []) {
     const actor = { userId: f.ada, orgId: f.org };
     const draft = (await saveCampaignSetupDraft(testDb.db, {
       ...actor,
@@ -513,7 +523,7 @@ describe('submitConnectionAdChanges: Setups (4.4)', () => {
           harvest: [],
           unlocks: {},
         },
-        sourceNegatives: [],
+        sourceNegatives,
         campaigns: [
           {
             block: 'SP-KW-EXACT',
@@ -578,6 +588,47 @@ describe('submitConnectionAdChanges: Setups (4.4)', () => {
     ]);
     expect(await submissionRow(submissionId)).toMatchObject({ status: 'finished' });
     expect(outcome.counters).toMatchObject({ submissions: 1, changesApplied: 5, changesFailed: 0 });
+  });
+
+  it('negiert in der Quelle erst nach der Anlage des Keywords, im selben Lauf (4.6)', async () => {
+    const submissionId = await setup([sourceNegative]);
+    await run();
+    expect(createCalls).toHaveLength(2);
+    expect(createCalls[0]!.operations.map((op) => op.entity)).not.toContain('negativeKeyword');
+    expect(createCalls[1]!.operations).toEqual([
+      expect.objectContaining({
+        entity: 'negativeKeyword',
+        campaignRef: 'amazon-campaign:1001',
+        adGroupRef: 'amazon-ad-group:2001',
+        keywordText: 'flasche',
+      }),
+    ]);
+    expect((await items(submissionId)).at(-1)).toMatchObject({
+      entityType: 'source_negative',
+      status: 'applied',
+    });
+    expect(await submissionRow(submissionId)).toMatchObject({ status: 'finished' });
+  });
+
+  it('negiert nicht in der Quelle, wenn das Keyword abgelehnt wird (4.6)', async () => {
+    const submissionId = await setup([sourceNegative]);
+    createAnswer = (input) => ({
+      results: input.operations.map((op) =>
+        op.entity === 'keyword'
+          ? { ref: op.ref, status: 'failed', code: 'INVALID_KEYWORD', message: 'abgelehnt' }
+          : { ref: op.ref, status: 'applied', amazonId: `7${op.ref.length}` },
+      ),
+      throttled: false,
+      retryAfterMs: null,
+    });
+    await run();
+    expect(createCalls).toHaveLength(1);
+    expect((await items(submissionId)).at(-1)).toMatchObject({
+      entityType: 'source_negative',
+      status: 'failed',
+      errorCode: 'HARVEST_TARGET_NOT_CREATED',
+    });
+    expect(await submissionRow(submissionId)).toMatchObject({ status: 'finished' });
   });
 
   it('hält Teilfehler fest und setzt nach einer Drosselung mit den angelegten Eltern fort', async () => {
