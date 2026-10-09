@@ -1,0 +1,3 @@
+ALTER TABLE "campaign_setup_items" DROP CONSTRAINT "campaign_setup_items_entity_type_ck";--> statement-breakpoint
+ALTER TABLE "campaign_setup_drafts" ADD COLUMN "source_negatives" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "campaign_setup_items" ADD CONSTRAINT "campaign_setup_items_entity_type_ck" CHECK ("campaign_setup_items"."entity_type" in ('campaign', 'placement', 'ad_group', 'product_ad', 'keyword', 'product_target', 'negative_keyword', 'negative_product_target', 'source_negative'));

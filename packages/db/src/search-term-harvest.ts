@@ -1,5 +1,6 @@
 import { comparableSearchTerm, Dec } from '@profitbash/engine';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import type { HarvestMarkSource } from '@profitbash/engine/plan';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { chunks } from './ad-change-entities';
 import { recordAuditEvent, type DbOrTx } from './audit';
@@ -7,6 +8,7 @@ import type { Db } from './client';
 import {
   amazonAdsAdGroups,
   amazonAdsCampaigns,
+  amazonAdsNegativeTargets,
   amazonAdsProfiles,
   amazonAdsSearchTermPeriodMetrics,
   amazonAdsTargets,
@@ -347,4 +349,119 @@ export async function removeHarvestMarks(
     }
     return removed.length;
   });
+}
+
+/**
+ * Einträge der Merkliste eines Profils als Eingang des Kampagnen-Setups (`docs/tasks/phase-4.md` 4.6), optional nur
+ * die genannten: Quelle mit Namen (`null`, wenn Kampagne bzw. Ad Group im Profil fehlen), Keyword-Target der Quelle,
+ * Klicks und Kosten zum Zeitpunkt des Vormerkens und ob der Begriff in der Ad Group der Quelle schon negativ exakt
+ * ist. Systemzugriff: Das Profil hat der Aufrufer über den Access-Layer geprüft.
+ */
+export async function loadHarvestMarkSources(
+  db: DbOrTx,
+  input: { profileId: string; markIds?: readonly string[] },
+): Promise<HarvestMarkSource[]> {
+  if (input.markIds !== undefined && input.markIds.length === 0) return [];
+  const c = amazonAdsCampaigns;
+  const g = amazonAdsAdGroups;
+  const t = amazonAdsTargets;
+  const n = amazonAdsNegativeTargets;
+  const rows = await db
+    .select({
+      id: h.id,
+      searchTerm: h.searchTerm,
+      termKey: h.termKey,
+      adProduct: h.adProduct,
+      amazonCampaignId: h.amazonCampaignId,
+      amazonAdGroupId: h.amazonAdGroupId,
+      campaignName: c.name,
+      adGroupId: g.id,
+      adGroupName: g.name,
+      keywordText: t.keywordText,
+      matchType: t.matchType,
+      clicks: h.clicks,
+      cost: h.cost,
+      currencyCode: h.currencyCode,
+    })
+    .from(h)
+    .leftJoin(
+      c,
+      and(
+        eq(c.profileId, h.profileId),
+        eq(c.amazonCampaignId, h.amazonCampaignId),
+        isNull(c.removedAt),
+      ),
+    )
+    .leftJoin(
+      g,
+      and(
+        eq(g.profileId, h.profileId),
+        eq(g.amazonAdGroupId, h.amazonAdGroupId),
+        eq(g.campaignId, c.id),
+        isNull(g.removedAt),
+      ),
+    )
+    .leftJoin(
+      t,
+      and(
+        eq(t.profileId, h.profileId),
+        eq(t.amazonTargetId, h.amazonTargetId),
+        eq(t.adGroupId, g.id),
+      ),
+    )
+    .where(
+      and(
+        eq(h.profileId, input.profileId),
+        input.markIds ? inArray(h.id, [...input.markIds]) : undefined,
+      ),
+    )
+    .orderBy(desc(h.createdAt), asc(h.termKey))
+    .limit(HARVEST_MARK_LIST_LIMIT);
+
+  // Negatives exakt der Quell-Ad-Groups (Keywords in Vergleichsform, ASINs groß).
+  const adGroupIds = [...new Set(rows.flatMap((row) => (row.adGroupId ? [row.adGroupId] : [])))];
+  const negated = new Set<string>();
+  for (const part of chunks(adGroupIds)) {
+    const negatives = await db
+      .select({
+        adGroupId: n.adGroupId,
+        targetType: n.targetType,
+        keywordText: n.keywordText,
+        asin: sql<string | null>`upper(${n.expression}->>'asin')`,
+      })
+      .from(n)
+      .where(
+        and(
+          inArray(n.adGroupId, part),
+          eq(n.level, 'ad_group'),
+          isNull(n.removedAt),
+          sql`(${n.targetType} = 'product' or upper(${n.matchType}) = 'EXACT')`,
+        ),
+      );
+    for (const negative of negatives) {
+      const value =
+        negative.targetType === 'keyword'
+          ? comparableSearchTerm(negative.keywordText ?? '')
+          : (negative.asin ?? '').toLowerCase();
+      negated.add(`${negative.adGroupId}:${value}`);
+    }
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    searchTerm: row.searchTerm,
+    adProduct: row.adProduct,
+    amazonCampaignId: row.amazonCampaignId,
+    amazonAdGroupId: row.amazonAdGroupId,
+    campaignName: row.adGroupId ? row.campaignName : null,
+    adGroupName: row.adGroupName,
+    sourceKeyword:
+      row.keywordText !== null && row.matchType !== null
+        ? { text: row.keywordText, matchType: row.matchType }
+        : null,
+    clicks: row.clicks,
+    cost: row.cost,
+    currencyCode: row.currencyCode,
+    alreadyNegative: row.adGroupId !== null && negated.has(`${row.adGroupId}:${row.termKey}`),
+  }));
 }

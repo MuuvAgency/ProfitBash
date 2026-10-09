@@ -1,8 +1,9 @@
+import { comparableSearchTerm } from '@profitbash/engine';
 import type { CampaignSetupItemEntity, CampaignSetupItemPayload } from '@profitbash/shared';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { loadAdChangeSubmissionSummaries, type AdChangeSubmissionSummary } from './ad-changes';
-import type { DbOrTx } from './audit';
+import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
 import {
   adChangeSubmissions,
@@ -12,7 +13,9 @@ import {
   amazonAdsProductAds,
   amazonAdsProfiles,
   amazonAdsTargets,
+  campaignSetupDrafts,
   campaignSetupItems,
+  searchTermHarvestMarks,
 } from './schema';
 
 /**
@@ -273,6 +276,32 @@ export async function confirmCampaignSetupItems(
   for (const row of rows) {
     const campaignKey = key(row, null);
     const payload = row.payload;
+    if (payload.entity === 'source_negative') {
+      // Negativ in der Quelle (4.6): bestehende Ad Group über ihre echte ID.
+      if (!pending(row)) continue;
+      const [adGroup] = await tx
+        .select({ id: amazonAdsAdGroups.id })
+        .from(amazonAdsAdGroups)
+        .where(
+          and(
+            eq(amazonAdsAdGroups.profileId, input.profileId),
+            eq(amazonAdsAdGroups.amazonAdGroupId, payload.amazonAdGroupId),
+            isNull(amazonAdsAdGroups.removedAt),
+          ),
+        )
+        .limit(1);
+      if (!adGroup) continue;
+      const negative = payload.negative;
+      const found = await findChild(
+        tx,
+        adGroup.id,
+        negative.type === 'keyword'
+          ? { entity: 'negative_keyword', text: negative.text, matchType: negative.matchType }
+          : { entity: 'negative_product_target', asin: negative.asin },
+      );
+      if (found !== null) await apply(row, found);
+      continue;
+    }
     if (payload.entity === 'campaign') {
       const campaign =
         row.status === 'applied' && row.amazonEntityId !== null
@@ -326,6 +355,64 @@ export async function confirmCampaignSetupItems(
     if (found !== null) await apply(row, found);
   }
   return confirmed;
+}
+
+/**
+ * Nimmt die Harvest-Begriffe eines Setups von der Merkliste, sobald seine Übermittlung abgeschlossen ist (4.6, F7):
+ * Einträge, die der Entwurf von der Merkliste übernommen hat und deren Keyword bzw. Produkt-Ziel angelegt wurde
+ * (in der Transaktion des Abschlusses). Nicht angelegte Begriffe bleiben vorgemerkt. Audit
+ * `search_term_harvest.remove` ohne Nutzer (Abschluss der Übermittlung). Liefert die Zahl der entfernten Einträge.
+ */
+export async function releaseHarvestMarks(
+  tx: DbOrTx,
+  input: { submissionId: string },
+): Promise<number> {
+  const d = campaignSetupDrafts;
+  const [draft] = await tx
+    .select({ organizationId: d.organizationId, profileId: d.profileId, inputs: d.inputs })
+    .from(d)
+    .where(eq(d.submissionId, input.submissionId));
+  const markIds = [...new Set((draft?.inputs.harvest ?? []).map((entry) => entry.markId))];
+  if (!draft || markIds.length === 0) return 0;
+  const applied = await tx
+    .select({ payload: i.payload })
+    .from(i)
+    .where(
+      and(
+        eq(i.submissionId, input.submissionId),
+        eq(i.status, 'applied'),
+        inArray(i.entityType, ['keyword', 'product_target']),
+      ),
+    );
+  const terms = new Set<string>();
+  for (const { payload } of applied) {
+    if (payload.entity === 'keyword') terms.add(comparableSearchTerm(payload.text));
+    if (payload.entity === 'product_target' && payload.expression.type !== 'category')
+      terms.add(payload.expression.value.toLowerCase());
+  }
+  if (terms.size === 0) return 0;
+  const h = searchTermHarvestMarks;
+  const removed = await tx
+    .delete(h)
+    .where(
+      and(inArray(h.id, markIds), eq(h.profileId, draft.profileId), inArray(h.termKey, [...terms])),
+    )
+    .returning({ id: h.id });
+  if (removed.length > 0) {
+    await recordAuditEvent(tx, {
+      organizationId: draft.organizationId,
+      actorUserId: null,
+      action: 'search_term_harvest.remove',
+      target: {
+        type: 'search_term_harvest',
+        id: draft.profileId,
+        profileId: draft.profileId,
+        removed: removed.length,
+        submissionId: input.submissionId,
+      },
+    });
+  }
+  return removed.length;
 }
 
 /** Amazon-ID der passenden Entity in der Ad Group, sonst `null`. */

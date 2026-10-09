@@ -1,4 +1,9 @@
-import type { CampaignSetupItemPayload, PlannedCampaign, SetupInputs } from '@profitbash/shared';
+import type {
+  CampaignSetupItemPayload,
+  PlannedCampaign,
+  SetupInputs,
+  SourceNegative,
+} from '@profitbash/shared';
 import { sql } from 'drizzle-orm';
 import {
   check,
@@ -47,6 +52,11 @@ export const campaignSetupDrafts = pgTable(
     campaignState: text('campaign_state').notNull().default('ENABLED'),
     inputs: jsonb('inputs').$type<SetupInputs>().notNull(),
     campaigns: jsonb('campaigns').$type<PlannedCampaign[]>().notNull(),
+    /** Negativ-Vorschläge für die Quellen der Harvest-Begriffe (4.6, F7), mit Auswahl. */
+    sourceNegatives: jsonb('source_negatives')
+      .$type<SourceNegative[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     /** Zählt jedes Speichern (gleichzeitige Änderungen enden mit 409). */
     version: integer('version').notNull().default(1),
     submissionId: uuid('submission_id'),
@@ -130,7 +140,7 @@ export const campaignSetupItems = pgTable(
     ),
     check(
       'campaign_setup_items_entity_type_ck',
-      sql`${t.entityType} in ('campaign', 'placement', 'ad_group', 'product_ad', 'keyword', 'product_target', 'negative_keyword', 'negative_product_target')`,
+      sql`${t.entityType} in ('campaign', 'placement', 'ad_group', 'product_ad', 'keyword', 'product_target', 'negative_keyword', 'negative_product_target', 'source_negative')`,
     ),
     check(
       'campaign_setup_items_parent_ck',
