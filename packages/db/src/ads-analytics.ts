@@ -56,6 +56,12 @@ export interface AnalyticsSelection extends ProfileVisibilityInput {
   /** Nur diese Profile (interne IDs). */
   profileIds?: readonly string[] | undefined;
   adProducts?: readonly AdProduct[] | undefined;
+  /**
+   * Eigene Tags (`phase-3.md` 3.7), mehrere als ODER; leer oder ohne Angabe: kein Filter. Ein Tag gilt für die
+   * Entity, an der es hängt, und für alles darunter (Kampagne → Ad Groups → Targets, Product Ads, Suchbegriffe,
+   * Negatives), nicht nach oben: Dashboard, Kampagnen und Portfolios zählen nur Kampagnen, die das Tag selbst tragen.
+   */
+  tagIds?: readonly string[] | undefined;
 }
 
 export interface AnalyticsQuery extends AnalyticsSelection {
@@ -243,6 +249,54 @@ async function executeLarge<T extends Record<string, unknown>>(db: Db, query: SQ
 
 const uuidArray = (values: readonly string[]) => sql`${sql.param([...values])}::uuid[]`;
 const textArray = (values: readonly string[]) => sql`${sql.param([...values])}::text[]`;
+
+// ---------------------------------------------------------------------------
+// Tags (3.7)
+// ---------------------------------------------------------------------------
+
+const tagFilterIds = (selection: AnalyticsSelection) =>
+  selection.tagIds && selection.tagIds.length > 0 ? selection.tagIds : null;
+
+/**
+ * Die Entity `idSql` der Art `entityType` trägt eines der Tags. Tags fremder Organisationen treffen nichts: Ihre
+ * Zuweisungen zeigen auf Entities außerhalb der sichtbaren Profile der Auswahl.
+ */
+const taggedSql = (tagIds: readonly string[], entityType: string, idSql: SQL) =>
+  sql`exists (select 1 from tag_assignments ta where ta.tag_id = any(${uuidArray(tagIds)})
+    and ta.entity_type = ${entityType} and ta.entity_id = ${idSql})`;
+
+const anyOf = (conditions: SQL[]) => sql`(${sql.join(conditions, sql` or `)})`;
+
+/** Filter der Entity `e` einer Ebene: Tag an ihr selbst oder an Ad Group bzw. Kampagne darüber. */
+function tagEntityWhere(level: AnalyticsLevel | 'negative', tagIds: readonly string[]): SQL {
+  const campaign = (idSql: SQL) => taggedSql(tagIds, 'campaign', idSql);
+  const adGroup = taggedSql(tagIds, 'ad_group', sql`e.ad_group_id`);
+  switch (level) {
+    case 'portfolio':
+      return sql`exists (select 1 from amazon_ads_campaigns tc where tc.portfolio_id = e.id
+        and ${campaign(sql`tc.id`)})`;
+    case 'campaign':
+      return campaign(sql`e.id`);
+    case 'adGroup':
+      return anyOf([taggedSql(tagIds, 'ad_group', sql`e.id`), campaign(sql`e.campaign_id`)]);
+    case 'target':
+    case 'searchTerm':
+      return anyOf([taggedSql(tagIds, 'target', sql`e.id`), adGroup, campaign(sql`e.campaign_id`)]);
+    case 'productAd':
+      return anyOf([
+        taggedSql(tagIds, 'product_ad', sql`e.id`),
+        adGroup,
+        campaign(sql`e.campaign_id`),
+      ]);
+    case 'negative':
+      return anyOf([adGroup, campaign(sql`e.campaign_id`)]);
+  }
+}
+
+/** Eigene Tags der Entity `e` für die Attribute einer Zeile (IDs, sortiert). */
+const tagIdsColumn = (entityType: string) =>
+  sql.raw(`(select coalesce(json_agg(ta.tag_id order by ta.tag_id), '[]'::json) from tag_assignments ta
+    where ta.entity_type = '${entityType}' and ta.entity_id = e.id)`);
 
 /** Sichtbare Profile der Auswahl als Unterabfrage (`id`, `currency_code`, `account_type`, …). */
 async function selectionSql(db: Db, selection: AnalyticsSelection): Promise<SQL | null> {
@@ -612,7 +666,8 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
         json_build_object('portfolioId', e.portfolio_id, 'portfolioName', pf.name, 'targetingType', e.targeting_type,
           'budgetAmount', e.budget_amount::text, 'budgetCurrencyCode', e.budget_currency_code, 'budgetType', e.budget_type,
           'biddingStrategy', e.bidding_strategy, 'costType', e.extra->>'costType', 'startDate', e.start_date,
-          'endDate', e.end_date, 'placementBidAdjustments', e.extra->'placementBidAdjustments') as attributes`,
+          'endDate', e.end_date, 'placementBidAdjustments', e.extra->'placementBidAdjustments',
+          'tagIds', ${tagIdsColumn('campaign')}, 'amazonTags', e.extra->'tags') as attributes`,
     }),
   },
   adGroup: {
@@ -635,7 +690,8 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
       columns: sql`e.id::text as row_id, e.ad_product as row_ad_product, e.name, e.state, e.amazon_ad_group_id as amazon_id,
         e.removed_at is not null as removed, e.synced_at is null as placeholder,
         json_build_object('campaignId', e.campaign_id, 'campaignName', c.name, 'defaultBid', e.default_bid::text,
-          'defaultBidCurrencyCode', e.default_bid_currency_code, 'costType', c.extra->>'costType') as attributes`,
+          'defaultBidCurrencyCode', e.default_bid_currency_code, 'costType', c.extra->>'costType',
+          'tagIds', ${tagIdsColumn('ad_group')}) as attributes`,
     }),
   },
   target: {
@@ -661,7 +717,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
         json_build_object('campaignId', e.campaign_id, 'campaignName', c.name, 'adGroupId', e.ad_group_id,
           'adGroupName', g.name, 'targetType', e.target_type, 'keywordText', e.keyword_text, 'matchType', e.match_type,
           'expression', e.expression, 'bid', e.bid::text, 'bidCurrencyCode', e.bid_currency_code,
-          'costType', c.extra->>'costType') as attributes`,
+          'costType', c.extra->>'costType', 'tagIds', ${tagIdsColumn('target')}) as attributes`,
     }),
   },
   productAd: {
@@ -693,7 +749,8 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
           e.state, e.amazon_ad_id as amazon_id, e.removed_at is not null as removed, e.synced_at is null as placeholder,
           json_build_object('campaignId', e.campaign_id, 'campaignName', c.name, 'adGroupId', e.ad_group_id,
             'adGroupName', g.name, 'asin', e.asin, 'sku', e.sku, 'adType', e.extra->>'adType',
-            'asins', case when jsonb_typeof(e.extra->'asins') = 'array' then e.extra->'asins' end) as attributes`,
+            'asins', case when jsonb_typeof(e.extra->'asins') = 'array' then e.extra->'asins' end,
+            'tagIds', ${tagIdsColumn('product_ad')}) as attributes`,
       };
     },
   },
@@ -762,7 +819,11 @@ function portfolioJoinSql(level: AnalyticsLevel, filter: ExplorerFilter): SQL {
 
 /** Join der Kennzahl-Zeilen auf ihre Entity `e` (mit Profil, damit der Schlüssel-Index greift). */
 function entityJoinSql(spec: LevelSpec, entity: { from: SQL }): SQL {
-  return sql`join (${entity.from}) on e.id = ${spec.entityKey} and e.profile_id = m.profile_id`;
+  const on = sql`on e.id = ${spec.entityKey} and e.profile_id = m.profile_id`;
+  // Portfolios sind eine einzelne Tabelle: In Klammern wäre das kein gültiger Join (nur Joins dürfen geklammert sein).
+  return spec === LEVELS.portfolio
+    ? sql`join ${entity.from} ${on}`
+    : sql`join (${entity.from}) ${on}`;
 }
 
 /**
@@ -775,16 +836,19 @@ function filtersOf(
   periods: Periods,
 ): { entityWhere: SQL[]; metricsWhere: SQL[] } {
   const metricsWhere: SQL[] = [anyRange(periods)];
-  if (!input.adProducts) return { entityWhere: entity.where, metricsWhere };
-  const adProducts = textArray(input.adProducts);
-  metricsWhere.push(sql`m.ad_product = any(${adProducts})`);
-  return {
-    entityWhere:
-      input.level === 'portfolio'
-        ? entity.where
-        : [...entity.where, sql`e.ad_product = any(${adProducts})`],
-    metricsWhere,
-  };
+  const entityWhere = [...entity.where];
+  if (input.adProducts) {
+    const adProducts = textArray(input.adProducts);
+    metricsWhere.push(sql`m.ad_product = any(${adProducts})`);
+    if (input.level !== 'portfolio') entityWhere.push(sql`e.ad_product = any(${adProducts})`);
+  }
+  const tagIds = tagFilterIds(input);
+  if (tagIds) {
+    entityWhere.push(tagEntityWhere(input.level, tagIds));
+    // Portfolios summieren ihre Kampagnen (`c` aus `portfolioJoinSql`): nur die mit dem Tag.
+    if (input.level === 'portfolio') metricsWhere.push(taggedSql(tagIds, 'campaign', sql`c.id`));
+  }
+  return { entityWhere, metricsWhere };
 }
 
 // ---------------------------------------------------------------------------
@@ -848,7 +912,12 @@ export async function queryExplorerRows(
   ];
   const searchTerms = input.level === 'searchTerm';
   const narrowed = Boolean(
-    filter.portfolioIds || filter.campaignIds || filter.adGroupIds || filter.productSearch,
+    filter.portfolioIds ||
+    filter.campaignIds ||
+    filter.adGroupIds ||
+    filter.productSearch ||
+    // Portfolios filtern das Tag schon an ihren Kampagnen (`metricsWhere`).
+    (input.level !== 'portfolio' && tagFilterIds(input)),
   );
   const metricRows = metricRowsSql({
     profileIds,
@@ -1150,6 +1219,8 @@ export async function queryDashboard(db: Db, input: AnalyticsQuery): Promise<Das
   const periods = periodsOf(input);
   const where: SQL[] = [anyRange(periods)];
   if (input.adProducts) where.push(sql`m.ad_product = any(${textArray(input.adProducts)})`);
+  const dashboardTagIds = tagFilterIds(input);
+  if (dashboardTagIds) where.push(taggedSql(dashboardTagIds, 'campaign', sql`m.campaign_id`));
   const level: MetricsLevel = 'campaign';
   const metricRows = metricRowsSql({
     profileIds,
@@ -1464,6 +1535,8 @@ export async function queryNegatives(
   ];
   if (filter.portfolioIds) where.push(sql`c.portfolio_id = any(${uuidArray(filter.portfolioIds)})`);
   if (input.adProducts) where.push(sql`e.ad_product = any(${textArray(input.adProducts)})`);
+  const negativeTagIds = tagFilterIds(input);
+  if (negativeTagIds) where.push(tagEntityWhere('negative', negativeTagIds));
   const rows = await db.execute<Record<string, unknown>>(sql`
     select e.id, e.profile_id, p.account_name, p.country_code, p.currency_code, e.ad_product,
       coalesce(e.keyword_text, e.expression::text) as name, e.state, e.removed_at is not null as removed,
