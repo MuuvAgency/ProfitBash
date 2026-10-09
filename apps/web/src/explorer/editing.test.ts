@@ -48,7 +48,9 @@ const open = (patch: Partial<OpenChange>): OpenChange =>
 
 describe('editIssue', () => {
   it('erlaubt je Ebene nur die Felder der Entity', () => {
-    expect(editIssue('campaign', row({ attributes: { budgetType: 'DAILY' } }), 'budget')).toBeNull();
+    expect(
+      editIssue('campaign', row({ attributes: { budgetType: 'DAILY' } }), 'budget'),
+    ).toBeNull();
     expect(editIssue('target', row(), 'bid')).toBeNull();
     expect(editIssue('adGroup', row(), 'default_bid')).toBeNull();
     expect(editIssue('productAd', row(), 'state')).toBeNull();
@@ -184,7 +186,11 @@ describe('bulkInputs', () => {
   it('ändert den Zustand; Negatives lassen sich nur archivieren', () => {
     const state = bulkInputs('campaign', rows, { field: 'state', value: 'PAUSED' });
     expect(state.inputs).toHaveLength(2);
-    expect(state.inputs[0]).toMatchObject({ entityType: 'campaign', field: 'state', value: 'PAUSED' });
+    expect(state.inputs[0]).toMatchObject({
+      entityType: 'campaign',
+      field: 'state',
+      value: 'PAUSED',
+    });
     const negatives = bulkInputs('negative', rows, { field: 'state', value: 'ARCHIVED' });
     expect(negatives.inputs[0]).toMatchObject({ entityType: 'negative_target', value: 'ARCHIVED' });
   });

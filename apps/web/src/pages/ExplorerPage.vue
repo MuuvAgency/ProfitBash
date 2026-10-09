@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { AD_PRODUCTS, formatNumber, type AdProduct, type ExplorerLevel } from '@profitbash/shared';
+import {
+  AD_PRODUCTS,
+  formatNumber,
+  type AdChangeField,
+  type AdProduct,
+  type ExplorerLevel,
+} from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -13,11 +19,18 @@ import {
   type LocationQueryRaw,
   type RouteLocationRaw,
 } from 'vue-router';
-import { api } from '../api';
+import { api, ApiError } from '../api';
 import FilterBar from '../analytics/FilterBar.vue';
 import type { MetricKey } from '../analytics/metrics';
 import { resolvePeriod } from '../analytics/periods';
 import { useAnalyticsFilters } from '../analytics/useAnalyticsFilters';
+import {
+  useChangeRights,
+  useDiscardChanges,
+  useOpenChanges,
+  usePendingCount,
+  useStageChanges,
+} from '../changes/queries';
 import EmptyState from '../components/common/EmptyState.vue';
 import InlineError from '../components/common/InlineError.vue';
 import PageHeader from '../components/common/PageHeader.vue';
@@ -29,6 +42,16 @@ import {
   totalRow,
   type GridRow,
 } from '../explorer/columns';
+import BulkEditDialog from '../explorer/BulkEditDialog.vue';
+import CampaignBiddingDialog from '../explorer/CampaignBiddingDialog.vue';
+import {
+  editIssue,
+  entityTypeOf,
+  indexOpenChanges,
+  openEntry,
+  type MoneyField,
+  type OpenChange,
+} from '../explorer/editing';
 import ExplorerChart from '../explorer/ExplorerChart.vue';
 import ExplorerGrid from '../explorer/ExplorerGrid.vue';
 import ExplorerTabs from '../explorer/ExplorerTabs.vue';
@@ -46,6 +69,7 @@ import {
   type GridSort,
 } from '../explorer/state';
 import { downloadCsv } from '../grid/csv';
+import { errorMessageKey } from '../i18n';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
 import { explorerTarget, filtersFromView, viewState } from '../saved-views/view-state';
 import { useSessionStore } from '../stores/session';
@@ -215,7 +239,71 @@ function linkFor(row: GridRow) {
     [crumbKey]: row.name ?? t('explorer.unknownName'),
   });
 }
-const gridContext = { linkFor };
+
+// --- Bearbeiten (`phase-3.md` 3.5) ---------------------------------------------------------
+
+const { canView: canViewChanges, canWrite: canWriteChanges } = useChangeRights();
+const pendingCount = usePendingCount();
+/** Ebenen, deren Zeilen sich ändern lassen (Kampagnen, Ad Groups, Targets, Product Ads, Negatives). */
+const editableLevel = computed(() => entityTypeOf(level.value) !== null);
+/** Genau ein Profil gewählt: Die offenen Änderungen kommen nur für dieses (sonst für alle sichtbaren). */
+const openProfileId = computed(() => {
+  const profileIds = filters.state.value.profileIds;
+  return profileIds?.length === 1 ? profileIds[0] : undefined;
+});
+const openChanges = useOpenChanges(
+  openProfileId,
+  computed(() => enabled.value && editableLevel.value),
+);
+const openIndex = computed(() => indexOpenChanges(openChanges.data.value?.changes ?? []));
+const entryFor = (row: GridRow, field: AdChangeField) =>
+  openEntry(openIndex.value, level.value, row.id, field);
+
+const stageChanges = useStageChanges();
+const discardChanges = useDiscardChanges();
+/** Meldung zur letzten Änderung in einer Zelle (abgelehnt oder gescheitert). */
+const editNotice = ref<string | null>(null);
+const errorText = (error: unknown) =>
+  t(errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN'));
+
+async function stageCell(row: GridRow, field: AdChangeField, value: string) {
+  const entityType = entityTypeOf(level.value);
+  if (!entityType) return;
+  editNotice.value = null;
+  try {
+    const { results } = await stageChanges.mutateAsync([
+      { operation: 'update', entityType, entityId: row.id, field, value },
+    ]);
+    const result = results[0];
+    if (result?.outcome === 'rejected') {
+      editNotice.value = t('explorer.edit.rejected', {
+        name: row.name ?? t('explorer.unknownName'),
+        reason: t(`changes.rejection.${result.reason}`),
+      });
+    }
+  } catch (error) {
+    editNotice.value = errorText(error);
+  }
+}
+async function undoCell(change: OpenChange) {
+  editNotice.value = null;
+  try {
+    await discardChanges.mutateAsync([change.id]);
+  } catch (error) {
+    editNotice.value = errorText(error);
+  }
+}
+
+const gridContext = {
+  linkFor,
+  editing: {
+    level: () => level.value,
+    canWrite: () => canWriteChanges.value,
+    entryFor,
+    stage: stageCell,
+    undo: undoCell,
+  },
+};
 
 // --- Werkzeugleiste ------------------------------------------------------------------------
 
@@ -350,6 +438,7 @@ const columnDefs = computed(() =>
     accountTypeOf: (profileId) => accountTypes.value.get(profileId),
     displayCurrency: data.value?.meta.currency ?? 'EUR',
     converted: data.value?.meta.converted ?? false,
+    editable: canViewChanges.value,
   }),
 );
 const gridRows = computed<GridRow[]>(() => data.value?.rows ?? []);
@@ -369,9 +458,49 @@ const series = useExplorerSeries(
   enabled,
 );
 
+// --- Markierte Zeilen: Bulk-Dialoge, Strategie und Platzierungen (3.5) ---------------------
+
+const selectedRows = computed(() => {
+  const ids = new Set(selectedIds.value);
+  return ids.size === 0 ? [] : gridRows.value.filter((row) => ids.has(row.id));
+});
+const BULK_MONEY_FIELD: Partial<Record<ExplorerLevel, MoneyField>> = {
+  campaign: 'budget',
+  adGroup: 'default_bid',
+  target: 'bid',
+};
+const bulkMoneyField = computed(() => BULK_MONEY_FIELD[level.value] ?? null);
+const showBulkBar = computed(
+  () => canWriteChanges.value && editableLevel.value && selectedRows.value.length > 0,
+);
+/** Strategie und Platzierungen gelten für genau eine SP-Kampagne. */
+const biddingRow = computed(() => {
+  const [row, ...rest] = selectedRows.value;
+  return level.value === 'campaign' &&
+    row &&
+    rest.length === 0 &&
+    editIssue('campaign', row, 'bidding_strategy') === null
+    ? row
+    : null;
+});
+const bulkField = ref<'state' | MoneyField | null>(null);
+const bulkRows = shallowRef<GridRow[]>([]);
+const biddingOpen = shallowRef<GridRow | null>(null);
+function openBulk(field: 'state' | MoneyField) {
+  bulkRows.value = selectedRows.value;
+  bulkField.value = field;
+}
+watch(level, () => {
+  bulkField.value = null;
+  biddingOpen.value = null;
+  editNotice.value = null;
+});
+
 // --- CSV -----------------------------------------------------------------------------------
 
 const grid = shallowRef<InstanceType<typeof ExplorerGrid>>();
+/** Nach dem Vormerken gilt die Markierung als erledigt. */
+const clearSelection = () => grid.value?.clearSelection();
 function exportCsv() {
   const d = data.value;
   if (!grid.value || !d) return;
@@ -405,6 +534,15 @@ const truncatedText = computed(() => {
       :description="t('explorer.description')"
     >
       <template #actions>
+        <RouterLink
+          v-if="canViewChanges && pendingCount !== null"
+          to="/ads/changes"
+          data-pending-link
+          class="flex min-h-11 items-center gap-space-xs rounded-control px-space-md text-body-sm font-semibold text-violet outline-none hover:bg-violet-wash focus-visible:ring-2 focus-visible:ring-violet"
+        >
+          <i class="pi pi-history" aria-hidden="true" />
+          {{ t('explorer.pendingLink', { count: formatNumber(String(pendingCount), locale) }) }}
+        </RouterLink>
         <SavedViewsMenu
           area="explorer"
           :current="currentView"
@@ -585,6 +723,66 @@ const truncatedText = computed(() => {
         />
 
         <InlineError
+          v-if="editableLevel && openChanges.isError.value"
+          :message="t('explorer.openChangesFailed')"
+          retryable
+          :retrying="openChanges.isFetching.value"
+          @retry="openChanges.refetch()"
+        />
+        <p
+          v-if="openChanges.data.value?.truncated"
+          role="status"
+          class="rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
+        >
+          <i class="pi pi-info-circle mr-space-xs text-warn" aria-hidden="true" />{{
+            t('explorer.openChangesTruncated')
+          }}
+        </p>
+        <InlineError v-if="editNotice" data-edit-notice :message="editNotice" />
+
+        <div
+          v-if="showBulkBar"
+          data-bulk-bar
+          role="toolbar"
+          :aria-label="t('explorer.bulk.toolbar')"
+          class="flex flex-wrap items-center gap-space-sm rounded-control bg-violet-wash px-space-md py-space-sm"
+        >
+          <span class="font-data text-body-sm font-semibold text-ink">
+            {{
+              t('explorer.bulk.selected', {
+                count: formatNumber(String(selectedRows.length), locale),
+              })
+            }}
+          </span>
+          <span class="flex-1" />
+          <Button
+            data-bulk="state"
+            :label="t('explorer.bulk.action.state')"
+            severity="secondary"
+            size="small"
+            @click="openBulk('state')"
+          />
+          <Button
+            v-if="bulkMoneyField"
+            :data-bulk="bulkMoneyField"
+            :label="t(`explorer.bulk.action.${bulkMoneyField}`)"
+            severity="secondary"
+            size="small"
+            @click="openBulk(bulkMoneyField)"
+          />
+          <Button
+            v-if="level === 'campaign'"
+            v-tooltip.top="biddingRow ? undefined : t('explorer.bulk.biddingHint')"
+            data-bulk="bidding"
+            :label="t('explorer.bulk.action.bidding')"
+            severity="secondary"
+            size="small"
+            :disabled="!biddingRow"
+            @click="biddingOpen = biddingRow"
+          />
+        </div>
+
+        <InlineError
           v-if="rows.base.isError.value && !data"
           :message="t('explorer.loadFailed')"
           retryable
@@ -613,5 +811,22 @@ const truncatedText = computed(() => {
         />
       </section>
     </template>
+
+    <BulkEditDialog
+      v-if="bulkField"
+      visible
+      :level="level"
+      :field="bulkField"
+      :rows="bulkRows"
+      @staged="clearSelection"
+      @close="bulkField = null"
+    />
+    <CampaignBiddingDialog
+      :visible="biddingOpen !== null"
+      :row="biddingOpen"
+      :entry-for="entryFor"
+      @staged="clearSelection"
+      @close="biddingOpen = null"
+    />
   </div>
 </template>

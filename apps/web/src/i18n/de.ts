@@ -871,6 +871,29 @@ export const de = {
   },
   changes: {
     pendingCount: '{count} ausstehend | {count} ausstehend',
+    channel: {
+      api: 'API',
+      bulk_file: 'Bulk-Datei',
+    },
+    stage: {
+      staged:
+        'Keine Änderung vorgemerkt | {count} Änderung vorgemerkt | {count} Änderungen vorgemerkt',
+      removed:
+        '{count} Vormerkung zurückgenommen (Wert entspricht dem Stand bei Amazon) | {count} Vormerkungen zurückgenommen (Wert entspricht dem Stand bei Amazon)',
+      unchanged: '{count} unverändert | {count} unverändert',
+      rejected: '{count} abgelehnt: {reason}',
+    },
+    rejection: {
+      notFound: 'Nicht gefunden oder nicht mehr sichtbar.',
+      entityRemoved: 'Amazon liefert den Eintrag nicht mehr.',
+      entityArchived: 'Archiviert ist endgültig und lässt sich nicht mehr ändern.',
+      budgetNotDaily: 'Nur Tagesbudgets lassen sich ändern.',
+      adProductNotSupported:
+        'Gebotsstrategie und Platzierungen gibt es nur für Sponsored Products.',
+      alreadyExists: 'Das Negative gibt es dort schon.',
+      noCurrentValue: 'Es gibt keinen Wert, auf den sich rechnen ließe.',
+      resultOutOfRange: 'Das Ergebnis wäre kein gültiger Betrag über 0.',
+    },
   },
   explorer: {
     productSearch: {
@@ -922,6 +945,90 @@ export const de = {
       failed: 'Der Tagesverlauf konnte nicht geladen werden.',
       selected: 'Chart zeigt {count} markierte Zeile | Chart zeigt {count} markierte Zeilen',
       tooMany: 'Mehr als {max} Zeilen markiert: Der Chart zeigt die ganze Auswahl.',
+    },
+    pendingLink: 'Ausstehend ({count})',
+    openChangesFailed: 'Die offenen Änderungen konnten nicht geladen werden.',
+    openChangesTruncated:
+      'Es gibt mehr als 5.000 offene Änderungen: Die ältesten fehlen im Grid. Wähle ein einzelnes Profil.',
+    edit: {
+      start: '{label} bearbeiten: {value}',
+      inputLabel: '{label} in {currency}',
+      invalidMoney: 'Bitte einen Betrag über 0 mit höchstens zwei Nachkommastellen eingeben.',
+      undo: 'Vormerkung für {label} zurücknehmen',
+      pendingMine: 'Vorgemerkt, bisher {value}',
+      pendingOther: '{name} hat {value} vorgemerkt',
+      someone: 'Jemand',
+      submitted: 'Übermittelt ({channel}), noch ohne Ergebnis: {value}',
+      rejected: '„{name}“ wurde nicht vorgemerkt: {reason}',
+    },
+    bulk: {
+      toolbar: 'Markierte Zeilen ändern',
+      selected: '{count} markiert',
+      action: {
+        state: 'Status ändern',
+        budget: 'Budget ändern',
+        default_bid: 'Standardgebot ändern',
+        bid: 'Gebot ändern',
+        bidding: 'Strategie & Platzierungen',
+      },
+      biddingHint: 'Dafür genau eine Sponsored-Products-Kampagne markieren.',
+      title: {
+        state: 'Status für {count} {entity} ändern',
+        budget: 'Budget für {count} {entity} ändern',
+        default_bid: 'Standardgebot für {count} {entity} ändern',
+        bid: 'Gebot für {count} {entity} ändern',
+      },
+      entity: {
+        portfolio: 'Portfolio | Portfolios',
+        campaign: 'Kampagne | Kampagnen',
+        adGroup: 'Ad Group | Ad Groups',
+        target: 'Target | Targets',
+        productAd: 'Product Ad | Product Ads',
+        searchTerm: 'Suchbegriff | Suchbegriffe',
+        negative: 'Negative | Negatives',
+      },
+      skipped:
+        '{count} Zeile wird übersprungen (archiviert, entfernt oder hier nicht änderbar). | {count} Zeilen werden übersprungen (archiviert, entfernt oder hier nicht änderbar).',
+      newState: 'Neuer Status',
+      archiveWarning: 'Archivieren lässt sich bei Amazon nicht zurücknehmen.',
+      mode: {
+        label: 'Art der Änderung',
+        fixed: 'Fester Wert',
+        percent: 'Um Prozent ändern',
+        amount: 'Um einen Betrag ändern',
+      },
+      direction: {
+        label: 'Richtung',
+        increase: 'Erhöhen',
+        decrease: 'Senken',
+      },
+      percentLabel: 'Prozent',
+      amountLabel: {
+        fixed: 'Neuer Wert in {currency}',
+        amount: 'Betrag in {currency}',
+      },
+      hint: {
+        fixed: 'Jede markierte Zeile bekommt diesen Wert in ihrer Währung.',
+        relative:
+          'Gerechnet wird auf den aktuellen Wert bei Amazon, gerundet auf zwei Nachkommastellen. Targets ohne eigenes Gebot starten beim Standardgebot ihrer Ad Group.',
+      },
+      submit: 'In den Warenkorb',
+      nextStep:
+        'An Amazon geht erst etwas, wenn du die Änderungen unter „Änderungen“ übermittelst.',
+    },
+    bidding: {
+      title: 'Gebotsstrategie und Platzierungen',
+      noStrategy: 'Keine Strategie',
+      strategyMissing:
+        'Diese Strategie lässt sich hier nicht setzen. Ohne eine der drei wählbaren Strategien nimmt Amazon keine Gebotsanpassungen an.',
+      placements: 'Gebotsanpassung je Platzierung',
+      placement: {
+        placement_top: 'Suche, oben (erste Seite)',
+        placement_rest_of_search: 'Suche, übrige Plätze',
+        placement_product_page: 'Produktseiten',
+        placement_amazon_business: 'Amazon Business',
+      },
+      placementHint: 'Ganze Prozent von 0 bis 900; 0 heißt keine Anpassung.',
     },
     total: 'Summe',
     unknownName: '(unbekannt)',
