@@ -926,7 +926,7 @@ describe('applyChanges: andere Ad-Typen', () => {
     const outcome = await apply(
       client,
       [{ ref: 'a', type: 'update', entity: 'campaign', amazonId: '1001', state: 'PAUSED' }],
-      'SPONSORED_BRANDS',
+      'SPONSORED_TV',
     );
 
     expect(outcome.results).toEqual([
