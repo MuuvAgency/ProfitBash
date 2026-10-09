@@ -4,10 +4,13 @@
 > `docs/tasks/phase-2.md` (Definition of Done, Umsetzungsnotizen 2.4–2.13), `docs/tasks/phase-1.md` (1.5 Schreibschicht,
 > 1.10, 1.11, F12), `docs/decisions/` (001–004), `design/DESIGN.md`.
 >
-> **Status: in Arbeit (2026-10-08).** Entschieden: F1, F2 (2026-09-29), **F3–F10** (2026-10-08, die Nummern gelten nur in
-> dieser Datei). `phase-1.md` 1.11 und `phase-2b.md` sind bis auf die Themen ohne Berichte abgeschlossen. Zusätzlich in
-> Phase 3: Suchbegriff-Aktionen aus 2b (Negativ anlegen, Harvest vormerken, F9), siehe
-> `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` Abschnitt B.
+> **Status: abgeschlossen (2026-10-09) bis auf drei Punkte, die nicht am Code hängen bzw. eigene Aufgaben sind:**
+> (1) der **echte Upload** der Bulk-Datei in der Werbekonsole durch Dominik (offene Punkte in 3.2b, dazu der Befund aus dem
+> „Config“-Blatt unten), (2) die **Bulk-Datei für Sponsored Brands und Sponsored Display** (3.9, ohne sie lassen sich SB und SD
+> ohne API-Zugang nicht ändern), (3) der **erste echte Lauf über die API** (`phase-1.md` 1.10, offene Punkte in ADR 005).
+> Entschieden: F1, F2 (2026-09-29), **F3–F10** (2026-10-08, die Nummern gelten nur in dieser Datei). `phase-1.md` 1.11 und
+> `phase-2b.md` sind bis auf die Themen ohne Berichte abgeschlossen. Zusätzlich in Phase 3: Suchbegriff-Aktionen aus 2b
+> (Negativ anlegen, Harvest vormerken, F9), siehe `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` Abschnitt B.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang (`phase-1.md` F12: das Partner Network nimmt keine
 > Einzelunternehmen an). Mit dem Abschluss von Phase 2 ist der Auslöser für den Datei-Import (`phase-1.md` 1.11) erreicht.
@@ -23,18 +26,63 @@ Die Agentur ändert ihre Amazon-Werbung aus ProfitBash heraus, nachvollziehbar u
 Navigation (`plan.md` §3): „Änderungen (Ausstehend · Übermittlungen)“ unter `/ads/changes` (Feature `changes`), „Tags“ unter
 `/ads/tags/*` (Feature `tags`). Schreiben nur mit Recht `write` (Admin, Editor).
 
-## Definition of Done (Entwurf)
+## Definition of Done
 
-- [ ] Jede Änderung läuft über den Warenkorb und eine Übermittlung (`runJob`, `job_runs`), nie direkt aus der Oberfläche an Amazon.
-- [ ] Je Änderung stehen vorher/nachher, Ergebnis von Amazon (Erfolg, Fehler mit Text) und der handelnde Nutzer fest (`audit_event`).
-- [ ] Teilfehler brechen die Übermittlung nicht ab; fehlgeschlagene Änderungen lassen sich erneut versuchen oder verwerfen.
-- [ ] Revert setzt auf den Wert vor der Übermittlung zurück und prüft vorher, ob sich der Wert bei Amazon seitdem geändert hat.
-- [ ] Beträge (Gebote, Budgets) bleiben Decimal-Strings mit Währung; Grenzen von Amazon je Ad-Typ und Marktplatz werden vor dem
+Geprüft am 2026-10-09 gegen Code und Tests (Stand `main` nach #68), je Punkt mit Beleg.
+
+- [x] Jede Änderung läuft über den Warenkorb und eine Übermittlung (`runJob`, `job_runs`), nie direkt aus der Oberfläche an Amazon.
+      Beleg: `applyChanges` ruft nur der Job `ad-changes-submit` auf (`apps/worker/src/jobs/ad-changes-submit.ts`, über
+      `runJob` mit Lease); die API plant nur ein (`enqueue` in der Transaktion der Übermittlung), das Web spricht nur mit
+      `/api/ads/changes`. Ende-zu-Ende: `ad-changes-flow.test.ts`.
+- [x] Je Änderung stehen vorher/nachher, Ergebnis von Amazon (Erfolg, Fehler mit Text) und der handelnde Nutzer fest (`audit_event`).
+      Beleg: `ad_changes` (`old_*`/`new_*`, `error_code`/`error_message`, `created_by`), Audit `ad_changes.stage`,
+      `.discard`, `.dismiss`, `ad_change_submission.create` und `.close`; `ad-changes.test.ts`, `ad-change-processing.test.ts`.
+- [x] Teilfehler brechen die Übermittlung nicht ab; fehlgeschlagene Änderungen lassen sich erneut versuchen oder verwerfen.
+      Beleg: `writes.test.ts` (207 mit Erfolg und Fehler je Eintrag, Abbruch mit Teilergebnissen), `ad-changes-submit.test.ts`,
+      `ad-change-actions.test.ts` (`retryAdChanges`, `dismissFailedAdChanges`), API `/retry`, `/dismiss`.
+- [x] Revert setzt auf den Wert vor der Übermittlung zurück und prüft vorher, ob sich der Wert bei Amazon seitdem geändert hat.
+      Beleg: `revertAdChanges` (`conflict` ohne `overwriteChanged`), Test „nimmt Änderungen zurück und fragt bei abweichendem
+      Stand nach (F8)“ in API und DB, Rückfrage in `ChangesPage.test.ts`. Grenzen: Archivieren ist nicht umkehrbar, ein
+      Revert auf „kein Wert“ wird übersprungen (3.3).
+- [x] Beträge (Gebote, Budgets) bleiben Decimal-Strings mit Währung; Grenzen von Amazon je Ad-Typ und Marktplatz werden vor dem
       Übermitteln geprüft (Test je Grenze).
-- [ ] Alle Zugriffe über den Access-Layer (ADR 002); Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
-- [ ] Tests gegen den Mock-Anbieter (msw bzw. `mock.ts`), keiner gegen echte Amazon-Endpunkte.
-- [ ] Browser-Pane geprüft wie in Phase 2 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole).
-- [ ] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
+      Beleg: `limits.test.ts` (SP, SB, SD je Marktplatz und Kostenart, Platzierung, negative Keywords),
+      `packages/engine/src/ad-changes.test.ts`, API „übermittelt nichts, solange ein Wert außerhalb der Grenzen von Amazon
+      liegt“. Kein Betrag läuft über `number` (`jsonDecimal`, Zahlzelle der Bulk-Datei aus dem Decimal-String).
+- [x] Alle Zugriffe über den Access-Layer (ADR 002); Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
+      Beleg: `ad-changes.ts`, `ad-change-actions.ts`, `ad-change-queries.ts`, `tags.ts`, `search-term-harvest.ts` gehen über
+      `visibleProfilesScope()`, keiner filtert selbst nach `organization_id` (der Job arbeitet als Systemzugriff, gebunden
+      an Organisation und Connection). API-Tests: Liste aller schreibenden und lesenden Endpunkte gegen 401, Viewer (403) und
+      Entitlement, dazu „Fremde Organisation und ausgeblendete Profile“ (`ad-changes.test.ts`), `tags.test.ts`,
+      `search-term-harvest.test.ts`.
+- [x] Tests gegen den Mock-Anbieter (msw bzw. `mock.ts`), keiner gegen echte Amazon-Endpunkte.
+      Beleg: Alle Tests, die Amazon-Adressen nennen, laufen mit msw und `onUnhandledRequest: 'error'`; der Job-Test nutzt
+      einen Stub, der Ablauf-Test den Mock-Anbieter im Prozess.
+- [x] Browser-Pane geprüft wie in Phase 2 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole).
+      Beleg: Notizen je Aufgabe (3.5–3.8) und die Nachprüfung vom 2026-10-09 unten.
+- [x] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
+      Beleg: Lauf vom 2026-10-09 auf dem Stand nach #68: 179 Testdateien, 2408 Tests grün; `typecheck`, `lint`, `build`,
+      `smoke-bundles.sh` und `smoke-db-backup.sh` ohne Fehler; CI auf `main` grün.
+
+**Nachprüfung im Browser (2026-10-09, Demo-Daten, Profil „Demo Lumen SE“):**
+- **CSV-Download der Suchbegriff-Analyse** (offen seit 2b.2e): Die Datei kommt mit BOM, 18 Spalten und 1320 Zeilen (so viele
+  wie die Auswahl nennt), ohne die Spalte „Aktionen“, mit der neuen Spalte „Merkliste“; Dateiname
+  `profitbash-search-term-analysis-demo-lumen-se-se-2026-08-01_2026-09-29.csv`. Quoten (CTR, ACoS, ROAS, CVR) stehen
+  ungerundet mit bis zu 34 Nachkommastellen in der Datei (dieselben Helfer wie der Explorer-Export, keine Rundung).
+- **Währung nach dem Sprung in den Explorer:** Der Link der Kampagne landet auf ihren Ad Groups, mit Client, Datei-Zeitraum
+  und „Entfernte anzeigen“. Die Zeilen zeigen die Währung des Profils (SEK). **Die Summenzeile zeigt „≈ … €“**: Der Link
+  nennt den Client, und der hat Profile in zwei Währungen (GBP, SEK); mit Währung „Automatisch“ rechnet der Explorer die
+  Summe dann in EUR um, obwohl der Drill-Down nur eine Kampagne in SEK zeigt. Gekennzeichnet und rechnerisch richtig, aber
+  unnötig. **Offen (klein):** bei einem Drill-Down auf eine Kampagne die Währung ihres Profils nehmen.
+- **Regel-Dialog schließen:** „Schließen“ (X), Escape und „Abbrechen“ schließen den Dialog, der Fokus geht zurück auf „Regeln
+  ändern“, eine nicht gespeicherte Eingabe ist nach dem erneuten Öffnen weg. Ein Klick neben den Dialog schließt ihn nicht
+  (bewusst, schützt die Eingaben). Bei geringer Fensterhöhe rollt der Inhalt im Dialog (höchstens 90 % der Höhe).
+- **Tablet (768 px), Hell-Modus:** Suchbegriff-Aktionen (Leiste, Auswahl, Spalte „Aktionen“ rechts fest, Dialog „Negativ
+  anlegen“ samt Ergebnis), „Änderungen“ (Ausstehend mit drei Negatives; als Bulk-Datei übermittelt; Übermittlungen mit Liste,
+  geöffneter Übermittlung, Hinweis zum Stand; „Nicht hochladen“ mit Rückfrage) und „Tags“ (leer, Dialog „Neues Tag“, Liste,
+  Löschen mit Rückfrage; auch bei 375 px): kein waagerechtes Scrollen, Kontraste in Ordnung, Konsole ohne Fehler.
+  Testdaten danach verworfen bzw. gelöscht. Beobachtung (kosmetisch): Unter „Ausstehend“ ist die Spalte mit Name und Lage
+  bei 768 px schmal (Namen brechen um), obwohl rechts Platz bleibt.
 
 ## Fragen an Dominik
 
@@ -339,6 +387,27 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     `Bidding Adjustment` für eine bisher nicht gesetzte Platzierung `Update` oder `Create` braucht und ob die Strategie
     in der Zeile stehen darf, ob beim Kampagnen-Update leere Spalten wirklich „unverändert“ heißen (auch die Spalten,
     die die Datei nicht schreibt: „Sites“, „Off-Amazon ad serving“), ob Vendor-Konten dieselben Zeilen annehmen.
+  - **Befund aus einer echten Datei (2026-10-09, drei Downloads von Dominik, nur Kopfzeilen und das versteckte Blatt
+    „Config“ gelesen):** Die Schreibweise der Kopfzeilen und Entity-Namen des Schreibers stimmt mit der englischen Datei
+    überein (`Campaign ID`, `Ad Group`, `Bidding Adjustment`, `Placement Top` …). Das Blatt „Config“ nennt je Entity und
+    Operation Pflicht- und Kann-Spalten. Abweichungen zu dem, was die Datei heute schreibt:
+    - **Kampagne, `Update`:** Pflicht laut Config sind `Campaign Id`, `Campaign Name`, `Daily Budget`, `State`, `Start
+      Date`, `Bidding Strategy` (Kann: `Portfolio Id`, `End Date`, `Off-Amazon ad serving`). Die Datei schreibt nur die
+      geänderten Felder plus Portfolio und Enddatum (nach dem Guide „leer = unverändert“). **Beim echten Upload zuerst
+      prüfen:** Meldet die Konsole fehlende Pflichtfelder, muss die Kampagnenzeile Name, Budget, Zustand, Startdatum und
+      Strategie aus dem Stand tragen (dann mit dem Alter des Stands als Risiko, siehe Review-Befund oben).
+    - **Ad Group, `Update`:** Pflicht `Ad Group Id`, `Ad Group Name`, `Ad Group Default Bid`, `State` (die Datei schreibt
+      nur Geändertes).
+    - **Keyword, Produkt-Target, Product Ad, Negatives, `Update`:** Pflicht nur ID und `State` (die Datei lässt `State`
+      weg, wenn nur das Gebot geändert wird).
+    - **`Bidding Adjustment`:** `Create` und `Update` gibt es beide, Pflicht `Campaign Id` und `Placement`, Kann
+      `Percentage`; `Bidding Strategy` gehört nicht dazu. Zustände beim Update schließen `archived` ein; ein negatives
+      Keyword der Kampagne kennt beim Update nur `archived`.
+    - Match-Typen und Platzierungen stehen in der Config in der Form der API (`negativeExact`, `placementTop`), in den
+      Datenzeilen in der Anzeigeform („Negative Exact“, „Placement Top“); die Datei schreibt `negativeExact` bzw.
+      „Placement Top“.
+    Ob die Konsole die Pflichtspalten beim Hochladen wirklich erzwingt oder nur die Excel-Vorlage sie so führt, zeigt erst
+    der Upload. Bis dahin bleibt der Schreiber, wie er ist.
   - **Bewusst so:** keine Grenzen im Schreiber (Excel: 1 048 576 Zeilen, 16 384 Spalten, 32 767 Zeichen je Zelle; das
     Blatt entsteht als ein Text im Speicher, für einige Tausend Zeilen unkritisch, für Phase 4 vormerken).
   - **Nicht enthalten:** Sponsored Brands und Sponsored Display (eigene Blätter und Spalten, mit 3.2c), Portfolios,
