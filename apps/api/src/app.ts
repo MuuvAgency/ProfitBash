@@ -16,6 +16,7 @@ import { registerHealthRoutes } from './routes/health';
 import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMemberRoutes } from './routes/members';
 import { registerMeRoutes } from './routes/me';
+import { registerProductGroupRoutes } from './routes/product-groups';
 import { registerTagRoutes } from './routes/tags';
 import { registerSavedViewRoutes } from './routes/saved-views';
 import { registerSearchTermRoutes } from './routes/search-terms';
@@ -103,6 +104,7 @@ export function createApp(options: CreateAppOptions) {
   registerSearchTermRoutes(app, deps);
   registerAdChangeRoutes(app, deps);
   registerMemberRoutes(app, deps);
+  registerProductGroupRoutes(app, deps);
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',
