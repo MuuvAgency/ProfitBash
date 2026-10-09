@@ -869,6 +869,9 @@ export const de = {
       searchTerms: 'Suchbegriffe',
     },
   },
+  changes: {
+    pendingCount: '{count} ausstehend | {count} ausstehend',
+  },
   explorer: {
     productSearch: {
       empty: 'Keine Product Ads zu dieser Suche.',

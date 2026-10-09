@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { formatNumber } from '@profitbash/shared';
 import { useI18n } from 'vue-i18n';
+import { usePendingCount } from '../../changes/queries';
 import { visibleNavigation } from '../../navigation/navigation';
 import { useSessionStore } from '../../stores/session';
 import BrandMark from '../brand/BrandMark.vue';
@@ -22,6 +24,18 @@ const emit = defineEmits<{ toggleCollapsed: []; navigate: []; showShortcuts: [];
 const { t } = useI18n();
 const session = useSessionStore();
 const groups = computed(() => (session.me ? visibleNavigation(session.me) : []));
+/** Warenkorb am Eintrag „Änderungen“ (3.5); ohne Zahl bei leerem Warenkorb oder wenn sie nicht bekannt ist. */
+const pendingCount = usePendingCount();
+const badges = computed(() => {
+  const count = pendingCount.value;
+  if (!count) return {};
+  return {
+    changes: {
+      text: formatNumber(String(count), session.preferences.locale),
+      label: t('changes.pendingCount', { count }, count),
+    },
+  };
+});
 const toggleLabel = computed(() =>
   props.collapsed ? t('shell.expandSidebar') : t('shell.collapseSidebar'),
 );
@@ -72,6 +86,7 @@ const toggleLabel = computed(() =>
         :id-prefix="idPrefix"
         :groups="groups"
         :collapsed="collapsed"
+        :badges="badges"
         @navigate="emit('navigate')"
       />
     </div>
