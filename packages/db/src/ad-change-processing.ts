@@ -5,6 +5,7 @@ import {
   type AdChangeField,
   type AdChangeNegative,
   type AdChangeSubmissionStatus,
+  type AdChangeSubmissionKind,
 } from '@profitbash/shared';
 import { and, asc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import {
@@ -80,6 +81,8 @@ export interface ClaimedAdChangeSubmission {
   id: string;
   profileId: string;
   amazonProfileId: string;
+  /** `changes` | `setup` (Anlagen eines Setup-Entwurfs, 4.4). */
+  kind: AdChangeSubmissionKind;
   /** Versuche einschließlich dieses Laufs. */
   attempts: number;
 }
@@ -108,6 +111,7 @@ export async function claimNextAdChangeSubmission(
         id: s.id,
         profileId: s.profileId,
         status: s.status,
+        kind: s.kind,
         attempts: s.attempts,
         amazonProfileId: p.amazonProfileId,
       })
@@ -176,6 +180,7 @@ export async function claimNextAdChangeSubmission(
       id: row.id,
       profileId: row.profileId,
       amazonProfileId: row.amazonProfileId,
+      kind: row.kind as AdChangeSubmissionKind,
       attempts,
     };
   });

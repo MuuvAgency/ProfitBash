@@ -100,6 +100,36 @@ export async function getCampaignSetupSubmissionItems(
   return { submission, profile: profile!, items: await loadCampaignSetupItems(db, submission.id) };
 }
 
+/**
+ * Zeilen und Profil einer Setup-Übermittlung für den Job (Systemzugriff, an die Organisation gebunden); `null`, wenn
+ * es keine Setup-Übermittlung der Organisation ist.
+ */
+export async function loadCampaignSetupJob(
+  db: DbOrTx,
+  input: { organizationId: string; submissionId: string },
+): Promise<{
+  profile: { countryCode: string; timezone: string; accountType: string };
+  items: CampaignSetupItemRow[];
+} | null> {
+  const [found] = await db
+    .select({
+      countryCode: amazonAdsProfiles.countryCode,
+      timezone: amazonAdsProfiles.timezone,
+      accountType: amazonAdsProfiles.accountType,
+    })
+    .from(adChangeSubmissions)
+    .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, adChangeSubmissions.profileId))
+    .where(
+      and(
+        eq(adChangeSubmissions.id, input.submissionId),
+        eq(adChangeSubmissions.organizationId, input.organizationId),
+        eq(adChangeSubmissions.kind, 'setup'),
+      ),
+    );
+  if (!found) return null;
+  return { profile: found, items: await loadCampaignSetupItems(db, input.submissionId) };
+}
+
 export type CampaignSetupResult = { itemId: string } & (
   | { outcome: 'applied'; amazonEntityId: string | null }
   | { outcome: 'failed'; code: string; message: string }
