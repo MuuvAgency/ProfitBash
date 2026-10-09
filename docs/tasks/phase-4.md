@@ -259,6 +259,19 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
       Produkt-Target, Gebotsanpassung, mit den vorläufigen Text-IDs der Guides für Eltern und Kinder; Rundlauf-Test.
 - [ ] Bestätigung durch den nächsten Bulk-Import (Zuordnung über Namen, danach echte IDs).
 - [ ] API-Weg gegen den Mock (SP v3 `POST /sp/campaigns` usw.), ADR 005 ergänzen.
+- **Stand (2026-10-09, unterbrochen, Branch `4-4-setup-write-layer`):** fertig und getestet: Create-Zeilen der
+  Bulk-Datei (`BulkFileCreate`, Spalte `Off-Amazon ad serving`), Rundlauf; Namen nach der Limits-Seite (Zeichen,
+  Vendoren 116); Schema für Plan und Entwurf (`@profitbash/shared/campaign-setup`); `reviewCampaignPlan` und
+  `planSetupItems` (Engine); Tabellen `campaign_setup_drafts`/`campaign_setup_items`, `ad_change_submissions.kind`
+  (Migration `0031_campaign_setup`); `packages/db/src/campaign-setup.ts` (speichern, lesen, verwerfen, übermitteln)
+  und `campaign-setup-processing.ts` (Ergebnisse, Bestätigung über Namen beim Bulk-Import, Abschluss von Hand,
+  unterbrochener Lauf = unklar); `buildSetupBulkFile` im Worker; Download und Abschluss über die Endpunkte der Seite
+  „Änderungen“; `applySpCreates` + Mock (ADR 005 ergänzt).
+  **Offen:** Job `ad-changes-submit` für `kind = setup` (`applySpCreates` in `AmazonAdsClient` und
+  `stubAmazonAdsClient` aufnehmen, `claimNextAdChangeSubmission` liefert `kind`, Platzierungen gehen mit der
+  Kampagne, `created` aus angelegten Zeilen, Startdatum heute in der Zeitzone des Profils), Ende-zu-Ende-Test gegen
+  den Mock, Umsetzungsnotiz und Häkchen, Review, Verifikation, PR. Für 4.5: Detail einer Setup-Übermittlung
+  (`getAdChangeSubmission` liefert für Setups keine Zeilen) und API für Entwürfe.
 
 ### 4.5 Kampagnen-Setup (`apps/api`, `apps/web`)
 - [ ] Assistent unter `/ads/tools/setup`: Client und Profil → Produktgruppe → Preset → Keywords und Targets → Vorschau der
