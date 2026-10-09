@@ -27,6 +27,7 @@ import { getReport, requestReport, type GetReportInput, type RequestReportInput 
 import { normalizeProfiles, profileResponseSchema, type AmazonAdsProfile } from './profiles';
 import { createProfileRateLimiter, type ProfileRateLimiterOptions } from './rate-limit';
 import { AMAZON_ADS_REGIONS, type AmazonAdsRegion, type AmazonAdsRegionEndpoints } from './regions';
+import { applySpCreates, type ApplySpCreatesInput } from './creates';
 import { applyChanges, type ApplyChangesInput, type ApplyChangesResult } from './writes';
 
 export interface AdsApiRequest<S extends z.ZodType> {
@@ -126,6 +127,15 @@ export interface AmazonAdsClient {
   applyChanges(
     connection: ConnectionRef,
     input: ApplyChangesInput,
+    options?: RequestOptions,
+  ): Promise<ApplyChangesResult>;
+  /**
+   * Legt Strukturen für Sponsored Products an (Phase 4, 4.4): Kampagnen, Ad Groups, Anzeigen, Targets, Negatives;
+   * Ergebnis je Auftrag wie bei `applyChanges`, Anlagen werden nie wiederholt.
+   */
+  applySpCreates(
+    connection: ConnectionRef,
+    input: ApplySpCreatesInput,
     options?: RequestOptions,
   ): Promise<ApplyChangesResult>;
 }
@@ -271,6 +281,8 @@ export function createAmazonAdsClient(options: AmazonAdsClientOptions): AmazonAd
       listPortfolios({ request, logger }, connection, amazonProfileId, requestOptions),
     applyChanges: (connection, input, requestOptions) =>
       applyChanges({ request, logger }, connection, input, requestOptions),
+    applySpCreates: (connection, input, requestOptions) =>
+      applySpCreates({ request, logger }, connection, input, requestOptions),
     downloadFile: (url) =>
       downloadFile(url, { fetch: fetchImpl, logger, timeoutMs: DOWNLOAD_TIMEOUT_MS }),
   };

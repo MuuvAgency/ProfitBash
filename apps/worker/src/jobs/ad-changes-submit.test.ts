@@ -6,8 +6,15 @@ import {
   type AmazonAdsWriteResult,
   type ApplyChangesInput,
   type ApplyChangesResult,
+  type ApplySpCreatesInput,
 } from '@profitbash/amazon-ads';
-import { schema, stageAdChanges, submitAdChanges } from '@profitbash/db';
+import {
+  saveCampaignSetupDraft,
+  schema,
+  stageAdChanges,
+  submitAdChanges,
+  submitCampaignSetupDraft,
+} from '@profitbash/db';
 import {
   createTestDatabase,
   seedAdChangeFixture,
@@ -24,8 +31,15 @@ import type { ConnectionJobData, ConnectionJobDeps, ConnectionQueue } from './co
 
 /** Job `ad-changes-submit` (`phase-3.md` 3.3): Übermittlungen über die API senden und das Ergebnis je Änderung festhalten. */
 
-const { adChangeSubmissions, adChanges, amazonAdsCampaigns, amazonAdsTargets, connections } =
-  schema;
+const {
+  adChangeSubmissions,
+  adChanges,
+  amazonAdsCampaigns,
+  amazonAdsTargets,
+  campaignSetupDrafts,
+  campaignSetupItems,
+  connections,
+} = schema;
 
 let testDb: TestDatabase;
 let f: AdChangeFixture;
@@ -34,6 +48,21 @@ const NOW = new Date('2026-10-08T12:00:00Z');
 type Answer = (input: ApplyChangesInput) => ApplyChangesResult | Promise<ApplyChangesResult>;
 let answer: Answer;
 const calls: ApplyChangesInput[] = [];
+type CreateAnswer = (
+  input: ApplySpCreatesInput,
+) => ApplyChangesResult | Promise<ApplyChangesResult>;
+/** Jede Anlage gelingt mit einer neuen ID; schon angelegte behalten ihre. */
+const allCreated: CreateAnswer = (input) => ({
+  results: input.operations.map((op, index) => ({
+    ref: op.ref,
+    status: 'applied',
+    amazonId: `90${index}`,
+  })),
+  throttled: false,
+  retryAfterMs: null,
+});
+let createAnswer: CreateAnswer;
+const createCalls: ApplySpCreatesInput[] = [];
 const enqueued: Array<{
   queue: ConnectionQueue;
   job: ConnectionJobData;
@@ -67,6 +96,10 @@ function deps(): ConnectionJobDeps {
       applyChanges(_connection, input) {
         calls.push(input);
         return Promise.resolve(answer(input));
+      },
+      applySpCreates(_connection, input) {
+        createCalls.push(input);
+        return Promise.resolve(createAnswer(input));
       },
     }),
     scheduleRetry: () => Promise.resolve(true),
@@ -134,6 +167,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   const { db } = testDb;
   await db.delete(adChanges);
+  await db.delete(campaignSetupItems);
+  await db.delete(campaignSetupDrafts);
   await db.delete(adChangeSubmissions);
   await db.update(amazonAdsTargets).set({ state: 'ENABLED', removedAt: null });
   await db.update(amazonAdsTargets).set({ bid: '0.50' }).where(eq(amazonAdsTargets.id, f.keyword));
@@ -141,6 +176,8 @@ beforeEach(async () => {
   await db.update(connections).set({ status: 'active' });
   answer = allApplied;
   calls.length = 0;
+  createAnswer = allCreated;
+  createCalls.length = 0;
   enqueued.length = 0;
   leaseExtensions = 0;
 });
@@ -453,5 +490,139 @@ describe('submitConnectionAdChanges', () => {
     expect(await submissionRow(second.submissionId)).toMatchObject({ status: 'finished' });
     expect(outcome.counters).toMatchObject({ submissions: 2, changesApplied: 2 });
     expect((await run()).counters).toMatchObject({ submissions: 0 });
+  });
+});
+
+describe('submitConnectionAdChanges: Setups (4.4)', () => {
+  const NAME = 'SP | EXACT | Flaschen';
+  async function setup() {
+    const actor = { userId: f.ada, orgId: f.org };
+    const draft = (await saveCampaignSetupDraft(testDb.db, {
+      ...actor,
+      draft: {
+        profileId: f.profile,
+        productGroupId: null,
+        presetKey: 'muuv-standard',
+        name: 'Flaschen',
+        campaignState: 'ENABLED',
+        inputs: { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} },
+        campaigns: [
+          {
+            block: 'SP-KW-EXACT',
+            adProduct: 'SP',
+            targeting: 'keyword',
+            name: NAME,
+            state: 'ENABLED',
+            currencyCode: 'EUR',
+            dailyBudget: '25.00',
+            biddingStrategy: 'SALES_DOWN_ONLY',
+            sdOptimization: null,
+            costType: 'cpc',
+            offAmazon: false,
+            placements: { topOfSearch: 20, productPages: 0, restOfSearch: 0 },
+            adGroup: { name: NAME, defaultBid: '0.85' },
+            ads: [{ asin: 'B0TEST0001', sku: 'SKU-1' }],
+            targets: [{ type: 'keyword', text: 'flasche', matchType: 'exact', bid: '0.90' }],
+            negatives: [],
+          },
+        ],
+      },
+    }))!;
+    const result = await submitCampaignSetupDraft(testDb.db, {
+      ...actor,
+      draftId: draft.id,
+      version: 1,
+      channel: 'api',
+      enqueue: async () => undefined,
+      review: () => null,
+    });
+    if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
+    return result.submission.id;
+  }
+  const items = (submissionId: string) =>
+    testDb.db
+      .select()
+      .from(campaignSetupItems)
+      .where(eq(campaignSetupItems.submissionId, submissionId))
+      .orderBy(campaignSetupItems.position);
+
+  it('legt die Struktur über die API an und hält die neuen IDs fest', async () => {
+    const submissionId = await setup();
+    const outcome = await run();
+
+    expect(calls).toEqual([]);
+    expect(createCalls).toHaveLength(1);
+    expect(createCalls[0]!.amazonProfileId).toBe('111');
+    // Startdatum: heute in der Zeitzone des Profils (Europe/Berlin).
+    expect(createCalls[0]!.operations[0]).toMatchObject({
+      entity: 'campaign',
+      startDate: '2026-10-08',
+      placements: [{ placement: 'PLACEMENT_TOP', percentage: '20' }],
+    });
+    expect(
+      (await items(submissionId)).map((row) => [row.entityType, row.status, row.amazonEntityId]),
+    ).toEqual([
+      ['campaign', 'applied', '900'],
+      ['placement', 'applied', null],
+      ['ad_group', 'applied', '901'],
+      ['product_ad', 'applied', '902'],
+      ['keyword', 'applied', '903'],
+    ]);
+    expect(await submissionRow(submissionId)).toMatchObject({ status: 'finished' });
+    expect(outcome.counters).toMatchObject({ submissions: 1, changesApplied: 5, changesFailed: 0 });
+  });
+
+  it('hält Teilfehler fest und setzt nach einer Drosselung mit den angelegten Eltern fort', async () => {
+    const submissionId = await setup();
+    createAnswer = (input) => ({
+      results: input.operations.map((op, index) =>
+        index === 0
+          ? { ref: op.ref, status: 'applied', amazonId: '4401' }
+          : { ref: op.ref, status: 'unsent' },
+      ),
+      throttled: true,
+      retryAfterMs: 90_000,
+    });
+    const first = await run();
+    expect(first.counters).toMatchObject({ changesApplied: 2, changesUnsent: 3 });
+    expect(await submissionRow(submissionId)).toMatchObject({ status: 'pending' });
+    expect(enqueued.at(-1)).toMatchObject({ startAfterSeconds: 90 });
+
+    createAnswer = (input) => ({
+      results: input.operations.map((op) =>
+        op.entity === 'keyword'
+          ? { ref: op.ref, status: 'failed', code: 'INVALID_KEYWORD', message: 'abgelehnt' }
+          : { ref: op.ref, status: 'applied', amazonId: `5${op.ref.length}` },
+      ),
+      throttled: false,
+      retryAfterMs: null,
+    });
+    await run();
+    const second = createCalls.at(-1)!;
+    expect(second.operations.map((op) => op.entity)).toEqual(['adGroup', 'productAd', 'keyword']);
+    expect([...(second.created ?? new Map()).values()]).toEqual(['4401']);
+    expect((await items(submissionId)).map((row) => [row.entityType, row.status])).toEqual([
+      ['campaign', 'applied'],
+      ['placement', 'applied'],
+      ['ad_group', 'applied'],
+      ['product_ad', 'applied'],
+      ['keyword', 'failed'],
+    ]);
+    expect(await submissionRow(submissionId)).toMatchObject({ status: 'finished' });
+  });
+
+  it('wertet unklare Ausgänge als Fehler und lässt bei einem Abbruch den Rest scheitern', async () => {
+    const submissionId = await setup();
+    createAnswer = () => {
+      throw new AmazonAdsWriteAbortedError(
+        'ads.applySpCreates',
+        [],
+        new AmazonAdsHttpError('Kein Zugriff', 'sp.campaigns.create', 403, 'FORBIDDEN', null),
+      );
+    };
+    await expect(run()).rejects.toBeInstanceOf(JobFailure);
+    expect((await items(submissionId)).every((row) => row.status === 'failed')).toBe(true);
+    expect((await items(submissionId))[0]!.errorCode).toBe('NOT_SENT');
+    expect(await submissionRow(submissionId)).toMatchObject({ status: 'failed' });
   });
 });

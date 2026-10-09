@@ -14,10 +14,16 @@ import {
   findJobConnection,
   finishAdChangeSubmission,
   prepareAdChangeSubmission,
+  loadCampaignSetupItems,
+  loadCampaignSetupJob,
   recordAdChangeResults,
+  recordCampaignSetupResults,
   type AdChangeResultInput,
+  type CampaignSetupResult,
 } from '@profitbash/db';
+import { todayInTimezone } from '@profitbash/shared';
 import { buildWriteOperations } from '../ad-changes/operations';
+import { buildSetupOperations } from '../campaign-setup/operations';
 import { JobFailure, type JobCounters, type JobOutcome } from '../run-job';
 import {
   handleAmazonError,
@@ -41,6 +47,8 @@ const MAX_RETRY_SECONDS = 10 * 60;
 
 const UNKNOWN_HINT =
   'Ob Amazon die Änderung angewendet hat, ist unklar; nach dem nächsten Sync prüfen.';
+const UNKNOWN_SETUP_HINT =
+  'Ob Amazon die Entity angelegt hat, ist unklar; nach dem nächsten Sync prüfen.';
 const THROTTLED_NOTE = 'Amazon hat gedrosselt; der Rest wird automatisch erneut gesendet.';
 const INTERRUPTED_GIVE_UP =
   'Die Übermittlung wurde wiederholt unterbrochen. Ob Amazon die offenen Änderungen angewendet hat, ist unklar; nach dem nächsten Sync prüfen.';
@@ -125,48 +133,10 @@ export async function submitConnectionAdChanges(
       continue;
     }
 
-    const rows = await prepareAdChangeSubmission(deps.db, submissionRef);
-    const plan = buildWriteOperations(rows);
-    let open = rows.length;
-    open -= await record(
-      plan.rejected.map(({ changeId, code, message }) => ({
-        changeId,
-        outcome: 'failed',
-        code,
-        message,
-      })),
-    );
-
-    let retryAfterMs: number | null = null;
-    let aborted: { cause: unknown } | null = null;
-    for (const batch of plan.batches) {
-      // Große Übermittlungen (viele Stücke, Wartezeiten des Anfrage-Budgets) können die Lease überdauern.
-      await run.extendLease();
-      let results: readonly AmazonAdsWriteResult[];
-      let throttled = false;
-      try {
-        const response = await deps.amazonAds.applyChanges(
-          connection,
-          {
-            amazonProfileId: submission.amazonProfileId,
-            adProduct: batch.adProduct,
-            operations: batch.operations,
-          },
-          { meter: run.meter },
-        );
-        results = response.results;
-        throttled = response.throttled;
-        retryAfterMs = response.retryAfterMs ?? retryAfterMs;
-      } catch (err) {
-        if (!(err instanceof AmazonAdsWriteAbortedError)) throw err;
-        // Was bis zum Abbruch feststeht, zuerst festhalten (schon angewendete Änderungen!).
-        results = err.results;
-        aborted = { cause: err.cause };
-      }
-      open -= await record(toChangeResults(results, plan.changeIdsByRef));
-      if (aborted || throttled) break;
-    }
-
+    const { open, retryAfterMs, aborted } =
+      submission.kind === 'setup'
+        ? await sendSetup(deps, connection, job.organizationId, submission, run, counters, now)
+        : await sendChanges(deps, connection, job.organizationId, submission, run, record);
     if (aborted) {
       const reauth =
         aborted.cause instanceof AmazonAdsReauthRequiredError ||
@@ -229,6 +199,161 @@ export async function submitConnectionAdChanges(
   if (retrySeconds !== null) await deps.enqueue(QUEUE, ref, { startAfterSeconds: retrySeconds });
   if (failure !== null) throw new JobFailure(failure, counters);
   return { counters };
+}
+
+interface SendOutcome {
+  /** Noch offen (gedrosselt bzw. nicht gesendet). */
+  open: number;
+  retryAfterMs: number | null;
+  aborted: { cause: unknown } | null;
+}
+
+type Claimed = NonNullable<Awaited<ReturnType<typeof claimNextAdChangeSubmission>>>;
+type Connection = Awaited<ReturnType<typeof loadConnection>>;
+
+/** Änderungen (Phase 3): je Ad-Typ ein Aufruf von `applyChanges`. */
+async function sendChanges(
+  deps: ConnectionJobDeps,
+  connection: Connection,
+  organizationId: string,
+  submission: Claimed,
+  run: ConnectionJobRun,
+  record: (results: AdChangeResultInput[]) => Promise<number>,
+): Promise<SendOutcome> {
+  const submissionRef = { organizationId, submissionId: submission.id };
+  const rows = await prepareAdChangeSubmission(deps.db, submissionRef);
+  const plan = buildWriteOperations(rows);
+  let open = rows.length;
+  open -= await record(
+    plan.rejected.map(({ changeId, code, message }) => ({
+      changeId,
+      outcome: 'failed',
+      code,
+      message,
+    })),
+  );
+
+  let retryAfterMs: number | null = null;
+  let aborted: { cause: unknown } | null = null;
+  for (const batch of plan.batches) {
+    // Große Übermittlungen (viele Stücke, Wartezeiten des Anfrage-Budgets) können die Lease überdauern.
+    await run.extendLease();
+    let results: readonly AmazonAdsWriteResult[];
+    let throttled = false;
+    try {
+      const response = await deps.amazonAds.applyChanges(
+        connection,
+        {
+          amazonProfileId: submission.amazonProfileId,
+          adProduct: batch.adProduct,
+          operations: batch.operations,
+        },
+        { meter: run.meter },
+      );
+      results = response.results;
+      throttled = response.throttled;
+      retryAfterMs = response.retryAfterMs ?? retryAfterMs;
+    } catch (err) {
+      if (!(err instanceof AmazonAdsWriteAbortedError)) throw err;
+      // Was bis zum Abbruch feststeht, zuerst festhalten (schon angewendete Änderungen!).
+      results = err.results;
+      aborted = { cause: err.cause };
+    }
+    open -= await record(toChangeResults(results, plan.changeIdsByRef));
+    if (aborted || throttled) break;
+  }
+  return { open, retryAfterMs, aborted };
+}
+
+/**
+ * Anlagen eines Setups (4.4): ein Aufruf von `applySpCreates` mit allen offenen Zeilen; Gebotsanpassungen teilen das
+ * Ergebnis ihrer Kampagne, das Startdatum ist heute in der Zeitzone des Profils.
+ */
+async function sendSetup(
+  deps: ConnectionJobDeps,
+  connection: Connection,
+  organizationId: string,
+  submission: Claimed,
+  run: ConnectionJobRun,
+  counters: JobCounters,
+  now: () => Date,
+): Promise<SendOutcome> {
+  const submissionRef = { organizationId, submissionId: submission.id };
+  const job = await loadCampaignSetupJob(deps.db, submissionRef);
+  if (!job) return { open: 0, retryAfterMs: null, aborted: null };
+  const plan = buildSetupOperations(job.items, {
+    accountType: job.profile.accountType,
+    countryCode: job.profile.countryCode,
+    startDate: todayInTimezone(job.profile.timezone, now()),
+  });
+  const record = async (results: CampaignSetupResult[]) => {
+    if (results.length === 0) return;
+    await recordCampaignSetupResults(deps.db, { ...submissionRef, now: now(), results });
+    for (const result of results) {
+      if (result.outcome === 'applied') counters.changesApplied! += 1;
+      else counters.changesFailed! += 1;
+    }
+  };
+  await record(
+    plan.rejected.map(({ itemId, code, message }) => ({
+      itemId,
+      outcome: 'failed',
+      code,
+      message,
+    })),
+  );
+
+  let results: readonly AmazonAdsWriteResult[] = [];
+  let retryAfterMs: number | null = null;
+  let aborted: { cause: unknown } | null = null;
+  if (plan.operations.length > 0) {
+    await run.extendLease();
+    try {
+      const response = await deps.amazonAds.applySpCreates(
+        connection,
+        {
+          amazonProfileId: submission.amazonProfileId,
+          operations: plan.operations,
+          created: plan.created,
+        },
+        { meter: run.meter },
+      );
+      results = response.results;
+      if (response.throttled) retryAfterMs = response.retryAfterMs ?? MIN_RETRY_SECONDS * 1000;
+    } catch (err) {
+      if (!(err instanceof AmazonAdsWriteAbortedError)) throw err;
+      results = err.results;
+      aborted = { cause: err.cause };
+    }
+  }
+  const outcomes: CampaignSetupResult[] = [];
+  const created = new Set(plan.created.keys());
+  for (const result of results) {
+    // Schon in einem früheren Lauf angelegt: Ergebnis steht.
+    if (created.has(result.ref) || result.status === 'unsent') continue;
+    const itemIds = [result.ref, ...(plan.followers.get(result.ref) ?? [])];
+    for (const itemId of itemIds) {
+      const amazonEntityId =
+        itemId === result.ref && result.status === 'applied' ? result.amazonId : null;
+      if (result.status === 'applied')
+        outcomes.push({ itemId, outcome: 'applied', amazonEntityId });
+      else if (result.status === 'failed') {
+        outcomes.push({ itemId, outcome: 'failed', code: result.code, message: result.message });
+      } else {
+        outcomes.push({
+          itemId,
+          outcome: 'failed',
+          code: AD_CHANGE_UNKNOWN_OUTCOME,
+          message: `${result.message} ${UNKNOWN_SETUP_HINT}`,
+        });
+      }
+    }
+  }
+  await record(outcomes);
+  const open = (await loadCampaignSetupItems(deps.db, submission.id)).filter(
+    (item) => item.status === 'submitted',
+  ).length;
+  return { open, retryAfterMs, aborted };
 }
 
 function abortMessage(cause: unknown): string {
