@@ -528,7 +528,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Profile und fremde Organisation je Endpunkt, 413, leeren Warenkorb, Auswahl per `changeIds`.
   - **Offen bzw. bewusst so (aus dem Review):** `confirmWarnings` bestätigt pauschal, auch Warnungen, die seit der
     Rückfrage dazukamen (3.6 kann die bestätigten Änderungen mitsenden). Ein Target ohne eigenes Gebot bekommt
-    keine ±50-%-Warnung (kein Vergleichswert; möglich wäre das Standardgebot der Ad Group). Ein leerer Warenkorb
+    keine ±50-%-Warnung (kein Vergleichswert; möglich wäre das Standardgebot der Ad Group; **so umgesetzt mit 3.5**). Ein leerer Warenkorb
     antwortet mit `submitted` und leerer Liste. `limitFor` und die Grenzen negativer Keywords stehen doppelt
     (Route bzw. Engine und `limits.ts`). Der Verlauf je Entity zeigt neue Negatives nicht (ohne `entityId`; über
     Profil oder Übermittlung sichtbar). Ein Warenkorb mit mehr als rund 65 000 Änderungen sprengt die
@@ -538,8 +538,61 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     `409 SUBMISSION_NOT_OPEN`, `409 SUBMISSION_NOT_BULK_FILE`, `409 BULK_FILE_EMPTY`.
 
 ### 3.5 Bearbeiten im Explorer
-- [ ] Inline-Bearbeitung (Status, Budget, Gebot), Dialog für Gebotsstrategie und Platzierungen der Kampagne, Bulk-Dialoge für
+- [x] Inline-Bearbeitung (Status, Budget, Gebot), Dialog für Gebotsstrategie und Platzierungen der Kampagne, Bulk-Dialoge für
       markierte Zeilen (Gebote, Budgets, Status), Anzeige offener Änderungen im Grid (eigene und fremde, F4).
+- **Entschieden (Dominik, 2026-10-08):**
+  - **Inline:** Der Wert geht **sofort** in den Warenkorb (Enter oder Verlassen der Zelle), die Zelle zeigt ihn mit
+    Markierung und lässt ihn dort zurücknehmen. An Amazon geht erst etwas beim Übermitteln (3.6).
+  - **Bulk-Dialog für Gebote und Budgets:** fester Wert, ±Prozent und ±Betrag.
+  - **Warenkorb-Zähler:** am Sidebar-Eintrag „Änderungen“ **und** als Link „Ausstehend (N)“ im Kopf des Explorers.
+  - **±50-%-Warnung bei Targets ohne eigenes Gebot:** Vergleich mit dem Standardgebot der Ad Group (offener Punkt aus
+    3.4).
+- [x] Umsetzung (Stand für 3.6 und später):
+  - **Vergleichswert** (`comparisonBefore`): `checkAdChanges` rechnet die ±50-%-Warnung ohne „vorher“ gegen
+    `comparisonBefore`; die Datenbankschicht liefert dafür das Standardgebot der Ad Group (`loadComparisonBids`) im
+    Warenkorb (`GET /pending`, Feld `comparisonBefore` je Änderung) und in den Review-Zeilen beim Übermitteln. Grenzen
+    von Amazon und alle anderen Warnungen bleiben unberührt.
+  - **Anpassen** (`operation: 'adjust'` in `adChangeInputSchema`, `POST /pending`): `entityType`, `entityId`, `field`
+    (`budget` | `default_bid` | `bid`), `mode` (`percent` | `amount`), `value` als Decimal-String mit Vorzeichen (höchstens
+    zwei Nachkommastellen, nicht 0, Prozent über −100; `adChangeAdjustmentIssue`). **Der Server rechnet**
+    (`resolveAdjustments`): Ausgangswert ist der Stand der Entity, nie ein schon vorgemerkter Wert (dieselbe Anpassung
+    zweimal ergibt denselben Wert), bei einem Target ohne eigenes Gebot das Standardgebot der Ad Group; kaufmännisch
+    auf zwei Nachkommastellen gerundet, danach wie eine Feldänderung vorgemerkt („vorher“ bleibt der Stand der Entity,
+    also leer beim Target ohne Gebot). Neue Ablehnungsgründe: `noCurrentValue` (kein Ausgangswert),
+    `resultOutOfRange` (Ergebnis kein Betrag über 0 bzw. zu groß). Das Web rechnet nie (kein `decimal.js`).
+  - **Explorer-Zeilen:** Kampagnen tragen `placementBidAdjustments` (aus `extra`) in den Attributen.
+  - **Logik ohne I/O** (`apps/web/src/explorer/editing.ts`): `editIssue(level, row, field)` (wie die Ablehnungen des
+    Servers: Summenzeile und Platzhalter, entfernt, archiviert, kein Tagesbudget, Strategie und Platzierungen nur SP),
+    `currentFieldValue`, `indexOpenChanges`/`openEntry` (je Stelle: eigene Vormerkung, fremde Vormerkungen,
+    Übermitteltes ohne Ergebnis), `parseMoneyInput`, `parsePercentInput`, `bulkInputs` (Eingaben der Bulk-Dialoge,
+    übersprungene Zeilen mit Grund), `fieldCurrency`.
+  - **Zelle** (`EditCell.vue`, Spalten Status, Budget, Standardgebot, Gebot auf den Ebenen Kampagnen, Ad Groups,
+    Targets, Product Ads, Negatives): zeigt den Stand von Amazon bzw. die eigene Vormerkung (violett, Punkt,
+    „Zurücknehmen“ über `POST /pending/discard`), dazu Hinweise auf Vormerkungen anderer (mit Name und Wert) und auf
+    Übermitteltes ohne Ergebnis (mit Weg). Klick oder Enter auf der Zelle öffnet die Eingabe (Betrag mit Komma oder
+    Punkt, Status als Auswahl; Negatives nur „Archiviert“); Enter oder Verlassen legt den Wert in den Warenkorb, Escape
+    bricht ab, ungültige Eingaben bleiben mit Hinweis offen. Sortierung, Filter und CSV bleiben beim Stand von Amazon.
+    Ohne Recht `write` nur die Anzeige; die Spalten nutzen die Zelle ab Recht `view` im Feature `changes`. Eine
+    abgelehnte Änderung meldet die Seite über dem Grid mit dem Grund.
+  - **Markierte Zeilen** (Leiste über dem Grid, nur mit `write`): „Status ändern“, je Ebene „Budget“/„Standardgebot“/
+    „Gebot ändern“ (`BulkEditDialog.vue`: fester Wert bzw. Betrag je Währung der markierten Zeilen, Prozent mit
+    Richtung; gesperrte Zeilen werden mit Hinweis übersprungen; Archivieren mit Warnung) und bei genau einer
+    SP-Kampagne „Strategie & Platzierungen“ (`CampaignBiddingDialog.vue`: Strategie und vier Platzierungen, 0–900 %;
+    gesendet werden alle Felder, was dem Stand entspricht, nimmt der Server zurück bzw. lässt es weg). Beide Dialoge
+    zeigen das Ergebnis des Vormerkens (`changes/StageResult.vue`: vorgemerkt, zurückgenommen, unverändert, abgelehnt
+    je Grund) und heben die Markierung auf.
+  - **Offene Änderungen** (`changes/queries.ts`): `GET /open`, mit `profileId` nur, wenn genau ein Profil gewählt ist;
+    Hinweis bei mehr als 5000 (`truncated`), eigener Fehlerzustand mit „Erneut versuchen“ (das Grid bleibt nutzbar).
+    Nach jedem Vormerken oder Verwerfen werden Warenkorb und offene Änderungen neu geladen (Schlüssel `ad-changes`
+    mit Organisation).
+  - **Zähler:** `usePendingCount` (Länge von `GET /pending`, nur mit `view`): Zahl am Sidebar-Eintrag „Änderungen“
+    (eingeklappt als kleine Marke, im `aria-label`), Link „Ausstehend (N)“ im Kopf des Explorers nach `/ads/changes`.
+    Scheitert die Abfrage, fehlt der Zähler still.
+  - **Tests:** `editing.test.ts`, `pages/ExplorerEditing.test.ts` (Inline, Markierungen, Bulk, Strategie, Rechte),
+    `layouts/AppShell.test.ts` (Zähler), dazu Engine, DB und API für Vergleichswert und Anpassen.
+  - Browser-Pane geprüft (Demo-Daten, 2026-10-09): Gebot in der Zelle geändert (Markierung, Zähler in Sidebar und
+    Kopf), drei Gebote um −10 % (2,36 → 2,12; archivierte Zeile übersprungen), Dialog Strategie und Platzierungen mit
+    den Werten der Kampagne; 1440 px dunkel, Tablet und Handy hell, kein waagerechtes Scrollen, Konsole ohne Fehler.
 
 ### 3.6 Seite „Änderungen“ (`/ads/changes`)
 - [ ] Ausstehend (Warenkorb prüfen, Warnungen bestätigen, über API übermitteln oder als Bulk-Datei herunterladen, verwerfen)
