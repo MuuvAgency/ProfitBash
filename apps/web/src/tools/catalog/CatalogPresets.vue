@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { CATALOG_AD_PRODUCTS, MAX_CATALOG_PRESETS, type CatalogPreset } from '@profitbash/shared';
 import Button from 'primevue/button';
-import { computed, useId } from 'vue';
+import Dialog from 'primevue/dialog';
+import { computed, ref, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { inputClass, integerInput, labelClass, moneyInput, useCatalogDraft } from './draft';
 
 /** Presets: Name, Beschreibung, Standard, Bausteine und Abweichungen je Baustein (`phase-4.md` 4.2, F-S8). */
 const { t } = useI18n();
 const id = useId();
-const { draft, canEdit } = useCatalogDraft();
+const { draft, canEdit, usage } = useCatalogDraft();
 const blocksByProduct = computed(() =>
   CATALOG_AD_PRODUCTS.map((adProduct) => ({
     adProduct,
@@ -46,11 +47,16 @@ function setOverride(preset: CatalogPreset, key: string, field: OverrideField, r
   }
 }
 
+/** Zufälliger Schlüssel: Ein neues Preset darf nie den Schlüssel eines gelöschten erben (alte Zuordnungen). */
+function newPresetKey() {
+  let key: string;
+  do key = `preset-${Math.random().toString(36).slice(2, 8)}`;
+  while (draft.value.presets.some((preset) => preset.key === key));
+  return key;
+}
 function addPreset() {
-  let number = draft.value.presets.length + 1;
-  while (draft.value.presets.some((preset) => preset.key === `preset-${number}`)) number++;
   draft.value.presets.push({
-    key: `preset-${number}`,
+    key: newPresetKey(),
     name: t('catalog.preset.newName'),
     description: '',
     blocks:
@@ -58,9 +64,31 @@ function addPreset() {
     isDefault: false,
   });
 }
-function removePreset(key: string) {
+const removing = ref<CatalogPreset | null>(null);
+const removingUsage = computed(() => {
+  const counts = removing.value ? usage.value.get(removing.value.key) : undefined;
+  const parts = [
+    counts?.clients
+      ? t('catalog.preset.usageClients', { count: counts.clients }, counts.clients)
+      : '',
+    counts?.productGroups
+      ? t('catalog.preset.usageGroups', { count: counts.productGroups }, counts.productGroups)
+      : '',
+  ].filter(Boolean);
+  return parts.length === 2
+    ? t('catalog.preset.usageAnd', { a: parts[0], b: parts[1] })
+    : (parts[0] ?? '');
+});
+function confirmRemove() {
+  const key = removing.value?.key;
   draft.value.presets = draft.value.presets.filter((preset) => preset.key !== key);
+  removing.value = null;
 }
+const overrideLabel = (field: string, key: string) =>
+  t('catalog.preset.overrideLabel', {
+    field: t(`catalog.preset.${field}`),
+    block: blockByKey.value.get(key)?.label ?? key,
+  });
 </script>
 
 <template>
@@ -105,7 +133,7 @@ function removePreset(key: string) {
           variant="text"
           size="small"
           :aria-label="t('catalog.preset.remove', { name: preset.name })"
-          @click="removePreset(preset.key)"
+          @click="removing = preset"
         />
       </div>
       <div class="flex flex-col gap-space-xs">
@@ -167,6 +195,7 @@ function removePreset(key: string) {
               <input
                 :value="item.defaultBid ?? ''"
                 :placeholder="blockByKey.get(item.block)?.defaultBid"
+                :aria-label="overrideLabel('bid', item.block)"
                 inputmode="decimal"
                 :disabled="!canEdit"
                 :class="[inputClass, 'font-data']"
@@ -185,6 +214,7 @@ function removePreset(key: string) {
               <input
                 :value="item.dailyBudget ?? ''"
                 :placeholder="blockByKey.get(item.block)?.dailyBudget"
+                :aria-label="overrideLabel('budget', item.block)"
                 inputmode="decimal"
                 :disabled="!canEdit"
                 :class="[inputClass, 'font-data']"
@@ -206,6 +236,7 @@ function removePreset(key: string) {
               <input
                 :value="item.topOfSearch ?? ''"
                 :placeholder="String(blockByKey.get(item.block)?.placements?.topOfSearch ?? '')"
+                :aria-label="overrideLabel('top', item.block)"
                 inputmode="numeric"
                 :disabled="!canEdit"
                 :class="[inputClass, 'font-data']"
@@ -220,13 +251,14 @@ function removePreset(key: string) {
               />
             </label>
             <label
-              v-if="blockByKey.get(item.block)?.lookbackDays"
+              v-if="blockByKey.get(item.block)?.targeting === 'audience'"
               class="flex w-28 flex-col gap-space-xs text-body-sm text-ink-secondary"
             >
               {{ t('catalog.preset.lookback') }}
               <input
                 :value="item.lookbackDays ?? ''"
                 :placeholder="String(blockByKey.get(item.block)?.lookbackDays ?? '')"
+                :aria-label="overrideLabel('lookback', item.block)"
                 inputmode="numeric"
                 :disabled="!canEdit"
                 :class="[inputClass, 'font-data']"
@@ -244,6 +276,41 @@ function removePreset(key: string) {
         </ul>
       </details>
     </section>
+
+    <Dialog
+      :visible="removing !== null"
+      modal
+      :header="t('catalog.preset.removeTitle')"
+      :style="{ width: 'min(28rem, calc(100vw - 2rem))' }"
+      @update:visible="(next) => !next && (removing = null)"
+    >
+      <div v-if="removing" class="flex flex-col gap-space-lg">
+        <p class="text-body-md text-ink">
+          {{
+            t(removingUsage ? 'catalog.preset.removeTextUsed' : 'catalog.preset.removeText', {
+              name: removing.name,
+              usage: removingUsage,
+            })
+          }}
+        </p>
+        <div class="flex justify-end gap-space-sm">
+          <Button
+            type="button"
+            severity="secondary"
+            variant="text"
+            :label="t('common.cancel')"
+            @click="removing = null"
+          />
+          <Button
+            type="button"
+            severity="danger"
+            data-preset-delete-confirm
+            :label="t('catalog.preset.removeConfirm')"
+            @click="confirmRemove"
+          />
+        </div>
+      </div>
+    </Dialog>
 
     <div v-if="canEdit && draft.presets.length < MAX_CATALOG_PRESETS">
       <Button

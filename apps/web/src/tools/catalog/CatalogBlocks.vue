@@ -5,7 +5,14 @@ import {
   type CatalogBlock,
 } from '@profitbash/shared';
 import { useI18n } from 'vue-i18n';
-import { inputClass, integerInput, labelClass, moneyInput, useCatalogDraft } from './draft';
+import {
+  inputClass,
+  integerInput,
+  labelClass,
+  moneyInput,
+  numberText,
+  useCatalogDraft,
+} from './draft';
 
 /**
  * Bausteine: Werte ändern (Bezeichnung, Kürzel, Gebote, Budget, Strategie, Platzierungen, Rückblick). Art und Targeting
@@ -18,10 +25,11 @@ type PlacementField = 'topOfSearch' | 'productPages' | 'restOfSearch';
 const PLACEMENTS: PlacementField[] = ['topOfSearch', 'productPages', 'restOfSearch'];
 function setPlacement(block: CatalogBlock, field: PlacementField, raw: string) {
   if (!block.placements) return;
-  block.placements[field] = integerInput(raw) ?? 0;
+  // Leer bleibt ungültig (NaN) und wird gemeldet, statt still zu 0 zu werden.
+  block.placements[field] = integerInput(raw) ?? Number.NaN;
 }
 function setLookback(block: CatalogBlock, raw: string) {
-  block.lookbackDays = integerInput(raw) ?? null;
+  block.lookbackDays = integerInput(raw) ?? Number.NaN;
 }
 function targetingText(block: CatalogBlock) {
   const parts = [t(`catalog.targeting.${block.targeting}`)];
@@ -110,7 +118,7 @@ const fieldClass = 'flex min-w-0 flex-col gap-space-xs text-body-sm text-ink-sec
           <label v-for="field in PLACEMENTS" :key="field" :class="fieldClass">
             <span :class="labelClass">{{ t(`catalog.block.${field}`) }}</span>
             <input
-              :value="block.placements[field]"
+              :value="numberText(block.placements[field])"
               :data-block-top="field === 'topOfSearch' ? '' : undefined"
               inputmode="numeric"
               :disabled="!canEdit"
@@ -119,10 +127,11 @@ const fieldClass = 'flex min-w-0 flex-col gap-space-xs text-body-sm text-ink-sec
             />
           </label>
         </template>
-        <label v-if="block.lookbackDays !== null" :class="fieldClass">
+        <label v-if="block.targeting === 'audience'" :class="fieldClass">
           <span :class="labelClass">{{ t('catalog.block.lookback') }}</span>
           <input
-            :value="block.lookbackDays"
+            :value="numberText(block.lookbackDays)"
+            data-block-lookback
             inputmode="numeric"
             :disabled="!canEdit"
             :class="[inputClass, 'font-data']"

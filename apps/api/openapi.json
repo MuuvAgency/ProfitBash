@@ -7158,6 +7158,24 @@
               ]
             }
           },
+          "productGroupPresets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "presetKey": {
+                  "type": "string"
+                },
+                "productGroups": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "presetKey",
+                "productGroups"
+              ]
+            }
+          },
           "clients": {
             "type": "array",
             "items": {
@@ -7183,6 +7201,7 @@
           "version",
           "updatedAt",
           "clientPresets",
+          "productGroupPresets",
           "clients"
         ]
       },

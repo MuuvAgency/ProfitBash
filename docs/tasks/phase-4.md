@@ -170,7 +170,7 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     es nicht (F3 nannte es als Empfehlung, entschieden war nur das Startschema); bei Bedarf als Platzhalter `{client}`.
   - **Namen** (`packages/engine/src/naming.ts`, Einstieg `@profitbash/engine/naming`): `renderCampaignName` (leerer
     Platzhalter fällt samt Trenner davor weg), `campaignNameIssues` (leer, länger als 128 Zeichen, Steuerzeichen),
-    `uniqueCampaignName` (ohne Groß/Klein, hängt ` 2`, ` 3` an und kürzt vorne). **Annahme:** 128 Zeichen für SP, SB und
+    `uniqueCampaignName` (ohne Groß/Klein, hängt ` 2`, ` 3` an und kürzt dafür das Ende). **Annahme:** 128 Zeichen für SP, SB und
     SD, noch gegen die Limits-Seite von Amazon zu prüfen (siehe „Offen vor dem Bau“).
   - **API** (Feature `tools`): `GET/PUT /api/ads/tools/catalog`, `PUT /api/ads/tools/client-presets/{clientId}`,
     `presetKey` an `POST/PATCH /api/ads/tools/product-groups` (400 `PRODUCT_GROUP_UNKNOWN_PRESET`).
@@ -180,6 +180,19 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     (Produktgruppen · Struktur-Katalog); der Produktgruppen-Dialog wählt das Preset der Gruppe. Das Web nutzt dafür
     `@profitbash/engine` (Workspace-Paket, keine neue externe Abhängigkeit). Geprüft im Browser-Pane (Speichern,
     Handy, Tablet, Hell-Modus); der Testkatalog ist aus der Dev-DB gelöscht.
+  - **Review-Befunde (eingearbeitet):** Gespeichert wird mit der Version, auf der der Entwurf beruht (sonst hätte ein
+    Neuladen im Hintergrund fremde Änderungen still überschrieben); die Seite meldet eine neuere Fassung. Beim Speichern
+    werden Zuordnungen zu gelöschten Presets gelöst (`client_presets`, `product_groups.preset_key`, Zahl im Audit unter
+    `clearedAssignments`), neue Presets bekommen zufällige Schlüssel, und das Löschen warnt mit der Zahl der Clients und
+    Produktgruppen. Graduation-Kanten dürfen keinen Kreis bilden. Kürzel sind je Anzeigentyp eindeutig. Abweichungen im
+    Preset passen zum Baustein (oben nur mit Platzierungen, Rückblick nur bei Zielgruppen; Rückblick nur und immer bei
+    Zielgruppen). Befunde der Prüfung sind Codes mit Parametern (`params.issue`), die Seite übersetzt sie und nennt
+    Baustein bzw. Preset und Feld. Im Namensschema sind nur Leerraum und `| - _ / · : , ;` Trenner; Klammern bleiben
+    stehen. Gleichzeitiges erstes Speichern endet mit 409 statt 500.
+  - **Bewusst offen:** Die API lässt Admins Schlüssel, Art und Targeting eines Bausteins ändern (die Oberfläche nicht);
+    die Plan-Engine (4.3) liest nur bekannte Schlüssel. Ein Namensschema ohne `{block}`/`{target}` ist erlaubt (Namen
+    unterscheiden sich dann nur über ` 2`, ` 3`); keine Warnung beim Wechsel der Seite innerhalb der App (nur beim
+    Schließen oder Neuladen des Tabs).
 
 ### 4.3 Plan-Engine (`packages/engine`, ohne I/O)
 - [ ] Eingabe: Preset, Produktgruppe, Keywords bzw. Targets (von Hand oder von der Merkliste), vorhandene Entities des

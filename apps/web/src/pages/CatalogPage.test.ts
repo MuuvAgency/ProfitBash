@@ -13,6 +13,7 @@ const catalogResponse = (overrides: Record<string, unknown> = {}) => ({
   version: 3,
   updatedAt: '2026-10-09T08:00:00.000Z',
   clientPresets: [],
+  productGroupPresets: [],
   clients: [{ id: C1, name: 'Waldkauz' }],
   ...overrides,
 });
@@ -81,7 +82,9 @@ describe('Seite „Struktur-Katalog“', () => {
   it('speichert Änderungen am Preset mit der gelesenen Version', async () => {
     const { requests } = await mountPage({
       'PUT /api/ads/tools/catalog': (request) =>
-        json(catalogResponse({ version: 4, catalog: (request.body as { catalog: unknown }).catalog })),
+        json(
+          catalogResponse({ version: 4, catalog: (request.body as { catalog: unknown }).catalog }),
+        ),
     });
     await type('[data-preset="launch"] [data-preset-name]', 'Neustart');
     (
@@ -158,6 +161,82 @@ describe('Seite „Struktur-Katalog“', () => {
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('inzwischen von jemand anderem geändert'),
     );
+  });
+
+  it('speichert mit der Version, auf der der Entwurf beruht, auch wenn inzwischen neuere Daten kamen', async () => {
+    let version = 3;
+    const { requests } = await mountPage({
+      'GET /api/ads/tools/catalog': () => json(catalogResponse({ version })),
+      'PUT /api/ads/tools/catalog': json(
+        { error: { code: 'STRUCTURE_CATALOG_VERSION_CONFLICT', message: 'x' } },
+        409,
+      ),
+      [`PUT /api/ads/tools/client-presets/${C1}`]: new Response(null, { status: 204 }),
+    });
+    await type('[data-preset="launch"] [data-preset-name]', 'Neustart');
+    // Jemand anderes speichert; das Setzen eines Client-Presets lädt den Katalog neu.
+    version = 4;
+    await tab('assignments');
+    await choose(`[data-client-preset="${C1}"]`, 'control');
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Version 4'));
+    expect(document.body.textContent).toContain('neuere Fassung');
+    (await found<HTMLButtonElement>('[data-catalog-save]')).click();
+    await flushPromises();
+    expect((puts(requests, '/api/ads/tools/catalog')[0] as { version: number }).version).toBe(3);
+  });
+
+  it('nennt bei Fehlern den Ort (Baustein, Feld) auf Deutsch', async () => {
+    await mountPage();
+    await tab('blocks');
+    await type('[data-block="SP-AUTO"] [data-block-bid]', 'abc');
+    expect((await found('[data-catalog-issues]')).textContent).toContain(
+      'Automatisch: Standardgebot ist ungültig',
+    );
+    await tab('presets');
+    for (const box of document.querySelectorAll<HTMLInputElement>(
+      '[data-preset="launch"] input[data-preset-block]:checked',
+    )) {
+      box.click();
+      await flushPromises();
+    }
+    expect((await found('[data-catalog-issues]')).textContent).toContain(
+      'Launch: mindestens ein Baustein',
+    );
+  });
+
+  it('behält das Feld „Rückblick“, wenn man es leert', async () => {
+    await mountPage();
+    await tab('blocks');
+    await type('[data-block="SD-RT-VIEWS"] [data-block-lookback]', '');
+    expect(
+      document.querySelector('[data-block="SD-RT-VIEWS"] [data-block-lookback]'),
+    ).not.toBeNull();
+    expect((await found('[data-catalog-issues]')).textContent).toContain('Retargeting Ansichten');
+  });
+
+  it('warnt beim Löschen eines Presets, das Clients oder Produktgruppen nutzen', async () => {
+    await mountPage({
+      'GET /api/ads/tools/catalog': json(
+        catalogResponse({
+          clientPresets: [{ clientId: C1, presetKey: 'launch' }],
+          productGroupPresets: [{ presetKey: 'launch', productGroups: 2 }],
+        }),
+      ),
+    });
+    const remove = await vi.waitFor(() => {
+      const button = [...document.querySelectorAll('button')].find(
+        (b) => b.getAttribute('aria-label') === 'Preset „Launch“ löschen',
+      );
+      if (!button) throw new Error('kein Löschen');
+      return button;
+    });
+    remove.click();
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('1 Client und 2 Produktgruppen'),
+    );
+    (await found<HTMLButtonElement>('[data-preset-delete-confirm]')).click();
+    await flushPromises();
+    expect(document.querySelector('[data-preset="launch"]')).toBeNull();
   });
 
   it('zeigt Editoren alles nur lesend, lässt sie aber Presets je Client setzen', async () => {

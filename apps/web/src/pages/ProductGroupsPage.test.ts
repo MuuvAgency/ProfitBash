@@ -349,6 +349,17 @@ describe('Seite „Produktgruppen“', () => {
     );
   });
 
+  it('sagt im Dialog, wenn die Presets nicht geladen werden konnten', async () => {
+    await mountPage({
+      'GET /api/ads/tools/catalog': json({ error: { code: 'X', message: 'kaputt' } }, 500),
+    });
+    await vi.waitFor(() => expect(button('Produktgruppe „Flaschen“ ändern')).toBeDefined());
+    button('Produktgruppe „Flaschen“ ändern')!.click();
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Die Presets konnten nicht geladen werden'),
+    );
+  });
+
   it('meldet einen vergebenen Namen im Dialog', async () => {
     await mountPage({
       [`PATCH /api/ads/tools/product-groups/${G1}`]: json(
