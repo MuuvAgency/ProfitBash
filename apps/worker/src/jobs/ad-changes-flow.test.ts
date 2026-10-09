@@ -308,7 +308,7 @@ describe('Setup über die API gegen den Mock-Anbieter (4.4)', () => {
       version: 1,
       channel: 'api',
       enqueue: async () => undefined,
-      review: () => null,
+      limitFor: () => null,
     });
     if (submitted?.status !== 'submitted') throw new Error('nicht übermittelt');
 
