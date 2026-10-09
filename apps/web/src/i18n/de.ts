@@ -875,6 +875,197 @@ export const de = {
       api: 'API',
       bulk_file: 'Bulk-Datei',
     },
+    entity: {
+      campaign: 'Kampagne',
+      ad_group: 'Ad Group',
+      target: 'Target',
+      product_ad: 'Product Ad',
+      negative_target: 'Negative',
+    },
+    subject: {
+      newNegative: 'Neues Negative',
+      asin: 'ASIN {asin}',
+    },
+    percentValue: '{value} %',
+    description:
+      'Vorgemerkte Änderungen prüfen und an Amazon übermitteln; Ergebnisse je Übermittlung, erneut versuchen und zurücknehmen.',
+    tabs: 'Bereiche',
+    tab: {
+      pending: 'Ausstehend',
+      pendingCount: 'Ausstehend ({count})',
+      submissions: 'Übermittlungen',
+    },
+    field: {
+      state: 'Status',
+      budget: 'Tagesbudget',
+      bidding_strategy: 'Gebotsstrategie',
+      placement_top: 'Platzierung: Suche, oben',
+      placement_rest_of_search: 'Platzierung: Suche, übrige Plätze',
+      placement_product_page: 'Platzierung: Produktseiten',
+      placement_amazon_business: 'Platzierung: Amazon Business',
+      default_bid: 'Standardgebot',
+      bid: 'Gebot',
+    },
+    becomes: 'wird zu',
+    createNegative: 'Wird neu angelegt',
+    violation: {
+      belowMinimum: 'Unter dem Minimum von Amazon ({limit})',
+      aboveMaximum: 'Über dem Maximum von Amazon ({limit})',
+      tooLong: 'Länger als {max} Zeichen',
+      tooManyWords: 'Mehr als {max} Wörter',
+    },
+    pending: {
+      loadFailed: 'Der Warenkorb konnte nicht geladen werden.',
+      empty: {
+        title: 'Der Warenkorb ist leer',
+        text: 'Ändere im Explorer Status, Budgets oder Gebote: Die Änderungen sammeln sich hier, bis du sie übermittelst.',
+        action: 'Zum Explorer',
+      },
+      count: '{count} Änderung | {count} Änderungen',
+      tooMany:
+        'In einem Profil liegen {count} Änderungen (mehr als {limit}): Beim Übermitteln fragt ProfitBash nach.',
+      blocked:
+        'Mindestens ein Wert liegt außerhalb der Grenzen von Amazon. Korrigiere oder verwirf die markierten Änderungen, dann lässt sich das Profil übermitteln.',
+      limitsExceeded:
+        'Mindestens ein Wert liegt außerhalb der Grenzen von Amazon. Es wurde nichts übermittelt.',
+      largeChange: '{percent} % gegenüber vorher',
+      largeChangeDefaultBid: '{percent} % gegenüber dem Standardgebot der Ad Group ({value})',
+      otherUsers: 'Auch vorgemerkt von {names}',
+      submitApi: 'Über API übermitteln',
+      submitBulkFile: 'Als Bulk-Datei',
+      discardOne: 'Änderung verwerfen',
+      discardAll: 'Alle verwerfen',
+      discardAllText:
+        'Die Änderung wird aus dem Warenkorb entfernt. Bei Amazon ändert sich nichts. | Alle {count} Änderungen werden aus dem Warenkorb entfernt. Bei Amazon ändert sich nichts.',
+      discardAllConfirm: 'Verwerfen',
+    },
+    confirm: {
+      title: 'Vor dem Übermitteln prüfen',
+      largeChanges:
+        '{count} Änderung ändert ein Gebot oder Budget um mehr als 50 %. | {count} Änderungen ändern ein Gebot oder Budget um mehr als 50 %.',
+      tooMany: 'Es gehen {count} Änderungen auf einmal raus (mehr als {limit}).',
+      text: 'Die betroffenen Änderungen sind im Warenkorb markiert. Übermittelt wird, was dort gerade für dieses Profil steht.',
+      submit: 'Trotzdem übermitteln',
+    },
+    submitted: {
+      done: 'Übermittelt. | {count} Übermittlungen angelegt.',
+      nothing: 'Es wurde nichts übermittelt.',
+      dropped:
+        '{count} Änderung entfiel, weil der Wert schon dem Stand bei Amazon entspricht. | {count} Änderungen entfielen, weil der Wert schon dem Stand bei Amazon entspricht.',
+      blocked:
+        '{count} Änderung bleibt im Warenkorb: {reasons} | {count} Änderungen bleiben im Warenkorb: {reasons}',
+      bulkFileSkipped:
+        '{count} Änderung ließ sich nicht in die Bulk-Datei schreiben und gilt als fehlgeschlagen. | {count} Änderungen ließen sich nicht in die Bulk-Datei schreiben und gelten als fehlgeschlagen.',
+    },
+    submission: {
+      loadFailed: 'Die Übermittlungen konnten nicht geladen werden.',
+      detailFailed: 'Die Übermittlung konnte nicht geladen werden.',
+      notFound: 'Diese Übermittlung gibt es nicht (mehr), oder ihr Profil ist ausgeblendet.',
+      listTitle: 'Letzte Übermittlungen',
+      empty: {
+        title: 'Noch keine Übermittlungen',
+        text: 'Sobald jemand aus der Organisation Änderungen übermittelt, erscheinen sie hier mit dem Ergebnis je Änderung.',
+      },
+      open: 'Öffnen',
+      unknownUser: 'Unbekannt',
+      waiting: {
+        api: 'Wartet auf die Übertragung',
+        bulk_file: 'Wartet auf den Upload',
+      },
+      status: {
+        pending: 'Wartet',
+        running: 'Wird übertragen',
+        finished: 'Abgeschlossen',
+        failed: 'Gescheitert',
+      },
+      count: {
+        applied: '{count} angewendet',
+        failed: '{count} fehlgeschlagen',
+        submitted: '{count} offen',
+        dismissed: '{count} verworfen',
+      },
+      entitiesSyncedAt:
+        'Portfolio und Enddatum der Kampagnen stammen vom Stand {date}. Wurden sie seitdem in der Werbekonsole geändert, setzt die Datei sie zurück.',
+      entitiesNeverSynced:
+        'Portfolio und Enddatum der Kampagnen sind nicht bekannt (noch kein Import): Die Datei lässt sie leer.',
+      bulkFileHint:
+        'Datei herunterladen, in der Werbekonsole hochladen, danach abschließen oder den nächsten Bulk-Import abwarten.',
+    },
+    change: {
+      waitingUpload: 'Wartet auf den Upload',
+      status: {
+        pending: 'Vorgemerkt',
+        submitted: 'Übermittelt, noch ohne Ergebnis',
+        applied: 'Angewendet',
+        failed: 'Fehlgeschlagen',
+        dismissed: 'Verworfen',
+      },
+    },
+    failure: {
+      NOT_SENT: 'Nicht gesendet.',
+      UNKNOWN_OUTCOME: 'Ausgang unklar: Erst nach dem nächsten Sync erneut versuchen.',
+      SUPERSEDED: 'Von einer späteren Änderung derselben Übermittlung überholt.',
+      ENTITY_NOT_FOUND: 'Den Eintrag gibt es nicht mehr.',
+      ENTITY_ARCHIVED: 'Der Eintrag ist archiviert.',
+      AD_PRODUCT_NOT_SUPPORTED: 'Für diesen Ad-Typ noch nicht möglich.',
+      BIDDING_STRATEGY_NOT_SUPPORTED:
+        'Mit der Gebotsstrategie der Kampagne lassen sich keine Platzierungen setzen.',
+      BULK_FILE_NOT_SUPPORTED: 'Lässt sich nicht per Bulk-Datei ändern.',
+      BULK_FILE_PARENT_ARCHIVED: 'Die Kampagne bzw. Ad Group wird in derselben Datei archiviert.',
+    },
+    followUp: {
+      retry: 'Erneut versucht: {status}',
+      revert: 'Zurückgenommen: {status}',
+      status: {
+        pending: 'vorgemerkt',
+        submitted: 'noch ohne Ergebnis',
+        applied: 'angewendet',
+        failed: 'fehlgeschlagen',
+        dismissed: 'verworfen',
+      },
+    },
+    action: {
+      channel: 'Weg für Folgeschritte',
+      download: 'Bulk-Datei herunterladen',
+      closeApplied: 'Als hochgeladen abschließen',
+      closeDiscarded: 'Nicht hochladen',
+      revertAll: 'Alles zurücknehmen',
+      retry: 'Erneut versuchen',
+      dismiss: 'Verwerfen',
+      revert: 'Zurücknehmen',
+      created: {
+        api: 'Als neue Übermittlung eingeplant.',
+        bulk_file: 'Als neue Übermittlung angelegt: Die Bulk-Datei gibt es dort.',
+      },
+      nothingCreated: 'Es wurde nichts übermittelt.',
+      openCreated: 'Öffnen',
+      skipped: '{count} übersprungen: {reason}',
+      bulkFileSkipped: 'Nicht in der Bulk-Datei: {message}',
+      dismissed: 'Verworfen.',
+      closed: {
+        applied: 'Abgeschlossen: Die Änderungen gelten als angewendet.',
+        discarded: 'Abgeschlossen: Die offenen Änderungen sind verworfen.',
+      },
+    },
+    skip: {
+      notFound: 'Nicht gefunden oder nicht mehr sichtbar.',
+      notFailed: 'Nicht (mehr) fehlgeschlagen.',
+      notApplied: 'Nicht angewendet.',
+      alreadyRetried: 'Schon erneut versucht.',
+      alreadyReverted: 'Schon zurückgenommen.',
+      archiveNotRevertible: 'Archivieren lässt sich nicht zurücknehmen.',
+      noPreviousValue: 'Es gab vorher keinen Wert.',
+      nothingToChange: 'Der Wert entspricht schon dem Ziel.',
+      superseded: 'Von einer späteren Änderung überholt.',
+      outcomeUnknown: 'Ausgang unklar: Erst den nächsten Sync abwarten.',
+      alreadySubmitted: 'Wird gerade schon übermittelt.',
+    },
+    conflict: {
+      title: 'Werte haben sich seitdem geändert',
+      text: 'Diese Werte stehen bei Amazon inzwischen anders als nach der Übermittlung. Zurücknehmen überschreibt auch die neueren Werte.',
+      values: 'übermittelt {expected}, jetzt {current}',
+      confirm: 'Trotzdem zurücksetzen',
+    },
     stage: {
       staged:
         'Keine Änderung vorgemerkt | {count} Änderung vorgemerkt | {count} Änderungen vorgemerkt',
@@ -1152,6 +1343,13 @@ export const de = {
   errors: {
     INVALID_EMAIL_OR_PASSWORD: 'E-Mail-Adresse oder Passwort ist falsch.',
     FORBIDDEN: 'Dafür fehlen dir die Rechte.',
+    PROFILE_HAS_NO_CONNECTION:
+      'Dieses Profil hat keine Verbindung zur API. Übermittle es als Bulk-Datei.',
+    SUBMISSION_NOT_FOUND: 'Diese Übermittlung gibt es nicht (mehr).',
+    SUBMISSION_NOT_OPEN: 'Diese Übermittlung ist schon abgeschlossen.',
+    SUBMISSION_NOT_BULK_FILE: 'Eine Bulk-Datei gibt es nur für Übermittlungen per Bulk-Datei.',
+    BULK_FILE_EMPTY:
+      'Die Bulk-Datei wäre leer: Keine Änderung dieser Übermittlung lässt sich hochladen.',
     NOT_FOUND: 'Der Eintrag wurde nicht gefunden. Vielleicht wurde er inzwischen gelöscht.',
     VALIDATION_ERROR: 'Die Eingaben sind unvollständig oder ungültig.',
     NO_ACTIVE_ORGANIZATION: 'Keine Organisation ausgewählt. Bitte wähle eine Organisation.',

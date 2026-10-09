@@ -41,6 +41,18 @@ export type AdChangeInputData = Schemas['AdChangeInput'];
 export type PendingAdChangesData = Schemas['PendingAdChangesResponse'];
 export type StageAdChangesData = Schemas['StageAdChangesResponse'];
 export type OpenAdChangesData = Schemas['OpenAdChangesResponse'];
+export type AdChangeCheckData = Schemas['AdChangeCheck'];
+export type AdChangeSubmissionData = Schemas['AdChangeSubmission'];
+export type AdChangeSubmissionDetailData = Schemas['AdChangeSubmissionDetail'];
+export type SubmitAdChangesInput = Schemas['SubmitAdChangesRequest'];
+export type SubmitAdChangesData = Schemas['SubmitAdChangesResponse'];
+export type RetryAdChangesData = Schemas['RetryAdChangesResponse'];
+export type RevertAdChangesInput = Schemas['RevertAdChangesRequest'];
+export type RevertAdChangesData = Schemas['RevertAdChangesResponse'];
+export type AdChangeChannelData = AdChangeSubmissionData['channel'];
+/** Eine Änderung im Warenkorb (mit `otherUsers`) bzw. in einer Übermittlung (mit `followUp`). */
+export type PendingAdChangeData = PendingAdChangesData['changes'][number];
+export type SubmittedAdChangeData = AdChangeSubmissionDetailData['changes'][number];
 
 export interface ApiOptions {
   /**
@@ -284,6 +296,54 @@ export function createApi(options: ApiOptions = {}) {
             body: changeIds ? { changeIds } : {},
           }),
         ),
+      /**
+       * Übermitteln: `limitsExceeded` und `needsConfirmation` übermitteln nichts (Grenzen von Amazon bzw.
+       * Warnungen, die mit `confirmWarnings` bestätigt werden). `409 PROFILE_HAS_NO_CONNECTION`: nur als Bulk-Datei.
+       */
+      submit: (input: SubmitAdChangesInput): Promise<SubmitAdChangesData> =>
+        unwrap(client.POST('/api/ads/changes/submit', { body: input })),
+      /** Übermittlungen der Organisation, neueste zuerst (höchstens 100). */
+      submissions: async (): Promise<AdChangeSubmissionData[]> =>
+        (await unwrap(client.GET('/api/ads/changes/submissions'))).submissions,
+      submission: (id: string): Promise<AdChangeSubmissionDetailData> =>
+        unwrap(client.GET('/api/ads/changes/submissions/{id}', { params: { path: { id } } })),
+      /** Die `.xlsx` für die Werbekonsole samt Dateiname aus `Content-Disposition`. */
+      async bulkFile(id: string): Promise<{ fileName: string; blob: Blob }> {
+        let result;
+        try {
+          result = await client.GET('/api/ads/changes/submissions/{id}/bulk-file', {
+            params: { path: { id } },
+            parseAs: 'blob',
+          });
+        } catch (cause) {
+          throw cause instanceof ApiError ? cause : ApiError.network(cause);
+        }
+        if (!result.response.ok) {
+          throw toApiError(result.response.status, result.error ?? null);
+        }
+        const disposition = result.response.headers.get('content-disposition') ?? '';
+        const fileName =
+          /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'profitbash-aenderungen.xlsx';
+        return { fileName, blob: result.data as unknown as Blob };
+      },
+      /** Bulk-Übermittlung von Hand abschließen: hochgeladen (`applied`) oder nicht (`discarded`). */
+      close: (id: string, outcome: 'applied' | 'discarded') =>
+        unwrap(
+          client.POST('/api/ads/changes/submissions/{id}/close', {
+            params: { path: { id } },
+            body: { outcome },
+          }),
+        ),
+      retry: (input: {
+        changeIds: string[];
+        channel: AdChangeChannelData;
+      }): Promise<RetryAdChangesData> =>
+        unwrap(client.POST('/api/ads/changes/retry', { body: input })),
+      dismiss: (changeIds: string[]) =>
+        unwrap(client.POST('/api/ads/changes/dismiss', { body: { changeIds } })),
+      /** Revert: `conflict` übermittelt nichts (Rückfrage, F8), erst mit `overwriteChanged`. */
+      revert: (input: RevertAdChangesInput): Promise<RevertAdChangesData> =>
+        unwrap(client.POST('/api/ads/changes/revert', { body: input })),
       /** Offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis), optional je Profil. */
       open: (profileId?: string): Promise<OpenAdChangesData> =>
         unwrap(
