@@ -301,7 +301,10 @@ describe('getCampaignSetupContext', () => {
       timezone: 'Europe/Berlin',
     });
     expect(context.existing.campaignNames.sort()).toEqual(['Kampagne 1001', 'Neu aus Setup']);
-    expect(context.existing.exactKeywords).toEqual([]);
+    // Exakte Keywords offener Setups zählen wie gebuchte (Warnung vor Dubletten).
+    expect(context.existing.exactKeywords).toEqual([
+      { text: 'trinkflasche', campaignName: 'Neu aus Setup' },
+    ]);
     expect(
       await code(getCampaignSetupContext(testDb.db, { ...as(f.ada), profileId: hiddenProfile })),
     ).toBe('NOT_FOUND');
@@ -400,7 +403,11 @@ describe('submitCampaignSetupDraft', () => {
     expect((await submit(first.id, 1))?.status).toBe('submitted');
     expect(await submit(second.id, 1)).toMatchObject({
       status: 'rejected',
-      issues: [{ code: 'campaignNameTaken', campaign: 'neu' }],
+      issues: [
+        { code: 'campaignNameTaken', campaign: 'neu' },
+        // Das exakte Keyword des ersten Setups gilt als gebucht.
+        { code: 'keywordAlreadyExact', keyword: 'trinkflasche', existing: 'Neu' },
+      ],
     });
 
     const expensive = await save({ campaigns: [campaign('Teuer')] });
@@ -408,7 +415,10 @@ describe('submitCampaignSetupDraft', () => {
       await submit(expensive.id, 1, {
         limitFor: ({ field }) => (field === 'budget' ? null : { min: '0.02', max: '0.88' }),
       }),
-    ).toMatchObject({ status: 'rejected', issues: [{ code: 'bidOutOfRange' }] });
+    ).toMatchObject({
+      status: 'rejected',
+      issues: [{ code: 'bidOutOfRange' }, { code: 'keywordAlreadyExact' }],
+    });
   });
 
   it('schließt eine Übermittlung ohne anlegbare Kampagne sofort ab', async () => {
