@@ -11,6 +11,8 @@ import { PARENT_NOT_CREATED } from './bulk-file';
  * - Angelegte Zeilen mit Amazon-ID stehen in `created` (Fortsetzen nach Drosselung) und werden nicht erneut gesendet.
  * - Kinder einer Kampagne bzw. Ad Group, die nicht angelegt wird (gescheitert, verworfen, ohne ID), scheitern mit
  *   `PARENT_NOT_CREATED`.
+ * - Negatives in der Quelle (4.6) hängen an bestehenden Kampagnen: deren echte IDs stehen unter eigenen refs in
+ *   `created`.
  * - Off-Amazon wie in der Bulk-Datei: nur in den USA einstellbar, dort ohne Freischaltung „Ausgaben begrenzen“.
  */
 
@@ -65,6 +67,30 @@ export function buildSetupOperations(
       continue;
     }
     if (row.status !== 'submitted') continue;
+
+    if (payload.entity === 'source_negative') {
+      // Bestehende Kampagne und Ad Group (4.6): ihre echten IDs gelten als schon angelegte Eltern.
+      const campaignRef = `amazon-campaign:${payload.amazonCampaignId}`;
+      const adGroupRef = `amazon-ad-group:${payload.amazonAdGroupId}`;
+      result.created.set(campaignRef, payload.amazonCampaignId);
+      result.created.set(adGroupRef, payload.amazonAdGroupId);
+      const parents = { campaignRef, adGroupRef };
+      result.operations.push(
+        payload.negative.type === 'keyword'
+          ? {
+              ref: row.id,
+              entity: 'negativeKeyword',
+              ...parents,
+              keywordText: payload.negative.text,
+              matchType:
+                payload.negative.matchType === 'negativeExact'
+                  ? 'NEGATIVE_EXACT'
+                  : 'NEGATIVE_PHRASE',
+            }
+          : { ref: row.id, entity: 'negativeTarget', ...parents, asin: payload.negative.asin },
+      );
+      continue;
+    }
 
     if (payload.entity === 'campaign') {
       const placements = items.filter(

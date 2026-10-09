@@ -236,4 +236,42 @@ describe('buildSetupBulkFile', () => {
     expect(file).toMatchObject({ content: null, rows: 0 });
     expect(file.skipped.map((skip) => skip.code)).toEqual(['PARENT_NOT_CREATED']);
   });
+
+  it('negiert in der Quelle mit den echten IDs der bestehenden Kampagne (4.6)', () => {
+    const source = (
+      negative: Extract<CampaignSetupItemRow['payload'], { entity: 'source_negative' }>['negative'],
+    ) =>
+      item(
+        {
+          entity: 'source_negative',
+          amazonCampaignId: '111',
+          amazonAdGroupId: '222',
+          negative,
+          harvestMarkId: '00000000-0000-4000-8000-000000000001',
+        },
+        { campaignRef: 'SP | AUTO | Flaschen', adGroupRef: 'Auto' },
+      );
+    const file = buildSetupBulkFile(
+      [
+        source({ type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' }),
+        source({ type: 'product', asin: 'B0FREMD001', matchType: 'negativeExact' }),
+      ],
+      { countryCode: 'DE', accountType: 'seller', startDate: '2026-10-09' },
+    );
+    expect(file.skipped).toEqual([]);
+    const { rows } = read(file.content!);
+    expect(rows[0]).toMatchObject({
+      Entity: 'Negative Keyword',
+      Operation: 'Create',
+      'Campaign ID': '111',
+      'Ad Group ID': '222',
+      'Keyword Text': 'trinkflasche 1l',
+      'Match Type': 'negativeExact',
+    });
+    expect(rows[1]).toMatchObject({
+      Entity: 'Negative Product Targeting',
+      'Campaign ID': '111',
+      'Ad Group ID': '222',
+    });
+  });
 });
