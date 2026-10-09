@@ -1631,6 +1631,7 @@ describe('submitAdChanges: Prüfung in der Transaktion (3.4)', () => {
         after: '0.75',
         adProduct: SP,
         countryCode: 'DE',
+        costType: null,
         negative: null,
       });
       expect(seen).toContainEqual(

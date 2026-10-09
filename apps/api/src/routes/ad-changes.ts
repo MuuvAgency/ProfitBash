@@ -1,9 +1,5 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
-import {
-  PLACEMENT_PERCENTAGE_LIMIT,
-  SP_BID_LIMITS,
-  SP_DAILY_BUDGET_LIMITS,
-} from '@profitbash/amazon-ads';
+import { amazonAdsValueLimit } from '@profitbash/amazon-ads';
 import {
   AdChangeError,
   closeBulkFileSubmission,
@@ -326,12 +322,7 @@ function serializeSubmission(submission: AdChangeSubmissionSummary): AdChangeSub
 }
 
 /** Grenzen von Amazon je Ad-Typ, Land und Feld (`limits.ts`); ohne bekannte Grenze entscheidet Amazon. */
-const limitFor: AdChangeLimitLookup = ({ adProduct, countryCode, field }) => {
-  if (adProduct !== 'SPONSORED_PRODUCTS') return null;
-  if (field === 'placement') return PLACEMENT_PERCENTAGE_LIMIT;
-  const table = field === 'budget' ? SP_DAILY_BUDGET_LIMITS : SP_BID_LIMITS;
-  return Object.hasOwn(table, countryCode) ? table[countryCode]! : null;
-};
+const limitFor: AdChangeLimitLookup = (input) => amazonAdsValueLimit(input) ?? null;
 
 function check(changes: readonly (PendingAdChange | AdChangeReviewRow)[]): AdChangeCheck {
   return checkAdChanges(changes, { limitFor });

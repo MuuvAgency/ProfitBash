@@ -425,6 +425,8 @@ export interface AdChangeRecord {
   countryCode: string;
   /** Ad-Typ der Kampagne. */
   adProduct: string;
+  /** Kostenart der Kampagne (`extra.costType`: `cpc` | `vcpm`), soweit geliefert (SB, SD). */
+  costType: string | null;
   status: AdChangeStatus;
   origin: AdChangeOrigin;
   originChangeId: string | null;
@@ -483,6 +485,7 @@ export async function loadAdChangeRecords(
       accountName: p.accountName,
       countryCode: p.countryCode,
       adProduct: c.adProduct,
+      costType: sql<string | null>`${c.extra}->>'costType'`,
       status: a.status,
       origin: a.origin,
       originChangeId: a.originChangeId,
@@ -796,6 +799,8 @@ export interface AdChangeReviewRow {
   /** Ad-Typ der Kampagne und Land des Profils. */
   adProduct: string;
   countryCode: string;
+  /** Kostenart der Kampagne (`extra.costType`), soweit geliefert. */
+  costType: string | null;
   negative: AdChangeNegative | null;
 }
 
@@ -907,7 +912,7 @@ async function submitInTransaction(
     const dropped: string[] = [];
     const byProfile = new Map<string, { organizationId: string; changeIds: string[] }>();
     const reviewed: Array<
-      Omit<AdChangeReviewRow, 'adProduct' | 'countryCode' | 'comparisonBefore'> & {
+      Omit<AdChangeReviewRow, 'adProduct' | 'countryCode' | 'costType' | 'comparisonBefore'> & {
         campaignId: string;
         adGroupId: string | null;
       }
@@ -974,13 +979,17 @@ async function submitInTransaction(
         .where(inArray(p.id, [...byProfile.keys()]))) {
         countries.set(profile.id, profile.countryCode);
       }
-      const adProducts = new Map<string, string>();
+      const adProducts = new Map<string, { adProduct: string; costType: string | null }>();
       for (const part of chunks([...new Set(reviewed.map((row) => row.campaignId))])) {
         for (const campaign of await tx
-          .select({ id: amazonAdsCampaigns.id, adProduct: amazonAdsCampaigns.adProduct })
+          .select({
+            id: amazonAdsCampaigns.id,
+            adProduct: amazonAdsCampaigns.adProduct,
+            costType: sql<string | null>`${amazonAdsCampaigns.extra}->>'costType'`,
+          })
           .from(amazonAdsCampaigns)
           .where(inArray(amazonAdsCampaigns.id, part))) {
-          adProducts.set(campaign.id, campaign.adProduct);
+          adProducts.set(campaign.id, campaign);
         }
       }
       const comparisonBids = await loadComparisonBids(tx, reviewed);
@@ -988,7 +997,8 @@ async function submitInTransaction(
         reviewed.map(({ campaignId, adGroupId: _adGroupId, ...row }) => ({
           ...row,
           comparisonBefore: comparisonBids.get(row.id) ?? null,
-          adProduct: adProducts.get(campaignId) ?? '',
+          adProduct: adProducts.get(campaignId)?.adProduct ?? '',
+          costType: adProducts.get(campaignId)?.costType ?? null,
           countryCode: countries.get(row.profileId) ?? '',
         })),
       );

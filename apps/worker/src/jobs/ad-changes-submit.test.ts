@@ -162,14 +162,16 @@ describe('submitConnectionAdChanges', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ amazonProfileId: '111', adProduct: 'SPONSORED_PRODUCTS' });
     expect(calls[0]!.operations).toHaveLength(2);
-    expect(calls[0]!.operations).toContainEqual({
-      ref: `target:${f.keyword}`,
-      type: 'update',
-      entity: 'keyword',
-      amazonId: '3001',
-      bid: '0.75',
-      state: 'PAUSED',
-    });
+    expect(calls[0]!.operations).toContainEqual(
+      expect.objectContaining({
+        ref: `target:${f.keyword}`,
+        type: 'update',
+        entity: 'keyword',
+        amazonId: '3001',
+        bid: '0.75',
+        state: 'PAUSED',
+      }),
+    );
     for (const id of changeIds) expect(await changeRow(id)).toMatchObject({ status: 'applied' });
     expect(await submissionRow(submissionId)).toMatchObject({
       status: 'finished',

@@ -62,7 +62,7 @@ describe('checkAdChanges: Grenzen von Amazon', () => {
       },
     );
     expect(asked).toEqual([
-      { adProduct: 'SPONSORED_PRODUCTS', countryCode: 'SE', field: 'placement' },
+      { adProduct: 'SPONSORED_PRODUCTS', countryCode: 'SE', field: 'placement', costType: null },
     ]);
   });
 
@@ -156,5 +156,25 @@ describe('checkAdChanges: Warnungen nach F6', () => {
       count: 201,
       limit: 200,
     });
+  });
+});
+
+describe('checkAdChanges: Kostenart (3.2c)', () => {
+  it('gibt die Kostenart der Kampagne an die Grenzen weiter (vCPM: Gebot je 1000 sichtbare Impressionen)', () => {
+    const seen: (string | null | undefined)[] = [];
+    const lookup: AdChangeLimitLookup = ({ costType }) => {
+      seen.push(costType);
+      return costType === 'vcpm' ? { min: '1', max: '1000' } : { min: '0.02', max: '1000' };
+    };
+    const vcpm = change({ adProduct: 'SPONSORED_DISPLAY', costType: 'vcpm', after: '0.50' });
+    const cpc = change({ adProduct: 'SPONSORED_DISPLAY', costType: 'cpc', after: '0.50' });
+    const unknown = change({ after: '0.50' });
+
+    const result = checkAdChanges([vcpm, cpc, unknown], { limitFor: lookup });
+
+    expect(seen).toEqual(['vcpm', 'cpc', null]);
+    expect(result.violations).toEqual([
+      { changeId: vcpm.id, code: 'belowMinimum', min: '1', max: '1000' },
+    ]);
   });
 });

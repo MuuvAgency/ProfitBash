@@ -32,6 +32,9 @@ function change(patch: Partial<SubmissionChange>): SubmissionChange {
   };
 }
 
+/** Kampagne und Ad Group der Entity gehen mit (Sponsored Brands verlangt sie, 3.2c). */
+const PARENTS = { amazonCampaignId: '100', amazonAdGroupId: '200' };
+
 const campaign = (field: SubmissionChange['field'], after: string, patch = {}) =>
   change({
     entityType: 'campaign',
@@ -63,6 +66,7 @@ describe('buildWriteOperations', () => {
         type: 'update',
         entity: 'keyword',
         amazonId: '300',
+        ...PARENTS,
         bid: '0.75',
         state: 'PAUSED',
       },
@@ -106,10 +110,21 @@ describe('buildWriteOperations', () => {
       }),
     ]);
     expect(operations).toEqual([
-      { ref: 'target:target-1', type: 'archive', entity: 'keyword', amazonId: '300' },
-      { ref: 'campaign:campaign-1', type: 'archive', entity: 'campaign', amazonId: '100' },
-      { ref: 'ad_group:g1', type: 'archive', entity: 'adGroup', amazonId: '200' },
-      { ref: 'product_ad:a1', type: 'archive', entity: 'productAd', amazonId: '400' },
+      { ref: 'target:target-1', type: 'archive', entity: 'keyword', amazonId: '300', ...PARENTS },
+      {
+        ref: 'campaign:campaign-1',
+        type: 'archive',
+        entity: 'campaign',
+        amazonId: '100',
+        amazonCampaignId: '100',
+      },
+      expect.objectContaining({
+        ref: 'ad_group:g1',
+        type: 'archive',
+        entity: 'adGroup',
+        amazonId: '200',
+      }),
+      { ref: 'product_ad:a1', type: 'archive', entity: 'productAd', amazonId: '400', ...PARENTS },
     ]);
   });
 
@@ -347,7 +362,14 @@ describe('buildWriteOperations', () => {
     const second = change({ field: 'bid', after: '0.90' });
     const { operations, changeIdsByRef, rejected } = build([first, second]);
     expect(operations).toEqual([
-      { ref: 'target:target-1', type: 'update', entity: 'keyword', amazonId: '300', bid: '0.90' },
+      {
+        ref: 'target:target-1',
+        type: 'update',
+        entity: 'keyword',
+        amazonId: '300',
+        ...PARENTS,
+        bid: '0.90',
+      },
     ]);
     expect(changeIdsByRef.get('target:target-1')).toEqual([second.id]);
     expect(rejected).toEqual([
