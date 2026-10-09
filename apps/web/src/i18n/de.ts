@@ -951,6 +951,25 @@ export const de = {
       api: 'API',
       bulk_file: 'Bulk-Datei',
     },
+    kind: { setup: 'Kampagnen-Setup' },
+    setupEntity: {
+      campaign: 'Kampagne',
+      placement: 'Gebotsanpassung',
+      ad_group: 'Ad Group',
+      product_ad: 'Anzeige',
+      keyword: 'Keyword',
+      product_target: 'Produkt-Target',
+      negative_keyword: 'Negatives Keyword',
+      negative_product_target: 'Negative ASIN',
+    },
+    setupStatus: {
+      submitted: 'Offen',
+      applied: 'Angelegt',
+      failed: 'Fehlgeschlagen',
+      dismissed: 'Verworfen',
+    },
+    setupItemsLabel: 'Anlagen des Setups',
+    amazonId: 'Amazon-ID {id}',
     entity: {
       campaign: 'Kampagne',
       ad_group: 'Ad Group',
@@ -1345,6 +1364,7 @@ export const de = {
     issue: {
       noHero: 'Kein Hero in der Produktgruppe: Beworben wird das erste Produkt.',
       bidFromProfile: 'Baustein {block}: Gebote aus den Daten des Profils.',
+      bidFromProfileGrouped: 'Gebote aus den Daten des Profils für: {blocks}.',
       keywordIsBrand:
         '„{keyword}“ enthält einen Marken-Begriff und läuft nur in der Marken-Kampagne.',
       ownAsinAsTarget: '{asin} gehört zur eigenen Produktgruppe und ist kein fremdes Ziel.',

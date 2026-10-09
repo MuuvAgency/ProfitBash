@@ -245,7 +245,9 @@ describe('Seite „Kampagnen-Setup“', () => {
       channel: 'bulk_file',
     });
     const done = await found('[data-setup-submitted]');
-    expect(done.querySelector('a')?.getAttribute('href')).toBe('/ads/changes');
+    expect(done.querySelector('a')?.getAttribute('href')).toBe(
+      `/ads/changes?tab=submissions&submission=${S1}`,
+    );
   });
 
   it('zeigt Fehler der Prüfung beim Übermitteln', async () => {

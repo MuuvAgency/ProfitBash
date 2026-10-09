@@ -71,6 +71,7 @@ export type AdChangeChannelData = AdChangeSubmissionData['channel'];
 /** Eine Änderung im Warenkorb (mit `otherUsers`) bzw. in einer Übermittlung (mit `followUp`). */
 export type PendingAdChangeData = PendingAdChangesData['changes'][number];
 export type SubmittedAdChangeData = AdChangeSubmissionDetailData['changes'][number];
+export type SetupItemData = AdChangeSubmissionDetailData['setupItems'][number];
 
 export interface ApiOptions {
   /**
