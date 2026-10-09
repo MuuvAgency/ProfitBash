@@ -20,3 +20,4 @@ export * from './search-terms';
 export * from './tags';
 export * from './ad-changes';
 export * from './ad-changes-api';
+export * from './product-groups';

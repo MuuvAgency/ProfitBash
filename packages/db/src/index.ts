@@ -26,3 +26,4 @@ export * from './ad-changes';
 export * from './ad-change-processing';
 export * from './ad-change-actions';
 export * from './ad-change-queries';
+export * from './product-groups';
