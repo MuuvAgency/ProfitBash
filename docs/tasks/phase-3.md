@@ -6,7 +6,7 @@
 >
 > **Status: abgeschlossen (2026-10-09) bis auf drei Punkte, die nicht am Code hängen bzw. eigene Aufgaben sind:**
 > (1) der **echte Upload** der Bulk-Datei in der Werbekonsole durch Dominik (offene Punkte in 3.2b, dazu der Befund aus dem
-> „Config“-Blatt unten), (2) dasselbe für die **Blätter für Sponsored Brands und Sponsored Display** (3.9 ist gebaut, aber ohne echte
+> „Config“-Blatt unten; **Stand 2026-10-09: ein Upload der SP-Datei ging ohne Fehler durch**, siehe 3.2b), (2) dasselbe für die **Blätter für Sponsored Brands und Sponsored Display** (3.9 ist gebaut, aber ohne echte
 > SB- oder SD-Daten ungeprüft), (3) der **erste echte Lauf über die API** (`phase-1.md` 1.10, offene Punkte in ADR 005).
 > Entschieden: F1, F2 (2026-09-29), **F3–F10** (2026-10-08, die Nummern gelten nur in dieser Datei). `phase-1.md` 1.11 und
 > `phase-2b.md` sind bis auf die Themen ohne Berichte abgeschlossen. Zusätzlich in Phase 3: Suchbegriff-Aktionen aus 2b
@@ -408,6 +408,10 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
       „Placement Top“.
     Ob die Konsole die Pflichtspalten beim Hochladen wirklich erzwingt oder nur die Excel-Vorlage sie so führt, zeigt erst
     der Upload. Bis dahin bleibt der Schreiber, wie er ist.
+  - **Echter Upload (Dominik, 2026-10-09):** Eine Bulk-Datei für Sponsored Products aus ProfitBash hat die Werbekonsole
+    ohne Fehler angenommen; fehlende Pflichtfelder hat sie nicht gemeldet. Der Schreiber bleibt deshalb, wie er ist.
+    Nicht festgehalten ist, welche Arten von Änderungen die Datei enthielt; Kampagnen-Updates ohne Name, Budget und
+    Startdatum sowie Platzierungen, die neu gesetzt werden, bleiben bis zu einem gezielten Upload ungeprüft.
   - **Bewusst so:** keine Grenzen im Schreiber (Excel: 1 048 576 Zeilen, 16 384 Spalten, 32 767 Zeichen je Zelle; das
     Blatt entsteht als ein Text im Speicher, für einige Tausend Zeilen unkritisch, für Phase 4 vormerken).
   - **Nicht enthalten:** Sponsored Brands und Sponsored Display (eigene Blätter und Spalten, mit 3.2c), Portfolios,
