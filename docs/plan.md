@@ -35,7 +35,8 @@ Falls sie früh kommt, kann ein schmaler „Sales-Import" vor Phase 7 gezogen we
 Phase 2b ist neu (`docs/tasks/phase-2b.md`). Für die späteren Phasen gilt das Dokument als Input, die Details werden beim
 Verfeinern der jeweiligen Phasen-Datei übernommen:
 - **Phase 3:** Suchbegriff-Aktionen aus 2b über den Warenkorb (Abschnitt B).
-- **Phase 4:** Struktur-Katalog mit Bausteinen, Graduation-Kanten und allen sechs Presets, je Client und ASIN (C.2b, F-S8); Phrase
+- **Phase 4** (`docs/tasks/phase-4.md`, Fragen entschieden am 2026-10-09: Setup für SP, dann SD, dann SB; eigener Entwurf statt
+  Warenkorb; neue Kampagnen aktiv): Struktur-Katalog mit Bausteinen, Graduation-Kanten und allen sechs Presets, je Client und ASIN (C.2b, F-S8); Phrase
   optional, Default Breit-Cluster; vCPM und Off-Amazon standardmäßig gesperrt, je Kampagne bewusst freischaltbar (E, F-S7);
   Conquesting-Liste von Hand je Client (F-S9); Bulk-Erzeugung mit zentraler Locale-Abbildung (C.3); Gebots-Stack-Simulator (D).
 - **Phase 5:** Optimizer-Leitplanken (max. Änderung je Woche, Gebotsboden, Mindestdaten) als Defaults je Organisation, je Client
