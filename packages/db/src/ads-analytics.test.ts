@@ -28,6 +28,8 @@ import {
   clients,
   fxRates,
   members,
+  tagAssignments,
+  tags,
   users,
 } from './schema';
 import { createTestConnection, createTestOrganization } from './test-fixtures';
@@ -1286,5 +1288,180 @@ describe('Unabhängige SQL-Prüfung der Summen (DoD)', () => {
     expect(explorer.currency).toBe('GBP');
     expect(explorer.converted).toBe(false);
     expect(explorer.totals.current).toEqual(dashboard.totals.current);
+  });
+});
+
+describe('Tags (phase-3.md 3.7)', () => {
+  const tagIds = { sd: '', sp: '', target: '', foreign: '' };
+  const assign = (
+    tagId: string,
+    profileId: string,
+    entityType: string,
+    entityId: string,
+    organizationId = ids.org,
+  ) => ({ tagId, organizationId, profileId, entityType, entityId });
+
+  beforeAll(async () => {
+    const created = await testDb.db
+      .insert(tags)
+      .values([
+        { organizationId: ids.org, name: 'Display', color: 'violet' },
+        { organizationId: ids.org, name: 'Kern', color: 'lime' },
+        { organizationId: ids.org, name: 'Keyword', color: 'amber' },
+        { organizationId: ids.otherOrg, name: 'Fremd', color: 'red' },
+      ])
+      .returning({ id: tags.id });
+    [tagIds.sd, tagIds.sp, tagIds.target, tagIds.foreign] = created.map((t) => t.id) as [
+      string,
+      string,
+      string,
+      string,
+    ];
+    await testDb.db
+      .insert(tagAssignments)
+      .values([
+        assign(tagIds.sd, ids.de, 'campaign', ids.sdDe),
+        assign(tagIds.sp, ids.de, 'campaign', ids.spDe),
+        assign(tagIds.target, ids.de, 'target', ids.tKeyword),
+        assign(tagIds.foreign, ids.foreign, 'campaign', ids.spForeign, ids.otherOrg),
+      ]);
+  });
+  afterAll(async () => {
+    await testDb.db.delete(tags);
+  });
+
+  it('nennt je Zeile die Tags der Entity', async () => {
+    const campaigns = await queryExplorerRows(testDb.db, { ...base(), level: 'campaign' });
+    const byId = new Map(campaigns.rows.map((row) => [row.id, row.attributes.tagIds]));
+    expect(byId.get(ids.sdDe)).toEqual([tagIds.sd]);
+    expect(byId.get(ids.spUk)).toEqual([]);
+
+    const targets = await queryExplorerRows(testDb.db, { ...base(), level: 'target' });
+    expect(targets.rows.find((row) => row.id === ids.tKeyword)!.attributes.tagIds).toEqual([
+      tagIds.target,
+    ]);
+  });
+
+  it('filtert Kampagnen nach Tag; Summen in Explorer und Dashboard stimmen überein', async () => {
+    const query = { ...base(), tagIds: [tagIds.sd] };
+
+    const explorer = await queryExplorerRows(testDb.db, { ...query, level: 'campaign' });
+    const dashboard = await queryDashboard(testDb.db, query);
+
+    expect(explorer.rows.map((row) => row.id)).toEqual([ids.sdDe]);
+    expect(explorer.totals.current.cost).toBe('8.25');
+    expect(dashboard.totals.current).toEqual(explorer.totals.current);
+    expect(dashboard.byProfile.map((group) => group.key)).toEqual([ids.de]);
+  });
+
+  it('nimmt mehrere Tags als ODER', async () => {
+    const result = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      tagIds: [tagIds.sd, tagIds.sp],
+    });
+    expect(result.rows.map((row) => row.id).sort()).toEqual([ids.sdDe, ids.spDe].sort());
+  });
+
+  it('vererbt das Tag einer Kampagne an ihre Ad Groups, Targets und Suchbegriffe', async () => {
+    for (const level of ['adGroup', 'target', 'searchTerm', 'productAd'] as const) {
+      const all = await queryExplorerRows(testDb.db, {
+        ...base(),
+        level,
+        filter: { campaignIds: [ids.spDe] },
+      });
+      const tagged = await queryExplorerRows(testDb.db, {
+        ...base(),
+        level,
+        tagIds: [tagIds.sp],
+      });
+      expect(tagged.rows.map((row) => row.id).sort(), level).toEqual(
+        all.rows.map((row) => row.id).sort(),
+      );
+      expect(tagged.totals.current.cost, level).toBe(all.totals.current.cost);
+    }
+  });
+
+  it('ein Tag am Target gilt für das Target und seine Suchbegriffe, nicht für die Kampagne', async () => {
+    const query = { ...base(), tagIds: [tagIds.target] };
+
+    const targets = await queryExplorerRows(testDb.db, { ...query, level: 'target' });
+    const terms = await queryExplorerRows(testDb.db, { ...query, level: 'searchTerm' });
+    const campaigns = await queryExplorerRows(testDb.db, { ...query, level: 'campaign' });
+
+    expect(targets.rows.map((row) => row.id)).toEqual([ids.tKeyword]);
+    expect(terms.rows.every((row) => row.attributes.targetId === ids.tKeyword)).toBe(true);
+    expect(terms.rows.length).toBeGreaterThan(0);
+    expect(campaigns.rows).toEqual([]);
+    expect((await queryDashboard(testDb.db, query)).byProfile).toEqual([]);
+  });
+
+  it('summiert Portfolios nur aus den Kampagnen mit dem Tag', async () => {
+    const portfolios = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'portfolio',
+      tagIds: [tagIds.sp],
+    });
+    const campaign = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      tagIds: [tagIds.sp],
+    });
+    const inPortfolio = campaign.rows.filter((row) => row.attributes.portfolioId === ids.portfolio);
+    expect(portfolios.rows.map((row) => row.id)).toEqual(
+      inPortfolio.length > 0 ? [ids.portfolio] : [],
+    );
+    if (inPortfolio.length > 0) {
+      expect(portfolios.rows[0]!.current.cost).toBe(inPortfolio[0]!.current.cost);
+    }
+  });
+
+  it('Tagesreihe und Drill-Down der Portfolios laufen (auch mit Tag)', async () => {
+    const series = await queryTimeSeries(testDb.db, {
+      ...base(),
+      level: 'portfolio',
+      tagIds: [tagIds.sp],
+    });
+    expect(series.days.length).toBeGreaterThan(0);
+    const drill = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'portfolio',
+      filter: { portfolioIds: [ids.portfolio] },
+    });
+    expect(drill.rows.map((row) => row.id)).toEqual([ids.portfolio]);
+  });
+
+  it('beschränkt die Tagesreihe und die Negatives auf das Tag', async () => {
+    const series = await queryTimeSeries(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      tagIds: [tagIds.sd],
+      currency: 'EUR',
+    });
+    const total = sumDecimals(series.days.map((day) => day.current.cost ?? '0'));
+    expect(round(total)).toBe(round('8.25'));
+
+    const all = await queryNegatives(testDb.db, base());
+    const tagged = await queryNegatives(testDb.db, { ...base(), tagIds: [tagIds.sp] });
+    expect(tagged.rows.map((row) => row.id).sort()).toEqual(
+      all.rows
+        .filter((row) => row.attributes.campaignId === ids.spDe)
+        .map((row) => row.id)
+        .sort(),
+    );
+    expect((await queryNegatives(testDb.db, { ...base(), tagIds: [tagIds.sd] })).rows).toEqual([]);
+  });
+
+  it('ein Tag einer fremden Organisation macht nichts sichtbar; eine leere Liste filtert nicht', async () => {
+    const foreign = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      tagIds: [tagIds.foreign],
+    });
+    expect(foreign.rows).toEqual([]);
+
+    const all = await queryExplorerRows(testDb.db, { ...base(), level: 'campaign' });
+    const none = await queryExplorerRows(testDb.db, { ...base(), level: 'campaign', tagIds: [] });
+    expect(none.rows.length).toBe(all.rows.length);
   });
 });
