@@ -576,3 +576,4 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
 }
 
 export { reviewCampaignPlan, type PlanReviewInput, type PlanReviewIssue } from './plan-review';
+export { planSetupItems, type SetupItemSpec } from './setup-items';

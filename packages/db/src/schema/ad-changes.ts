@@ -39,6 +39,11 @@ export const adChangeSubmissions = pgTable(
     profileId: uuid('profile_id').notNull(),
     /** `api` | `bulk_file` (`AD_CHANGE_CHANNELS`). */
     channel: text('channel').notNull(),
+    /**
+     * `changes`: Änderungen aus `ad_changes`; `setup`: Anlagen eines Setup-Entwurfs aus `campaign_setup_items`
+     * (`phase-4.md` 4.4). Beide erscheinen auf der Seite „Änderungen“.
+     */
+    kind: text('kind').notNull().default('changes'),
     /** `pending` → `running` → `finished` | `failed` (`AD_CHANGE_SUBMISSION_STATUSES`). */
     status: text('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
@@ -59,6 +64,7 @@ export const adChangeSubmissions = pgTable(
       foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
     }),
     check('ad_change_submissions_channel_ck', sql`${t.channel} in ('api', 'bulk_file')`),
+    check('ad_change_submissions_kind_ck', sql`${t.kind} in ('changes', 'setup')`),
     check(
       'ad_change_submissions_status_ck',
       sql`${t.status} in ('pending', 'running', 'finished', 'failed')`,
