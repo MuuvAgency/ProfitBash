@@ -311,7 +311,9 @@ describe('buildSpBulkSheet: Anlagen', () => {
     const { records, skipped } = build(invalid.map((change, index) => create(`r${index}`, change)));
 
     expect(records).toEqual([]);
-    expect(skipped).toEqual(invalid.map((_, index) => ({ ref: `r${index}`, reason: 'invalidValue' })));
+    expect(skipped).toEqual(
+      invalid.map((_, index) => ({ ref: `r${index}`, reason: 'invalidValue' })),
+    );
   });
 
   it('lässt dieselbe Anlage nur einmal zu', () => {
