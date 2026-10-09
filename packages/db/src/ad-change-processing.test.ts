@@ -134,6 +134,7 @@ describe('claimNextAdChangeSubmission', () => {
       id: first.submissionId,
       profileId: f.profile,
       amazonProfileId: '111',
+      kind: 'changes',
       attempts: 1,
     });
     expect(await submissionRow(first.submissionId)).toMatchObject({
