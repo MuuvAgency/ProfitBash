@@ -7,6 +7,7 @@ import {
 import { and, asc, count, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { listVisibleClientsAndProfiles, visibleProfilesScope } from './access';
 import { recordAuditEvent } from './audit';
+import { assertPresetKnown, StructureCatalogError } from './structure-catalog';
 import type { Db } from './client';
 import { amazonAdsProductAds, amazonAdsProfiles, productGroupItems, productGroups } from './schema';
 
@@ -19,7 +20,12 @@ import { amazonAdsProductAds, amazonAdsProfiles, productGroupItems, productGroup
  */
 
 export type ProductGroupErrorCode =
-  'NOT_FOUND' | 'NAME_TAKEN' | 'LIMIT_REACHED' | 'SKU_REQUIRED' | 'SKU_NOT_ALLOWED';
+  | 'NOT_FOUND'
+  | 'NAME_TAKEN'
+  | 'LIMIT_REACHED'
+  | 'SKU_REQUIRED'
+  | 'SKU_NOT_ALLOWED'
+  | 'UNKNOWN_PRESET';
 
 export class ProductGroupError extends Error {
   constructor(
@@ -62,6 +68,8 @@ export interface ProductGroupRecord {
   id: string;
   profileId: string;
   name: string;
+  /** Preset aus dem Struktur-Katalog; `null` = Preset des Clients bzw. Standard. */
+  presetKey: string | null;
   items: ProductGroupItem[];
   createdAt: Date;
   updatedAt: Date;
@@ -83,6 +91,7 @@ const groupColumns = {
   id: productGroups.id,
   profileId: productGroups.profileId,
   name: productGroups.name,
+  presetKey: productGroups.presetKey,
   createdAt: productGroups.createdAt,
   updatedAt: productGroups.updatedAt,
 };
@@ -122,6 +131,22 @@ async function visibleProfile(
     .for('share');
   if (!profile) throw notFound();
   return profile;
+}
+
+/** Prüft den Preset-Schlüssel gegen den Katalog der Organisation (`UNKNOWN_PRESET`). */
+async function checkPreset(
+  db: Parameters<typeof assertPresetKnown>[0],
+  orgId: string,
+  key: string | null,
+) {
+  try {
+    await assertPresetKnown(db, orgId, key);
+  } catch (error) {
+    if (error instanceof StructureCatalogError) {
+      throw new ProductGroupError('UNKNOWN_PRESET', error.message);
+    }
+    throw error;
+  }
 }
 
 function checkSkus(accountType: string, items: readonly ProductGroupItem[]) {
@@ -197,6 +222,7 @@ export async function createProductGroup(
     profileId: string;
     name: string;
     items: readonly ProductGroupItem[];
+    presetKey?: string | null | undefined;
   },
 ): Promise<ProductGroupRecord | null> {
   try {
@@ -209,6 +235,7 @@ export async function createProductGroup(
       const profile = await visibleProfile(tx, input);
       if (profile === null) return null;
       checkSkus(profile.accountType, input.items);
+      await checkPreset(tx, input.orgId, input.presetKey ?? null);
       const [{ existing } = { existing: 0 }] = await tx
         .select({ existing: count() })
         .from(productGroups)
@@ -225,6 +252,7 @@ export async function createProductGroup(
           organizationId: input.orgId,
           profileId: input.profileId,
           name: input.name,
+          presetKey: input.presetKey ?? null,
           createdBy: input.userId,
         })
         .returning(groupColumns);
@@ -238,6 +266,7 @@ export async function createProductGroup(
           id: row!.id,
           profileId: input.profileId,
           name: row!.name,
+          presetKey: row!.presetKey,
           items: input.items.length,
         },
       });
@@ -285,6 +314,7 @@ export async function updateProductGroup(
   input: ProductGroupAccessInput & {
     id: string;
     name?: string | undefined;
+    presetKey?: string | null | undefined;
     items?: readonly ProductGroupItem[] | undefined;
   },
 ): Promise<ProductGroupRecord | null> {
@@ -293,15 +323,27 @@ export async function updateProductGroup(
       const locked = await lockVisibleGroup(tx, input);
       if (locked === null) return null;
       const { accountType, ...row } = locked;
-      const before = { name: row.name, items: (await loadItems(tx, [row.id])).get(row.id) ?? [] };
+      const before = {
+        name: row.name,
+        presetKey: row.presetKey,
+        items: (await loadItems(tx, [row.id])).get(row.id) ?? [],
+      };
       const name = input.name ?? before.name;
+      const presetKey = input.presetKey === undefined ? before.presetKey : input.presetKey;
+      if (presetKey !== before.presetKey) await checkPreset(tx, input.orgId, presetKey);
       const items = input.items ? [...input.items] : before.items;
       if (input.items) checkSkus(accountType, items);
-      if (name === before.name && sameItems(items, before.items)) return { ...row, ...before };
+      if (
+        name === before.name &&
+        presetKey === before.presetKey &&
+        sameItems(items, before.items)
+      ) {
+        return { ...row, ...before };
+      }
 
       const [updated] = await tx
         .update(productGroups)
-        .set({ name, updatedAt: new Date() })
+        .set({ name, presetKey, updatedAt: new Date() })
         .where(eq(productGroups.id, row.id))
         .returning(groupColumns);
       if (!sameItems(items, before.items)) {
@@ -317,7 +359,7 @@ export async function updateProductGroup(
           id: row.id,
           profileId: row.profileId,
           before,
-          after: { name, items },
+          after: { name, presetKey, items },
         },
       });
       return { ...updated!, items };

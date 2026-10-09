@@ -25,6 +25,8 @@ export const productGroups = pgTable(
     organizationId: organizationId(),
     profileId: uuid('profile_id').notNull(),
     name: text('name').notNull(),
+    /** Preset aus dem Struktur-Katalog (4.2); leer = Preset des Clients bzw. Standard. */
+    presetKey: text('preset_key'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

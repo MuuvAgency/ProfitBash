@@ -9,3 +9,4 @@ export * from './search-terms';
 export * from './ad-changes';
 export * from './tags';
 export * from './product-groups';
+export * from './structure-catalog';
