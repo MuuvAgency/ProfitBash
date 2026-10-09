@@ -5877,6 +5877,8 @@ export interface components {
             /** @enum {string} */
             channel: "api" | "bulk_file";
             /** @enum {string} */
+            kind: "changes" | "setup";
+            /** @enum {string} */
             status: "pending" | "running" | "finished" | "failed";
             error: string | null;
             /** Format: uuid */

@@ -5213,6 +5213,13 @@
               "bulk_file"
             ]
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "changes",
+              "setup"
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -5292,6 +5299,7 @@
           "accountName",
           "countryCode",
           "channel",
+          "kind",
           "status",
           "error",
           "createdBy",
