@@ -35,6 +35,8 @@ export type AdChangeLimitLookup = (input: {
   adProduct: string;
   countryCode: string;
   field: AdChangeLimitField;
+  /** Kostenart der Kampagne (`cpc` | `vcpm`), soweit bekannt: SB und SD haben je Kostenart eigene Gebotsgrenzen. */
+  costType: string | null;
 }) => { min: string; max: string } | null;
 
 export interface AdChangeCheckInput {
@@ -51,6 +53,8 @@ export interface AdChangeCheckInput {
   /** Ad-Typ der Kampagne und Land des Profils. */
   adProduct: string;
   countryCode: string;
+  /** Kostenart der Kampagne (`extra.costType`), soweit bekannt. */
+  costType?: string | null;
   negative: AdChangeNegative | null;
   /** Für „mehr als 200 Änderungen“ je Übermittlung (eine je Profil); ohne Angabe zählen alle zusammen. */
   profileId?: string;
@@ -110,6 +114,7 @@ export function checkAdChanges(
       field: isAdChangePlacementField(change.field)
         ? 'placement'
         : (change.field as AdChangeLimitField),
+      costType: change.costType ?? null,
     });
     const after = new Dec(change.after);
     if (limit && after.lessThan(limit.min)) {

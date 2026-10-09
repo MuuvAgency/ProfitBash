@@ -56,6 +56,12 @@ const REJECTIONS = {
   NOT_SUPPORTED: 'Negatives lassen sich nur archivieren.',
 } as const;
 
+/** Kampagne und Ad Group der Entity: Sponsored Brands verlangt sie bei Keywords, Targets und Negatives (3.2c). */
+const parentIds = (change: SubmissionChange) => ({
+  amazonCampaignId: change.amazonCampaignId,
+  ...(change.amazonAdGroupId !== null && { amazonAdGroupId: change.amazonAdGroupId }),
+});
+
 const isStrategy = (value: string | null): value is AmazonAdsBiddingStrategy =>
   value !== null && (AD_CHANGE_BIDDING_STRATEGIES as readonly string[]).includes(value);
 
@@ -163,9 +169,11 @@ export function buildWriteOperations(changes: readonly SubmissionChange[]): Writ
     const archive = group.find((change) => change.field === 'state' && change.after === 'ARCHIVED');
     if (archive) {
       for (const change of group) if (change !== archive) reject(change, 'ENTITY_ARCHIVED');
-      add(first.adProduct, { ref, type: 'archive', entity: archiveEntity(first), amazonId }, [
-        archive,
-      ]);
+      add(
+        first.adProduct,
+        { ref, type: 'archive', entity: archiveEntity(first), amazonId, ...parentIds(first) },
+        [archive],
+      );
       continue;
     }
     if (first.entityType === 'negative_target') {
@@ -213,6 +221,7 @@ export function buildWriteOperations(changes: readonly SubmissionChange[]): Writ
         type: 'update',
         entity: first.targetType === 'keyword' ? 'keyword' : 'target',
         amazonId,
+        ...parentIds(first),
         ...(bid !== undefined && { bid }),
         ...(state !== undefined && { state }),
       };

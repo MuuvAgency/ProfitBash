@@ -71,10 +71,10 @@ describe('Grenzen von Amazon für Sponsored Products (Doku-Stand 2026-10-08)', (
     expect(issue('901')).toEqual({ code: 'aboveMaximum', min: '0', max: '900' });
   });
 
-  it('kennt für andere Ad-Typen und unbekannte Marktplätze noch keine Grenzen (Amazon entscheidet)', () => {
+  it('kennt für unbekannte Ad-Typen und Marktplätze keine Grenzen (Amazon entscheidet)', () => {
     expect(
       amazonAdsValueLimitIssue({
-        adProduct: 'SPONSORED_BRANDS',
+        adProduct: 'SPONSORED_TV',
         countryCode: 'DE',
         field: 'bid',
         value: '0.01',
@@ -124,5 +124,79 @@ describe('negativeKeywordLimitIssue', () => {
       code: 'tooManyWords',
       max: 10,
     });
+  });
+});
+
+describe('Grenzen für Sponsored Brands und Sponsored Display (3.2c, Doku-Stand 2026-10-09)', () => {
+  const SB = 'SPONSORED_BRANDS';
+  const SD = 'SPONSORED_DISPLAY';
+  const issue = (
+    adProduct: string,
+    countryCode: string,
+    field: 'bid' | 'default_bid' | 'budget' | 'placement',
+    value: string,
+    costType?: string | null,
+  ) => amazonAdsValueLimitIssue({ adProduct, countryCode, field, value, costType })?.code ?? null;
+
+  it('SD: Gebote je Kostenart (CPC ab 0,02, vCPM ab 1 in EUR), auch als Standardgebot', () => {
+    expect(issue(SD, 'DE', 'bid', '0.02', 'cpc')).toBeNull();
+    expect(issue(SD, 'DE', 'bid', '0.01', 'cpc')).toBe('belowMinimum');
+    expect(issue(SD, 'DE', 'default_bid', '0.50', 'VCPM')).toBe('belowMinimum');
+    expect(issue(SD, 'DE', 'bid', '1', 'vcpm')).toBeNull();
+    expect(issue(SD, 'DE', 'bid', '1000.01', 'vcpm')).toBe('aboveMaximum');
+    expect(issue(SD, 'TR', 'bid', '1.80', 'vcpm')).toBe('belowMinimum');
+    expect(issue(SD, 'SE', 'bid', '0.17', 'cpc')).toBe('belowMinimum');
+  });
+
+  it('SD ohne bekannte Kostenart: nur was für beide Kostenarten ausgeschlossen ist', () => {
+    expect(issue(SD, 'DE', 'bid', '0.50', null)).toBeNull();
+    expect(issue(SD, 'DE', 'bid', '0.01')).toBe('belowMinimum');
+    expect(issue(SD, 'DE', 'bid', '1000.01')).toBe('aboveMaximum');
+    // Für Irland nennt Amazon keine SD-Grenzen.
+    expect(issue(SD, 'IE', 'bid', '0.01', 'cpc')).toBeNull();
+  });
+
+  it('SB: CPC zwischen dem Minimum für Bild-Anzeigen und dem Maximum, vCPM zwischen 1 und 5000', () => {
+    expect(issue(SB, 'DE', 'bid', '0.09', 'cpc')).toBe('belowMinimum');
+    expect(issue(SB, 'DE', 'bid', '0.10', 'cpc')).toBeNull();
+    expect(issue(SB, 'DE', 'bid', '39.01', 'cpc')).toBe('aboveMaximum');
+    expect(issue(SB, 'UK', 'bid', '31.01', 'cpc')).toBe('aboveMaximum');
+    expect(issue(SB, 'DE', 'bid', '45', 'vcpm')).toBeNull();
+    expect(issue(SB, 'DE', 'bid', '5000.01', 'vcpm')).toBe('aboveMaximum');
+    // Ohne Kostenart gilt die weiteste Spanne (0,10 bis 5000).
+    expect(issue(SB, 'DE', 'bid', '45')).toBeNull();
+    expect(issue(SB, 'DE', 'bid', '0.09')).toBe('belowMinimum');
+  });
+
+  it('Tagesbudgets je Marktplatz; Platzierungen gibt es nur bei SP', () => {
+    expect(issue(SB, 'DE', 'budget', '0.99')).toBe('belowMinimum');
+    expect(issue(SB, 'SE', 'budget', '8')).toBe('belowMinimum');
+    expect(issue(SD, 'DE', 'budget', '1')).toBeNull();
+    expect(issue(SD, 'TR', 'budget', '1.99')).toBe('belowMinimum');
+    expect(issue(SD, 'DE', 'budget', '1000001')).toBe('aboveMaximum');
+    expect(issue(SB, 'DE', 'placement', '950')).toBeNull();
+  });
+
+  it('kennt SB- und SD-Grenzen für die Marktplätze, die ProfitBash anlegt (SD ohne Irland)', () => {
+    for (const country of [
+      'DE',
+      'FR',
+      'IT',
+      'ES',
+      'NL',
+      'BE',
+      'UK',
+      'US',
+      'CA',
+      'SE',
+      'PL',
+      'TR',
+    ]) {
+      expect(issue(SB, country, 'bid', '0.001', 'cpc'), country).toBe('belowMinimum');
+      expect(issue(SD, country, 'bid', '0.001', 'cpc'), country).toBe('belowMinimum');
+      expect(issue(SB, country, 'budget', '0.5'), country).toBe('belowMinimum');
+      expect(issue(SD, country, 'budget', '0.5'), country).toBe('belowMinimum');
+    }
+    expect(issue(SB, 'IE', 'bid', '0.001', 'cpc')).toBe('belowMinimum');
   });
 });
