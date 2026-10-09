@@ -355,7 +355,7 @@ const selectedIds = ref<string[]>([]);
 // Die Markierung gilt für die gezeigten Zeilen: Mit Ansicht, Filter, Profil oder Zeitraum fällt sie weg.
 // Über den Inhalt der Auswahl, nicht das Objekt: Der URL-Abgleich erzeugt es neu, ohne dass sich etwas ändert.
 const requestKey = computed(() => JSON.stringify(request.value));
-watch([view, classFilter, requestKey], () => (selectedIds.value = []));
+watch([view, classFilter, requestKey], () => clearSelection());
 const selectedTermRows = computed(() => {
   const ids = new Set(selectedIds.value);
   return (data.value?.rows ?? []).filter((row) => ids.has(row.id));
@@ -368,9 +368,12 @@ function clearSelection() {
 const negativeOpen = ref(false);
 /** Die Zeilen, für die der Dialog fragt: beim Öffnen festgehalten (eine Zeile oder die Markierung). */
 const negativeRows = shallowRef<SearchTermRowData[]>([]);
-function openNegative(rows: SearchTermRowData[]) {
+/** Die Aktion einer einzelnen Zeile lässt die Markierung der anderen stehen. */
+const negativeFromSelection = ref(false);
+function openNegative(rows: SearchTermRowData[], fromSelection = false) {
   if (rows.length === 0) return;
   negativeRows.value = rows;
+  negativeFromSelection.value = fromSelection;
   negativeOpen.value = true;
 }
 
@@ -401,14 +404,14 @@ const markHarvest = useMutation({
       queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'harvest'] }),
     ]),
 });
-async function markForHarvest(rows: SearchTermRowData[]) {
+async function markForHarvest(rows: SearchTermRowData[], fromSelection = false) {
   const period = request.value;
   if (!period || rows.length === 0 || markHarvest.isPending.value) return;
   harvestResult.value = null;
   harvestErrorKey.value = null;
   try {
     harvestResult.value = await markHarvest.mutateAsync({ period, terms: harvestTerms(rows) });
-    clearSelection();
+    if (fromSelection) clearSelection();
   } catch (error) {
     harvestErrorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
   }
@@ -424,7 +427,6 @@ const harvestList = useQuery({
   queryKey: harvestKey,
   queryFn: () => api.searchTerms.harvest.list(selected.value!.profileId),
   enabled: computed(() => view.value === 'harvest' && selected.value !== null),
-  placeholderData: keepPreviousData,
 });
 const harvestRows = computed(() => harvestList.data.value?.marks ?? []);
 const harvestDefs = computed(() =>
@@ -858,7 +860,7 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
                   size="small"
                   severity="secondary"
                   :disabled="selectedTermRows.length === 0"
-                  @click="openNegative(selectedTermRows)"
+                  @click="openNegative(selectedTermRows, true)"
                 />
                 <Button
                   v-if="canWrite"
@@ -868,7 +870,7 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
                   severity="secondary"
                   :disabled="selectedTermRows.length === 0"
                   :loading="markHarvest.isPending.value"
-                  @click="markForHarvest(selectedTermRows)"
+                  @click="markForHarvest(selectedTermRows, true)"
                 />
                 <span v-if="selectedIds.length === 0" class="text-body-sm text-ink-secondary">
                   {{ t('searchTerms.actions.hint') }}
@@ -1008,7 +1010,7 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
         :visible="negativeOpen"
         :rows="negativeRows"
         @close="negativeOpen = false"
-        @staged="clearSelection"
+        @staged="negativeFromSelection && clearSelection()"
       />
       <RulesDialog
         v-if="meta && canWrite"

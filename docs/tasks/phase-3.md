@@ -711,7 +711,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     sich etwas geändert hat. ADR 002 ergänzt.
   - **API** (`routes/search-terms.ts`, Feature `sp-explorer`, Schemas in `packages/shared/src/search-terms.ts`):
     `POST /api/ads/search-terms/harvest` (`write`; `profileId`, `periodStart`, `periodEnd`, `searchTerms` mit
-    höchstens 200 Begriffen je Anfrage, wegen des Body-Limits von 64 KB; nicht sichtbares Profil `404
+    höchstens 80 Begriffen je Anfrage, wegen des Body-Limits von 64 KB; nicht sichtbares Profil `404
     PROFILE_NOT_FOUND`), `POST …/harvest/list` (`view`; optional `profileId`; Kennzahlen mit ACoS, CVR usw. wie die
     Analyse; `truncated`, `maxMarks`), `POST …/harvest/remove` (`write`; `ids`, höchstens 1000). Die Analyse nennt je
     Zeile `harvestMarked`. Negatives gehen über den vorhandenen Endpunkt `POST /api/ads/changes/pending` mit
@@ -728,7 +728,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     (`NegativeDialog.vue`): „Wo“ (Ad Group der Zeile | Kampagne der Zeile), „Wie“ (negativ exakt | Wortgruppe),
     Hinweis auf geschützte Begriffe mit Häkchen „trotzdem negieren“ (ohne Häkchen bleiben sie weg), Hinweise auf
     übersprungene Zeilen, Zahl der Negatives; danach das Ergebnis des Vormerkens (`StageResult.vue`, mit „gibt es dort
-    schon“ und „geschützter Begriff“ als Ablehnungsgründe). **Harvest vormerken** geht ohne Dialog (in Stücken zu 200),
+    schon“ und „geschützter Begriff“ als Ablehnungsgründe). **Harvest vormerken** geht ohne Dialog (in Stücken zu 80),
     das Ergebnis steht über dem Grid („2 Suchbegriffe vorgemerkt“, „stand schon auf der Merkliste“) mit Sprung zur
     Merkliste. Neue Spalte „Merkliste“ („Vorgemerkt“, filter- und sortierbar, auch im CSV). **Ansicht „Merkliste“**
     (`view=harvest`): Einträge des gewählten Profils mit Quelle, Datei-Zeitraum, Kennzahlen, „Vorgemerkt am“ und
@@ -739,6 +739,30 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     `write`, Entitlement, Kennzeichnung in der Analyse), `search-terms/actions.test.ts`,
     `pages/SearchTermAnalysisPage.test.ts` (Auswahl, Dialog, Ebene und Match-Typ, geschützte Begriffe, Ergebnis,
     Aktion je Zeile, Vormerken, Merkliste mit Entfernen, Leer- und Fehlerzustand, Viewer).
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung aller neuen Wege, Gleichwertigkeit der
+    gebündelten Prüfung mit der alten Schleife, Sperrreihenfolge, Decimal-Summen, Migration (nur additiv), Rechte und
+    i18n-Keys bestätigt. Übernommen: Der Wechsel von Filter, Ansicht, Profil oder Zeitraum hebt die Markierung auch
+    im Grid auf (vorher blieben Zeilen angehakt, die Leiste zeigte „0 markiert“); eine negative **Wortgruppe**, die in
+    einem geschützten Begriff steckt („nordwind“ bei geschütztem „nordwind jacke“), gilt als geschützt, und der
+    Dialog lässt vom Server als geschützt abgelehnte Negatives nach dem Ergebnis bestätigen („Trotzdem in den
+    Warenkorb“); die IDs neuer Negatives vergibt der Server vor dem Einfügen (keine Zuordnung über die Reihenfolge von
+    `RETURNING`); `confirmedProtected` im Audit-Event `ad_changes.stage`; höchstens 80 Begriffe je Anfrage (vorher
+    200: Begriffe voller Länge in Schriften mit drei Bytes je Zeichen sprengten das Body-Limit); die Aktion einer
+    einzelnen Zeile lässt die Markierung der anderen stehen; die Merkliste zeigt beim Profilwechsel keine Einträge des
+    vorigen Profils mehr; eigenes `aria-label` für schon vorgemerkte Zeilen; Tests dazu.
+  - **Offen bzw. bewusst so:** Die Merkliste hängt an der Auswahl der Analyse: Hat ein Profil keinen Datei-Zeitraum
+    mehr (2b.2d) oder lädt die Analyse nicht, ist seine Merkliste in der Oberfläche nicht erreichbar (die Einträge
+    bleiben, Phase 4 liest sie je Profil; dort bzw. mit einer eigenen Profil-Auswahl lösen). „Von der Merkliste
+    entfernen“ fragt nicht nach (ein erneutes Vormerken trägt dann die Kennzahlen des gewählten Zeitraums). Die
+    Zeilenkennung `protected` der Analyse kennt den Fall „Wortgruppe steckt im geschützten Begriff“ nicht (der Server
+    lehnt ab, der Dialog fragt danach). Ob ein geschützter Begriff bestätigt wurde, steht nur als Zahl im Audit-Event,
+    nicht an der Änderung. `checkNegatives` liest alle Negatives der betroffenen Kampagnen (auch für die Einzelprüfung
+    beim Übermitteln und beim erneuten Versuch, dort je Zeile); das Vormerken für den Harvest liest je Anfrage alle
+    Zeilen des Zeitraums (bei 5000 markierten Begriffen über 60 Anfragen). `truncated` der Merkliste ist bei genau
+    5000 Einträgen schon wahr. Die Audit-Events der Merkliste nennen Zahlen, keine Begriffe. Negatives für SB und SD
+    scheitern über die API bis 3.2c mit `AD_PRODUCT_NOT_SUPPORTED`; eine negative ASIN auf Kampagnenebene geht nicht
+    per Bulk-Datei (3.2b). Nicht getestet: Stücke über 80 Begriffe und ein Fehler mittendrin, Fehlermeldung beim
+    Vormerken in der Oberfläche, gleichzeitiges Vormerken, Reihenfolge der Merkliste bei mehreren Einträgen.
   - Browser-Pane geprüft (Demo-Daten, 2026-10-09): drei Zeilen markiert, Dialog mit den Standardwerten, drei
     Negatives im Warenkorb (Zähler in der Sidebar), dieselben noch einmal: „3 unverändert“; zwei Suchbegriffe
     vorgemerkt (Spalte „Merkliste“, Ansicht „Merkliste“ mit Quelle), entfernt; 1440 px dunkel und Handy ohne

@@ -29,8 +29,7 @@ export function isAsinSearchTerm(searchTerm: string): boolean {
 }
 
 /** Vergleichsform wie im Server (`comparableSearchTerm`): klein, NFC, Leerraum zusammengefasst. */
-const comparable = (searchTerm: string) =>
-  normalizeNegativeKeywordText(searchTerm).toLocaleLowerCase();
+const comparable = (searchTerm: string) => normalizeNegativeKeywordText(searchTerm).toLowerCase();
 
 export interface NegativeInputs {
   inputs: AdChangeInputData[];

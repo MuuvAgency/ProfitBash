@@ -216,7 +216,7 @@ describe('POST /api/ads/search-terms/harvest', () => {
       (
         await mark(
           admin,
-          Array.from({ length: 201 }, (_, i) => `b ${i}`),
+          Array.from({ length: 81 }, (_, i) => `b ${i}`),
         )
       ).status,
     ).toBe(400);

@@ -770,6 +770,7 @@ export const de = {
       row: {
         negative: '„{term}“ negativ anlegen',
         harvest: '„{term}“ für den Harvest vormerken',
+        harvestMarked: '„{term}“ steht auf der Harvest-Merkliste',
       },
     },
     negative: {
@@ -799,6 +800,9 @@ export const de = {
         'Es kommt kein Negative in den Warenkorb. | {count} Negative kommt in den Warenkorb. | {count} Negatives kommen in den Warenkorb.',
       existingHint: 'Was es an der Stelle schon gibt, wird nicht doppelt angelegt.',
       submit: 'In den Warenkorb',
+      rejectedProtected:
+        '{count} Negative enthält einen geschützten Begriff des Clients oder deckt ihn als Wortgruppe mit ab. | {count} Negatives enthalten einen geschützten Begriff des Clients oder decken ihn als Wortgruppe mit ab.',
+      confirmRejected: 'Trotzdem in den Warenkorb',
       nextStep:
         'An Amazon geht erst etwas, wenn du die Änderungen unter „Änderungen“ übermittelst.',
     },
@@ -1291,6 +1295,9 @@ export const de = {
           'Gerechnet wird auf den aktuellen Wert bei Amazon, gerundet auf zwei Nachkommastellen. Targets ohne eigenes Gebot starten beim Standardgebot ihrer Ad Group.',
       },
       submit: 'In den Warenkorb',
+      rejectedProtected:
+        '{count} Negative enthält einen geschützten Begriff des Clients oder deckt ihn als Wortgruppe mit ab. | {count} Negatives enthalten einen geschützten Begriff des Clients oder decken ihn als Wortgruppe mit ab.',
+      confirmRejected: 'Trotzdem in den Warenkorb',
       nextStep:
         'An Amazon geht erst etwas, wenn du die Änderungen unter „Änderungen“ übermittelst.',
     },

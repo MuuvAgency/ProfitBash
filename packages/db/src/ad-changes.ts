@@ -10,6 +10,7 @@ import {
   type AdChangeSubmissionStatus,
   type AdChangeUpdateInput,
 } from '@profitbash/shared';
+import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { visibleProfilesScope } from './access';
@@ -129,6 +130,8 @@ export async function stageAdChanges(
   return db.transaction(async (tx) => {
     const results: StageAdChangeResult[] = input.changes.map(() => ({ outcome: 'unchanged' }));
     const profileIds = new Set<string>();
+    /** Negatives mit geschütztem Begriff, die die Anfrage bestätigt hat (steht im Audit-Event). */
+    let confirmedProtected = 0;
     // Anpassungen (±Prozent, ±Betrag) werden zu Feldänderungen mit dem errechneten Wert.
     const { changes, rejected } = await resolveAdjustments(tx, scope, input.changes);
     for (const [index, reason] of rejected) results[index] = { outcome: 'rejected', reason };
@@ -349,16 +352,20 @@ export async function stageAdChanges(
         const key = negativePlaceKey(change.campaignId, change.adGroupId, negativeKey(negative));
         // Schon im eigenen Warenkorb (auch durch eine frühere Angabe derselben Anfrage): `unchanged`.
         if (own.has(key)) continue;
-        const term = negative.type === 'keyword' ? negative.keywordText : negative.asin;
-        if (change.confirmProtected !== true && isProtected.get(parent.profileId)?.(term)) {
-          results[index] = { outcome: 'rejected', reason: 'protectedTerm' };
-          continue;
+        if (isProtected.get(parent.profileId)?.(negative)) {
+          if (change.confirmProtected !== true) {
+            results[index] = { outcome: 'rejected', reason: 'protectedTerm' };
+            continue;
+          }
+          confirmedProtected += 1;
         }
         own.add(key);
         toInsert.push({
           index,
           key,
           values: {
+            // Die ID kommt von hier: So hängt die Zuordnung nicht an der Reihenfolge von `RETURNING`.
+            id: randomUUID(),
             organizationId: parent.organizationId,
             profileId: parent.profileId,
             origin: input.origin,
@@ -372,19 +379,15 @@ export async function stageAdChanges(
         });
       }
       for (const part of chunks(toInsert, 500)) {
-        // `RETURNING` eines mehrzeiligen `VALUES` liefert die Zeilen in der Reihenfolge der Eingabe.
-        const rows = await tx
-          .insert(adChanges)
-          .values(part.map((item) => item.values))
-          .returning({ id: adChanges.id });
-        part.forEach((item, at) => {
+        await tx.insert(adChanges).values(part.map((item) => item.values));
+        for (const item of part) {
           results[item.index] = {
             outcome: 'created',
-            changeId: rows[at]!.id,
+            changeId: item.values.id!,
             otherUsers: others.get(item.key)?.size ?? 0,
           };
           profileIds.add(item.values.profileId);
-        });
+        }
       }
     }
 
@@ -402,6 +405,7 @@ export async function stageAdChanges(
           created: counts.created,
           updated: counts.updated,
           removed: counts.removed,
+          ...(confirmedProtected > 0 && { confirmedProtected }),
           profileIds: [...profileIds].sort(),
         },
       });

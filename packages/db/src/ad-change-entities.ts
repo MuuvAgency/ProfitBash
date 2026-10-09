@@ -464,23 +464,31 @@ export async function checkNegative(
 
 /**
  * Prüfer je Profil für geschützte Begriffe des Clients (`clients.protected_terms`, `phase-2b.md` 2b.2); Profile ohne
- * Client oder ohne Begriffe fehlen. Die Profile hat der Aufrufer über den Access-Layer geprüft.
+ * Client oder ohne Begriffe fehlen. Ein Negative trifft einen geschützten Begriff, wenn es ihn enthält, und als
+ * Wortgruppe auch, wenn es in ihm steckt (negativ Wortgruppe „nordwind“ sperrte „nordwind jacke“ mit aus). Die
+ * Profile hat der Aufrufer über den Access-Layer geprüft.
  */
 export async function loadProtectedTermMatchers(
   db: DbOrTx,
   profileIds: readonly string[],
-): Promise<Map<string, (term: string) => boolean>> {
-  const matchers = new Map<string, (term: string) => boolean>();
+): Promise<Map<string, (negative: AdChangeNegative) => boolean>> {
+  const matchers = new Map<string, (negative: AdChangeNegative) => boolean>();
   for (const part of chunks([...new Set(profileIds)])) {
     const rows = await db
       .select({ profileId: amazonAdsProfiles.id, protectedTerms: clients.protectedTerms })
       .from(amazonAdsProfiles)
       .innerJoin(clients, eq(clients.id, amazonAdsProfiles.clientId))
       .where(inArray(amazonAdsProfiles.id, part));
-    for (const row of rows) {
-      if (row.protectedTerms.length > 0) {
-        matchers.set(row.profileId, createProtectedTermMatcher(row.protectedTerms));
-      }
+    for (const { profileId, protectedTerms } of rows) {
+      if (protectedTerms.length === 0) continue;
+      const contains = createProtectedTermMatcher(protectedTerms);
+      matchers.set(profileId, (negative) => {
+        if (negative.type === 'product') return contains(negative.asin);
+        if (contains(negative.keywordText)) return true;
+        if (negative.matchType !== 'PHRASE') return false;
+        const within = createProtectedTermMatcher([negative.keywordText]);
+        return protectedTerms.some(within);
+      });
     }
   }
   return matchers;
