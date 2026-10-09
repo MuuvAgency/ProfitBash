@@ -1,7 +1,21 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, integer, numeric, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  check,
+  date,
+  foreignKey,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { amazonAdsProfiles } from './app';
 import { organizations, users } from './auth';
+import { createdAt, id, organizationId } from './columns';
 
 /**
  * Regeln der Suchbegriff-Einstufung je Organisation (`phase-2b.md` 2b.2): Harvest ab `harvest_min_purchases`
@@ -48,5 +62,51 @@ export const searchTermRuleOverrides = pgTable(
       'search_term_rule_overrides_not_empty_ck',
       sql`num_nonnulls(${t.harvestMinPurchases}, ${t.harvestMaxAcos}, ${t.negateMinClicks}, ${t.negateMinCost}) > 0`,
     ),
+  ],
+);
+
+/**
+ * Harvest-Merkliste je Profil (`phase-3.md` 3.8, F9): Suchbegriffe, aus denen später eine Exakt-Kampagne werden soll
+ * (Phase 4, Kampagnen-Setup). Keine Änderung bei Amazon. Je Profil und Begriff (`term_key` = Vergleichsform:
+ * klein, NFC, Leerraum zusammengefasst) ein Eintrag mit der Quelle (Zeile mit dem höchsten Spend, als Amazon-IDs
+ * wie in den Suchbegriff-Blättern) und den Kennzahlen des Begriffs über alle seine Zeilen im Datei-Zeitraum, so wie
+ * sie beim Vormerken galten. Zugriffe nur über `search-term-harvest.ts` (ADR 002).
+ */
+export const searchTermHarvestMarks = pgTable(
+  'search_term_harvest_marks',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: uuid('profile_id').notNull(),
+    /** Schreibweise der Quellzeile. */
+    searchTerm: text('search_term').notNull(),
+    termKey: text('term_key').notNull(),
+    adProduct: text('ad_product').notNull(),
+    amazonCampaignId: text('amazon_campaign_id').notNull(),
+    amazonAdGroupId: text('amazon_ad_group_id').notNull(),
+    amazonTargetId: text('amazon_target_id').notNull(),
+    periodStart: date('period_start', { mode: 'string' }).notNull(),
+    periodEnd: date('period_end', { mode: 'string' }).notNull(),
+    /** Zeilen (Suchbegriff je Target), die in die Kennzahlen eingehen. */
+    sourceRows: integer('source_rows').notNull(),
+    currencyCode: text('currency_code').notNull(),
+    impressions: bigint('impressions', { mode: 'number' }).notNull(),
+    clicks: bigint('clicks', { mode: 'number' }).notNull(),
+    cost: numeric('cost', { mode: 'string' }).notNull(),
+    sales: numeric('sales', { mode: 'string' }).notNull(),
+    purchases: bigint('purchases', { mode: 'number' }).notNull(),
+    units: bigint('units', { mode: 'number' }).notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'search_term_harvest_marks_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    unique('search_term_harvest_marks_profile_term_uq').on(t.profileId, t.termKey),
+    check('search_term_harvest_marks_period_ck', sql`${t.periodStart} <= ${t.periodEnd}`),
+    index('search_term_harvest_marks_profile_created_idx').on(t.profileId, t.createdAt),
   ],
 );

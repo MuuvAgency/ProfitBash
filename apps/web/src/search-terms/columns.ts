@@ -1,6 +1,8 @@
 import {
   compareDecimalNullsLast,
   formatCurrency,
+  formatDateTime,
+  formatDay,
   formatNumber,
   formatPercent,
   MISSING_VALUE,
@@ -9,10 +11,17 @@ import {
 import type { CellClassParams, ColDef, ICellRendererParams } from 'ag-grid-community';
 import { markRaw } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
-import type { SearchTermAnalysisData, SearchTermNgramData, SearchTermRowData } from '../api/client';
+import type {
+  HarvestMarkData,
+  SearchTermAnalysisData,
+  SearchTermNgramData,
+  SearchTermRowData,
+} from '../api/client';
 import DecimalFilter from '../explorer/DecimalFilter.vue';
 import { targetLabel, type Labels } from '../explorer/amazon-labels';
+import { ACTIONS_COLUMN_ID } from '../grid/csv';
 import EntityLinkCell, { type EntityLinkCellParams } from './EntityLinkCell.vue';
+import RowActionsCell, { type RowActionsCellParams } from './RowActionsCell.vue';
 import type { ExplorerLinkLevel } from './explorer-link';
 
 /**
@@ -62,6 +71,9 @@ export interface ColumnContext extends Labels {
   currency: string;
   /** Ziel im Explorer für Kampagne bzw. Ad Group einer Zeile (2b.2e); fehlt oder `null`: reiner Text. */
   explorerLink?: (level: ExplorerLinkLevel, row: SearchTermRowData) => RouteLocationRaw | null;
+  /** Aktionen je Zeile (3.8); fehlt eine, hat der Nutzer das Recht nicht. Ohne beide gibt es die Spalte nicht. */
+  onNegative?: (row: SearchTermRowData) => void;
+  onHarvest?: (row: SearchTermRowData) => void;
 }
 
 export function formatSearchTermMetric(
@@ -84,7 +96,9 @@ export function formatSearchTermMetric(
 
 const DATA_CELL = 'font-data text-right justify-end';
 
-function metricColumns<T extends Sums>(context: ColumnContext): ColDef<T>[] {
+function metricColumns<T extends Sums>(
+  context: Pick<ColumnContext, 't' | 'locale' | 'currency'>,
+): ColDef<T>[] {
   return METRICS.map((key) => ({
     colId: key,
     headerName: context.t(`explorer.column.${key}`),
@@ -103,7 +117,7 @@ function metricColumns<T extends Sums>(context: ColumnContext): ColDef<T>[] {
 }
 
 /** Währung des Profils: nie sichtbar, aber immer im CSV-Export (`gridCsv`). */
-function currencyColumn<T>(context: ColumnContext): ColDef<T> {
+function currencyColumn<T>(context: Pick<ColumnContext, 't' | 'currency'>): ColDef<T> {
   return {
     colId: 'currency',
     headerName: context.t('explorer.column.currency'),
@@ -233,6 +247,18 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
     text('classification', t('searchTerms.column.classification'), (row) =>
       classificationValue(row, context),
     ),
+    // Als eigene Spalte (nicht als Zeichen am Suchbegriff): Das Grid zeichnet eine Zelle nur neu, wenn sich ihr
+    // Wert ändert, und so lässt sich nach „Vorgemerkt“ filtern und sortieren.
+    text(
+      'harvest',
+      t('searchTerms.harvest.column'),
+      (row) => (row.harvestMarked ? t('searchTerms.harvest.marked') : null),
+      {
+        valueFormatter: ({ value }) => (typeof value === 'string' ? value : ''),
+        minWidth: 120,
+        cellClass: 'flex items-center text-lime-deep',
+      },
+    ),
     text('campaign', t('explorer.column.campaign'), (row) => row.campaignName, link('campaign')),
     text('adGroup', t('explorer.column.adGroup'), (row) => row.adGroupName, link('adGroup')),
     text('target', t('explorer.column.target'), (row) =>
@@ -244,6 +270,26 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
     ...metricColumns<TermGridRow>(context),
     currencyColumn<TermGridRow>(context),
   ];
+  if (context.onNegative || context.onHarvest) {
+    defs.push({
+      colId: ACTIONS_COLUMN_ID,
+      headerName: t('searchTerms.actions.column'),
+      // Der Wert trägt die Merkliste: Das Lesezeichen der Zelle wird so nach dem Vormerken neu gezeichnet.
+      valueGetter: ({ data }) => (data && !data.isTotal ? data.harvestMarked : null),
+      cellRenderer: markRaw(RowActionsCell),
+      cellRendererParams: {
+        onNegative: context.onNegative,
+        onHarvest: context.onHarvest,
+        label: (action, row) => t(`searchTerms.actions.row.${action}`, { term: row.searchTerm }),
+      } satisfies RowActionsCellParams,
+      pinned: 'right',
+      lockPinned: true,
+      sortable: false,
+      resizable: false,
+      width: 104,
+      minWidth: 104,
+    });
+  }
   return defs.map((def) =>
     def.colId === 'classification'
       ? {
@@ -297,4 +343,71 @@ export function ngramColumns(context: ColumnContext): ColDef<NgramGridRow>[] {
 
 export function totalRow(total: SearchTermAnalysisData['total']): TermGridRow {
   return { id: '__total__', isTotal: true, ...total };
+}
+
+/** Zeile der Harvest-Merkliste (3.8): Kennzahlen vom Zeitpunkt des Vormerkens. */
+export type HarvestGridRow = HarvestMarkData;
+
+export interface HarvestColumnContext extends Labels {
+  locale: Locale;
+}
+
+/**
+ * Spalten der Merkliste. Die Beträge stehen in der Währung des Eintrags (ein Profil je Ansicht); gezeigt werden
+ * Quelle, Datei-Zeitraum und wer wann vorgemerkt hat.
+ */
+export function harvestColumns(
+  context: HarvestColumnContext,
+  currency: string,
+): ColDef<HarvestGridRow>[] {
+  const { t, locale } = context;
+  const text = (
+    id: string,
+    header: string,
+    get: (row: HarvestGridRow) => string | null,
+    extra: Partial<ColDef<HarvestGridRow>> = {},
+  ): ColDef<HarvestGridRow> => ({
+    colId: id,
+    headerName: header,
+    valueGetter: ({ data }) => (data ? get(data) : null),
+    valueFormatter: ({ value }) =>
+      value === null || value === undefined ? MISSING_VALUE : String(value),
+    filter: 'agTextColumnFilter',
+    ...extra,
+  });
+  return [
+    {
+      colId: 'searchTerm',
+      headerName: t('searchTerms.column.searchTerm'),
+      field: 'searchTerm',
+      pinned: 'left',
+      lockPinned: true,
+      minWidth: 240,
+      filter: 'agTextColumnFilter',
+    },
+    text('campaign', t('explorer.column.campaign'), (row) => row.campaignName),
+    text('adGroup', t('explorer.column.adGroup'), (row) => row.adGroupName),
+    text('target', t('explorer.column.target'), (row) =>
+      targetLabel(
+        { keywordText: row.keywordText, matchType: row.matchType, expression: row.expression },
+        context,
+      ),
+    ),
+    text(
+      'period',
+      t('searchTerms.harvest.period'),
+      (row) => `${formatDay(row.periodStart, locale)} – ${formatDay(row.periodEnd, locale)}`,
+      { cellClass: 'flex items-center font-data', minWidth: 210 },
+    ),
+    ...metricColumns<HarvestGridRow>({ t, locale, currency }),
+    text('createdAt', t('searchTerms.harvest.markedAt'), (row) => row.createdAt, {
+      valueFormatter: ({ value }) =>
+        typeof value === 'string' ? formatDateTime(value, locale) : MISSING_VALUE,
+      cellClass: 'flex items-center font-data',
+      filter: false,
+      minWidth: 170,
+    }),
+    text('createdBy', t('searchTerms.harvest.markedBy'), (row) => row.createdByName),
+    currencyColumn<HarvestGridRow>({ t, currency }),
+  ];
 }

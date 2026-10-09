@@ -56,11 +56,11 @@ export function useOpenChanges(profileId: Ref<string | undefined>, enabled: Ref<
 }
 
 /** Vormerken; lädt danach Warenkorb und offene Änderungen neu. */
-export function useStageChanges() {
+export function useStageChanges(origin: 'explorer' | 'search_terms' = 'explorer') {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (changes: AdChangeInputData[]) =>
-      stageInChunks(changes, (part) => api.adChanges.stage(part)),
+      stageInChunks(changes, (part) => api.adChanges.stage(part, origin)),
     onSettled: () => queryClient.invalidateQueries({ queryKey: [KEY] }),
   });
 }

@@ -239,6 +239,8 @@ export const searchTermRowSchema = z
     protected: z.boolean(),
     /** Im Profil gibt es schon ein aktives exaktes Keyword bzw. Produkt-Target dafür. */
     alreadyTargeted: z.boolean(),
+    /** Der Begriff steht für das Profil auf der Harvest-Merkliste (`phase-3.md` 3.8). */
+    harvestMarked: z.boolean(),
     /**
      * Einstufung des Suchbegriffs über **alle** seine Zeilen (Targets) im Profil und Datei-Zeitraum: Zeilen desselben
      * Begriffs (klein, Leerraum zusammengefasst) summiert, dieselben Regeln. `classification` bleibt die der Zeile.
@@ -321,3 +323,101 @@ export const searchTermAnalysisResponseSchema = z
   })
   .meta({ id: 'SearchTermAnalysisResponse' });
 export type SearchTermAnalysisResponse = z.infer<typeof searchTermAnalysisResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Harvest-Merkliste (`phase-3.md` 3.8, F9)
+// ---------------------------------------------------------------------------
+
+/** Je Anfrage; die Oberfläche schickt eine größere Auswahl in Stücken (Body-Limit 64 KB). */
+export const MAX_HARVEST_TERMS_PER_REQUEST = 200;
+export const MAX_HARVEST_SEARCH_TERM_LENGTH = 200;
+
+/**
+ * Suchbegriffe eines Datei-Zeitraums auf die Merkliste des Profils setzen. Quelle und Kennzahlen liest der Server
+ * aus den Zeilen des Zeitraums; die Anfrage nennt nur die Begriffe.
+ */
+export const harvestMarkRequestSchema = z
+  .strictObject({
+    profileId: z.uuid(),
+    periodStart: z.iso.date(),
+    periodEnd: z.iso.date(),
+    searchTerms: z
+      .array(z.string().min(1).max(MAX_HARVEST_SEARCH_TERM_LENGTH))
+      .min(1)
+      .max(MAX_HARVEST_TERMS_PER_REQUEST),
+  })
+  .refine((body) => body.periodStart <= body.periodEnd, {
+    message: '`periodStart` liegt nach `periodEnd`',
+  })
+  .meta({ id: 'HarvestMarkRequest' });
+
+export const HARVEST_MARK_OUTCOMES = ['added', 'alreadyMarked', 'notFound'] as const;
+
+export const harvestMarkResponseSchema = z
+  .object({
+    /** Je Begriff ein Ergebnis, in der Reihenfolge der Anfrage. */
+    results: z.array(z.object({ outcome: z.enum(HARVEST_MARK_OUTCOMES), id: z.uuid().optional() })),
+    counts: z.object({
+      added: z.number().int(),
+      alreadyMarked: z.number().int(),
+      notFound: z.number().int(),
+    }),
+  })
+  .meta({ id: 'HarvestMarkResponse' });
+export type HarvestMarkResponse = z.infer<typeof harvestMarkResponseSchema>;
+
+export const harvestListRequestSchema = z
+  .strictObject({ profileId: z.uuid().optional() })
+  .meta({ id: 'HarvestListRequest' });
+
+export const harvestMarkSchema = z
+  .object({
+    id: z.uuid(),
+    profileId: z.uuid(),
+    accountName: z.string(),
+    countryCode: z.string(),
+    searchTerm: z.string(),
+    /** Quelle: die Zeile des Begriffs mit dem höchsten Spend im Datei-Zeitraum. */
+    adProduct: z.string(),
+    amazonCampaignId: z.string(),
+    amazonAdGroupId: z.string(),
+    amazonTargetId: z.string(),
+    campaignId: z.uuid().nullable(),
+    campaignName: z.string().nullable(),
+    adGroupId: z.uuid().nullable(),
+    adGroupName: z.string().nullable(),
+    targetId: z.uuid().nullable(),
+    keywordText: z.string().nullable(),
+    matchType: z.string().nullable(),
+    expression: z.unknown().nullable(),
+    periodStart: z.iso.date(),
+    periodEnd: z.iso.date(),
+    /** Zeilen (Suchbegriff je Target), die in die Kennzahlen eingehen. */
+    sourceRows: z.number().int(),
+    /** Kennzahlen des Begriffs über alle seine Zeilen, Stand beim Vormerken; Beträge in `currencyCode`. */
+    currencyCode: z.string(),
+    ...searchTermSums,
+    ...searchTermDerived,
+    createdByName: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .meta({ id: 'HarvestMark' });
+export type HarvestMarkEntry = z.infer<typeof harvestMarkSchema>;
+
+export const harvestListResponseSchema = z
+  .object({
+    marks: z.array(harvestMarkSchema),
+    /** Mehr Einträge als die Liste zeigt (`maxMarks`). */
+    truncated: z.boolean(),
+    maxMarks: z.number().int(),
+  })
+  .meta({ id: 'HarvestListResponse' });
+export type HarvestListResponse = z.infer<typeof harvestListResponseSchema>;
+
+export const harvestRemoveRequestSchema = z
+  .strictObject({ ids: z.array(z.uuid()).min(1).max(1000) })
+  .meta({ id: 'HarvestRemoveRequest' });
+
+export const harvestRemoveResponseSchema = z
+  .object({ removed: z.number().int() })
+  .meta({ id: 'HarvestRemoveResponse' });

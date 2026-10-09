@@ -20,6 +20,7 @@ export * from './fx-rates';
 export * from './saved-views';
 export * from './members';
 export * from './search-terms';
+export * from './search-term-harvest';
 export * from './ad-changes';
 export * from './ad-change-processing';
 export * from './ad-change-actions';

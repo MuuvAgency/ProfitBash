@@ -34,6 +34,9 @@ export type AsinSearchInput = Schemas['AsinSearchRequest'];
 export type SearchTermPeriodData = Schemas['SearchTermPeriod'];
 export type SearchTermAnalysisData = Schemas['SearchTermAnalysisResponse'];
 export type SearchTermRowData = Schemas['SearchTermRow'];
+export type HarvestMarkData = Schemas['HarvestMark'];
+export type HarvestListData = Schemas['HarvestListResponse'];
+export type HarvestMarkResultData = Schemas['HarvestMarkResponse'];
 export type SearchTermNgramData = Schemas['SearchTermNgram'];
 export type SearchTermRulesData = Schemas['SearchTermRules'];
 export type SearchTermRuleOverridesData = Schemas['SearchTermRuleOverrides'];
@@ -263,6 +266,21 @@ export function createApi(options: ApiOptions = {}) {
       /** Löscht die Suchbegriffe genau eines Datei-Zeitraums (2b.2d), über alle Ad-Typen. */
       deletePeriod: (input: { profileId: string; periodStart: string; periodEnd: string }) =>
         unwrap(client.POST('/api/ads/search-terms/periods/delete', { body: input })),
+      /** Harvest-Merkliste je Profil (`phase-3.md` 3.8): keine Änderung bei Amazon. */
+      harvest: {
+        /** Höchstens `MAX_HARVEST_TERMS_PER_REQUEST` Begriffe je Anfrage; Quelle und Kennzahlen liest der Server. */
+        mark: (input: {
+          profileId: string;
+          periodStart: string;
+          periodEnd: string;
+          searchTerms: string[];
+        }): Promise<HarvestMarkResultData> =>
+          unwrap(client.POST('/api/ads/search-terms/harvest', { body: input })),
+        list: (profileId: string): Promise<HarvestListData> =>
+          unwrap(client.POST('/api/ads/search-terms/harvest/list', { body: { profileId } })),
+        remove: (ids: string[]) =>
+          unwrap(client.POST('/api/ads/search-terms/harvest/remove', { body: { ids } })),
+      },
     },
 
     /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */
@@ -287,8 +305,11 @@ export function createApi(options: ApiOptions = {}) {
     adChanges: {
       pending: (): Promise<PendingAdChangesData> => unwrap(client.GET('/api/ads/changes/pending')),
       /** Vormerken: je Eingabe ein Ergebnis in derselben Reihenfolge (viele IDs, deshalb im Body). */
-      stage: (changes: AdChangeInputData[]): Promise<StageAdChangesData> =>
-        unwrap(client.POST('/api/ads/changes/pending', { body: { origin: 'explorer', changes } })),
+      stage: (
+        changes: AdChangeInputData[],
+        origin: 'explorer' | 'search_terms' = 'explorer',
+      ): Promise<StageAdChangesData> =>
+        unwrap(client.POST('/api/ads/changes/pending', { body: { origin, changes } })),
       /** Genannte oder (ohne Angabe) alle eigenen vorgemerkten Änderungen verwerfen. */
       discard: (changeIds?: string[]) =>
         unwrap(
