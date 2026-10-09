@@ -87,6 +87,17 @@ export interface PlanInput {
   limitFor: AdChangeLimitLookup;
   /** Bewusst freigeschaltet je Baustein (F-S7). */
   unlocks: Readonly<Record<string, { vcpm?: boolean; offAmazon?: boolean }>>;
+  /**
+   * Gebote aus den eigenen Daten des Profils (F13, Währung des Profils, z. B. mittlerer CPC der letzten 60 Tage):
+   * ersetzen für Sponsored Products Preset und Baustein; ein Gebot aus der Eingabe geht vor.
+   */
+  profileBids?: ProfileBids;
+}
+
+export interface ProfileBids {
+  keyword?: Partial<Record<'broad' | 'phrase' | 'exact', string>>;
+  product?: string;
+  category?: string;
 }
 
 /** Formen des Plans aus `@profitbash/shared/campaign-setup` (ein Entwurf speichert sie so). */
@@ -94,6 +105,7 @@ export type { PlannedCampaign, PlannedNegative, PlannedTarget };
 
 export type PlanHint =
   | { severity: 'info'; code: 'noHero' }
+  | { severity: 'info'; code: 'bidFromProfile'; block: string }
   | { severity: 'info'; code: 'keywordIsBrand'; keyword: string }
   | { severity: 'warning'; code: 'ownAsinAsTarget'; asin: string }
   | { severity: 'warning'; code: 'vcpmBidPerThousand'; campaign: string }
@@ -280,10 +292,33 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
   );
   const multiProducts = productTargets.filter((target) => !singleProducts.includes(target));
 
+  /** Gebot aus dem Profil (nur SP; die Daten stammen aus SP-Targets), sonst `undefined`. */
+  const profileBid = (block: CatalogBlock): string | undefined => {
+    if (block.adProduct !== 'SP' || !input.profileBids) return undefined;
+    switch (block.targeting) {
+      case 'keyword':
+        return block.matchType ? input.profileBids.keyword?.[block.matchType] : undefined;
+      case 'product':
+        return input.profileBids.product;
+      case 'category':
+        return input.profileBids.category;
+      default:
+        return undefined;
+    }
+  };
+  /** Standardgebot eines Bausteins: Profil vor Preset vor Baustein. */
+  const defaultBid = (block: CatalogBlock, entry: PresetBlock) => {
+    const fromData = profileBid(block);
+    if (fromData !== undefined) {
+      hint({ severity: 'info', code: 'bidFromProfile', block: block.key });
+      return fromProfile(fromData);
+    }
+    return fromEur(entry.defaultBid ?? block.defaultBid);
+  };
+
   // --- Ziele je Baustein -----------------------------------------------------------------------------------------
   function slotsFor(block: CatalogBlock, entry: PresetBlock): Slot[] | null {
-    const bid = (own?: string) =>
-      own !== undefined ? fromProfile(own) : fromEur(entry.defaultBid ?? block.defaultBid);
+    const bid = (own?: string) => (own !== undefined ? fromProfile(own) : defaultBid(block, entry));
     const perTarget = block.structure === '1:1:1';
     const pack = (targets: PlannedTarget[], label: (target: PlannedTarget) => string): Slot[] =>
       perTarget
@@ -476,7 +511,7 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
           ...block.placements,
           ...(entry.topOfSearch !== undefined && { topOfSearch: entry.topOfSearch }),
         },
-        adGroup: { name, defaultBid: fromEur(entry.defaultBid ?? block.defaultBid) },
+        adGroup: { name, defaultBid: defaultBid(block, entry) },
         ads: ads(block),
         targets: slot.targets,
         negatives: [],
