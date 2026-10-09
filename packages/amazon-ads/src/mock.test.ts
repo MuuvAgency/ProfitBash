@@ -556,6 +556,27 @@ describe('Mock-Anbieter: Änderungen (3.2a)', () => {
     ]);
   });
 
+  it('lehnt Schreiben für Sponsored Brands und Sponsored Display mit klarem Grund ab (3.2c)', async () => {
+    for (const adProduct of ['SPONSORED_BRANDS', 'SPONSORED_DISPLAY']) {
+      const outcome = await setupWrites().applyChanges(connection, {
+        amazonProfileId: DE_PROFILE,
+        adProduct,
+        operations: [
+          { ref: 'c', type: 'update', entity: 'campaign', amazonId: '101', state: 'PAUSED' },
+        ],
+      });
+
+      expect(outcome.results, adProduct).toEqual([
+        {
+          ref: 'c',
+          status: 'failed',
+          code: 'MOCK_NOT_SUPPORTED',
+          message: expect.stringContaining('nur für Sponsored Products'),
+        },
+      ]);
+    }
+  });
+
   it('drosselt auf Wunsch die ersten Schreibaufrufe (429 mit Retry-After)', async () => {
     const outcome = await setupWrites({ throttledWrites: 1 }).applyChanges(connection, {
       amazonProfileId: DE_PROFILE,
