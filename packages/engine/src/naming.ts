@@ -34,7 +34,7 @@ const NAME_CHARACTERS = new RegExp(
 );
 
 export type NamingValues = Partial<Record<NamingPlaceholder, string | null | undefined>>;
-export type CampaignNameIssue = 'empty' | 'tooLong' | 'invalidCharacters';
+export type CampaignNameIssue = 'empty' | 'tooLong' | 'invalidCharacters' | 'onlyDigits';
 
 const clean = (value: string | null | undefined) =>
   (value ?? '').normalize('NFC').split(/\s+/u).filter(Boolean).join(' ');
@@ -57,7 +57,7 @@ export function renderCampaignName(pattern: string, values: NamingValues): strin
   return clean(result + pattern.slice(last));
 }
 
-/** Prüft einen Namen gegen die Grenzen von Amazon (Länge je Kontoart, erlaubte Zeichen). */
+/** Prüft einen Namen gegen die Grenzen von Amazon (Länge je Kontoart, erlaubte Zeichen) und die Bulk-Datei. */
 export function campaignNameIssues(
   name: string,
   maxLength: number = MAX_CAMPAIGN_NAME_LENGTH,
@@ -66,6 +66,8 @@ export function campaignNameIssues(
   const issues: CampaignNameIssue[] = [];
   if ([...name].length > maxLength) issues.push('tooLong');
   if (!NAME_CHARACTERS.test(name)) issues.push('invalidCharacters');
+  // Die Bulk-Datei nimmt den Namen als vorläufige ID: nur Ziffern wäre eine echte ID.
+  if (/^\d+$/.test(name.trim())) issues.push('onlyDigits');
   return issues;
 }
 

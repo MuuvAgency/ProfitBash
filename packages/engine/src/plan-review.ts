@@ -35,9 +35,16 @@ export type PlanReviewIssue =
   | {
       severity: 'error';
       code:
-        'currencyMismatch' | 'vcpmNotAvailable' | 'offAmazonNotAvailable' | 'noAds' | 'noTargets';
+        | 'currencyMismatch'
+        | 'vcpmNotAvailable'
+        | 'offAmazonNotAvailable'
+        | 'noAds'
+        | 'noTargets'
+        | 'autoWithTargets';
       campaign: string;
     }
+  | { severity: 'error'; code: 'adGroupNameInvalid'; campaign: string; issue: string }
+  | { severity: 'error'; code: 'duplicateTarget'; campaign: string; target: string }
   | { severity: 'error'; code: 'missingSku'; asin: string }
   | {
       severity: 'error';
@@ -61,6 +68,25 @@ const MAX_WORDS = {
 };
 const tooLong = (text: string, maxWords: number) =>
   text.split(/\s+/u).length > maxWords || [...text].length > NEGATIVE_KEYWORD_MAX_LENGTH;
+
+/** Ad-Group-Namen: höchstens 255 Zeichen (Limits-Seite), dieselben Zeichen wie Kampagnennamen. */
+const MAX_AD_GROUP_NAME_LENGTH = 255;
+
+function targetKey(target: PlannedCampaign['targets'][number]): { key: string; label: string } {
+  switch (target.type) {
+    case 'keyword':
+      return { key: `kw:${target.matchType}:${target.text.toLowerCase()}`, label: target.text };
+    case 'product':
+      return { key: `asin:${target.match}:${target.asin}`, label: target.asin };
+    case 'category':
+      return { key: `cat:${target.categoryId}`, label: target.name || target.categoryId };
+    case 'audience':
+      return {
+        key: `aud:${target.audience}:${target.lookbackDays}`,
+        label: `${target.audience} ${target.lookbackDays}`,
+      };
+  }
+}
 
 export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
   const issues: PlanReviewIssue[] = [];
@@ -122,6 +148,13 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     if (campaign.targeting !== 'auto' && campaign.targets.length === 0) {
       add({ severity: 'error', code: 'noTargets', campaign: name });
     }
+    // Auto-Kampagnen zielen selbst; Keywords und Produkt-Targets darunter lehnt Amazon ab.
+    if (campaign.targeting === 'auto' && campaign.targets.length > 0) {
+      add({ severity: 'error', code: 'autoWithTargets', campaign: name });
+    }
+    for (const issue of campaignNameIssues(campaign.adGroup.name, MAX_AD_GROUP_NAME_LENGTH)) {
+      add({ severity: 'error', code: 'adGroupNameInvalid', campaign: name, issue });
+    }
 
     const check = (field: 'bid' | 'default_bid' | 'budget', value: string) => {
       const limit = input.limitFor({
@@ -161,6 +194,25 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
       if (negative.type === 'keyword' && tooLong(negative.text, MAX_WORDS[negative.matchType])) {
         add({ severity: 'error', code: 'keywordTooLong', keyword: negative.text });
       }
+    }
+    // Dasselbe Ziel bzw. Negative zweimal in einer Ad Group (ohne Groß/Klein): Amazon nimmt es nur einmal an.
+    const keys = new Set<string>();
+    const entries = [
+      ...campaign.targets.map(targetKey),
+      ...campaign.negatives.map((negative) =>
+        negative.type === 'keyword'
+          ? {
+              key: `-kw:${negative.matchType}:${negative.text.toLowerCase()}`,
+              label: negative.text,
+            }
+          : { key: `-asin:${negative.asin}`, label: negative.asin },
+      ),
+    ];
+    for (const { key, label } of entries) {
+      if (keys.has(key)) {
+        add({ severity: 'error', code: 'duplicateTarget', campaign: name, target: label });
+      }
+      keys.add(key);
     }
   }
   return issues;
