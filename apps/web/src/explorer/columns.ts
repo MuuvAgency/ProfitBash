@@ -14,6 +14,7 @@ import type { ExplorerRowsData } from '../api/client';
 import { changeTone, formatChange, type MetricKey } from '../analytics/metrics';
 import { amazonLabel, targetLabel } from './amazon-labels';
 import DecimalFilter from './DecimalFilter.vue';
+import { EDITABLE_COLUMN_FIELDS, entityTypeOf } from './editing';
 
 /**
  * Spalten des Explorers je Ebene (`phase-2.md` F6, F7, 2.8). Beträge bleiben Decimal-Strings: `valueGetter` liefert den
@@ -38,6 +39,11 @@ export interface ColumnContext {
   displayCurrency: string;
   /** Summenzeile umgerechnet („≈“). */
   converted: boolean;
+  /**
+   * Status, Budget und Gebote mit der Zelle zum Bearbeiten (3.5): zeigt offene Änderungen und, mit dem Recht
+   * `write`, die Eingabe. Sortierung, Filter und CSV bleiben beim Stand von Amazon.
+   */
+  editable?: boolean;
 }
 
 type MetricKind = 'money' | 'count' | 'ratio' | 'factor';
@@ -394,5 +400,19 @@ export function buildColumnDefs(
 
   const sortOf = (colId: string | undefined) =>
     input.sort && input.sort.column === colId ? input.sort.direction : null;
-  return [nameColumn, ...optional].map((def) => ({ ...def, sort: sortOf(def.colId) }));
+  const editCell = (def: ColDef<GridRow>): ColDef<GridRow> =>
+    input.editable &&
+    def.colId !== undefined &&
+    def.colId in EDITABLE_COLUMN_FIELDS &&
+    entityTypeOf(level) !== null
+      ? {
+          ...def,
+          cellRenderer: 'editCell',
+          minWidth: 132,
+          // Pfeiltasten, Enter und Escape gehören der Eingabe in der Zelle, nicht der Navigation des Grids.
+          suppressKeyboardEvent: ({ event }) =>
+            event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement,
+        }
+      : def;
+  return [nameColumn, ...optional].map((def) => ({ ...editCell(def), sort: sortOf(def.colId) }));
 }

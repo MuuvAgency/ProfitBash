@@ -27,14 +27,15 @@ const groups = computed(() => (session.me ? visibleNavigation(session.me) : []))
 /** Warenkorb am Eintrag „Änderungen“ (3.5); ohne Zahl bei leerem Warenkorb oder wenn sie nicht bekannt ist. */
 const pendingCount = usePendingCount();
 const badges = computed(() => {
+  const result: Record<string, { text: string; label: string }> = {};
   const count = pendingCount.value;
-  if (!count) return {};
-  return {
-    changes: {
+  if (count) {
+    result.changes = {
       text: formatNumber(String(count), session.preferences.locale),
       label: t('changes.pendingCount', { count }, count),
-    },
-  };
+    };
+  }
+  return result;
 });
 const toggleLabel = computed(() =>
   props.collapsed ? t('shell.expandSidebar') : t('shell.collapseSidebar'),

@@ -17,6 +17,7 @@ import { gridCsv } from '../grid/csv';
 import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
 import { activateCellControlOnEnter } from '../grid/keyboard';
 import type { GridRow } from './columns';
+import EditCell, { type EditCellContext } from './EditCell.vue';
 import NameCell, { type NameCellContext } from './NameCell.vue';
 
 /**
@@ -27,7 +28,7 @@ const props = defineProps<{
   rows: GridRow[];
   total: GridRow | null;
   columnDefs: ColDef<GridRow>[];
-  context: NameCellContext;
+  context: NameCellContext & EditCellContext;
 }>();
 
 const emit = defineEmits<{
@@ -93,9 +94,14 @@ function csv(note?: string): string {
   return api.value ? gridCsv(api.value, note) : '';
 }
 
-defineExpose({ csv });
+/** Hebt alle Markierungen auf (nach einem Bulk-Dialog). */
+function clearSelection() {
+  api.value?.deselectAll();
+}
 
-const components = { nameCell: markRaw(NameCell) };
+defineExpose({ csv, clearSelection });
+
+const components = { nameCell: markRaw(NameCell), editCell: markRaw(EditCell) };
 </script>
 
 <template>
