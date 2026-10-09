@@ -62,14 +62,12 @@ beforeAll(async () => {
     .returning({ id: users.id });
   other.otto = otto!.id;
   stranger = niemand!.id;
-  await db
-    .insert(members)
-    .values({
-      organizationId: other.org,
-      userId: other.otto,
-      role: 'admin',
-      createdAt: new Date(),
-    });
+  await db.insert(members).values({
+    organizationId: other.org,
+    userId: other.otto,
+    role: 'admin',
+    createdAt: new Date(),
+  });
   const [theirs] = await db
     .insert(clients)
     .values({ organizationId: other.org, name: 'Fremd', slug: 'fremd' })
@@ -113,6 +111,51 @@ describe('Struktur-Katalog lesen und speichern', () => {
     const events = await testDb.db.select().from(auditEvents);
     expect(events.map((event) => event.action)).toEqual(['structure_catalog.update']);
     expect(events[0]!.target).toMatchObject({ version: 1, before: { version: 0 } });
+  });
+
+  it('löst beim Speichern Zuordnungen zu gelöschten Presets (Client und Produktgruppe) und zählt sie im Audit', async () => {
+    await setClientPreset(testDb.db, { ...as(f.ada), clientId: client, presetKey: 'control' });
+    await createProductGroup(testDb.db, {
+      ...as(f.ada),
+      profileId: f.profile,
+      name: 'Flaschen',
+      items: [{ asin: 'B0TEST0001', sku: 'SKU-1', isHero: true }],
+      presetKey: 'launch',
+    });
+    expect((await getStructureCatalog(testDb.db, as(f.ada)))!.productGroupPresets).toEqual([
+      { presetKey: 'launch', productGroups: 1 },
+    ]);
+    await testDb.db.delete(auditEvents);
+    const withoutLaunch = structuredClone(DEFAULT_STRUCTURE_CATALOG);
+    withoutLaunch.presets = withoutLaunch.presets.filter((preset) => preset.key !== 'launch');
+    // Erst nur „launch“ (Produktgruppe), dann auch „control“ (Client).
+
+    await saveStructureCatalog(testDb.db, { ...as(f.ada), catalog: withoutLaunch, version: 0 });
+
+    const view = (await getStructureCatalog(testDb.db, as(f.ada)))!;
+    expect(view.clientPresets).toEqual([{ clientId: client, presetKey: 'control' }]);
+    expect(view.productGroupPresets).toEqual([]);
+    expect(await testDb.db.select({ key: productGroups.presetKey }).from(productGroups)).toEqual([
+      { key: null },
+    ]);
+    const [event] = await testDb.db.select().from(auditEvents);
+    expect(event!.target).toMatchObject({
+      clearedAssignments: { clients: 0, productGroups: 1, presets: ['launch'] },
+    });
+
+    withoutLaunch.presets = withoutLaunch.presets.filter((preset) => preset.key !== 'control');
+    await saveStructureCatalog(testDb.db, { ...as(f.ada), catalog: withoutLaunch, version: 1 });
+    expect((await getStructureCatalog(testDb.db, as(f.ada)))!.clientPresets).toEqual([]);
+  });
+
+  it('meldet ein gleichzeitiges erstes Speichern als Konflikt', async () => {
+    const results = await Promise.allSettled([
+      saveStructureCatalog(testDb.db, { ...as(f.ada), catalog: changed(), version: 0 }),
+      saveStructureCatalog(testDb.db, { ...as(f.ada), catalog: changed(), version: 0 }),
+    ]);
+    const failed = results.filter((result) => result.status === 'rejected');
+    expect(failed).toHaveLength(1);
+    expect((failed[0] as PromiseRejectedResult).reason).toMatchObject({ code: 'VERSION_CONFLICT' });
   });
 
   it('lässt nur Admins speichern', async () => {

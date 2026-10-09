@@ -8,8 +8,13 @@ import {
 const clone = (): StructureCatalog => structuredClone(DEFAULT_STRUCTURE_CATALOG);
 const issues = (catalog: unknown) => {
   const result = structureCatalogSchema.safeParse(catalog);
-  return result.success ? [] : result.error.issues.map((issue) => issue.message);
+  return result.success ? [] : result.error.issues;
 };
+/** Befunde der eigenen Prüfung als `{ issue, ...Parameter }`. */
+const found = (catalog: unknown) =>
+  issues(catalog).flatMap((issue) =>
+    issue.code === 'custom' ? [issue.params as { issue: string } & Record<string, unknown>] : [],
+  );
 
 describe('Startwerte des Struktur-Katalogs', () => {
   it('sind gültig', () => {
@@ -55,52 +60,84 @@ describe('Startwerte des Struktur-Katalogs', () => {
 });
 
 describe('Prüfung eines geänderten Katalogs', () => {
-  it('verlangt eindeutige Schlüssel von Bausteinen und Presets', () => {
+  it('verlangt eindeutige Schlüssel von Bausteinen und Presets und eindeutige Kürzel je Anzeigentyp', () => {
     const catalog = clone();
     catalog.blocks.push({ ...catalog.blocks[0]! });
-    expect(issues(catalog)).toContain(`Baustein ${catalog.blocks[0]!.key} gibt es zweimal`);
+    expect(found(catalog)).toContainEqual({ issue: 'duplicateBlock', key: 'SP-AUTO' });
     const presets = clone();
     presets.presets.push({ ...presets.presets[1]!, isDefault: false });
-    expect(issues(presets)).toContain(`Preset ${presets.presets[1]!.key} gibt es zweimal`);
+    expect(found(presets)).toContainEqual({ issue: 'duplicatePreset', key: 'control' });
+    const codes = clone();
+    codes.blocks.find((block) => block.key === 'SP-KW-PHRASE')!.code = 'EXACT';
+    expect(found(codes)).toContainEqual({ issue: 'duplicateCode', code: 'EXACT', adProduct: 'SP' });
+    // Dasselbe Kürzel in verschiedenen Anzeigentypen ist erlaubt (der Name trägt den Typ).
+    expect(issues(DEFAULT_STRUCTURE_CATALOG)).toEqual([]);
   });
 
   it('verlangt Kanten zwischen bekannten Bausteinen, ohne Schleife und ohne Kante aus der Marken-Verteidigung', () => {
     const unknown = clone();
     unknown.edges.push({ from: 'SP-AUTO', to: 'SP-GIBT-ES-NICHT' });
-    expect(issues(unknown)).toContain('Kante SP-AUTO → SP-GIBT-ES-NICHT: unbekannter Baustein');
+    expect(found(unknown)).toContainEqual({
+      issue: 'edgeUnknownBlock',
+      from: 'SP-AUTO',
+      to: 'SP-GIBT-ES-NICHT',
+    });
 
-    const loop = clone();
-    loop.edges.push({ from: 'SP-AUTO', to: 'SP-AUTO' });
-    expect(issues(loop)).toContain('Kante SP-AUTO → SP-AUTO: Baustein zeigt auf sich selbst');
+    const self = clone();
+    self.edges.push({ from: 'SP-AUTO', to: 'SP-AUTO' });
+    expect(found(self)).toContainEqual({ issue: 'edgeCycle', key: 'SP-AUTO' });
+
+    const cycle = clone();
+    cycle.edges.push({ from: 'SP-KW-EXACT', to: 'SP-AUTO' });
+    expect(found(cycle).some((issue) => issue.issue === 'edgeCycle')).toBe(true);
 
     const brand = clone();
     brand.edges.push({ from: 'SP-BRAND-DEF', to: 'SP-KW-EXACT' });
-    expect(issues(brand)).toContain(
-      'Kante SP-BRAND-DEF → SP-KW-EXACT: Marken-Bausteine graduieren nie',
-    );
+    expect(found(brand)).toContainEqual({
+      issue: 'edgeFromBrand',
+      from: 'SP-BRAND-DEF',
+      to: 'SP-KW-EXACT',
+    });
 
     const twice = clone();
     twice.edges.push({ ...twice.edges[0]! });
-    expect(issues(twice).some((message) => message.endsWith('gibt es zweimal'))).toBe(true);
+    expect(found(twice).some((issue) => issue.issue === 'duplicateEdge')).toBe(true);
   });
 
-  it('verlangt Presets aus bekannten Bausteinen und genau einen Standard', () => {
+  it('verlangt Presets aus bekannten Bausteinen, passende Abweichungen und genau einen Standard', () => {
     const unknown = clone();
     unknown.presets[0]!.blocks.push({ block: 'SP-GIBT-ES-NICHT' });
-    expect(issues(unknown)).toContain(
-      `Preset ${unknown.presets[0]!.key}: unbekannter Baustein SP-GIBT-ES-NICHT`,
-    );
+    expect(found(unknown)).toContainEqual({
+      issue: 'presetUnknownBlock',
+      preset: 'muuv-standard',
+      block: 'SP-GIBT-ES-NICHT',
+    });
 
     const none = clone();
     for (const preset of none.presets) preset.isDefault = false;
-    expect(issues(none)).toContain('Genau ein Preset ist der Standard');
+    expect(found(none)).toContainEqual({ issue: 'oneDefault' });
 
     const empty = clone();
     empty.presets[0]!.blocks = [];
     expect(issues(empty).length).toBeGreaterThan(0);
+
+    const top = clone();
+    top.presets[0]!.blocks.push({ block: 'SD-CAT', topOfSearch: 20 });
+    expect(found(top)).toContainEqual({
+      issue: 'presetTopWithoutPlacements',
+      preset: 'muuv-standard',
+      block: 'SD-CAT',
+    });
+    const lookback = clone();
+    lookback.presets[0]!.blocks[0]!.lookbackDays = 30;
+    expect(found(lookback)).toContainEqual({
+      issue: 'presetLookbackWithoutAudience',
+      preset: 'muuv-standard',
+      block: 'SP-AUTO',
+    });
   });
 
-  it('prüft Werte der Bausteine (Geld als Decimal-String, Platzierungen 0–900 %, Match-Typ nur bei Keywords)', () => {
+  it('prüft Werte der Bausteine (Geld als Decimal-String, Platzierungen 0–900 %, Felder je Art)', () => {
     const money = clone();
     money.blocks[0]!.defaultBid = '0,50';
     expect(issues(money).length).toBeGreaterThan(0);
@@ -110,17 +147,31 @@ describe('Prüfung eines geänderten Katalogs', () => {
     expect(issues(placement).length).toBeGreaterThan(0);
 
     const match = clone();
-    const auto = match.blocks.find((block) => block.targeting === 'auto')!;
-    auto.matchType = 'exact';
-    expect(issues(match)).toContain(`Baustein ${auto.key}: Match-Typ nur bei Keywords`);
+    match.blocks[0]!.matchType = 'exact';
+    expect(found(match)).toContainEqual({ issue: 'matchTypeOnlyKeyword', key: 'SP-AUTO' });
+
+    const lookback = clone();
+    lookback.blocks[0]!.lookbackDays = 30;
+    expect(found(lookback)).toContainEqual({ issue: 'lookbackOnlyAudience', key: 'SP-AUTO' });
+    const missing = clone();
+    missing.blocks.find((block) => block.key === 'SD-RT-VIEWS')!.lookbackDays = null;
+    expect(found(missing)).toContainEqual({ issue: 'audienceNeedsLookback', key: 'SD-RT-VIEWS' });
   });
 
   it('kennt im Namensschema nur bekannte Platzhalter', () => {
     const catalog = clone();
     catalog.naming.pattern = '{adType} | {unbekannt}';
-    expect(issues(catalog)).toContain('Unbekannter Platzhalter {unbekannt}');
+    expect(found(catalog)).toContainEqual({ issue: 'namingUnknownPlaceholder', name: 'unbekannt' });
     catalog.naming.pattern = 'nur Text';
-    expect(issues(catalog)).toContain('Das Namensschema braucht mindestens einen Platzhalter');
+    expect(found(catalog)).toContainEqual({ issue: 'namingNoPlaceholder' });
+  });
+
+  it('nennt bei Fehlern in Feldern den Pfad (für die Meldung in der Oberfläche)', () => {
+    const money = clone();
+    money.blocks[2]!.defaultBid = 'abc';
+    const result = structureCatalogSchema.safeParse(money);
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0]!.path).toEqual(['blocks', 2, 'defaultBid']);
   });
 });
 

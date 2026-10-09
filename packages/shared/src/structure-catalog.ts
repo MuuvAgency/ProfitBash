@@ -123,22 +123,44 @@ export function namingPlaceholders(pattern: string): string[] {
   return [...pattern.matchAll(PLACEHOLDER)].map((match) => match[1]!);
 }
 
+/**
+ * Eigene Befunde der Prüfung als `custom`-Issue: `message` ist der Code, `params` enthält `issue` (derselbe Code) und
+ * die Schlüssel, damit die Oberfläche die Meldung übersetzt und die Stelle nennt (`catalog.issue.<code>`).
+ */
+type IssueContext = { addIssue(issue: { code: 'custom'; message: string; params: object }): void };
+function report(ctx: IssueContext, issue: string, params: Record<string, string | number> = {}) {
+  ctx.addIssue({ code: 'custom', message: issue, params: { issue, ...params } });
+}
+
 export const namingSchema = z
   .strictObject({ pattern: z.string().trim().min(1).max(MAX_NAMING_PATTERN_LENGTH) })
   .superRefine((naming, ctx) => {
     const found = namingPlaceholders(naming.pattern);
-    if (found.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Das Namensschema braucht mindestens einen Platzhalter',
-      });
-    }
+    if (found.length === 0) report(ctx, 'namingNoPlaceholder');
     for (const name of found) {
       if (!(NAMING_PLACEHOLDERS as readonly string[]).includes(name)) {
-        ctx.addIssue({ code: 'custom', message: `Unbekannter Platzhalter {${name}}` });
+        report(ctx, 'namingUnknownPlaceholder', { name });
       }
     }
   });
+
+/** Bausteine in einem Kreis von Graduation-Kanten (je Kreis der erste gefundene Baustein). */
+function cycleStarts(edges: readonly CatalogEdge[]): string[] {
+  const next = new Map<string, string[]>();
+  for (const edge of edges) next.set(edge.from, [...(next.get(edge.from) ?? []), edge.to]);
+  const state = new Map<string, 'open' | 'done'>();
+  const starts: string[] = [];
+  const visit = (key: string): void => {
+    state.set(key, 'open');
+    for (const to of next.get(key) ?? []) {
+      if (state.get(to) === 'open') starts.push(to);
+      else if (!state.has(to)) visit(to);
+    }
+    state.set(key, 'done');
+  };
+  for (const key of next.keys()) if (!state.has(key)) visit(key);
+  return [...new Set(starts)];
+}
 
 export const structureCatalogSchema = z
   .strictObject({
@@ -148,68 +170,75 @@ export const structureCatalogSchema = z
     naming: namingSchema,
   })
   .superRefine((catalog, ctx) => {
-    const add = (message: string) => ctx.addIssue({ code: 'custom', message });
+    const add = (issue: string, params: Record<string, string | number> = {}) =>
+      report(ctx, issue, params);
     const blocks = new Map<string, CatalogBlock>();
+    const codes = new Set<string>();
     for (const block of catalog.blocks) {
-      if (blocks.has(block.key)) add(`Baustein ${block.key} gibt es zweimal`);
-      blocks.set(block.key, block);
-      if (block.matchType !== null && block.targeting !== 'keyword') {
-        add(`Baustein ${block.key}: Match-Typ nur bei Keywords`);
-      }
-      if (block.targeting === 'keyword' && block.matchType === null) {
-        add(`Baustein ${block.key}: Keywords brauchen einen Match-Typ`);
-      }
+      const key = block.key;
+      if (blocks.has(key)) add('duplicateBlock', { key });
+      blocks.set(key, block);
+      const code = `${block.adProduct}:${block.code}`;
+      // Gleiches Kürzel im selben Anzeigentyp ergäbe gleiche Namen (der Name trägt den Typ, nicht den Schlüssel).
+      if (codes.has(code)) add('duplicateCode', { code: block.code, adProduct: block.adProduct });
+      codes.add(code);
+      if (block.matchType !== null && block.targeting !== 'keyword')
+        add('matchTypeOnlyKeyword', { key });
+      if (block.targeting === 'keyword' && block.matchType === null)
+        add('keywordNeedsMatch', { key });
       if (block.productMatch !== null && block.targeting !== 'product') {
-        add(`Baustein ${block.key}: Produkt-Match nur bei Produkt-Targets`);
+        add('productMatchOnlyProduct', { key });
       }
-      if (block.biddingStrategy !== null && block.adProduct !== 'SP') {
-        add(`Baustein ${block.key}: Gebotsstrategie nur bei Sponsored Products`);
+      if (block.biddingStrategy !== null && block.adProduct !== 'SP')
+        add('strategyOnlySp', { key });
+      if (block.placements !== null && block.adProduct !== 'SP') add('placementsOnlySp', { key });
+      if (block.adProduct === 'SD' && block.sdOptimization === null)
+        add('sdNeedsOptimization', { key });
+      if (block.sdOptimization !== null && block.adProduct !== 'SD')
+        add('optimizationOnlySd', { key });
+      if (block.targeting === 'audience' && block.adProduct !== 'SD')
+        add('audienceOnlySd', { key });
+      if (block.targeting === 'auto' && block.adProduct !== 'SP') add('autoOnlySp', { key });
+      if (block.lookbackDays !== null && block.targeting !== 'audience') {
+        add('lookbackOnlyAudience', { key });
       }
-      if (block.placements !== null && block.adProduct !== 'SP') {
-        add(`Baustein ${block.key}: Platzierungen nur bei Sponsored Products`);
-      }
-      if (block.adProduct === 'SD' && block.sdOptimization === null) {
-        add(`Baustein ${block.key}: Sponsored Display braucht eine Gebotsoptimierung`);
-      }
-      if (block.sdOptimization !== null && block.adProduct !== 'SD') {
-        add(`Baustein ${block.key}: Gebotsoptimierung nur bei Sponsored Display`);
-      }
-      if (block.targeting === 'audience' && block.adProduct !== 'SD') {
-        add(`Baustein ${block.key}: Zielgruppen nur bei Sponsored Display`);
-      }
-      if (block.targeting === 'auto' && block.adProduct !== 'SP') {
-        add(`Baustein ${block.key}: Automatisch nur bei Sponsored Products`);
+      if (block.targeting === 'audience' && block.lookbackDays === null) {
+        add('audienceNeedsLookback', { key });
       }
     }
 
     const edges = new Set<string>();
-    for (const edge of catalog.edges) {
-      const label = `Kante ${edge.from} → ${edge.to}`;
-      const id = `${edge.from}>${edge.to}`;
-      if (edges.has(id)) add(`${label} gibt es zweimal`);
+    for (const { from, to } of catalog.edges) {
+      const id = `${from}>${to}`;
+      if (edges.has(id)) add('duplicateEdge', { from, to });
       edges.add(id);
-      if (!blocks.has(edge.from) || !blocks.has(edge.to)) add(`${label}: unbekannter Baustein`);
-      else if (edge.from === edge.to) add(`${label}: Baustein zeigt auf sich selbst`);
-      else if (blocks.get(edge.from)!.source === 'brand') {
-        add(`${label}: Marken-Bausteine graduieren nie`);
-      }
+      if (!blocks.has(from) || !blocks.has(to)) add('edgeUnknownBlock', { from, to });
+      else if (from !== to && blocks.get(from)!.source === 'brand')
+        add('edgeFromBrand', { from, to });
     }
+    // Graduation läuft nur vorwärts: kein Kreis (auch keine Kante auf sich selbst).
+    for (const key of cycleStarts(catalog.edges)) add('edgeCycle', { key });
 
     const presets = new Set<string>();
     for (const preset of catalog.presets) {
-      if (presets.has(preset.key)) add(`Preset ${preset.key} gibt es zweimal`);
+      if (presets.has(preset.key)) add('duplicatePreset', { key: preset.key });
       presets.add(preset.key);
       const used = new Set<string>();
       for (const entry of preset.blocks) {
-        if (!blocks.has(entry.block))
-          add(`Preset ${preset.key}: unbekannter Baustein ${entry.block}`);
-        if (used.has(entry.block)) add(`Preset ${preset.key}: Baustein ${entry.block} zweimal`);
+        const params = { preset: preset.key, block: entry.block };
+        const block = blocks.get(entry.block);
+        if (!block) add('presetUnknownBlock', params);
+        if (used.has(entry.block)) add('presetDuplicateBlock', params);
         used.add(entry.block);
+        if (block && entry.topOfSearch !== undefined && block.placements === null) {
+          add('presetTopWithoutPlacements', params);
+        }
+        if (block && entry.lookbackDays !== undefined && block.targeting !== 'audience') {
+          add('presetLookbackWithoutAudience', params);
+        }
       }
     }
-    if (catalog.presets.filter((preset) => preset.isDefault).length !== 1) {
-      add('Genau ein Preset ist der Standard');
-    }
+    if (catalog.presets.filter((preset) => preset.isDefault).length !== 1) add('oneDefault');
   })
   .meta({ id: 'StructureCatalog' });
 export type StructureCatalog = z.output<typeof structureCatalogSchema>;
@@ -639,6 +668,10 @@ export const structureCatalogResponseSchema = z
     updatedAt: z.string().nullable(),
     /** Preset je Client (ohne Eintrag gilt der Standard). */
     clientPresets: z.array(z.object({ clientId: z.uuid(), presetKey: z.string() })),
+    /** Produktgruppen mit eigenem Preset, gezählt je Preset. */
+    productGroupPresets: z.array(
+      z.object({ presetKey: z.string(), productGroups: z.number().int() }),
+    ),
     /** Clients der Organisation, für die Zuordnung. */
     clients: z.array(z.object({ id: z.uuid(), name: z.string() })),
   })

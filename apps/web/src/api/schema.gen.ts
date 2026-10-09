@@ -6302,6 +6302,10 @@ export interface components {
                 clientId: string;
                 presetKey: string;
             }[];
+            productGroupPresets: {
+                presetKey: string;
+                productGroups: number;
+            }[];
             clients: {
                 /** Format: uuid */
                 id: string;

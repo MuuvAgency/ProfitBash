@@ -6,7 +6,7 @@ import {
   type StructureCatalog,
 } from '@profitbash/shared';
 import Button from 'primevue/button';
-import { computed, provide, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ApiError } from '../api';
 import InlineError from '../components/common/InlineError.vue';
@@ -20,6 +20,7 @@ import CatalogEdges from '../tools/catalog/CatalogEdges.vue';
 import CatalogNaming from '../tools/catalog/CatalogNaming.vue';
 import CatalogPresets from '../tools/catalog/CatalogPresets.vue';
 import { CATALOG_DRAFT } from '../tools/catalog/draft';
+import { describeCatalogIssues } from '../tools/catalog/issues';
 import { useSaveStructureCatalog, useStructureCatalog, useToolRights } from '../tools/queries';
 import ToolsTabs from '../tools/ToolsTabs.vue';
 
@@ -38,6 +39,8 @@ const clone = (catalog: StructureCatalog): StructureCatalog =>
   JSON.parse(JSON.stringify(catalog)) as StructureCatalog;
 const draft = ref<StructureCatalog>(clone(DEFAULT_STRUCTURE_CATALOG));
 const loaded = ref(false);
+/** Version, auf der der Entwurf beruht; mit ihr wird gespeichert (409, wenn inzwischen jemand anderes gespeichert hat). */
+const baseVersion = ref(0);
 /**
  * Vergleich unabhängig von der Reihenfolge der Schlüssel: Vue Query übernimmt beim Aktualisieren unveränderte
  * Teilobjekte aus den alten Daten (samt deren Reihenfolge), der Entwurf hat die des Servers.
@@ -58,20 +61,53 @@ watch(
     if (!next) return;
     if (!loaded.value || (previous && serialize(draft.value) === serialize(previous.catalog))) {
       draft.value = clone(next.catalog);
+      baseVersion.value = next.version;
       loaded.value = true;
     }
   },
   { immediate: true },
 );
-provide(CATALOG_DRAFT, { draft, canEdit: canEditCatalog });
+/** Ein geänderter Entwurf, der auf einer älteren Version beruht als der Stand auf dem Server. */
+const stale = computed(
+  () => data.value !== undefined && dirty.value && data.value.version !== baseVersion.value,
+);
+const usage = computed(() => {
+  const counts = new Map<string, { clients: number; productGroups: number }>();
+  const entry = (key: string) => counts.get(key) ?? { clients: 0, productGroups: 0 };
+  for (const { presetKey } of data.value?.clientPresets ?? []) {
+    counts.set(presetKey, { ...entry(presetKey), clients: entry(presetKey).clients + 1 });
+  }
+  for (const { presetKey, productGroups } of data.value?.productGroupPresets ?? []) {
+    counts.set(presetKey, { ...entry(presetKey), productGroups });
+  }
+  return counts;
+});
+provide(CATALOG_DRAFT, { draft, canEdit: canEditCatalog, usage });
+
+// Ungespeicherte Änderungen nicht still verlieren (Tab schließen, neu laden).
+const onBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (dirty.value) event.preventDefault();
+};
+onMounted(() => window.addEventListener('beforeunload', onBeforeUnload));
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload));
 
 const validation = computed(() => structureCatalogSchema.safeParse(draft.value));
 const issues = computed(() =>
-  validation.value.success ? [] : [...new Set(validation.value.error.issues.map((i) => i.message))],
+  validation.value.success
+    ? []
+    : describeCatalogIssues(validation.value.error.issues, draft.value, (key, params) =>
+        t(key, params ?? {}),
+      ),
 );
 
 const TABS = ['presets', 'blocks', 'edges', 'naming', 'assignments'] as const;
 const tab = ref<(typeof TABS)[number]>('presets');
+const tabId = (name: string) => `catalog-tab-${name}`;
+function moveTab(step: number) {
+  const next = TABS[(TABS.indexOf(tab.value) + step + TABS.length) % TABS.length]!;
+  tab.value = next;
+  document.getElementById(tabId(next))?.focus();
+}
 
 const save = useSaveStructureCatalog();
 const saveErrorKey = ref<string | null>(null);
@@ -86,9 +122,10 @@ async function submit() {
   try {
     const result = await save.mutateAsync({
       catalog: validation.value.data,
-      version: data.value.version,
+      version: baseVersion.value,
     });
     draft.value = clone(result.catalog);
+    baseVersion.value = result.version;
     savedNotice.value = true;
   } catch (error) {
     const code = error instanceof ApiError ? error.code : 'UNKNOWN';
@@ -97,7 +134,10 @@ async function submit() {
   }
 }
 function discard() {
-  if (data.value) draft.value = clone(data.value.catalog);
+  if (data.value) {
+    draft.value = clone(data.value.catalog);
+    baseVersion.value = data.value.version;
+  }
   saveErrorKey.value = null;
 }
 function loadDefaults() {
@@ -155,6 +195,14 @@ function loadDefaults() {
       </p>
 
       <InlineError v-if="saveErrorKey" :message="t(saveErrorKey)" />
+      <p
+        v-if="stale"
+        role="status"
+        class="rounded-tile bg-well p-space-md text-body-md text-warn"
+        data-catalog-stale
+      >
+        {{ t('catalog.staleDraft', { version: data.version, base: baseVersion }) }}
+      </p>
       <section
         v-if="issues.length > 0"
         data-catalog-issues
@@ -177,8 +225,11 @@ function loadDefaults() {
           :key="name"
           type="button"
           role="tab"
+          :id="tabId(name)"
           :data-catalog-tab="name"
+          aria-controls="catalog-tabpanel"
           :aria-selected="tab === name"
+          :tabindex="tab === name ? 0 : -1"
           :class="[
             'whitespace-nowrap rounded-control px-space-md py-space-sm text-body-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-violet',
             tab === name
@@ -186,12 +237,14 @@ function loadDefaults() {
               : 'text-ink-secondary hover:bg-violet-wash hover:text-ink',
           ]"
           @click="tab = name"
+          @keydown.right.prevent="moveTab(1)"
+          @keydown.left.prevent="moveTab(-1)"
         >
           {{ t(`catalog.tabs.${name}`) }}
         </button>
       </div>
 
-      <div role="tabpanel">
+      <div id="catalog-tabpanel" role="tabpanel" :aria-labelledby="tabId(tab)">
         <CatalogPresets v-if="tab === 'presets'" />
         <CatalogBlocks v-else-if="tab === 'blocks'" />
         <CatalogEdges v-else-if="tab === 'edges'" />

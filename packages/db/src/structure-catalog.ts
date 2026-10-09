@@ -3,11 +3,11 @@ import {
   structureCatalogSchema,
   type StructureCatalog,
 } from '@profitbash/shared';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq, isNotNull, notInArray } from 'drizzle-orm';
 import { getOrgRole } from './access';
 import { recordAuditEvent } from './audit';
 import type { Db } from './client';
-import { clientPresets, clients, structureCatalogs } from './schema';
+import { clientPresets, clients, productGroups, structureCatalogs } from './schema';
 
 /**
  * Struktur-Katalog (`docs/tasks/phase-4.md` 4.2, F11): ein Dokument je Organisation, lesbar für alle Mitglieder,
@@ -64,6 +64,8 @@ export async function loadStructureCatalog(
 
 export interface StructureCatalogView extends StoredStructureCatalog {
   clientPresets: { clientId: string; presetKey: string }[];
+  /** Produktgruppen mit eigenem Preset je Preset (alle Profile der Organisation, nur Zahlen). */
+  productGroupPresets: { presetKey: string; productGroups: number }[];
   clients: { id: string; name: string }[];
 }
 
@@ -84,7 +86,21 @@ export async function getStructureCatalog(
     .from(clients)
     .where(eq(clients.organizationId, input.orgId))
     .orderBy(asc(clients.name), asc(clients.id));
-  return { ...stored, clientPresets: presets, clients: orgClients };
+  const groupPresets = await db
+    .select({ presetKey: productGroups.presetKey, productGroups: count() })
+    .from(productGroups)
+    .where(and(eq(productGroups.organizationId, input.orgId), isNotNull(productGroups.presetKey)))
+    .groupBy(productGroups.presetKey)
+    .orderBy(asc(productGroups.presetKey));
+  return {
+    ...stored,
+    clientPresets: presets,
+    productGroupPresets: groupPresets.map((row) => ({
+      presetKey: row.presetKey!,
+      productGroups: row.productGroups,
+    })),
+    clients: orgClients,
+  };
 }
 
 /**
@@ -101,6 +117,37 @@ export async function saveStructureCatalog(
   if (role !== 'admin') {
     throw new StructureCatalogError('FORBIDDEN', 'Nur Admins ändern den Struktur-Katalog.');
   }
+  try {
+    return await saveInTransaction(db, input);
+  } catch (error) {
+    // Zwei gleichzeitige erste Speicherungen: Die zweite scheitert am Primärschlüssel.
+    if (isUniqueViolation(error, 'structure_catalogs_pkey')) {
+      throw new StructureCatalogError(
+        'VERSION_CONFLICT',
+        'Der Katalog wurde inzwischen geändert. Bitte neu laden.',
+      );
+    }
+    throw error;
+  }
+}
+
+function isUniqueViolation(error: unknown, constraint: string): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+    const { code, constraint_name: name } = current as {
+      code?: unknown;
+      constraint_name?: unknown;
+    };
+    if (code === '23505' && name === constraint) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+function saveInTransaction(
+  db: Db,
+  input: { userId: string; orgId: string; catalog: StructureCatalog; version: number },
+): Promise<StoredStructureCatalog> {
   return db.transaction(async (tx) => {
     const [current] = await tx
       .select({ version: structureCatalogs.version })
@@ -136,6 +183,32 @@ export async function saveStructureCatalog(
     } else {
       await tx.insert(structureCatalogs).values({ organizationId: input.orgId, ...values });
     }
+    // Zuordnungen zu Presets, die es nicht mehr gibt, lösen: Ein später neu angelegtes Preset mit demselben Schlüssel
+    // bekäme sie sonst still.
+    const keys = input.catalog.presets.map((preset) => preset.key);
+    const clearedClients = await tx
+      .delete(clientPresets)
+      .where(
+        and(
+          eq(clientPresets.organizationId, input.orgId),
+          notInArray(clientPresets.presetKey, keys),
+        ),
+      )
+      .returning({ presetKey: clientPresets.presetKey });
+    const dangling = and(
+      eq(productGroups.organizationId, input.orgId),
+      isNotNull(productGroups.presetKey),
+      notInArray(productGroups.presetKey, keys),
+    );
+    // Schlüssel vorher lesen: `returning` liefert nach dem Leeren nur noch `null`.
+    const clearedGroups = await tx
+      .select({ presetKey: productGroups.presetKey })
+      .from(productGroups)
+      .where(dangling)
+      .for('update');
+    if (clearedGroups.length > 0) {
+      await tx.update(productGroups).set({ presetKey: null, updatedAt }).where(dangling);
+    }
     await recordAuditEvent(tx, {
       organizationId: input.orgId,
       actorUserId: input.userId,
@@ -146,6 +219,17 @@ export async function saveStructureCatalog(
         version,
         before: { version: before.version, catalog: before.catalog },
         after: input.catalog,
+        clearedAssignments: {
+          clients: clearedClients.length,
+          productGroups: clearedGroups.length,
+          presets: [
+            ...new Set(
+              [...clearedClients, ...clearedGroups].flatMap((row) =>
+                row.presetKey ? [row.presetKey] : [],
+              ),
+            ),
+          ].sort(),
+        },
       },
     });
     return { catalog: input.catalog, version, updatedAt };

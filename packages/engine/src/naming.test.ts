@@ -29,6 +29,15 @@ describe('renderCampaignName', () => {
     );
   });
 
+  it('lässt Klammern und anderen festen Text stehen, nur Trenner fallen weg', () => {
+    expect(
+      renderCampaignName('{adType} ({country}) {block}', { adType: 'SP', country: 'DE' }),
+    ).toBe('SP (DE)');
+    expect(
+      renderCampaignName('{adType} [{country}] {block}', { adType: 'SP', block: 'AUTO' }),
+    ).toBe('SP [] AUTO');
+  });
+
   it('fasst Leerraum in Werten zusammen und lässt festen Text stehen', () => {
     expect(
       renderCampaignName('PB {adType} / {group}', { adType: 'SB', group: '  Große   Becher ' }),

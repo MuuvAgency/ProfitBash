@@ -231,6 +231,9 @@ const labelClass = 'text-label-eyebrow uppercase text-ink-tertiary';
         </p>
       </div>
 
+      <p v-if="catalog.isError.value" class="text-body-sm text-on-loss-wash">
+        {{ t('productGroups.field.presetLoadFailed') }}
+      </p>
       <div v-if="presets.length > 0" class="flex flex-col gap-space-xs">
         <label :for="`${id}-preset`" :class="labelClass">{{
           t('productGroups.field.preset')

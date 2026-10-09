@@ -19,13 +19,14 @@ const clean = (value: string | null | undefined) =>
   (value ?? '').normalize('NFC').split(/\s+/u).filter(Boolean).join(' ');
 
 /**
- * Setzt die Werte ein. Ein leerer Platzhalter fällt samt dem Trenner davor weg (Text vor ihm ohne Buchstaben und
- * Ziffern), damit `SP | AUTO | Flaschen` ohne Ziel nicht auf ` | ` endet. Unbekannte Platzhalter bleiben leer.
+ * Setzt die Werte ein. Ein leerer Platzhalter fällt samt dem Trenner davor weg, damit `SP | AUTO | Flaschen` ohne Ziel
+ * nicht auf ` | ` endet. Trenner sind nur Leerraum und `| - _ / · : , ;`; anderer fester Text (Klammern, Buchstaben)
+ * bleibt immer stehen. Unbekannte Platzhalter bleiben leer.
  */
 export function renderCampaignName(pattern: string, values: NamingValues): string {
   let result = '';
   let last = 0;
-  for (const match of pattern.matchAll(/([^\p{L}\p{N}{}]*)\{([^{}]*)\}/gu)) {
+  for (const match of pattern.matchAll(/([\s|\-_/·:,;]*)\{([^{}]*)\}/gu)) {
     result += pattern.slice(last, match.index);
     last = match.index + match[0].length;
     const value = clean(values[match[2] as NamingPlaceholder]);
@@ -47,7 +48,7 @@ export function campaignNameIssues(name: string): CampaignNameIssue[] {
 
 /**
  * Eindeutig gegenüber `taken` (ohne Groß/Klein, wie Amazon Kampagnennamen im Profil vergleicht): Ist der Name
- * vergeben, kommt ` 2`, ` 3` … dazu; der Name wird dafür vorne so gekürzt, dass er in die Höchstlänge passt.
+ * vergeben, kommt ` 2`, ` 3` … dazu; dafür wird das Ende des Namens so gekürzt, dass er in die Höchstlänge passt.
  */
 export function uniqueCampaignName(name: string, taken: Iterable<string>): string {
   const used = new Set([...taken].map((entry) => entry.toLowerCase()));
