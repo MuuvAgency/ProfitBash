@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import PendingPanel, { type Submitted } from '../changes/PendingPanel.vue';
@@ -40,6 +40,21 @@ const tabs = computed(() => [
 
 /** Was beim letzten Übermitteln nicht mitging (entfallen, blockiert, nicht in die Bulk-Datei geschrieben). */
 const submitNotice = ref<string[] | null>(null);
+// Der Hinweis gehört zur eben angelegten Übermittlung: Wer weitergeht, braucht ihn nicht mehr.
+let noticeFor: string | null = null;
+watch(
+  () => [tab.value, submissionId.value] as const,
+  ([nextTab, nextSubmission]) => {
+    if (
+      submitNotice.value &&
+      noticeFor &&
+      (nextTab !== 'submissions' || nextSubmission !== noticeFor)
+    ) {
+      submitNotice.value = null;
+    }
+  },
+);
+
 function onSubmitted(result: Submitted) {
   const lines = [
     result.submissions.length > 0
@@ -72,6 +87,7 @@ function onSubmitted(result: Submitted) {
   }
   submitNotice.value = lines;
   const first = result.submissions[0];
+  noticeFor = first?.id ?? null;
   if (first) {
     void router.push({ path: '/ads/changes', query: { tab: 'submissions', submission: first.id } });
   }

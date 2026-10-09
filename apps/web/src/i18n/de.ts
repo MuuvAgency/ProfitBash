@@ -933,7 +933,7 @@ export const de = {
       otherUsers: 'Auch vorgemerkt von {names}',
       submitApi: 'Über API übermitteln',
       submitBulkFile: 'Als Bulk-Datei',
-      discardOne: 'Änderung verwerfen',
+      discardOne: 'Änderung an „{name}“ verwerfen',
       discardAll: 'Alle verwerfen',
       discardAllText:
         'Die Änderung wird aus dem Warenkorb entfernt. Bei Amazon ändert sich nichts. | Alle {count} Änderungen werden aus dem Warenkorb entfernt. Bei Amazon ändert sich nichts.',
@@ -944,7 +944,7 @@ export const de = {
       largeChanges:
         '{count} Änderung ändert ein Gebot oder Budget um mehr als 50 %. | {count} Änderungen ändern ein Gebot oder Budget um mehr als 50 %.',
       tooMany: 'Es gehen {count} Änderungen auf einmal raus (mehr als {limit}).',
-      text: 'Die betroffenen Änderungen sind im Warenkorb markiert. Übermittelt wird, was dort gerade für dieses Profil steht.',
+      text: 'Die betroffenen Änderungen sind im Warenkorb markiert. Übermittelt werden die Änderungen dieses Profils mit den Werten, die jetzt im Warenkorb stehen.',
       submit: 'Trotzdem übermitteln',
     },
     submitted: {
@@ -962,6 +962,7 @@ export const de = {
       detailFailed: 'Die Übermittlung konnte nicht geladen werden.',
       notFound: 'Diese Übermittlung gibt es nicht (mehr), oder ihr Profil ist ausgeblendet.',
       listTitle: 'Letzte Übermittlungen',
+      detailLabel: 'Geöffnete Übermittlung',
       empty: {
         title: 'Noch keine Übermittlungen',
         text: 'Sobald jemand aus der Organisation Änderungen übermittelt, erscheinen sie hier mit dem Ergebnis je Änderung.',
@@ -1045,6 +1046,22 @@ export const de = {
       closed: {
         applied: 'Abgeschlossen: Die Änderungen gelten als angewendet.',
         discarded: 'Abgeschlossen: Die offenen Änderungen sind verworfen.',
+      },
+    },
+    close: {
+      title: {
+        applied: 'Als hochgeladen abschließen',
+        discarded: 'Nicht hochladen',
+      },
+      text: {
+        applied:
+          'Die offene Änderung gilt danach als angewendet, ihr Wert wird in ProfitBash übernommen. Nur bestätigen, wenn die Datei in der Werbekonsole hochgeladen ist. | Die {count} offenen Änderungen gelten danach als angewendet, ihre Werte werden in ProfitBash übernommen. Nur bestätigen, wenn die Datei in der Werbekonsole hochgeladen ist.',
+        discarded:
+          'Die offene Änderung wird verworfen und muss bei Bedarf neu vorgemerkt werden. | Die {count} offenen Änderungen werden verworfen und müssen bei Bedarf neu vorgemerkt werden.',
+      },
+      confirm: {
+        applied: 'Abschließen',
+        discarded: 'Verwerfen',
       },
     },
     skip: {
