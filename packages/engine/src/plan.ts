@@ -574,3 +574,5 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
 
   return { campaigns, hints };
 }
+
+export { reviewCampaignPlan, type PlanReviewInput, type PlanReviewIssue } from './plan-review';
