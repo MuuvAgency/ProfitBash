@@ -2,7 +2,7 @@
 import { formatDateTime, formatNumber } from '@profitbash/shared';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
-import { computed, nextTick, ref, useId, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ApiError } from '../api';
 import type {
@@ -57,11 +57,15 @@ const notFound = computed(
 
 /** Die geöffnete Übermittlung steht unter der Liste: beim Öffnen dorthin springen (vor allem auf dem Handy). */
 const detailSection = ref<HTMLElement>();
-watch(selectedId, async (next, previous) => {
-  if (!next || previous === undefined) return;
+async function showDetail() {
+  if (!selectedId.value) return;
   await nextTick();
   detailSection.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-});
+  detailSection.value?.focus({ preventScroll: true });
+}
+watch(selectedId, showDetail);
+// Auch nach dem Übermitteln (die Seite wechselt hierher) und bei einem Link auf eine Übermittlung.
+onMounted(showDetail);
 
 function statusText(submission: AdChangeSubmissionData): string {
   return submission.status === 'pending'
@@ -157,6 +161,9 @@ async function run(action: () => Promise<Notice | null>) {
   try {
     notice.value = await action();
   } catch (error) {
+    // Eine offene Rückfrage verdeckte die Meldung sonst.
+    conflict.value = null;
+    closing.value = null;
     errorText.value = t(errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN'));
   }
 }
@@ -190,9 +197,15 @@ const revertAll = () =>
   selected.value &&
   sendRevert({ submissionId: selected.value.submission.id, channel: followUpChannel.value });
 
+/** Abschließen von Hand ist endgültig (verworfen bzw. als angewendet in die Entities geschrieben): mit Rückfrage. */
+const closing = ref<'applied' | 'discarded' | null>(null);
+const openCount = computed(
+  () => (selected.value?.changes ?? []).filter((change) => change.status === 'submitted').length,
+);
 const closeSubmission = (outcome: 'applied' | 'discarded') =>
   run(async () => {
     await close.mutateAsync({ id: selected.value!.submission.id, outcome });
+    closing.value = null;
     return { text: t(`changes.action.closed.${outcome}`), submissionId: null, details: [] };
   });
 const downloadFile = () =>
@@ -208,11 +221,22 @@ const isBulkFile = computed(() => selected.value?.submission.channel === 'bulk_f
 const openBulkFile = computed(
   () => isBulkFile.value && selected.value?.submission.status === 'pending',
 );
-const canRetry = (change: SubmittedAdChangeData) => change.status === 'failed' && !change.followUp;
+/**
+ * Ein Folgeschritt sperrt wie beim Server, solange er offen oder angewendet ist. Ist er gescheitert, geht es an ihm
+ * weiter (dort „Erneut versuchen“); wurde er verworfen, ist die Änderung wieder frei.
+ */
+const followUpBlocks = (change: SubmittedAdChangeData, origin: 'retry' | 'revert') =>
+  change.followUp?.origin === origin && change.followUp.status !== 'dismissed';
+/** Eine überholte Änderung trüge beim erneuten Versuch den älteren Wert über den neueren. */
+const canRetry = (change: SubmittedAdChangeData) =>
+  change.status === 'failed' &&
+  change.errorCode !== 'SUPERSEDED' &&
+  !followUpBlocks(change, 'retry');
+const canDismiss = (change: SubmittedAdChangeData) => change.status === 'failed';
 /** Archivieren lässt sich bei Amazon nicht zurücknehmen. */
 const canRevert = (change: SubmittedAdChangeData) =>
   change.status === 'applied' &&
-  change.followUp?.origin !== 'revert' &&
+  !followUpBlocks(change, 'revert') &&
   !(change.field === 'state' && change.after === 'ARCHIVED');
 const revertible = computed(() => (selected.value?.changes ?? []).some(canRevert));
 const downloadable = computed(
@@ -329,8 +353,10 @@ const conflictRows = computed(() =>
     <section
       v-if="submissionId"
       ref="detailSection"
+      tabindex="-1"
+      :aria-label="t('changes.submission.detailLabel')"
       data-submission-detail
-      class="flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
+      class="flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile outline-none sm:p-space-lg"
     >
       <InlineError v-if="notFound" :message="t('changes.submission.notFound')" />
       <InlineError
@@ -392,7 +418,7 @@ const conflictRows = computed(() =>
               severity="secondary"
               size="small"
               :disabled="busy"
-              @click="closeSubmission('applied')"
+              @click="closing = 'applied'"
             />
             <Button
               v-if="openBulkFile"
@@ -402,7 +428,7 @@ const conflictRows = computed(() =>
               variant="text"
               size="small"
               :disabled="busy"
-              @click="closeSubmission('discarded')"
+              @click="closing = 'discarded'"
             />
             <Button
               v-if="revertible"
@@ -417,7 +443,17 @@ const conflictRows = computed(() =>
           </div>
         </header>
 
-        <InlineError v-if="selected.submission.error" :message="selected.submission.error" />
+        <!-- `error` nennt bei wartenden Übermittlungen den Grund des Wartens (z. B. Drosselung), sonst den Fehler. -->
+        <p
+          v-if="selected.submission.error && selected.submission.status !== 'failed'"
+          role="status"
+          class="rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
+        >
+          <i class="pi pi-clock mr-space-xs text-warn" aria-hidden="true" />{{
+            selected.submission.error
+          }}
+        </p>
+        <InlineError v-else-if="selected.submission.error" :message="selected.submission.error" />
         <p
           v-if="isBulkFile"
           class="rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
@@ -495,7 +531,7 @@ const conflictRows = computed(() =>
                 @click="retryChange(change)"
               />
               <Button
-                v-if="canRetry(change)"
+                v-if="canDismiss(change)"
                 data-dismiss
                 :label="t('changes.action.dismiss')"
                 severity="secondary"
@@ -519,6 +555,39 @@ const conflictRows = computed(() =>
         </ul>
       </template>
     </section>
+
+    <Dialog
+      :visible="closing !== null"
+      modal
+      :closable="!close.isPending.value"
+      :header="closing ? t(`changes.close.title.${closing}`) : ''"
+      :style="{ width: 'min(30rem, calc(100vw - 2rem))' }"
+      @update:visible="(next) => !next && (closing = null)"
+    >
+      <div v-if="closing" class="flex flex-col gap-space-lg">
+        <p class="text-body-md text-ink">
+          {{ t(`changes.close.text.${closing}`, { count: openCount }, openCount) }}
+        </p>
+        <div class="flex justify-end gap-space-sm">
+          <Button
+            type="button"
+            :label="t('common.cancel')"
+            severity="secondary"
+            variant="text"
+            :disabled="close.isPending.value"
+            @click="closing = null"
+          />
+          <Button
+            type="button"
+            data-confirm-close
+            :label="t(`changes.close.confirm.${closing}`)"
+            :severity="closing === 'discarded' ? 'danger' : undefined"
+            :loading="close.isPending.value"
+            @click="closeSubmission(closing)"
+          />
+        </div>
+      </div>
+    </Dialog>
 
     <Dialog
       :visible="conflict !== null"

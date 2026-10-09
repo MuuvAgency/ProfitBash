@@ -17,7 +17,7 @@ import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { errorMessageKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 import ChangeSummary from './ChangeSummary.vue';
-import { changeValueText } from './labels';
+import { changeSubject, changeValueText } from './labels';
 import { useChangeRights, useDiscardChanges, usePendingChanges, useSubmitChanges } from './queries';
 
 /**
@@ -66,7 +66,7 @@ const groups = computed<Group[]>(() => {
     group.blocked ||= violations.value.has(change.id);
     byProfile.set(change.profileId, group);
   }
-  return [...byProfile.values()].sort((a, b) => a.title.localeCompare(b.title, 'de'));
+  return [...byProfile.values()].sort((a, b) => a.title.localeCompare(b.title, locale.value));
 });
 
 // --- Hinweise je Änderung --------------------------------------------------------------------
@@ -197,7 +197,10 @@ async function discardChanges(changeIds?: string[]) {
         class="rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
       >
         <i class="pi pi-info-circle mr-space-xs text-warn" aria-hidden="true" />{{
-          t('changes.pending.tooMany', check.tooMany)
+          t('changes.pending.tooMany', {
+            count: formatNumber(String(check.tooMany.count), locale),
+            limit: formatNumber(String(check.tooMany.limit), locale),
+          })
         }}
       </p>
       <div class="flex flex-wrap items-center justify-between gap-space-md">
@@ -300,7 +303,9 @@ async function discardChanges(changeIds?: string[]) {
               severity="secondary"
               variant="text"
               size="small"
-              :aria-label="t('changes.pending.discardOne')"
+              :aria-label="
+                t('changes.pending.discardOne', { name: changeSubject(change, labels).name })
+              "
               :disabled="busy"
               @click="discardChanges([change.id])"
             />

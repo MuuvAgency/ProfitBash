@@ -502,8 +502,82 @@ describe('Änderungen: Übermittlungen', () => {
     await vi.waitFor(() => expect(createObjectURL).toHaveBeenCalled());
     expect(requests.some((r) => r.path.endsWith('/bulk-file'))).toBe(true);
 
-    await click(wrapper, '[data-close="applied"]');
-    expect(posts(requests, `/submissions/${S1}/close`)).toEqual([{ outcome: 'applied' }]);
+    // Abschließen ist endgültig: erst nach Rückfrage.
+    await click(wrapper, '[data-close="discarded"]');
+    expect(posts(requests, `/submissions/${S1}/close`)).toEqual([]);
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+      'Die offene Änderung wird verworfen',
+    );
+    await click(wrapper, '[data-confirm-close]');
+    expect(posts(requests, `/submissions/${S1}/close`)).toEqual([{ outcome: 'discarded' }]);
+  });
+
+  it('richtet die Knöpfe nach dem Stand des Folgeschritts: offen sperrt, verworfen gibt wieder frei', async () => {
+    const followUp = (origin: 'retry' | 'revert', status: SubmittedAdChangeData['status']) => ({
+      changeId: 'x',
+      origin,
+      status,
+      submissionId: S2,
+    });
+    stubFetch(
+      routes({
+        'GET /api/ads/changes/submissions': json({ submissions: [submission(S1)] }),
+        [`GET /api/ads/changes/submissions/${S1}`]: detail({}, [
+          change('a1', { status: 'applied', followUp: followUp('revert', 'dismissed') }),
+          change('a2', { status: 'applied', followUp: followUp('revert', 'failed') }),
+          change('a3', { status: 'applied', field: 'state', before: 'ENABLED', after: 'ARCHIVED' }),
+          change('f1', { status: 'failed', followUp: followUp('retry', 'dismissed') }),
+          change('f2', { status: 'failed', followUp: followUp('retry', 'applied') }),
+          change('f3', { status: 'failed', errorCode: 'SUPERSEDED' }),
+        ]),
+      }),
+    );
+    const { wrapper } = await mountPage(`/ads/changes?tab=submissions&submission=${S1}`);
+    await vi.waitFor(() => expect(wrapper.find('[data-change="f3"]').exists()).toBe(true));
+    const has = (id: string, action: string) =>
+      wrapper.find(`[data-change="${id}"] [data-${action}]`).exists();
+    expect([has('a1', 'revert'), has('a2', 'revert'), has('a3', 'revert')]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect([has('f1', 'retry'), has('f2', 'retry'), has('f3', 'retry')]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    // Verwerfen geht für jede fehlgeschlagene Änderung, auch mit Folgeversuch und für überholte.
+    expect([has('f1', 'dismiss'), has('f2', 'dismiss'), has('f3', 'dismiss')]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('zeigt einen Fehler beim bestätigten Überschreiben statt ihn hinter der Rückfrage zu lassen', async () => {
+    stubFetch(
+      routes({
+        'GET /api/ads/changes/submissions': json({ submissions: [submission(S1)] }),
+        [`GET /api/ads/changes/submissions/${S1}`]: detail(),
+        'POST /api/ads/changes/revert': ({ body }) =>
+          (body as { overwriteChanged?: boolean }).overwriteChanged
+            ? json({ error: { code: 'PROFILE_HAS_NO_CONNECTION', message: 'x' } }, 409)
+            : json({
+                status: 'conflict',
+                conflicts: [{ changeId: C1, expected: '0.80', current: '0.95' }],
+                skipped: [],
+              }),
+      }),
+    );
+    const { wrapper } = await mountPage(`/ads/changes?tab=submissions&submission=${S1}`);
+    await click(wrapper, `[data-change="${C1}"] [data-revert]`);
+    await click(wrapper, '[data-confirm-overwrite]');
+    await vi.waitFor(() =>
+      expect(wrapper.get('[data-submission-detail]').text()).toContain(
+        'Dieses Profil hat keine Verbindung zur API',
+      ),
+    );
+    await vi.waitFor(() => expect(document.querySelector('[data-confirm-overwrite]')).toBeNull());
   });
 
   it('zeigt leere Liste, unbekannte Übermittlung und Viewern keine Aktionen', async () => {

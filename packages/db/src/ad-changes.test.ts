@@ -442,10 +442,10 @@ describe('stageAdChanges: Feldänderungen', () => {
     ]);
 
     const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
-    expect(cart!.map((c) => [c.entityId, c.before, c.comparisonBefore])).toEqual([
-      [ids.targetWithoutBid, null, '0.40'],
-      [ids.target, expect.any(String), null],
-    ]);
+    // Beide Zeilen entstehen im selben Augenblick: Die Reihenfolge ist nicht festgelegt.
+    const byEntity = new Map(cart!.map((c) => [c.entityId, [c.before, c.comparisonBefore]]));
+    expect(byEntity.get(ids.targetWithoutBid)).toEqual([null, '0.40']);
+    expect(byEntity.get(ids.target)).toEqual(['0.50', null]);
 
     let reviewed: unknown[] = [];
     await submitAdChanges(testDb.db, {
@@ -457,10 +457,9 @@ describe('stageAdChanges: Feldänderungen', () => {
         return 'abgelehnt';
       },
     });
-    expect(reviewed).toEqual([
-      [null, '0.40'],
-      [expect.any(String), null],
-    ]);
+    expect(reviewed).toHaveLength(2);
+    expect(reviewed).toContainEqual([null, '0.40']);
+    expect(reviewed).toContainEqual(['0.50', null]);
   });
 
   it('liest Zustand, Budget, Strategie und Standardgebot als „vorher“', async () => {

@@ -613,8 +613,60 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     den Werten der Kampagne; 1440 px dunkel, Tablet und Handy hell, kein waagerechtes Scrollen, Konsole ohne Fehler.
 
 ### 3.6 Seite „Änderungen“ (`/ads/changes`)
-- [ ] Ausstehend (Warenkorb prüfen, Warnungen bestätigen, über API übermitteln oder als Bulk-Datei herunterladen, verwerfen)
+- [x] Ausstehend (Warenkorb prüfen, Warnungen bestätigen, über API übermitteln oder als Bulk-Datei herunterladen, verwerfen)
       und Übermittlungen (Ergebnis je Änderung, erneut versuchen, verwerfen, Revert).
+- [x] Umsetzung (Stand für 3.8 und später):
+  - **Seite** `pages/ChangesPage.vue` (Route `changes`), Bausteine in `apps/web/src/changes/`. Zwei Reiter, Zustand in
+    der URL: `/ads/changes` (Ausstehend), `?tab=submissions` und `&submission=<id>` für die geöffnete Übermittlung.
+  - **Ausstehend** (`PendingPanel.vue`): der eigene Warenkorb aus `GET /pending`, **je Profil** gruppiert (eine
+    Übermittlung gilt je Profil). Je Änderung: Art, Name und Lage der Entity (`labels.ts`, `changeSubject`), Feld,
+    vorher → nachher (`changeValueText`: Betrag mit Währung, Platzierung in Prozent, Zustand und Strategie
+    übersetzt), dazu die Prüfungen des Servers: Verstoß gegen Grenzen von Amazon (mit der Grenze), große Änderung
+    („+60 % gegenüber vorher“ bzw. „gegenüber dem Standardgebot der Ad Group“), Vormerkungen anderer (F4), Hinweis
+    bei mehr als 200 Änderungen. Je Profil „Über API übermitteln“ und „Als Bulk-Datei“; ein Verstoß sperrt beide.
+    Einzelne Änderung verwerfen, „Alle verwerfen“ mit Rückfrage.
+  - **Übermitteln:** gesendet werden die **gezeigten** Änderungen des Profils (`changeIds`; über 5000 das ganze
+    Profil per `profileId`). `needsConfirmation` öffnet die Rückfrage (Zahl großer Änderungen, „mehr als 200“);
+    „Trotzdem übermitteln“ sendet dieselbe Anfrage mit `confirmWarnings`. Damit deckt die Bestätigung nichts, was
+    nach dem Laden dazukam (offener Punkt aus 3.4). `limitsExceeded` und `409 PROFILE_HAS_NO_CONNECTION` als Meldung.
+    Nach `submitted` springt die Seite zur ersten Übermittlung und nennt, was nicht mitging (`dropped`, `blocked`
+    mit Grund, `bulkFileSkipped`).
+  - **Übermittlungen** (`SubmissionsPanel.vue`): Liste der Organisation (Zeit, Nutzer, Profil, Weg, Status, Zähler
+    je Ergebnis), darunter die geöffnete Übermittlung mit dem Ergebnis je Änderung (Fehlertext von Amazon mit Code;
+    eigene Codes wie `NOT_SENT`, `UNKNOWN_OUTCOME` übersetzt) und dem letzten Folgeschritt (`followUp`, Link zur
+    neuen Übermittlung). Aktionen mit `write`: „Erneut versuchen“ und „Verwerfen“ für fehlgeschlagene Änderungen
+    ohne Folgeschritt, „Zurücknehmen“ je angewendeter Änderung und „Alles zurücknehmen“ (nicht für Archivieren; bei
+    `conflict` Rückfrage mit übermitteltem und jetzigem Wert, erst dann `overwriteChanged`, F8), für den Weg
+    Bulk-Datei „Bulk-Datei herunterladen“, „Als hochgeladen abschließen“ und „Nicht hochladen“, dazu der Hinweis,
+    von welchem Stand Portfolio und Enddatum stammen (`entitiesSyncedAt`). Der Weg für Folgeschritte ist wählbar
+    (Standard: Weg der Übermittlung). Übersprungenes erscheint mit Grund.
+  - **Nachfragen:** Solange eine Übermittlung über die API oder ein Folgeschritt auf sein Ergebnis wartet, fragt die
+    Seite alle 5 s nach (`refetchInterval`); jede Aktion lädt Warenkorb, offene Änderungen und Übermittlungen neu.
+  - **Download:** `api.adChanges.bulkFile` holt die Datei als Blob (Fehler wie `BULK_FILE_EMPTY` als Meldung),
+    Dateiname aus `Content-Disposition`.
+  - **Tests:** `pages/ChangesPage.test.ts` (Warenkorb mit Prüfungen, leer, Fehler, verwerfen, Rückfrage und
+    Bestätigung, Grenzen, Profil ohne Connection, Viewer; Liste, Ergebnis je Änderung, Folgeschritte, Revert mit
+    Rückfrage, Bulk-Datei, unbekannte Übermittlung), `changes/labels.test.ts`.
+  - Review (unabhängig): keine kritischen Befunde; Anfragen und Antworten gegen die Schemas, alle dynamischen
+    i18n-Keys, Rechte, Invalidierung und die Darstellung von Servertexten (nur als Text) bestätigt. Übernommen: Ein
+    Folgeschritt sperrt nur, solange er offen oder angewendet ist (ein verworfener Revert bzw. Versuch gibt die
+    Änderung wieder frei; vorher Sackgasse), „Verwerfen“ für jede fehlgeschlagene Änderung, kein erneuter Versuch für
+    überholte (`SUPERSEDED`: er trüge den älteren Wert über den neueren), Fehler nach bestätigtem Überschreiben
+    schließt die Rückfrage, „Als hochgeladen abschließen“ und „Nicht hochladen“ mit Rückfrage, Nachfragen nur für
+    Folgeschritte über die API (einer per Bulk-Datei wartet Tage), Wartegrund einer Übermittlung als Hinweis statt
+    als Fehler, Download startet ohne auf das Neuladen zu warten, die geöffnete Übermittlung wird auch nach dem
+    Übermitteln und bei Links ins Bild geholt und fokussiert, Hinweis nach dem Übermitteln verschwindet beim
+    Weitergehen, „Verwerfen“ nennt die Entity, Zahlen formatiert.
+  - **Offen bzw. bewusst so:** Die Bestätigung der Warnungen deckt die gezeigten Änderungen (IDs), nicht ihre Werte:
+    Wer zwischen Rückfrage und Bestätigung in einem zweiten Fenster einen Wert ändert, bestätigt ihn mit; über 5000
+    Änderungen gilt sie für das ganze Profil. Die Liste zeigt höchstens 100 Übermittlungen ohne Blättern und ohne
+    Filter (3.1). Nach dem Verwerfen einer Zeile fällt der Fokus auf die Seite. Der Verlauf je Entity
+    (`POST /history`) hat noch keine Oberfläche. Nicht getestet: das Nachfragen (`refetchInterval`), Download mit
+    `BULK_FILE_EMPTY`, Rückfall auf `profileId` über 5000 Änderungen, `blocked` und `bulkFileSkipped` im Hinweis.
+  - Browser-Pane geprüft (Demo-Daten gegen den Mock, 2026-10-09): vier Gebote um +80 % vorgemerkt, Warenkorb je
+    Profil mit Warnungen, Rückfrage, über die API übermittelt (drei angewendet), „Alles zurücknehmen“ als neue
+    Übermittlung, zweites Profil als Bulk-Datei (Datei `profitbash-aenderungen-…-it-2026-10-09.xlsx` mit 200 und
+    richtigem Typ ausgeliefert), „Nicht hochladen“; 1440 px dunkel, Handy hell, kein waagerechtes Scrollen.
 
 ### 3.7 Tags (`/ads/tags/*`, F7)
 - [ ] Eigene Tags je Organisation (Name, Farbe) für Kampagnen, Ad Groups, Targets und Product Ads: verwalten, zuweisen (auch per

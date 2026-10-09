@@ -4,6 +4,7 @@ import { api } from '../api';
 import type {
   AdChangeChannelData,
   AdChangeInputData,
+  AdChangeSubmissionData,
   RevertAdChangesInput,
   SubmitAdChangesInput,
 } from '../api/client';
@@ -110,18 +111,32 @@ export function useSubmissions(enabled: Ref<boolean>) {
 
 /** Eine Übermittlung mit ihren Änderungen, Folgeschritten und dem Stand der Kampagnen. */
 export function useSubmission(id: Ref<string | null>) {
+  const queryClient = useQueryClient();
   const orgId = useActiveOrgId();
   const { canView } = useChangeRights();
   return useQuery({
     queryKey: computed(() => [KEY, 'submission', orgId.value, id.value] as const),
     queryFn: () => api.adChanges.submission(id.value!),
     enabled: computed(() => canView.value && id.value !== null && orgId.value !== null),
-    // Auch solange ein Folgeschritt (erneuter Versuch, Revert) einer ihrer Änderungen noch läuft.
+    // Auch solange ein Folgeschritt (erneuter Versuch, Revert) über die API noch läuft; einer per Bulk-Datei
+    // wartet Tage auf den Import und wird nicht nachgefragt.
     refetchInterval: (query) => {
       const data = query.state.data;
       if (!data) return false;
-      const followUpOpen = data.changes.some((change) => change.followUp?.status === 'submitted');
-      return awaitsJob(data.submission) || followUpOpen ? POLL_MS : false;
+      const submissions = queryClient.getQueryData<AdChangeSubmissionData[]>([
+        KEY,
+        'submissions',
+        orgId.value,
+      ]);
+      const followUpRuns = data.changes.some(
+        (change) =>
+          change.followUp?.status === 'submitted' &&
+          (submissions ?? []).some(
+            (submission) =>
+              submission.id === change.followUp!.submissionId && awaitsJob(submission),
+          ),
+      );
+      return awaitsJob(data.submission) || followUpRuns ? POLL_MS : false;
     },
     retry: false,
   });
@@ -166,6 +181,7 @@ export function useBulkFileDownload() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: (id: string) => api.adChanges.bulkFile(id),
-    onSettled: invalidate,
+    // Nicht auf das Neuladen warten: Der Download soll gleich nach dem Klick starten.
+    onSettled: () => void invalidate(),
   });
 }
