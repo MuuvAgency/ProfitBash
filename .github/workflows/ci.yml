@@ -12,7 +12,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        # Docker Hub über Googles Spiegel: anonyme Pulls von GitHub-Runnern laufen sonst ins Rate-Limit.
+        image: mirror.gcr.io/library/postgres:17
         env:
           POSTGRES_USER: profitbash
           POSTGRES_PASSWORD: profitbash

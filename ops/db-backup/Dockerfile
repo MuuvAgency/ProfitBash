@@ -1,6 +1,7 @@
 # Railway-Cron-Service `db-backup` (docs/deploy.md): pg_dump 17 aus dem offiziellen Image, dazu age und curl.
 # pg_dump muss mindestens die Hauptversion des Railway-Postgres haben. Basis per Digest gepinnt; Updates bewusst.
-FROM postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+# Über Googles Spiegel von Docker Hub (gleiches Image per Digest; Docker Hub drosselt anonyme Pulls).
+FROM mirror.gcr.io/library/postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
 
 RUN apk add --no-cache bash curl 'age~1.3'
 
