@@ -1,7 +1,8 @@
 # ADR 005 – Amazon-Ads-API für Schreibaufträge
 
 - **Status:** angenommen
-- **Datum:** 2026-10-08 (Start von Phase 3, Doku-Stand vom selben Tag)
+- **Datum:** 2026-10-08 (Start von Phase 3, Doku-Stand vom selben Tag), am 2026-10-09 um Sponsored Brands und
+  Sponsored Display ergänzt (3.2c)
 - **Beteiligte:** Dominik
 - **Bezug:** ADR 004 hatte das Schreiben offen gelassen („beim Start von Phase 3 als eigene Entscheidung prüfen“).
 
@@ -24,9 +25,9 @@ Weg ist die Bulk-Datei (`phase-3.md` F2).
 schmalen Modell in `packages/amazon-ads` (`AmazonAdsWriteOperation` → `applyChanges`). Jobs und Datenbank kennen die
 Endpunkte nicht; ein späterer Wechsel auf v1 bleibt auf das Paket begrenzt (wie beim Lesen, ADR 004).
 
-Umgesetzt wird in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsored Brands und Sponsored Display** mit 3.2c
-(wie in Phase 1: SP zuerst vollständig, SB und SD danach). Bis dahin lehnt `applyChanges` andere Ad-Typen je Änderung ab
-(`AD_PRODUCT_NOT_SUPPORTED`); der Weg über die Bulk-Datei ist davon unabhängig.
+Umgesetzt in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsored Brands und Sponsored Display** mit 3.2c
+(wie in Phase 1: SP zuerst vollständig, SB und SD danach). Andere Ad-Typen lehnt `applyChanges` je Änderung ab
+(`AD_PRODUCT_NOT_SUPPORTED`).
 
 ### Sponsored Products v3 (geprüft am 2026-10-08 gegen die OpenAPI-Spec `SponsoredProducts_prod_3p.json`)
 
@@ -57,6 +58,61 @@ Umgesetzt wird in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsore
 - **Drosselung:** `429` mit `{ code: THROTTLED }`; Rate-Limits sind dynamisch (wie beim Lesen: Anfrage-Budget je Profil,
   `Retry-After`).
 
+### Sponsored Brands (geprüft am 2026-10-09 gegen `SponsoredBrands_prod_3p.json` für v4 und die Spec `sponsored-brands/3-0`)
+
+| Änderung | Endpunkt | Hinweis |
+|---|---|---|
+| Zustand, Tagesbudget der Kampagne | `PUT /sb/v4/campaigns` | `budget` als Zahl; **höchstens 10 je Aufruf** |
+| Zustand der Ad Group, Zustand der Anzeige | `PUT /sb/v4/adGroups`, `PUT /sb/v4/ads` | höchstens 10 je Aufruf |
+| Archivieren von Kampagne, Ad Group, Anzeige | `POST /sb/v4/<entity>/delete` | ID-Filter wie bei SP, höchstens 10 IDs |
+| Zustand, Gebot eines Keywords | `PUT /sb/keywords` (v3) | Liste; `keywordId`, `adGroupId`, `campaignId` als **JSON-Zahl**, Zustand klein |
+| Zustand, Gebot eines Produkt-Targets | `PUT /sb/targets` (v3) | `{ targets: [...] }` |
+| Archivieren von Keywords, Targets, Negatives | dieselben `PUT`-Endpunkte bzw. `PUT /sb/negativeKeywords`, `PUT /sb/negativeTargets` | Zustand `archived` |
+| Negatives Keyword bzw. negative ASIN in der Ad Group | `POST /sb/negativeKeywords`, `POST /sb/negativeTargets` | `negativeExact` \| `negativePhrase`; `expressions: [{ type: asinSameAs, value }]` |
+
+- **v4** antwortet wie SP v3 (`207`, `success`/`error` je `index`), Content-Type
+  `application/vnd.sb<campaign|adgroup|ad>resource.v4+json`, IDs als Text.
+- **v3** (Keywords, Targets, Negatives): `application/json`, höchstens 100 je Aufruf, **IDs als `integer`**. Der
+  Client schreibt die Ziffern der ID als Zahl-Literal (`jsonDecimal`) und liest Antworten verlustfrei
+  (`parseJsonLossless`); intern bleiben IDs Strings. Kampagne und Ad Group stehen in jedem Eintrag, deshalb tragen
+  die Schreibaufträge für Keywords, Targets und das Archivieren optional `amazonCampaignId` und `amazonAdGroupId`
+  (der Job liefert sie immer mit).
+- **Antwortformen v3:** Keywords und negative Keywords als Liste `{ keywordId, code, description }` in der
+  **Reihenfolge der Anfrage** (`code: SUCCESS` = angenommen); Targets und negative Targets als
+  `{ updateTarget|createTarget SuccessResults: [{ targetId, targetRequestIndex }], …ErrorResults: [{ code, details,
+  targetRequestIndex }] }`.
+- **Nicht abgebildet** (Ablehnung `NOT_SUPPORTED` je Änderung, ohne Amazon zu fragen): Gebotsstrategie und
+  Platzierungen (SB kennt `bidOptimization` und eigene Platzierungen `HOME`, `DETAIL_PAGE`, `OTHER`,
+  `TOP_OF_SEARCH`; die Schreibschicht bietet beides nur für SP an), Standardgebot der Ad Group (gibt es bei SB
+  nicht), Negatives auf Kampagnenebene.
+
+### Sponsored Display (geprüft am 2026-10-09 gegen die Spec `sponsored-display/3-0`)
+
+| Änderung | Endpunkt | Hinweis |
+|---|---|---|
+| Zustand, Tagesbudget der Kampagne | `PUT /sd/campaigns` | Liste; `budget` als Zahl |
+| Zustand, Standardgebot der Ad Group | `PUT /sd/adGroups` | |
+| Zustand, Gebot eines Targets | `PUT /sd/targets` | bei `costType` vCPM je 1000 sichtbare Impressionen |
+| Zustand einer Product Ad | `PUT /sd/productAds` | |
+| Archivieren (Kampagne, Ad Group, Target, Product Ad, negatives Target) | dieselben `PUT`-Endpunkte, `PUT /sd/negativeTargets` | Zustand `archived` (laut Doku gleichwertig zu `DELETE /sd/<entity>/{id}`) |
+| Negative ASIN in der Ad Group | `POST /sd/negativeTargets` | `expressionType: manual`, `expression: [{ type: asinSameAs, value }]`, `state: enabled` |
+
+- Alles `application/json`, Listen von Einträgen, **IDs als `integer`**, Zustände klein (`enabled`, `paused`,
+  `archived`). Antwort `207` als Liste `{ code, description, <id> }` in der Reihenfolge der Anfrage.
+- **Nicht vorhanden:** Keywords, negative Keywords, Negatives auf Kampagnenebene, Gebotsstrategie und Platzierungen.
+- Die Spec nennt keine Höchstzahl je Aufruf; der Client schickt höchstens 100 (Annahme, beim ersten echten Lauf
+  prüfen).
+
+### Grenzen für SB und SD
+
+Aus derselben Doku-Seite wie bei SP („Limits, constraints, and quotas“, gelesen am 2026-10-09): Gebote je
+**Kostenart** (CPC, vCPM) und Marktplatz, dazu Tagesbudgets. Amazon unterscheidet bei SB zusätzlich Bild und Video
+und bei vCPM zwei Kampagnenziele; diese Merkmale kennt ProfitBash nicht. `limits.ts` prüft deshalb gegen die
+**weiteste** Spanne je Ad-Typ, Kostenart und Marktplatz (sperrt nie einen gültigen Wert), ohne bekannte Kostenart
+gegen die Spanne über beide. Die Kostenart kommt aus `extra.costType` der Kampagne. Für SD in Irland nennt Amazon
+keine Grenzen; für SD-Budgets von Vendoren gilt in einigen Marktplätzen ein kleineres Maximum, das die Prüfung
+nicht kennt (Amazon entscheidet).
+
 ### Verhalten des Clients
 
 - Ergebnis **je Änderung**: `applied` (mit ID), `failed` (Grund und Text von Amazon), `unsent` (gedrosselt, später
@@ -78,7 +134,14 @@ Umgesetzt wird in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsore
 
 ## Konsequenzen
 
-- Je Anzeigentyp eine eigene Abbildung (SP in `writes.ts`, SB und SD mit 3.2c: eigene Endpunkte, Body- und Antwortformen).
+- Je Anzeigentyp eine eigene Abbildung (`WriteDialect`): SP in `writes.ts`, SB und SD in `writes-sb-sd.ts`; die
+  Antwortformen liest je Endpunkt eine eigene Funktion (`write-endpoints.ts`). Senden, Stückeln, Wiederholen und
+  Abbruch sind für alle gleich.
+- **Offen für 1.10 bei SB und SD:** ob v3 IDs oberhalb von 2^53 als Zahl annimmt und so zurückgibt, ob die
+  v3-Antworten wirklich in der Reihenfolge der Anfrage kommen (bei abweichender ID gilt der Ausgang als unklar),
+  welche `code`-Werte außer `SUCCESS` vorkommen (der Client wertet Codes mit „throttl“ als gedrosselt, mit
+  „internal“/„server“ als unklar), die Höchstzahl je Aufruf bei SD, ob `PUT /sb/v4/campaigns` ein Tagesbudget ohne
+  `budgetType` annimmt, ob Vendor-Profile dieselben Endpunkte nutzen.
 - **Offen für 1.10 (erster echter Lauf):** ob `dynamicBidding` als Ganzes ersetzt wird (der Client schickt Strategie und
   alle Platzierungen deshalb immer zusammen), ob ein Budget-Update `budgetType` verlangt (die Spec sagt ja), ob die
   `delete`-Endpunkte je ID ein Ergebnis mit `index` liefern, welche Fehlercodes in der Praxis vorkommen, wie streng die

@@ -146,6 +146,13 @@ const EXPORT_STRATEGIES: Readonly<Record<string, string>> = {
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
 
+/**
+ * Schreib-Endpunkte für SB (v4 und v3) und SD (3.2c): Der Mock bildet ihre Antwortformen nicht nach. Getestet sind
+ * sie mit msw (`writes-sb-sd.test.ts`).
+ */
+const UNMOCKED_WRITE_PATH =
+  /^\/(sb\/v4\/(campaigns|adGroups|ads)(\/delete)?|sb\/(keywords|targets|negativeKeywords|negativeTargets)|sd\/(campaigns|adGroups|targets|productAds|negativeTargets))$/;
+
 export function createMockWrites(simulation: MockWriteSimulation) {
   let throttled = simulation.throttledWrites ?? 0;
   /** Laufende Nummer für neue IDs; mit dem Startzeitpunkt, damit ein neuer Prozess keine früheren IDs vergibt. */
@@ -308,6 +315,17 @@ export function createMockWrites(simulation: MockWriteSimulation) {
     url: URL,
     profile: MockProfile | undefined,
   ): Promise<Response | null> {
+    if (UNMOCKED_WRITE_PATH.test(url.pathname) && request.method !== 'GET') {
+      // Klarer Grund statt „nicht gefunden“: Der Client meldet ihn je Änderung.
+      return Response.json(
+        {
+          code: 'MOCK_NOT_SUPPORTED',
+          details:
+            'Der Mock-Anbieter bildet Schreiben nur für Sponsored Products nach; Sponsored Brands und Sponsored Display gehen als Bulk-Datei oder gegen die echte API.',
+        },
+        { status: 400 },
+      );
+    }
     const route = WRITE_ROUTES.find((r) => r.method === request.method && r.path === url.pathname);
     if (!route) return null;
     if (!profile) {

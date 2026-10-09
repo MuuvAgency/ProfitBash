@@ -345,9 +345,50 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     neue Kampagnen, Ad Groups und Keywords (Phase 4 nutzt denselben Schreiber).
 
 #### 3.2c Schreib-Client für Sponsored Brands und Sponsored Display
-- [ ] Abbildung von `AmazonAdsWriteOperation` auf SB v4 (Keywords und Targets v3) und SD samt deren Antwortformen, Grenzen
+- [x] Abbildung von `AmazonAdsWriteOperation` auf SB v4 (Keywords und Targets v3) und SD samt deren Antwortformen, Grenzen
       je Kostenart (CPC, vCPM) und Marktplatz; Doku-Stand prüfen und ADR 005 ergänzen. Kann nach 3.3 kommen: Die Kunden
-      nutzen heute fast nur SP, und die Bulk-Datei deckt SB und SD ab.
+      nutzen heute fast nur SP.
+- [x] Umsetzung (Stand für 1.10 und später):
+  - **Doku-Stand** (2026-10-09): OpenAPI-Specs von Amazon, `SponsoredBrands_prod_3p.json` (v4: Kampagnen, Ad Groups,
+    Ads), `sponsored-brands/3-0/openapi.yaml` (Keywords, Targets, Negatives) und `sponsored-display/3-0/openapi.yaml`,
+    dazu die Seite „Limits, constraints, and quotas“. Endpunkte, Formen und offene Punkte in ADR 005.
+  - **Aufbau** (`packages/amazon-ads/src`): `write-endpoints.ts` (Form eines Endpunkts mit `batchSize` und `read`,
+    `WriteDialect` je Anzeigentyp, Lesen der Antwortformen: `indexedReader` für SP v3 und SB v4,
+    `collectOutcomes`), `writes.ts` (Modell, SP, Senden und Stückeln für alle), `writes-sb-sd.ts` (SB und SD).
+    `applyChanges` wählt die Abbildung über `adProduct`; unbekannte Ad-Typen: `AD_PRODUCT_NOT_SUPPORTED`.
+  - **Modell:** `update` für `keyword`/`target` und `archive` tragen optional `amazonCampaignId` und
+    `amazonAdGroupId` (SB v3 verlangt Kampagne und Ad Group in jedem Eintrag; fehlen sie dort: `INVALID_VALUE`).
+    Der Job liefert sie immer mit (`apps/worker/src/ad-changes/operations.ts`, `parentIds`).
+  - **Sponsored Brands:** Kampagne (Zustand, Tagesbudget), Ad Group und Anzeige (Zustand) über v4 mit höchstens 10
+    Einträgen je Aufruf, Archivieren über `.../delete`; Keywords und Produkt-Targets (Zustand, Gebot) und das
+    Archivieren von Keywords, Targets und Negatives über v3 (höchstens 100, IDs als JSON-Zahl, Zustand klein,
+    Archivieren als Zustand `archived`); Negatives (Keyword exakt/Wortgruppe, ASIN) in der Ad Group.
+  - **Sponsored Display:** Kampagne (Zustand, Tagesbudget), Ad Group (Zustand, Standardgebot), Target (Zustand,
+    Gebot), Product Ad (Zustand), Archivieren als Zustand `archived`, negative ASIN in der Ad Group.
+  - **Nicht vorhanden** (je Änderung `NOT_SUPPORTED` mit Grund, ohne Amazon zu fragen): bei SB Gebotsstrategie und
+    Platzierungen, Standardgebot der Ad Group, Negatives auf Kampagnenebene; bei SD Keywords und negative Keywords,
+    Negatives auf Kampagnenebene, Gebotsstrategie und Platzierungen.
+  - **Antwortformen:** `success`/`error` je `index` (SB v4 wie SP v3); Liste `{ code, description, <id> }` in der
+    Reihenfolge der Anfrage (SB-Keywords v3, SD); Erfolgs- und Fehlerlisten je `targetRequestIndex` (SB-Targets
+    v3). Fehlende Einträge, abweichende IDs und doppelt genannte Einträge gelten wie bei SP als unklar. Anlagen
+    werden nach 5xx nicht wiederholt.
+  - **Grenzen** (`limits.ts`): `SB_BID_LIMITS`, `SD_BID_LIMITS` je Kostenart (CPC, vCPM) und
+    `SB_DAILY_BUDGET_LIMITS`, `SD_DAILY_BUDGET_LIMITS` für die Marktplätze aus `AMAZON_MARKETPLACES` (SD ohne
+    Irland), `amazonAdsValueLimit({ adProduct, countryCode, field, costType })`. Geprüft wird gegen die weiteste
+    Spanne, die Amazon für Ad-Typ, Kostenart und Marktplatz annimmt (Bild/Video und die vCPM-Ziele von SB kennt
+    ProfitBash nicht); ohne Kostenart gegen die Spanne über beide. Die **Kostenart** der Kampagne
+    (`extra.costType`) geht jetzt durch Warenkorb und Prüfung beim Übermitteln (`AdChangeRecord.costType`,
+    `AdChangeReviewRow.costType`, `checkAdChanges`); die API nutzt `amazonAdsValueLimit` direkt (die doppelte
+    Tabelle aus 3.4 entfällt).
+  - **Mock:** bildet Schreiben weiter nur für SP nach; SB und SD beantwortet er mit `400 MOCK_NOT_SUPPORTED` und
+    klarem Text (je Änderung fehlgeschlagen). Getestet sind SB und SD mit msw (`writes-sb-sd.test.ts`).
+  - **Offen bzw. bewusst so:** **Die Bulk-Datei kennt weiter nur SP** (eigene Blätter und Spalten für SB und SD;
+    `AD_PRODUCT_NOT_SUPPORTED` beim Weg `bulk_file`). Die Aufgabenzeile nannte die Bulk-Datei als Abdeckung für SB
+    und SD; das stimmt nicht (Notiz 3.2b). Ohne API-Zugang lassen sich SB und SD damit noch nicht ändern: eigene
+    Aufgabe mit den Bulksheets-Guides für SB und SD, am besten mit einer echten Datei von Dominik. Die ±50-%-Warnung
+    und die Anzeige im Explorer unterscheiden vCPM nicht von CPC (nur die Grenzen). SB-Platzierungen und
+    `bidOptimization` lassen sich nicht ändern. Die offenen Punkte zum echten Verhalten der v3-Endpunkte stehen in
+    ADR 005 (IDs über 2^53 als Zahl, Reihenfolge der Antworten, Codes, Höchstzahl bei SD).
 
 ### 3.3 Übermitteln, Wiederholen, Revert (`apps/worker`, `packages/db`)
 - [x] Job über `runJob` mit Lease je Connection (wie die Datenjobs): Übermittlung abholen, über den Schreib-Client senden,
