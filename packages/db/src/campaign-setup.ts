@@ -363,7 +363,7 @@ export interface CampaignSetupContext {
 /**
  * Was es im Profil schon gibt: Namen aller nicht entfernten Kampagnen (auch archivierte, Amazon vergibt einen Namen
  * nur einmal) und der Kampagnen offener oder angelegter Setups, die der Import noch nicht kennt, dazu exakt gebuchte
- * Keywords (nicht archiviert).
+ * Keywords (nicht archiviert, auch aus Setups).
  */
 async function loadContext(
   db: DbOrTx,
@@ -400,12 +400,28 @@ async function loadContext(
         isNull(amazonAdsTargets.removedAt),
       ),
     );
-  return {
-    campaignNames: [...names.values()],
-    exactKeywords: exactKeywords.flatMap(({ text, campaignName }) =>
-      text ? [{ text, campaignName: campaignName ?? '' }] : [],
-    ),
-  };
+  // Exakte Keywords offener bzw. angelegter Setups, die der Import noch nicht kennt.
+  const setupKeywords = await db
+    .select({
+      text: sql<string>`${campaignSetupItems.payload}->>'text'`,
+      campaignName: campaignSetupItems.campaignRef,
+    })
+    .from(campaignSetupItems)
+    .where(
+      and(
+        eq(campaignSetupItems.profileId, profileId),
+        eq(campaignSetupItems.entityType, 'keyword'),
+        inArray(campaignSetupItems.status, ['submitted', 'applied']),
+        sql`${campaignSetupItems.payload}->>'matchType' = 'exact'`,
+      ),
+    );
+  const keywords = new Map<string, { text: string; campaignName: string }>();
+  for (const { text, campaignName } of [...exactKeywords, ...setupKeywords]) {
+    if (text && !keywords.has(text.toLowerCase())) {
+      keywords.set(text.toLowerCase(), { text, campaignName: campaignName ?? '' });
+    }
+  }
+  return { campaignNames: [...names.values()], exactKeywords: [...keywords.values()] };
 }
 
 /** Profil und Vorhandenes für das Planen eines Setups. `NOT_FOUND` für unsichtbare Profile, `null` für Nicht-Mitglieder. */

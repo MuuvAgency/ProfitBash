@@ -148,28 +148,32 @@ export async function recordCampaignSetupResults(
     results: readonly CampaignSetupResult[];
   },
 ): Promise<void> {
-  for (const result of input.results) {
-    await db
-      .update(i)
-      .set(
-        result.outcome === 'applied'
-          ? { status: 'applied', amazonEntityId: result.amazonEntityId, resolvedAt: input.now }
-          : {
-              status: 'failed',
-              errorCode: result.code,
-              errorMessage: result.message,
-              resolvedAt: input.now,
-            },
-      )
-      .where(
-        and(
-          eq(i.id, result.itemId),
-          eq(i.submissionId, input.submissionId),
-          eq(i.organizationId, input.organizationId),
-          eq(i.status, 'submitted'),
-        ),
-      );
-  }
+  if (input.results.length === 0) return;
+  // In einer Transaktion: Kampagne und ihre Gebotsanpassungen haben immer dasselbe Ergebnis.
+  await db.transaction(async (tx) => {
+    for (const result of input.results) {
+      await tx
+        .update(i)
+        .set(
+          result.outcome === 'applied'
+            ? { status: 'applied', amazonEntityId: result.amazonEntityId, resolvedAt: input.now }
+            : {
+                status: 'failed',
+                errorCode: result.code,
+                errorMessage: result.message,
+                resolvedAt: input.now,
+              },
+        )
+        .where(
+          and(
+            eq(i.id, result.itemId),
+            eq(i.submissionId, input.submissionId),
+            eq(i.organizationId, input.organizationId),
+            eq(i.status, 'submitted'),
+          ),
+        );
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
