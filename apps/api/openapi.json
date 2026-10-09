@@ -6940,6 +6940,12 @@
           "name": {
             "type": "string"
           },
+          "presetKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "items": {
             "type": "array",
             "items": {
@@ -6976,6 +6982,7 @@
           "id",
           "profileId",
           "name",
+          "presetKey",
           "items",
           "createdAt",
           "updatedAt"
@@ -6998,6 +7005,14 @@
             },
             "minItems": 1,
             "maxItems": 100
+          },
+          "presetKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           }
         },
         "required": [
@@ -7042,6 +7057,14 @@
             },
             "minItems": 1,
             "maxItems": 100
+          },
+          "presetKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           }
         },
         "additionalProperties": false
@@ -7100,6 +7123,391 @@
           "enabled",
           "groupIds"
         ]
+      },
+      "StructureCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "catalog": {
+            "$ref": "#/components/schemas/StructureCatalog"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clientPresets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "clientId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "presetKey": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "clientId",
+                "presetKey"
+              ]
+            }
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "catalog",
+          "version",
+          "updatedAt",
+          "clientPresets",
+          "clients"
+        ]
+      },
+      "StructureCatalog": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
+                },
+                "code": {
+                  "type": "string",
+                  "maxLength": 16,
+                  "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 400,
+                  "default": ""
+                },
+                "adProduct": {
+                  "type": "string",
+                  "enum": [
+                    "SP",
+                    "SB",
+                    "SD"
+                  ]
+                },
+                "targeting": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "keyword",
+                    "product",
+                    "category",
+                    "audience"
+                  ]
+                },
+                "matchType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "broad",
+                    "phrase",
+                    "exact",
+                    null
+                  ],
+                  "default": null
+                },
+                "productMatch": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "exact",
+                    "expanded",
+                    null
+                  ],
+                  "default": null
+                },
+                "structure": {
+                  "type": "string",
+                  "enum": [
+                    "1:1:1",
+                    "1:1:n",
+                    "1:n:1"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "generic",
+                    "brand",
+                    "competitor",
+                    "own"
+                  ]
+                },
+                "biddingStrategy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "SALES_DOWN_ONLY",
+                    "SALES_UP_AND_DOWN",
+                    "NONE",
+                    null
+                  ],
+                  "default": null
+                },
+                "sdOptimization": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "clicks",
+                    "conversions",
+                    null
+                  ],
+                  "default": null
+                },
+                "defaultBid": {
+                  "type": "string",
+                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                },
+                "dailyBudget": {
+                  "type": "string",
+                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                },
+                "placements": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "topOfSearch": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 900
+                    },
+                    "productPages": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 900
+                    },
+                    "restOfSearch": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 900
+                    }
+                  },
+                  "default": null,
+                  "required": [
+                    "topOfSearch",
+                    "productPages",
+                    "restOfSearch"
+                  ],
+                  "additionalProperties": false
+                },
+                "lookbackDays": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 365,
+                  "default": null
+                }
+              },
+              "required": [
+                "key",
+                "code",
+                "label",
+                "adProduct",
+                "targeting",
+                "structure",
+                "source",
+                "defaultBid",
+                "dailyBudget"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 60
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 200
+          },
+          "presets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 400,
+                  "default": ""
+                },
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "block": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
+                      },
+                      "defaultBid": {
+                        "type": "string",
+                        "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                      },
+                      "dailyBudget": {
+                        "type": "string",
+                        "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                      },
+                      "topOfSearch": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 900
+                      },
+                      "lookbackDays": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 365
+                      }
+                    },
+                    "required": [
+                      "block"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "maxItems": 30
+                },
+                "isDefault": {
+                  "type": "boolean",
+                  "default": false
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "blocks"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 30
+          },
+          "naming": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "pattern"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "blocks",
+          "edges",
+          "presets",
+          "naming"
+        ],
+        "additionalProperties": false
+      },
+      "SaveStructureCatalogRequest": {
+        "type": "object",
+        "properties": {
+          "catalog": {
+            "$ref": "#/components/schemas/StructureCatalog"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "catalog",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "SetClientPresetRequest": {
+        "type": "object",
+        "properties": {
+          "presetKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 32,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          }
+        },
+        "required": [
+          "presetKey"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -11492,6 +11900,189 @@
           },
           "404": {
             "description": "Produktgruppe oder Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/tools/catalog": {
+      "get": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Struktur-Katalog der Organisation (ohne gespeichertes Dokument die Startwerte), Presets je Client",
+        "responses": {
+          "200": {
+            "description": "Katalog.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructureCatalogResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Struktur-Katalog speichern (nur Org-Admins)",
+        "description": "`version` ist die gelesene Version; wurde der Katalog inzwischen gespeichert, antwortet die API mit `409 STRUCTURE_CATALOG_VERSION_CONFLICT`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveStructureCatalogRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeichert.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructureCatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Veraltete Version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/tools/client-presets/{clientId}": {
+      "put": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Preset eines Clients setzen oder lösen (Recht „write“)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "clientId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetClientPresetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Gespeichert."
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Client nicht gefunden.",
             "content": {
               "application/json": {
                 "schema": {
