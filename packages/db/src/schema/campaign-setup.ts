@@ -137,8 +137,11 @@ export const campaignSetupItems = pgTable(
       sql`(${t.entityType} in ('campaign', 'placement')) = (${t.adGroupRef} is null)`,
     ),
     index('campaign_setup_items_submission_idx').on(t.submissionId, t.position),
-    index('campaign_setup_items_open_profile_idx')
+    // Offene Zeilen und angelegte ohne echte ID (Bestätigung durch den nächsten Bulk-Import).
+    index('campaign_setup_items_unresolved_profile_idx')
       .on(t.profileId)
-      .where(sql`${t.status} = 'submitted'`),
+      .where(
+        sql`${t.status} = 'submitted' or (${t.status} = 'applied' and ${t.amazonEntityId} is null and ${t.entityType} <> 'placement')`,
+      ),
   ],
 );

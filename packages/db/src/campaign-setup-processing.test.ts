@@ -64,7 +64,11 @@ const plan: PlannedCampaign = {
 
 const who = () => ({ userId: f.ada, orgId: f.org });
 
-async function submitted(channel: 'api' | 'bulk_file' = 'bulk_file', profileId = f.profile) {
+async function submitted(
+  channel: 'api' | 'bulk_file' = 'bulk_file',
+  profileId = f.profile,
+  name = NAME,
+) {
   const draft: SaveCampaignSetupDraft = {
     profileId,
     productGroupId: null,
@@ -72,7 +76,7 @@ async function submitted(channel: 'api' | 'bulk_file' = 'bulk_file', profileId =
     name: 'Flaschen',
     campaignState: 'ENABLED',
     inputs: { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} },
-    campaigns: [plan],
+    campaigns: [{ ...plan, name, adGroup: { ...plan.adGroup, name } }],
   };
   const saved = (await saveCampaignSetupDraft(testDb.db, { ...who(), draft }))!;
   const result = await submitCampaignSetupDraft(testDb.db, {
@@ -213,95 +217,95 @@ describe('recordCampaignSetupResults und Abschluss', () => {
   });
 });
 
-describe('Bestätigung durch den Bulk-Import (Zuordnung über Namen)', () => {
-  async function importStructure() {
-    const { db } = testDb;
-    const [campaign] = await db
-      .insert(amazonAdsCampaigns)
-      .values({
-        organizationId: f.org,
-        profileId: f.profile,
-        amazonCampaignId: '4401',
-        adProduct: SP,
-        name: NAME.toLowerCase(),
-        state: 'ENABLED',
-        budgetAmount: '25',
-        budgetCurrencyCode: 'EUR',
-        budgetType: 'DAILY',
-        biddingStrategy: 'SALES_DOWN_ONLY',
-        extra: { placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: '20' }] },
-      })
-      .returning({ id: amazonAdsCampaigns.id });
-    const [adGroup] = await db
-      .insert(amazonAdsAdGroups)
-      .values({
-        organizationId: f.org,
-        profileId: f.profile,
-        campaignId: campaign!.id,
-        amazonAdGroupId: '5501',
-        adProduct: SP,
-        name: NAME,
-        state: 'ENABLED',
-        defaultBid: '0.85',
-        defaultBidCurrencyCode: 'EUR',
-      })
-      .returning({ id: amazonAdsAdGroups.id });
-    const parents = {
+/** Struktur, wie sie der nächste Bulk-Import nach dem Upload liefern würde. */
+async function importStructure() {
+  const { db } = testDb;
+  const [campaign] = await db
+    .insert(amazonAdsCampaigns)
+    .values({
+      organizationId: f.org,
+      profileId: f.profile,
+      amazonCampaignId: '4401',
+      adProduct: SP,
+      name: NAME.toLowerCase(),
+      state: 'ENABLED',
+      budgetAmount: '25',
+      budgetCurrencyCode: 'EUR',
+      budgetType: 'DAILY',
+      biddingStrategy: 'SALES_DOWN_ONLY',
+      extra: { placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: '20' }] },
+    })
+    .returning({ id: amazonAdsCampaigns.id });
+  const [adGroup] = await db
+    .insert(amazonAdsAdGroups)
+    .values({
       organizationId: f.org,
       profileId: f.profile,
       campaignId: campaign!.id,
-      adGroupId: adGroup!.id,
+      amazonAdGroupId: '5501',
       adProduct: SP,
+      name: NAME,
       state: 'ENABLED',
-    };
-    await db.insert(amazonAdsProductAds).values({
+      defaultBid: '0.85',
+      defaultBidCurrencyCode: 'EUR',
+    })
+    .returning({ id: amazonAdsAdGroups.id });
+  const parents = {
+    organizationId: f.org,
+    profileId: f.profile,
+    campaignId: campaign!.id,
+    adGroupId: adGroup!.id,
+    adProduct: SP,
+    state: 'ENABLED',
+  };
+  await db.insert(amazonAdsProductAds).values({
+    ...parents,
+    amazonAdId: '6601',
+    asin: 'B0TEST0001',
+    sku: 'SKU-1',
+  });
+  await db.insert(amazonAdsTargets).values([
+    {
       ...parents,
-      amazonAdId: '6601',
-      asin: 'B0TEST0001',
-      sku: 'SKU-1',
-    });
-    await db.insert(amazonAdsTargets).values([
-      {
-        ...parents,
-        amazonTargetId: '7701',
-        targetType: 'keyword',
-        keywordText: 'trinkflasche',
-        matchType: 'EXACT',
-        bid: '0.90',
-        bidCurrencyCode: 'EUR',
-      },
-      {
-        ...parents,
-        amazonTargetId: '7702',
-        targetType: 'product',
-        expression: { matchType: 'PRODUCT_SIMILAR', asin: 'B0FREMD001' },
-      },
-      {
-        ...parents,
-        amazonTargetId: '7703',
-        targetType: 'category',
-        expression: { productCategoryId: '12345' },
-      },
-    ]);
-    await db.insert(amazonAdsNegativeTargets).values([
-      {
-        ...parents,
-        level: 'ad_group',
-        amazonTargetId: '8801',
-        targetType: 'keyword',
-        keywordText: 'glas',
-        matchType: 'PHRASE',
-      },
-      {
-        ...parents,
-        level: 'ad_group',
-        amazonTargetId: '8802',
-        targetType: 'product',
-        expression: { asin: 'B0FREMD002' },
-      },
-    ]);
-  }
-
+      amazonTargetId: '7701',
+      targetType: 'keyword',
+      keywordText: 'trinkflasche',
+      matchType: 'EXACT',
+      bid: '0.90',
+      bidCurrencyCode: 'EUR',
+    },
+    {
+      ...parents,
+      amazonTargetId: '7702',
+      targetType: 'product',
+      expression: { matchType: 'PRODUCT_SIMILAR', asin: 'B0FREMD001' },
+    },
+    {
+      ...parents,
+      amazonTargetId: '7703',
+      targetType: 'category',
+      expression: { productCategoryId: '12345' },
+    },
+  ]);
+  await db.insert(amazonAdsNegativeTargets).values([
+    {
+      ...parents,
+      level: 'ad_group',
+      amazonTargetId: '8801',
+      targetType: 'keyword',
+      keywordText: 'glas',
+      matchType: 'PHRASE',
+    },
+    {
+      ...parents,
+      level: 'ad_group',
+      amazonTargetId: '8802',
+      targetType: 'product',
+      expression: { asin: 'B0FREMD002' },
+    },
+  ]);
+}
+describe('Bestätigung durch den Bulk-Import (Zuordnung über Namen)', () => {
   it('ordnet die angelegten Entities ihrem Entwurf zu und schließt die Übermittlung', async () => {
     const id = await submitted();
     expect(
@@ -364,12 +368,37 @@ describe('closeBulkFileSubmission für Setups', () => {
     expect((await items(applied)).every((row) => row.status === 'applied')).toBe(true);
     expect(await submissionStatus(applied)).toBe('finished');
 
-    const discarded = await submitted();
+    const discarded = await submitted('bulk_file', f.profile, 'Zweite');
     await closeBulkFileSubmission(testDb.db, {
       ...who(),
       submissionId: discarded,
       outcome: 'discarded',
     });
     expect((await items(discarded)).every((row) => row.status === 'dismissed')).toBe(true);
+  });
+
+  it('trägt nach dem Abschließen von Hand die echten IDs beim nächsten Import nach', async () => {
+    const id = await submitted();
+    await closeBulkFileSubmission(testDb.db, { ...who(), submissionId: id, outcome: 'applied' });
+    expect(await submissionStatus(id)).toBe('finished');
+
+    await importStructure();
+    const result = await confirmBulkFileAdChanges(testDb.db, {
+      organizationId: f.org,
+      profileId: f.profile,
+      now: new Date(),
+    });
+    expect(result.finished).toBe(0);
+    expect((await items(id)).map((row) => [row.entityType, row.amazonEntityId])).toEqual([
+      ['campaign', '4401'],
+      ['placement', null],
+      ['ad_group', '5501'],
+      ['product_ad', '6601'],
+      ['keyword', '7701'],
+      ['product_target', '7702'],
+      ['product_target', '7703'],
+      ['negative_keyword', '8801'],
+      ['negative_product_target', '8802'],
+    ]);
   });
 });

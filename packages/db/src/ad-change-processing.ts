@@ -874,11 +874,9 @@ export async function confirmBulkFileAdChanges(
       )
       .for('update');
     const result = { confirmed: 0, finished: 0 };
+    // Anlagen eines Setups, auch aus schon abgeschlossenen Übermittlungen (echte IDs nachtragen).
+    result.confirmed += await confirmCampaignSetupItems(tx, input);
     if (submissions.length === 0) return result;
-    result.confirmed += await confirmCampaignSetupItems(tx, {
-      ...input,
-      submissionIds: submissions.map((submission) => submission.id),
-    });
 
     const changes = await tx
       .select()
