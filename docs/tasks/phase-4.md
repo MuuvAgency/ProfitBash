@@ -103,6 +103,15 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   („Simulieren“ an einer Kampagne übernimmt deren Strategie und Platzierungen). Alternative: nur als Quick-Tool im Popover.
   **Entschieden (Dominik, 2026-10-09): eigene Seite unter „Tools“ und Aufruf aus dem Explorer.**
 
+- **F13 – Fragen zu Beginn von 4.4 (Dominik, 2026-10-09):**
+  - **Startwerte im Katalog:** noch nicht angesehen; es gelten die Startwerte. Dominik fragt, ob Gebote und Budgets
+    **aus vorhandenen Kampagnen des Profils** kommen können, wenn es sie schon gibt. Wird in 4.5 umgesetzt (Vorschlag
+    in 4.5 unten), sonst wie empfohlen der Katalog.
+  - **Freischalten von vCPM und Off-Amazon** gilt je Baustein des Entwurfs, nicht je Kampagne (wie empfohlen).
+  - **Entwürfe gehören dem Team:** Alle mit Schreibrecht sehen und ändern die Entwürfe eines Profils; der Ersteller
+    steht dabei.
+  - **Ein Entwurf = eine Übermittlung = eine Bulk-Datei** (kein Bündeln mehrerer Entwürfe).
+
 ## Aufgaben (nach F1–F12, 2026-10-09)
 
 **Begriffe:** Ein **Baustein** beschreibt eine Art von Kampagne (Anzeigentyp, Targeting, Struktur, Gebotsstrategie,
@@ -256,6 +265,9 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
       Struktur mit Namen, Geboten, Budgets und Hinweisen → Entwurf speichern → übermitteln.
 - [ ] Entwürfe ansehen, ändern, verwerfen; Verweis auf die Übermittlung. Neue Kampagnen sind im Entwurf **aktiv**
       vorbelegt und je Entwurf auf pausiert umstellbar (F6); die Vorschau sagt das deutlich.
+- [ ] Startwerte aus dem Profil (F13): Hat das Profil Kampagnen mit Kennzahlen, schlägt das Setup Gebote aus den
+      eigenen Daten vor (z. B. mittlerer CPC der letzten 60 Tage je Match-Typ bzw. Targeting-Art, gekennzeichnet als
+      „aus dem Profil“), sonst gelten Preset und Baustein. Regel und Mindestdaten beim Bau festlegen und hier notieren.
 
 ### 4.6 Harvest von der Merkliste
 - [ ] Merkliste als Eingang des Setups (Auswahl je Profil), Vorschlag für das Negieren in der Quelle (F7), Einträge nach
