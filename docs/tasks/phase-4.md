@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1, 4.2, 4.3, 4.4. Nächster Schritt: 4.5.
+> Datei). Fertig: 4.1–4.5. Nächster Schritt: 4.6.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -335,13 +335,47 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     (kommt mit 4.5, ebenso die API für Entwürfe). Kampagnennamen im Profil zählen ohne Rücksicht auf den Anzeigentyp.
 
 ### 4.5 Kampagnen-Setup (`apps/api`, `apps/web`)
-- [ ] Assistent unter `/ads/tools/setup`: Client und Profil → Produktgruppe → Preset → Keywords und Targets → Vorschau der
+- [x] Assistent unter `/ads/tools/setup`: Client und Profil → Produktgruppe → Preset → Keywords und Targets → Vorschau der
       Struktur mit Namen, Geboten, Budgets und Hinweisen → Entwurf speichern → übermitteln.
-- [ ] Entwürfe ansehen, ändern, verwerfen; Verweis auf die Übermittlung. Neue Kampagnen sind im Entwurf **aktiv**
+- [x] Entwürfe ansehen, ändern, verwerfen; Verweis auf die Übermittlung. Neue Kampagnen sind im Entwurf **aktiv**
       vorbelegt und je Entwurf auf pausiert umstellbar (F6); die Vorschau sagt das deutlich.
-- [ ] Startwerte aus dem Profil (F13): Hat das Profil Kampagnen mit Kennzahlen, schlägt das Setup Gebote aus den
+- [x] Startwerte aus dem Profil (F13): Hat das Profil Kampagnen mit Kennzahlen, schlägt das Setup Gebote aus den
       eigenen Daten vor (z. B. mittlerer CPC der letzten 60 Tage je Match-Typ bzw. Targeting-Art, gekennzeichnet als
       „aus dem Profil“), sonst gelten Preset und Baustein. Regel und Mindestdaten beim Bau festlegen und hier notieren.
+- [x] Umsetzung (Stand für 4.6 und später):
+  - **Startwerte aus dem Profil (F13, Regel):** mittlerer CPC (Kosten ÷ Klicks) der Sponsored-Products-Targets in
+    den 60 Tagen vor heute (Zeitzone des Profils), getrennt nach Keywords je Match-Typ, Produkt-Targets (exakt und
+    „ähnlich“ zusammen) und Kategorien; nur ab **30 Klicks** je Gruppe, zwei Nachkommastellen (half-even)
+    (`loadProfileBidSuggestions`). Die Plan-Engine nimmt sie als `profileBids`: für SP-Bausteine vor Preset und
+    Baustein, Gebote aus der Eingabe gehen vor; Standardgebot der Ad Group und Gebote der Ziele. Hinweis
+    `bidFromProfile` je Baustein, in der Vorschau zu einer Zeile zusammengefasst; abschaltbar im Assistenten. Budgets
+    bleiben beim Katalog (die Kennzahlen sagen nichts über ein passendes Budget neuer Kampagnen).
+  - **API** (Feature `tools`, `apps/api/src/routes/campaign-setup.ts`): `POST /api/ads/tools/setup/plan` (Lesen;
+    plant auf dem Server mit Katalog, Produktgruppe, Kurs des Tages, Grenzen von Amazon, Vorhandenem und Geboten aus
+    dem Profil; `409 CAMPAIGN_SETUP_FX_RATE_MISSING` ohne Kurs), `GET/POST …/setup/drafts`, `GET/PUT …/drafts/{id}`,
+    `POST …/drafts/{id}/discard`, `POST …/drafts/{id}/submit` (`status: submitted | rejected` mit `issues`; Weg
+    `api` plant den Job ein). Fehler `CAMPAIGN_SETUP_<CODE>`. Das Detail einer Übermittlung
+    (`GET /api/ads/changes/submissions/{id}`) liefert `setupItems`. Die Wettbewerber-Liste je Client (F-S9) gibt es
+    noch nicht: Conquesting fällt mit Hinweis weg.
+  - **Seite** `/ads/tools/setup` (Reiter „Kampagnen-Setup“): Entwürfe des Teams (Status, Ersteller, Link auf die
+    Übermittlung) und Assistent auf einer Seite: Profil, Produktgruppe, Preset (vorbelegt: Gruppe vor Client vor
+    Standard), Eingaben als Textfelder je Zeile (Keywords, Einzel-Keywords, Marke, fremde ASINs einzeln bzw.
+    gesammelt, Kategorien `ID;Name`), Freischalten je Baustein (vCPM bei SB/SD, Off-Amazon bei SP), „Planen“.
+    Vorschau: Hinweise nach Schwere, Kampagnen mit Art, Budget und Standardgebot (bearbeitbar), Zahl der Anzeigen,
+    Ziele und Negatives, Kampagne entfernen; Kurs-Hinweis außerhalb EUR; Schalter „pausiert anlegen“ mit klarem Text
+    (F6). Speichern, Übermitteln (Bulk-Datei oder API; ungespeicherte Änderungen werden vorher gesichert; Fehler der
+    Prüfung sperren), Verwerfen. Nach dem Übermitteln Verweis auf die Übermittlung. Übermittelte Entwürfe sind nur
+    lesbar.
+  - **Seite „Änderungen“:** Setup-Übermittlungen tragen „Kampagnen-Setup“, das Detail listet die Anlagen (Art, was,
+    Kampagne, Status, Amazon-ID, Fehler) ohne Folgeschritte und mit eigenem Hinweis zum Upload.
+  - Geprüft im Browser-Pane (Demo-Daten, 2026-10-09): planen mit Geboten aus dem Profil (8 Kampagnen), pausiert
+    speichern, als Bulk-Datei übermitteln (45 Anlagen, eine SD-Kampagne als „noch nicht“), Detail auf der Seite
+    „Änderungen“, Download (`profitbash-setup-…xlsx`), Handy und Hell-Modus (die Tabelle lief am Handy über:
+    behoben), Konsole ohne Fehler. Testdaten danach gelöscht.
+  - **Offen bzw. bewusst so:** Gebote einzelner Keywords lassen sich in der Vorschau nicht ändern (nur Budget und
+    Standardgebot je Kampagne; feiner über „Neu planen“ mit Geboten in der Eingabe später). Ein Ändern der Eingaben
+    verlangt „Neu planen“, das manuelle Änderungen der Vorschau überschreibt. Die Kanalwahl „API“ prüft die
+    Verbindung erst beim Übermitteln (`409`). Startdatum ist der Tag des Downloads (Hinweis auf der Seite).
 
 ### 4.6 Harvest von der Merkliste
 - [ ] Merkliste als Eingang des Setups (Auswahl je Profil), Vorschlag für das Negieren in der Quelle (F7), Einträge nach
