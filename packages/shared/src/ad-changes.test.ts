@@ -130,6 +130,19 @@ describe('adChangeInputSchema', () => {
     });
   });
 
+  it('nimmt die Bestätigung für geschützte Begriffe als Wahrheitswert (3.8)', () => {
+    const input = {
+      operation: 'create_negative',
+      campaignId: ID,
+      adGroupId: null,
+      negative: { type: 'keyword', keywordText: 'nordwind', matchType: 'EXACT' },
+    };
+    expect(adChangeInputSchema.parse({ ...input, confirmProtected: true })).toMatchObject({
+      confirmProtected: true,
+    });
+    expect(adChangeInputSchema.safeParse({ ...input, confirmProtected: 'ja' }).success).toBe(false);
+  });
+
   it('nimmt eine negative ASIN auf Kampagnenebene in Großbuchstaben', () => {
     const parsed = adChangeInputSchema.parse({
       operation: 'create_negative',

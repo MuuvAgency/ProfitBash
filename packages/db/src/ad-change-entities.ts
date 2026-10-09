@@ -1,4 +1,4 @@
-import { comparableSearchTerm, Dec } from '@profitbash/engine';
+import { comparableSearchTerm, createProtectedTermMatcher, Dec } from '@profitbash/engine';
 import {
   AD_CHANGE_PLACEMENTS,
   adChangeFieldKind,
@@ -21,6 +21,7 @@ import {
   amazonAdsProductAds,
   amazonAdsProfiles,
   amazonAdsTargets,
+  clients,
 } from './schema';
 
 /**
@@ -386,45 +387,101 @@ export interface NegativeParent {
   profileId: string;
 }
 
+type NegativeInput = Pick<AdChangeCreateNegativeInput, 'campaignId' | 'adGroupId' | 'negative'>;
+
+/** Stelle eines Negatives (Kampagne bzw. Ad Group) samt Inhalt, für den Abgleich mit vorhandenen und vorgemerkten. */
+export const negativePlaceKey = (campaignId: string, adGroupId: string | null, key: string) =>
+  `${campaignId}:${adGroupId ?? ''}:${key}`;
+
+/**
+ * Prüft Kampagne, Ad Group und vorhandene Negatives für viele Anlagen auf einmal (eine Mehrfachauswahl der
+ * Suchbegriff-Analyse, 3.8): je Eingabe das Profil oder der Grund der Ablehnung, in derselben Reihenfolge.
+ */
+export async function checkNegatives(
+  db: DbOrTx,
+  scope: ProfileScope,
+  inputs: readonly NegativeInput[],
+): Promise<(NegativeParent | AdChangeRejection)[]> {
+  if (inputs.length === 0) return [];
+  const campaigns = await loadEntities(
+    db,
+    scope,
+    'campaign',
+    inputs.map((input) => input.campaignId),
+  );
+  const adGroups = await loadEntities(
+    db,
+    scope,
+    'ad_group',
+    inputs.flatMap((input) => (input.adGroupId === null ? [] : [input.adGroupId])),
+  );
+  const n = amazonAdsNegativeTargets;
+  const existing = new Set<string>();
+  for (const part of chunks([...campaigns.keys()])) {
+    const rows = await db
+      .select({
+        campaignId: n.campaignId,
+        adGroupId: n.adGroupId,
+        targetType: n.targetType,
+        keywordText: n.keywordText,
+        matchType: n.matchType,
+        asin: sql<string | null>`${n.expression}->>'asin'`,
+      })
+      .from(n)
+      .where(
+        and(inArray(n.campaignId, part), isNull(n.removedAt), sql`upper(${n.state}) <> 'ARCHIVED'`),
+      );
+    for (const row of rows) {
+      const key = existingNegativeKey(row);
+      if (key !== null) existing.add(negativePlaceKey(row.campaignId, row.adGroupId, key));
+    }
+  }
+  return inputs.map((input) => {
+    const campaign = campaigns.get(input.campaignId);
+    if (!campaign) return 'notFound';
+    if (campaign.removedAt !== null) return 'entityRemoved';
+    if (isArchived(campaign.state)) return 'entityArchived';
+    if (input.adGroupId !== null) {
+      const adGroup = adGroups.get(input.adGroupId);
+      if (!adGroup || adGroup.campaignId !== campaign.id) return 'notFound';
+      if (adGroup.removedAt !== null) return 'entityRemoved';
+      if (isArchived(adGroup.state)) return 'entityArchived';
+    }
+    const key = negativePlaceKey(campaign.id, input.adGroupId, negativeKey(input.negative));
+    if (existing.has(key)) return 'alreadyExists';
+    return { organizationId: campaign.organizationId, profileId: campaign.profileId };
+  });
+}
+
 /** Prüft Kampagne, Ad Group und vorhandene Negatives; liefert das Profil oder den Grund der Ablehnung. */
 export async function checkNegative(
   db: DbOrTx,
   scope: ProfileScope,
-  input: Pick<AdChangeCreateNegativeInput, 'campaignId' | 'adGroupId' | 'negative'>,
+  input: NegativeInput,
 ): Promise<NegativeParent | AdChangeRejection> {
-  const campaign = (await loadEntities(db, scope, 'campaign', [input.campaignId])).get(
-    input.campaignId,
-  );
-  if (!campaign) return 'notFound';
-  if (campaign.removedAt !== null) return 'entityRemoved';
-  if (isArchived(campaign.state)) return 'entityArchived';
-  if (input.adGroupId !== null) {
-    const adGroup = (await loadEntities(db, scope, 'ad_group', [input.adGroupId])).get(
-      input.adGroupId,
-    );
-    if (!adGroup || adGroup.campaignId !== campaign.id) return 'notFound';
-    if (adGroup.removedAt !== null) return 'entityRemoved';
-    if (isArchived(adGroup.state)) return 'entityArchived';
+  return (await checkNegatives(db, scope, [input]))[0]!;
+}
+
+/**
+ * Prüfer je Profil für geschützte Begriffe des Clients (`clients.protected_terms`, `phase-2b.md` 2b.2); Profile ohne
+ * Client oder ohne Begriffe fehlen. Die Profile hat der Aufrufer über den Access-Layer geprüft.
+ */
+export async function loadProtectedTermMatchers(
+  db: DbOrTx,
+  profileIds: readonly string[],
+): Promise<Map<string, (term: string) => boolean>> {
+  const matchers = new Map<string, (term: string) => boolean>();
+  for (const part of chunks([...new Set(profileIds)])) {
+    const rows = await db
+      .select({ profileId: amazonAdsProfiles.id, protectedTerms: clients.protectedTerms })
+      .from(amazonAdsProfiles)
+      .innerJoin(clients, eq(clients.id, amazonAdsProfiles.clientId))
+      .where(inArray(amazonAdsProfiles.id, part));
+    for (const row of rows) {
+      if (row.protectedTerms.length > 0) {
+        matchers.set(row.profileId, createProtectedTermMatcher(row.protectedTerms));
+      }
+    }
   }
-  const n = amazonAdsNegativeTargets;
-  const existing = await db
-    .select({
-      targetType: n.targetType,
-      keywordText: n.keywordText,
-      matchType: n.matchType,
-      asin: sql<string | null>`${n.expression}->>'asin'`,
-    })
-    .from(n)
-    .where(
-      and(
-        eq(n.campaignId, campaign.id),
-        input.adGroupId === null ? isNull(n.adGroupId) : eq(n.adGroupId, input.adGroupId),
-        eq(n.targetType, input.negative.type),
-        isNull(n.removedAt),
-        sql`upper(${n.state}) <> 'ARCHIVED'`,
-      ),
-    );
-  const key = negativeKey(input.negative);
-  if (existing.some((row) => existingNegativeKey(row) === key)) return 'alreadyExists';
-  return { organizationId: campaign.organizationId, profileId: campaign.profileId };
+  return matchers;
 }
