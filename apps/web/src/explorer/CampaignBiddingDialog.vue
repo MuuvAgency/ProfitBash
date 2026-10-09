@@ -21,14 +21,19 @@ import { currentFieldValue, parsePercentInput, type OpenEntry } from './editing'
 
 /**
  * Gebotsstrategie und Gebotsanpassung je Platzierung einer SP-Kampagne (`phase-3.md` F3, 3.5). Der Dialog zeigt den
- * Stand von Amazon bzw. die eigene Vormerkung und schickt beim Speichern alle Felder: Was dem Stand entspricht,
- * nimmt der Server aus dem Warenkorb bzw. lässt es weg.
+ * Stand von Amazon bzw. die eigene Vormerkung und schickt beim Speichern nur die Felder, die hier geändert wurden
+ * (ein Wert, der wieder dem Stand von Amazon entspricht, nimmt die Vormerkung zurück).
  */
 const props = defineProps<{
   visible: boolean;
   row: GridRow | null;
   /** Offene Änderungen an einem Feld der Kampagne. */
   entryFor: (row: GridRow, field: AdChangeField) => OpenEntry | undefined;
+  /**
+   * Die offenen Änderungen sind geladen. Ohne sie zeigte der Dialog statt einer eigenen Vormerkung den Stand von
+   * Amazon, und Speichern nähme die Vormerkung zurück.
+   */
+  ready: boolean;
 }>();
 const emit = defineEmits<{ close: []; staged: [] }>();
 
@@ -40,6 +45,8 @@ const stage = useStageChanges();
 const placementFields = Object.keys(AD_CHANGE_PLACEMENTS) as AdChangePlacementField[];
 const strategy = ref('');
 const placements = ref<Record<string, string>>({});
+/** Werte beim Öffnen: Gesendet wird nur, was davon abweicht. */
+const initial = ref<Record<string, string>>({});
 const result = ref<StageAdChangesData | null>(null);
 const errorKey = ref<string | null>(null);
 
@@ -47,13 +54,15 @@ const valueOf = (row: GridRow, field: AdChangeField) =>
   props.entryFor(row, field)?.mine?.after ?? currentFieldValue(row, field);
 
 watch(
-  () => [props.visible, props.row?.id] as const,
+  // Auch wenn die offenen Änderungen erst nach dem Öffnen eintreffen.
+  () => [props.visible, props.row?.id, props.ready] as const,
   ([visible]) => {
     if (!visible || !props.row) return;
     strategy.value = valueOf(props.row, 'bidding_strategy') ?? '';
     placements.value = Object.fromEntries(
       placementFields.map((field) => [field, valueOf(props.row!, field) ?? '0']),
     );
+    initial.value = { bidding_strategy: strategy.value, ...placements.value };
     result.value = null;
     errorKey.value = null;
     stage.reset();
@@ -81,8 +90,23 @@ const parsed = computed(() =>
 const invalid = computed(() => placementFields.filter((field) => parsed.value[field] === null));
 /** Ohne setzbare Strategie nimmt Amazon keine Gebotsanpassungen an (`BIDDING_STRATEGY_NOT_SUPPORTED`). */
 const strategyMissing = computed(() => !settable(strategy.value));
+const changedFields = computed(() => [
+  ...(settable(strategy.value) && strategy.value !== initial.value.bidding_strategy
+    ? (['bidding_strategy'] as const)
+    : []),
+  ...placementFields.filter(
+    (field) => parsed.value[field] !== null && parsed.value[field] !== initial.value[field],
+  ),
+]);
 const canSubmit = computed(
-  () => props.row !== null && invalid.value.length === 0 && !stage.isPending.value,
+  () =>
+    props.row !== null &&
+    props.ready &&
+    invalid.value.length === 0 &&
+    changedFields.value.length > 0 &&
+    // Ohne setzbare Strategie scheiterten Platzierungen erst beim Übermitteln.
+    !strategyMissing.value &&
+    !stage.isPending.value,
 );
 
 async function submit() {
@@ -96,10 +120,9 @@ async function submit() {
     field,
     value,
   });
-  const inputs = [
-    ...(settable(strategy.value) ? [update('bidding_strategy', strategy.value)] : []),
-    ...placementFields.map((field) => update(field, parsed.value[field]!)),
-  ];
+  const inputs = changedFields.value.map((field) =>
+    update(field, field === 'bidding_strategy' ? strategy.value : parsed.value[field]!),
+  );
   try {
     result.value = await stage.mutateAsync(inputs);
     emit('staged');
@@ -132,6 +155,15 @@ async function submit() {
 
       <form v-else class="flex flex-col gap-space-lg" @submit.prevent="submit">
         <InlineError v-if="errorKey" :message="t(errorKey)" />
+        <p
+          v-if="!ready"
+          role="status"
+          class="rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
+        >
+          <i class="pi pi-info-circle mr-space-xs text-warn" aria-hidden="true" />{{
+            t('explorer.bidding.notReady')
+          }}
+        </p>
         <div class="flex flex-col gap-space-xs">
           <label :for="`${id}-strategy`" class="text-label-eyebrow uppercase text-ink-tertiary">
             {{ t('explorer.column.biddingStrategy') }}

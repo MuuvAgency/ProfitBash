@@ -56,6 +56,8 @@ const rowSelection: RowSelectionOptions = {
   mode: 'multiRow',
   checkboxes: true,
   headerCheckbox: true,
+  // Die Markierung ändert Gebote (3.5): Die Kopf-Checkbox meint die angezeigten Zeilen, nicht weggefilterte.
+  selectAll: 'filtered',
   enableClickSelection: false,
 };
 const selectionColumnDef: SelectionColumnDef = { pinned: 'left', lockPinned: true };
@@ -78,6 +80,11 @@ function onSelectionChanged({ api: gridApi }: SelectionChangedEvent<GridRow>) {
 /** Tastatur (2.13): Pfeiltasten, Leertaste markiert die Zeile, Enter löst den Link oder Knopf der Zelle aus. */
 function onCellKeyDown({ event }: CellKeyDownEvent<GridRow>) {
   activateCellControlOnEnter(event);
+}
+
+/** Nach einem Filterwechsel gälte die Markierung auch für ausgeblendete Zeilen: aufheben. */
+function onFilterChanged() {
+  api.value?.deselectAll();
 }
 
 function onSortChanged({ api: gridApi, source }: SortChangedEvent<GridRow>) {
@@ -128,5 +135,6 @@ const components = { nameCell: markRaw(NameCell), editCell: markRaw(EditCell) };
     @selection-changed="onSelectionChanged"
     @cell-key-down="onCellKeyDown"
     @sort-changed="onSortChanged"
+    @filter-changed="onFilterChanged"
   />
 </template>

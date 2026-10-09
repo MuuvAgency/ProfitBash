@@ -3,6 +3,7 @@ import { computed, type Ref } from 'vue';
 import { api } from '../api';
 import type { AdChangeInputData } from '../api/client';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
+import { stageInChunks } from './stage';
 
 /**
  * Änderungen (`phase-3.md` 3.5): Warenkorb des Nutzers und offene Änderungen fürs Grid. Alle Schlüssel beginnen mit
@@ -52,7 +53,8 @@ export function useOpenChanges(profileId: Ref<string | undefined>, enabled: Ref<
 export function useStageChanges() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (changes: AdChangeInputData[]) => api.adChanges.stage(changes),
+    mutationFn: (changes: AdChangeInputData[]) =>
+      stageInChunks(changes, (part) => api.adChanges.stage(part)),
     onSettled: () => queryClient.invalidateQueries({ queryKey: [KEY] }),
   });
 }

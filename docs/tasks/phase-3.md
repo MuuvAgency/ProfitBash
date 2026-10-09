@@ -590,6 +590,24 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Scheitert die Abfrage, fehlt der Zähler still.
   - **Tests:** `editing.test.ts`, `pages/ExplorerEditing.test.ts` (Inline, Markierungen, Bulk, Strategie, Rechte),
     `layouts/AppShell.test.ts` (Zähler), dazu Engine, DB und API für Vergleichswert und Anpassen.
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung von `resolveAdjustments` und
+    `loadComparisonBids`, Rundung, Ergebnisse je Index, Audit, Rechte und Query-Keys bestätigt. Übernommen: Die
+    Kopf-Checkbox markiert nur gefilterte Zeilen und ein Filterwechsel hebt die Markierung auf (vorher hätte ein
+    Bulk-Dialog auch ausgeblendete Zeilen geändert); Vormerken in Stücken zu 5000 (`changes/stage.ts`; der Explorer
+    lädt bis 10 000 Zeilen); der Fokus bleibt nach der Eingabe in der Zelle; der Status wird per Tastatur erst mit
+    Enter oder beim Verlassen übernommen (Pfeiltasten blättern nur), mit der Maus sofort; der Dialog „Strategie &
+    Platzierungen“ sendet nur geänderte Felder und sperrt das Speichern, solange die offenen Änderungen fehlen oder
+    gekürzt sind (vorher konnte er eine eigene Vormerkung zurücknehmen) und solange keine setzbare Strategie gewählt
+    ist; eine abgelehnte Anpassung gilt als letzte Angabe ihrer Stelle; Prozent ohne führende Nullen; Hinweise zu
+    ungültigen Eingaben im Bulk-Dialog, Felder beim Wechsel der Art geleert; Tests dazu (Verlassen der Zelle, Fokus,
+    Filter, Fehler von `/open`, gerundetes Ergebnis gleich Stand).
+  - **Offen bzw. bewusst so:** Jedes Vormerken lädt den ganzen Warenkorb (für den Zähler) und die offenen Änderungen
+    neu; bei sehr großem Warenkorb wird die Zelle träge (später ein schlanker Zähler-Endpunkt). Scheitert `/open`,
+    zeigt die Zelle den Stand von Amazon ohne die eigene Vormerkung (Hinweis über dem Grid). Scheitert beim Vormerken
+    in Stücken ein späteres Stück, sind die früheren schon vorgemerkt. Feste Maße der Zelle (Symbolgröße, Mindestbreite
+    132 px) wie in `NameCell.vue`. Für Prozent nach oben gibt es keine eigene Obergrenze (Grenzen von Amazon und die
+    ±50-%-Warnung greifen beim Übermitteln). Nicht getestet: Bulk-Dialog mit gemischten Währungen in der Oberfläche
+    (`bulkInputs` ist getestet), Fehler beim Zurücknehmen.
   - Browser-Pane geprüft (Demo-Daten, 2026-10-09): Gebot in der Zelle geändert (Markierung, Zähler in Sidebar und
     Kopf), drei Gebote um −10 % (2,36 → 2,12; archivierte Zeile übersprungen), Dialog Strategie und Platzierungen mit
     den Werten der Kampagne; 1440 px dunkel, Tablet und Handy hell, kein waagerechtes Scrollen, Konsole ohne Fehler.

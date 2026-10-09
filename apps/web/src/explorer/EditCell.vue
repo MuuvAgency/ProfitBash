@@ -138,23 +138,29 @@ async function start() {
   if (input.value instanceof HTMLInputElement) input.value.select();
 }
 
-function cancel() {
+/** Schließt die Eingabe; der Fokus geht zurück an die Zelle (Pfeiltasten des Grids gehen weiter). */
+function close({ refocus = true } = {}) {
   open.value = false;
   invalid.value = false;
+  keyboard = false;
+  if (refocus) props.params.eGridCell?.focus();
 }
+const cancel = () => close();
+/** Beim Verlassen ist der Fokus schon woanders: nicht zurückholen. */
+const leave = () => open.value && close({ refocus: false });
 
 async function commit(raw: string, { fromBlur = false } = {}) {
   if (!open.value || !row.value) return;
   const value = isState ? raw : parseMoneyInput(raw);
   if (value === null || value === '') {
     // Beim Verlassen mit ungültiger Eingabe bleibt der alte Wert (kein Feld, das den Fokus festhält).
-    if (fromBlur) cancel();
+    if (fromBlur) close({ refocus: false });
     else invalid.value = true;
     return;
   }
   const shown = mine.value?.after ?? current.value;
   const same = shown !== null && (isState ? shown === value : compareDecimal(shown, value) === 0);
-  open.value = false;
+  close({ refocus: !fromBlur });
   if (same) return;
   busy.value = true;
   try {
@@ -162,6 +168,30 @@ async function commit(raw: string, { fromBlur = false } = {}) {
   } finally {
     busy.value = false;
   }
+}
+
+/**
+ * Status-Auswahl: Mit der Maus gilt die Wahl sofort. Per Tastatur blättern die Pfeiltasten nur (manche Browser
+ * melden dabei jedes Mal `change`); übernommen wird mit Enter oder beim Verlassen.
+ */
+let keyboard = false;
+function onSelectKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    void commit((event.target as HTMLSelectElement).value);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    cancel();
+  } else {
+    keyboard = true;
+  }
+}
+function onSelectChange(event: Event) {
+  if (!keyboard) void commit((event.target as HTMLSelectElement).value);
+}
+function onSelectBlur(event: Event) {
+  if (keyboard) void commit((event.target as HTMLSelectElement).value, { fromBlur: true });
+  else leave();
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -200,9 +230,10 @@ async function undo() {
         :aria-label="label"
         :value="text"
         class="h-8 w-full min-w-0 rounded-control bg-tile px-space-xs text-body-sm text-ink outline-none ring-2 ring-violet"
-        @change="commit(($event.target as HTMLSelectElement).value)"
-        @blur="cancel"
-        @keydown.escape.prevent="cancel"
+        @pointerdown="keyboard = false"
+        @change="onSelectChange"
+        @blur="onSelectBlur"
+        @keydown="onSelectKeydown"
       >
         <option v-for="option in stateOptions" :key="option.value" :value="option.value">
           {{ option.label }}

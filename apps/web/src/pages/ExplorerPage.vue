@@ -825,6 +825,7 @@ const truncatedText = computed(() => {
       :visible="biddingOpen !== null"
       :row="biddingOpen"
       :entry-for="entryFor"
+      :ready="openChanges.isSuccess.value && !openChanges.data.value?.truncated"
       @staged="clearSelection"
       @close="biddingOpen = null"
     />
