@@ -34,7 +34,12 @@ export interface FilterState {
   /** `auto` oder ein Währungscode aus den wählbaren Währungen. */
   currency: string;
   attribution: AttributionSetting;
+  /** Eigene Tags (3.7), mehrere als ODER; leer = kein Filter. Höchstens `MAX_FILTER_TAGS` (sie stehen in der URL). */
+  tagIds: string[];
 }
+
+/** Wenige Tags, damit die URL kurz bleibt (Regel „viele IDs nie im Query-String“). */
+export const MAX_FILTER_TAGS = 10;
 
 export const DEFAULT_FILTER_STATE: FilterState = Object.freeze({
   clientIds: [],
@@ -44,6 +49,7 @@ export const DEFAULT_FILTER_STATE: FilterState = Object.freeze({
   comparison: DEFAULT_COMPARISON_MODE,
   currency: 'auto',
   attribution: DEFAULT_ATTRIBUTION_SETTING,
+  tagIds: [],
 }) as FilterState;
 
 /** Höchstzahl gespeicherter Profile, wie die API (`profileIds` bis 1000). `ui_state` fasst 16 KB, also rund 400 IDs. */
@@ -60,6 +66,7 @@ export const FILTER_QUERY_KEYS = [
   'cmp',
   'cur',
   'attr',
+  'tags',
 ] as const;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -126,6 +133,8 @@ export function parseStoredFilters(value: unknown): FilterState | null {
     comparison: v.comparison,
     currency: v.currency,
     attribution: v.attribution,
+    // Ältere Einträge kennen das Feld nicht; eine ungültige Liste kostet nur den Tag-Filter.
+    tagIds: uuidList(v.tagIds, MAX_FILTER_TAGS) ?? [],
   };
 }
 
@@ -146,6 +155,7 @@ export function filterStateFromQuery(
   const cmp = get('cmp');
   const cur = get('cur');
   const attr = get('attr');
+  const tags = get('tags')?.split(',') ?? [];
   return {
     clientIds: clients.every((id) => UUID.test(id)) ? uniqueSorted(clients) : [],
     withoutClient: get('nc') === '1',
@@ -154,6 +164,7 @@ export function filterStateFromQuery(
     comparison: isComparisonMode(cmp) ? cmp : DEFAULT_COMPARISON_MODE,
     currency: isCurrency(cur) ? cur : 'auto',
     attribution: isAttribution(attr) ? attr : DEFAULT_ATTRIBUTION_SETTING,
+    tagIds: uuidList(tags, MAX_FILTER_TAGS) ?? [],
   };
 }
 
@@ -171,6 +182,7 @@ export function filterStateToQuery(state: FilterState): Record<string, string> {
   if (state.comparison !== DEFAULT_COMPARISON_MODE) query.cmp = state.comparison;
   if (state.currency !== 'auto') query.cur = state.currency;
   if (state.attribution !== DEFAULT_ATTRIBUTION_SETTING) query.attr = state.attribution;
+  if (state.tagIds.length) query.tags = uniqueSorted(state.tagIds).join(',');
   return query;
 }
 
@@ -188,6 +200,8 @@ export interface FilterOptionsLike {
   clients: { id: string; name: string }[];
   profiles: { id: string; clientId: string | null }[];
   currencies?: string[];
+  /** Tags der Organisation, soweit geladen (ohne Angabe bleibt der Tag-Filter unverändert). */
+  tags?: { id: string }[];
 }
 
 /**
@@ -216,6 +230,9 @@ export function sanitizeFilterState(state: FilterState, options: FilterOptionsLi
     withoutClient,
     profileIds: profileIds?.length ? profileIds : null,
     currency,
+    tagIds: options.tags
+      ? state.tagIds.filter((id) => options.tags!.some((tag) => tag.id === id))
+      : state.tagIds,
   };
 }
 
@@ -227,6 +244,7 @@ export interface AnalyticsQueryBody {
   comparison: DateRange | null;
   currency: string;
   attribution: AttributionSetting;
+  tagIds?: string[];
 }
 
 /** Anfrage-Body für `/api/ads/*` (Auswahl nur, wenn eingeschränkt). `today` = Tag in der Zeitzone des Browsers. */
@@ -236,6 +254,7 @@ export function toAnalyticsQuery(state: FilterState, today: string): AnalyticsQu
     ...(state.clientIds.length && { clientIds: state.clientIds }),
     ...(state.withoutClient && { withoutClient: true }),
     ...(state.profileIds?.length && { profileIds: state.profileIds }),
+    ...(state.tagIds.length && { tagIds: state.tagIds }),
     period: range,
     comparison: comparisonRange(range, state.comparison),
     currency: state.currency,

@@ -479,6 +479,11 @@ export const de = {
     filter: {
       label: 'Filter',
       selection: 'Clients und Profile',
+      tags: 'Tags',
+      allTags: 'Alle (kein Tag-Filter)',
+      tagCount: '{count} Tags',
+      tagsHint:
+        'Ein Tag gilt für die Kampagne, Ad Group oder das Target, an dem es hängt, und für alles darunter. Dashboard und Kampagnen zählen nur Kampagnen, die das Tag selbst tragen.',
       allProfiles: 'Alle Profile',
       profileCount: '{count} Profil | {count} Profile',
       withoutClient: 'Ohne Client',
@@ -1175,6 +1180,66 @@ export const de = {
       resultOutOfRange: 'Das Ergebnis wäre kein gültiger Betrag über 0.',
     },
   },
+  tags: {
+    title: 'Tags',
+    description:
+      'Eigene Tags der Organisation für Kampagnen, Ad Groups, Targets und Product Ads: gruppieren und danach filtern. Sie ändern nichts bei Amazon.',
+    loadFailed: 'Die Tags konnten nicht geladen werden.',
+    create: 'Neues Tag',
+    howTo:
+      'Zugewiesen wird im Explorer: Zeilen markieren und „Tags zuweisen“ wählen. Gefiltert wird in der Filterleiste von Dashboard und Explorer.',
+    empty: {
+      title: 'Noch keine Tags',
+      text: 'Lege ein Tag an und weise es im Explorer markierten Zeilen zu.',
+      textViewer: 'Admins und Editoren können Tags anlegen und zuweisen.',
+    },
+    count: {
+      campaign: '{count} Kampagne | {count} Kampagnen',
+      ad_group: '{count} Ad Group | {count} Ad Groups',
+      target: '{count} Target | {count} Targets',
+      product_ad: '{count} Product Ad | {count} Product Ads',
+      none: 'Noch nicht zugewiesen',
+    },
+    field: {
+      name: 'Name',
+      nameTooLong: 'Höchstens {max} Zeichen.',
+      color: 'Farbe',
+    },
+    color: {
+      violet: 'Violett',
+      lime: 'Limette',
+      amber: 'Bernstein',
+      red: 'Rot',
+      ink: 'Tinte',
+      grey: 'Grau',
+    },
+    edit: {
+      action: 'Tag „{name}“ ändern',
+      title: 'Tag ändern',
+    },
+    delete: {
+      action: 'Tag „{name}“ löschen',
+      title: 'Tag löschen',
+      text: 'Das Tag „{name}“ wird gelöscht. Es ist noch nirgends zugewiesen. | Das Tag „{name}“ wird gelöscht und von {count} Eintrag gelöst. | Das Tag „{name}“ wird gelöscht und von {count} Einträgen gelöst.',
+      confirm: 'Löschen',
+    },
+    assign: {
+      title: 'Tags für {count} Zeile | Tags für {count} Zeilen',
+      legend: 'Tags',
+      some: 'bei manchen',
+      hint: 'Geändert wird nur, was du anfasst: Häkchen setzen hängt das Tag an alle markierten Zeilen, Häkchen entfernen löst es von allen.',
+      noTags: 'Es gibt noch keine Tags.',
+      manage: 'Tags verwalten',
+      submit: 'Übernehmen',
+      result: {
+        added:
+          'Keine neue Zuweisung | {count} Zuweisung hinzugefügt | {count} Zuweisungen hinzugefügt',
+        removed: '{count} Zuweisung gelöst | {count} Zuweisungen gelöst',
+        skipped:
+          '{count} Zeile übersprungen (nicht mehr sichtbar) | {count} Zeilen übersprungen (nicht mehr sichtbar)',
+      },
+    },
+  },
   explorer: {
     productSearch: {
       empty: 'Keine Product Ads zu dieser Suche.',
@@ -1250,6 +1315,7 @@ export const de = {
         default_bid: 'Standardgebot ändern',
         bid: 'Gebot ändern',
         bidding: 'Strategie & Platzierungen',
+        tags: 'Tags zuweisen',
       },
       biddingHint: 'Dafür genau eine Sponsored-Products-Kampagne markieren.',
       title: {
@@ -1329,6 +1395,7 @@ export const de = {
       clicksViews: '{days} Tage, Klick + View',
     },
     column: {
+      tags: 'Tags',
       name: 'Name',
       state: 'Status',
       adProduct: 'Ad-Typ',
@@ -1433,6 +1500,9 @@ export const de = {
     text: 'Die Adresse gibt es nicht (mehr). Prüfe den Link oder nutze die Navigation.',
   },
   errors: {
+    TAG_NAME_TAKEN: 'Ein Tag mit diesem Namen gibt es schon.',
+    TAG_NOT_FOUND: 'Dieses Tag gibt es nicht (mehr).',
+    TAG_LIMIT_REACHED: 'Die Organisation hat schon die Höchstzahl an Tags.',
     INVALID_EMAIL_OR_PASSWORD: 'E-Mail-Adresse oder Passwort ist falsch.',
     FORBIDDEN: 'Dafür fehlen dir die Rechte.',
     PROFILE_HAS_NO_CONNECTION:

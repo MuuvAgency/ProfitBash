@@ -10,7 +10,9 @@ import {
 } from '@profitbash/shared';
 import type { CellClassParams, ColDef, ValueGetterParams } from 'ag-grid-community';
 import { markRaw } from 'vue';
-import type { ExplorerRowsData } from '../api/client';
+import type { ExplorerRowsData, TagData } from '../api/client';
+import { rowTags, rowTagsText } from '../tags/row-tags';
+import type { TagsCellParams } from '../tags/TagsCell.vue';
 import { changeTone, formatChange, type MetricKey } from '../analytics/metrics';
 import { amazonLabel, targetLabel } from './amazon-labels';
 import DecimalFilter from './DecimalFilter.vue';
@@ -44,6 +46,8 @@ export interface ColumnContext {
    * `write`, die Eingabe. Sortierung, Filter und CSV bleiben beim Stand von Amazon.
    */
   editable?: boolean;
+  /** Tags der Organisation nach ID (3.7); ohne Angabe (kein Recht `view` im Feature `tags`) fehlt die Spalte. */
+  tags?: ReadonlyMap<string, TagData>;
 }
 
 type MetricKind = 'money' | 'count' | 'ratio' | 'factor';
@@ -74,6 +78,9 @@ interface ColumnSpec {
 
 const METRIC_LEVELS = 'metrics' as const;
 const ENTITY_LEVELS: ExplorerLevel[] = ['adGroup', 'target', 'productAd', 'searchTerm', 'negative'];
+/** Ebenen mit eigenen Tags (`TAG_ENTITY_TYPES`). */
+export const TAG_LEVELS: ExplorerLevel[] = ['campaign', 'adGroup', 'target', 'productAd'];
+const NO_TAGS: ReadonlyMap<string, TagData> = new Map();
 
 /** Wählbare Spalten (außer „Name“) in ihrer Reihenfolge. */
 export const OPTIONAL_COLUMNS: ColumnSpec[] = [
@@ -82,6 +89,7 @@ export const OPTIONAL_COLUMNS: ColumnSpec[] = [
   { id: 'profile', levels: 'all', defaultLevels: 'all' },
   { id: 'currency', levels: 'all' },
   { id: 'portfolio', levels: ['campaign'], defaultLevels: ['campaign'] },
+  { id: 'tags', levels: TAG_LEVELS, defaultLevels: TAG_LEVELS },
   { id: 'campaign', levels: ENTITY_LEVELS, defaultLevels: ENTITY_LEVELS },
   {
     id: 'adGroup',
@@ -328,6 +336,12 @@ export function buildColumnDefs(
     profile: () => text('profile', (row) => `${row.accountName} · ${row.countryCode}`),
     currency: () => text('currency', (row) => row.currencyCode),
     portfolio: () => text('portfolio', (row) => attr(row, 'portfolioName')),
+    tags: () =>
+      text('tags', (row) => rowTagsText(rowTags(row.attributes, input.tags ?? NO_TAGS)), {
+        cellRenderer: 'tagsCell',
+        cellRendererParams: { tags: () => input.tags ?? NO_TAGS } satisfies TagsCellParams,
+        minWidth: 160,
+      }),
     campaign: () => text('campaign', (row) => attr(row, 'campaignName')),
     adGroup: () => text('adGroup', (row) => attr(row, 'adGroupName')),
     target: () => text('target', (row) => targetLabel(row.attributes, input)),
@@ -392,7 +406,10 @@ export function buildColumnDefs(
 
   // Die Währung ist immer da (für den CSV-Export), aber nur sichtbar, wenn gewählt.
   const optional = OPTIONAL_COLUMNS.filter(
-    (spec) => availableAt(spec, level) && (input.visible.has(spec.id) || spec.id === 'currency'),
+    (spec) =>
+      availableAt(spec, level) &&
+      (input.visible.has(spec.id) || spec.id === 'currency') &&
+      (spec.id !== 'tags' || input.tags !== undefined),
   ).map((spec) => {
     const def = (builders[spec.id] ?? (() => metric(spec.id as ColumnMetric)))();
     return spec.id === 'currency' ? { ...def, hide: !input.visible.has('currency') } : def;

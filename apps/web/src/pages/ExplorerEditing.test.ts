@@ -794,3 +794,155 @@ describe('Explorer: markierte Zeilen', () => {
     await vi.waitFor(() => expect(wrapper.get('[data-bulk-bar]').text()).toContain('1 markiert'));
   });
 });
+
+describe('Tags im Explorer (phase-3.md 3.7)', () => {
+  const WINTER = '00000000-0000-4000-8000-0000000000e1';
+  const SOMMER = '00000000-0000-4000-8000-0000000000e2';
+  const tag = (id: string, name: string, color: string) => ({
+    id,
+    name,
+    color,
+    counts: { campaign: 0, ad_group: 0, target: 0, product_ad: 0 },
+    createdAt: '2026-10-09T08:00:00.000Z',
+    updatedAt: '2026-10-09T08:00:00.000Z',
+  });
+  const tagRoutes = (
+    options: Parameters<typeof routes>[0] = {},
+    tags = [tag(SOMMER, 'Sommer', 'amber'), tag(WINTER, 'Winter', 'violet')],
+  ) => ({
+    ...routes(options),
+    'GET /api/ads/tags': json({ tags, maxTags: 200 }),
+    'POST /api/ads/tags/assign': json({ added: 5, removed: 0, skippedEntities: 0 }),
+    'POST /api/ads/explorer/rows': (request: RecordedRequest) => {
+      const level = (request.body as { level: string }).level;
+      const rows = (rowsByLevel[level] ?? (() => []))().map((r) => ({
+        ...r,
+        attributes: {
+          ...r.attributes,
+          tagIds: r.id === T1 || r.id === CAMPAIGN ? [WINTER] : [],
+          ...(r.id === CAMPAIGN && { amazonTags: { Saison: 'Herbst' } }),
+        },
+      }));
+      return json({
+        meta,
+        rows,
+        totalRows: rows.length,
+        truncated: false,
+        maxRows: 10000,
+        total: {
+          current: period,
+          comparison: null,
+          change: null,
+          attribution: { mixed: false, sameSkuMixed: false, coverage },
+        },
+      });
+    },
+  });
+  const rowRequests = (requests: RecordedRequest[]) =>
+    requests
+      .filter((r) => r.path === '/api/ads/explorer/rows')
+      .map((r) => r.body as { tagIds?: string[] });
+
+  it('zeigt eigene Tags je Zeile und die Tags von Amazon an der Kampagne', async () => {
+    stubFetch(tagRoutes());
+    await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Nistkasten');
+
+    await vi.waitFor(() => expect(cell('SP Nistkasten', 'tags').textContent).toContain('Winter'));
+    expect(cell('SP Nistkasten', 'tags').textContent).toContain('Saison: Herbst');
+    expect(cell('SB Marke', 'tags').textContent?.trim()).toBe('');
+  });
+
+  it('weist markierten Zeilen Tags zu: „manche“ als Strich, geändert wird nur Angefasstes', async () => {
+    const { requests } = stubFetch(tagRoutes());
+    const { wrapper } = await mountExplorer('/ads/explorer/targets');
+    await waitForRow('nistkasten meise');
+    await selectAllRows();
+    await vi.waitFor(() => expect(wrapper.get('[data-bulk-bar]').text()).toContain('3 markiert'));
+
+    wrapper.get('[data-bulk="tags"]').element.dispatchEvent(new MouseEvent('click'));
+    await flushPromises();
+    const box = (id: string) =>
+      document.querySelector<HTMLInputElement>(`input[data-tag="${id}"]`)!;
+    await vi.waitFor(() => expect(box(WINTER)).not.toBeNull());
+    expect(box(WINTER).indeterminate).toBe(true);
+    expect(box(SOMMER).checked).toBe(false);
+    const submit = () => document.querySelector<HTMLButtonElement>('[data-assign-submit]')!;
+    expect(submit().disabled).toBe(true);
+
+    box(SOMMER).click();
+    await flushPromises();
+    submit().click();
+    await flushPromises();
+
+    const sent = requests.filter((r) => r.path === '/api/ads/tags/assign').map((r) => r.body);
+    expect(sent).toEqual([
+      { entityType: 'target', entityIds: [T1, T2, T3], addTagIds: [SOMMER], removeTagIds: [] },
+    ]);
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-assign-result]')?.textContent).toContain(
+        '5 Zuweisungen hinzugefügt',
+      ),
+    );
+  });
+
+  it('löst ein Tag von allen markierten Zeilen, wenn das Häkchen entfernt wird', async () => {
+    const { requests } = stubFetch(tagRoutes());
+    const { wrapper } = await mountExplorer('/ads/explorer/targets');
+    await waitForRow('nistkasten meise');
+    await selectAllRows();
+    await vi.waitFor(() => expect(wrapper.get('[data-bulk-bar]').text()).toContain('3 markiert'));
+    wrapper.get('[data-bulk="tags"]').element.dispatchEvent(new MouseEvent('click'));
+    await flushPromises();
+    const winter = await vi.waitFor(() => {
+      const input = document.querySelector<HTMLInputElement>(`input[data-tag="${WINTER}"]`);
+      if (!input) throw new Error('kein Häkchen');
+      return input;
+    });
+
+    // Strich → gesetzt → entfernt.
+    winter.click();
+    winter.click();
+    await flushPromises();
+    document.querySelector<HTMLButtonElement>('[data-assign-submit]')!.click();
+    await flushPromises();
+
+    const [sent] = requests.filter((r) => r.path === '/api/ads/tags/assign').map((r) => r.body);
+    expect(sent).toMatchObject({ addTagIds: [], removeTagIds: [WINTER] });
+  });
+
+  it('nimmt den Tag-Filter aus der URL in die Anfrage; ein unbekanntes Tag gilt nicht', async () => {
+    const first = stubFetch(tagRoutes());
+    await mountExplorer(`/ads/explorer/campaigns?tags=${WINTER}`);
+    await waitForRow('SP Nistkasten');
+    expect(rowRequests(first.requests).at(-1)!.tagIds).toEqual([WINTER]);
+    cleanupMounted();
+    vi.unstubAllGlobals();
+
+    const GONE = '00000000-0000-4000-8000-0000000000ef';
+    const second = stubFetch(tagRoutes());
+    await mountExplorer(`/ads/explorer/campaigns?tags=${GONE}`);
+    await waitForRow('SP Nistkasten');
+    expect(rowRequests(second.requests).every((body) => body.tagIds === undefined)).toBe(true);
+  });
+
+  it('Viewer sehen die Tags, aber kein „Tags zuweisen“; ohne das Feature fehlt die Spalte', async () => {
+    stubFetch(tagRoutes({ me: { orgRole: 'viewer' } }));
+    const viewer = await mountExplorer('/ads/explorer/targets');
+    await waitForRow('nistkasten meise');
+    await vi.waitFor(() =>
+      expect(cell('nistkasten meise', 'tags').textContent).toContain('Winter'),
+    );
+    await selectAllRows();
+    await flushPromises();
+    expect(viewer.wrapper.find('[data-bulk="tags"]').exists()).toBe(false);
+    cleanupMounted();
+    vi.unstubAllGlobals();
+
+    stubFetch(tagRoutes({ me: { features: ['dashboard', 'sp-explorer', 'changes'] } }));
+    await mountExplorer('/ads/explorer/targets');
+    await waitForRow('nistkasten meise');
+    await flushPromises();
+    expect(document.querySelector('.ag-cell[col-id="tags"]')).toBeNull();
+  });
+});

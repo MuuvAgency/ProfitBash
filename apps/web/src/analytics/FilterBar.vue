@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ATTRIBUTION_SETTINGS, formatDay, MAX_ANALYTICS_RANGE_DAYS } from '@profitbash/shared';
 import DatePicker from 'primevue/datepicker';
+import MultiSelect from 'primevue/multiselect';
 import Select from 'primevue/select';
 import TreeSelect from 'primevue/treeselect';
 import { computed, ref, useId } from 'vue';
@@ -8,9 +9,12 @@ import { useI18n } from 'vue-i18n';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { useSessionStore } from '../stores/session';
+import { tagDotClass } from '../tags/colors';
+import { useTagRights, useTags } from '../tags/queries';
 import {
   clientNodeKey,
   fromTreeSelection,
+  MAX_FILTER_TAGS,
   profileNodeKey,
   toTreeSelection,
   WITHOUT_CLIENT_NODE_KEY,
@@ -49,6 +53,7 @@ const ids = {
   comparison: `${id}-comparison`,
   currency: `${id}-currency`,
   attribution: `${id}-attribution`,
+  tags: `${id}-tags`,
 };
 
 const state = computed(() => props.filters.state.value);
@@ -102,6 +107,11 @@ const selectionLabel = computed(() => {
   return names.join(', ');
 });
 
+// --- Tags (`phase-3.md` 3.7) --------------------------------------------------------------
+
+const { canView: canViewTags } = useTagRights();
+const tagsQuery = useTags();
+const tagOptions = computed(() => tagsQuery.data.value ?? []);
 // --- Zeitraum und Vergleich ------------------------------------------------------------
 
 const periodOptions = computed(() =>
@@ -315,6 +325,44 @@ const day = (value: string) => formatDay(value, locale.value);
       <span v-if="state.comparison === 'previousYear' && !previousYearAvailable" class="text-warn">
         {{ t('analytics.filter.previousYearUnavailable') }}
       </span>
+    </div>
+    <div
+      v-if="options && canViewTags && tagOptions.length > 0"
+      class="flex flex-wrap items-end gap-x-space-md gap-y-space-xs"
+    >
+      <div class="flex w-72 max-w-full flex-col gap-space-xs">
+        <label :for="ids.tags" class="text-label-eyebrow uppercase text-ink-tertiary">
+          {{ t('analytics.filter.tags') }}
+        </label>
+        <MultiSelect
+          :input-id="ids.tags"
+          :model-value="state.tagIds"
+          :options="tagOptions"
+          option-label="name"
+          option-value="id"
+          :placeholder="t('analytics.filter.allTags')"
+          :max-selected-labels="2"
+          :selected-items-label="t('analytics.filter.tagCount', { count: '{0}' })"
+          :selection-limit="MAX_FILTER_TAGS"
+          :show-toggle-all="false"
+          filter
+          class="w-full"
+          @update:model-value="(value: string[]) => filters.update({ tagIds: value })"
+        >
+          <template #option="{ option }">
+            <span class="flex min-w-0 items-center gap-space-sm">
+              <span
+                :class="['size-2 shrink-0 rounded-full', tagDotClass(option.color)]"
+                aria-hidden="true"
+              />
+              <span class="truncate">{{ option.name }}</span>
+            </span>
+          </template>
+        </MultiSelect>
+      </div>
+      <p v-if="state.tagIds.length > 0" class="max-w-prose text-body-sm text-ink-secondary">
+        {{ t('analytics.filter.tagsHint') }}
+      </p>
     </div>
   </section>
 </template>

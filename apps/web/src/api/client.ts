@@ -35,6 +35,9 @@ export type SearchTermPeriodData = Schemas['SearchTermPeriod'];
 export type SearchTermAnalysisData = Schemas['SearchTermAnalysisResponse'];
 export type SearchTermRowData = Schemas['SearchTermRow'];
 export type HarvestMarkData = Schemas['HarvestMark'];
+export type TagData = Schemas['Tag'];
+export type AssignTagsInput = Schemas['AssignTagsRequest'];
+export type AssignTagsData = Schemas['AssignTagsResponse'];
 export type HarvestListData = Schemas['HarvestListResponse'];
 export type HarvestMarkResultData = Schemas['HarvestMarkResponse'];
 export type SearchTermNgramData = Schemas['SearchTermNgram'];
@@ -281,6 +284,20 @@ export function createApi(options: ApiOptions = {}) {
         remove: (ids: string[]) =>
           unwrap(client.POST('/api/ads/search-terms/harvest/remove', { body: { ids } })),
       },
+    },
+
+    /** Eigene Tags der Organisation (`phase-3.md` 3.7): verwalten und Entities zuweisen. */
+    tags: {
+      list: async (): Promise<TagData[]> => (await unwrap(client.GET('/api/ads/tags'))).tags,
+      create: (input: Schemas['CreateTagRequest']): Promise<TagData> =>
+        unwrap(client.POST('/api/ads/tags', { body: input })),
+      update: (id: string, input: Schemas['UpdateTagRequest']): Promise<TagData> =>
+        unwrap(client.PATCH('/api/ads/tags/{id}', { params: { path: { id } }, body: input })),
+      remove: (id: string) =>
+        unwrap(client.DELETE('/api/ads/tags/{id}', { params: { path: { id } } })),
+      /** Höchstens `MAX_TAG_ASSIGN_ENTITIES` Entities je Anfrage. */
+      assign: (input: AssignTagsInput): Promise<AssignTagsData> =>
+        unwrap(client.POST('/api/ads/tags/assign', { body: input })),
     },
 
     /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */
