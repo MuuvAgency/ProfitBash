@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1–4.5. Nächster Schritt: 4.6.
+> Datei). Fertig: 4.1–4.6. Nächster Schritt: 4.7.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -388,8 +388,42 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     geöffneter, gespeicherter Entwurf zeigt Hinweise erst nach „Neu planen“ bzw. beim Übermitteln.
 
 ### 4.6 Harvest von der Merkliste
-- [ ] Merkliste als Eingang des Setups (Auswahl je Profil), Vorschlag für das Negieren in der Quelle (F7), Einträge nach
+- [x] Merkliste als Eingang des Setups (Auswahl je Profil), Vorschlag für das Negieren in der Quelle (F7), Einträge nach
       Abschluss von der Merkliste nehmen. Die Merkliste bekommt eine eigene Profil-Auswahl (offener Punkt aus 3.8).
+- [x] Umsetzung (Stand für 4.7 und später):
+  - **Entschieden (Dominik, 2026-10-09):** Harvest-Begriffe kommen in einen **eigenen Entwurf**; die Produktgruppe
+    wählt der Nutzer (kein Übernehmen in offene Entwürfe). Die Wettbewerber-Liste je Client (F-S9) kommt **später**.
+  - **Eingang:** Der Assistent zeigt nach der Profil-Wahl die Merkliste dieses Profils („Von der Merkliste“: Begriff,
+    Quelle, Klicks, Kosten, CPC; je Begriff Gebot und „eigene Kampagne“). Das ist die eigene Profil-Auswahl der
+    Merkliste: Sie hängt hier nicht am Datei-Zeitraum der Suchbegriff-Analyse (offener Punkt aus 3.8 gelöst). Die
+    Auswahl steht in `inputs.harvest` (`markId`, `single`, `bid`); der Server liest Begriff, Quelle und CPC selbst
+    (`loadHarvestMarkSources`), Einträge anderer Profile fallen mit Warnung `harvestMarkMissing` weg.
+  - **Engine** (`packages/engine/src/harvest.ts`, Einstieg `@profitbash/engine/plan`): `harvestInputs` macht aus
+    Begriffen Keywords, aus ASIN-Suchbegriffen fremde Produkt-Ziele; das Preset verteilt sie wie alle Eingaben (F7).
+    Gebot (F8): Eingabe vor CPC der Merkliste (`harvestCpc`: Kosten ÷ Klicks beim Vormerken, half-even, nur in der
+    Währung des Profils), sonst Baustein bzw. Gebote aus dem Profil. `planSourceNegatives` schlägt je Begriff
+    **negativ exakt in der Ad Group der Quelle** vor (ASINs als negatives Produkt-Ziel), vorbelegt und abwählbar
+    (`deselectedSources` bleibt beim neuen Planen abgewählt). Kein Vorschlag (Hinweis `info`): geschützt
+    (`sourceProtected`, nie), Quelle fehlt, kein SP, schon negativ exakt, Quelle bucht den Begriff selbst exakt,
+    Plan legt den Begriff nicht an (`sourceNotPlanned`, sonst ginge der Traffic verloren).
+  - **Eine Übermittlung:** Gewählte Vorschläge stehen im Entwurf (`campaign_setup_drafts.source_negatives`,
+    Migration `0032_harvest_setup`) und werden beim Übermitteln zu Zeilen `source_negative` nach den neuen Kampagnen
+    (echte IDs der bestehenden Kampagne und Ad Group im `payload`, Namen in `campaign_ref`/`ad_group_ref`). Damit
+    bleibt es bei einem Entwurf = einer Bulk-Datei (F13). Bulk-Datei: `Create` „Negative Keyword“ bzw. „Negative
+    Product Targeting“ mit den echten IDs; API-Weg: Eltern als schon angelegt (`created`). Prüfung beim Übermitteln
+    (`reviewCampaignPlan`): Ad Group der Quelle muss als SP-Ad-Group im Profil bestehen (`sourceNegativeMissing`),
+    geschützte Begriffe des Clients sperren (`sourceNegativeProtected`), Dubletten und Länge wie sonst.
+    Bestätigung durch den Import über die Ad Group der Quelle (Amazon-ID) und Text bzw. ASIN.
+  - **Merkliste leeren:** Sobald die Übermittlung abgeschlossen ist (`closeAdChangeSubmission` ohne offene Zeilen,
+    also nach API-Lauf, Import-Bestätigung oder „hochgeladen“ von Hand), verlassen die Einträge des Entwurfs die
+    Merkliste, deren Keyword bzw. Produkt-Ziel angelegt wurde (`releaseHarvestMarks`, Audit
+    `search_term_harvest.remove` ohne Nutzer mit `submissionId`). Verworfene oder gescheiterte bleiben vorgemerkt.
+  - **API:** `GET /api/ads/tools/setup/harvest?profileId=` (Feature `tools`, `view`; 404 für unsichtbare Profile),
+    `inputs.harvest` und `deselectedSources` an `POST …/setup/plan` (Antwort mit `sourceNegatives`),
+    `sourceNegatives` an Entwürfen. Die Seite „Änderungen“ zeigt die Zeilen als „Negativ in der Quelle“.
+  - **Offen bzw. bewusst so:** Die Suchbegriff-Analyse verlinkt noch nicht ins Setup (Einstieg ist der Assistent).
+    Ein Begriff kann in mehreren offenen Entwürfen stehen; die Warnung „schon exakt gebucht“ zählt offene Setups
+    mit. Negativ immer exakt in der Ad Group (nicht Kampagnenebene, nicht Wortgruppe).
 
 ### 4.7 Portfolio anlegen
 - [ ] Blatt „Portfolios“ der Bulk-Datei (`Create`), Dialog unter `/ads/tools/portfolios`, Zuordnung beim Setup (F9).

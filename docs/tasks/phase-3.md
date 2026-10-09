@@ -947,7 +947,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     vorigen Profils mehr; eigenes `aria-label` für schon vorgemerkte Zeilen; Tests dazu.
   - **Offen bzw. bewusst so:** Die Merkliste hängt an der Auswahl der Analyse: Hat ein Profil keinen Datei-Zeitraum
     mehr (2b.2d) oder lädt die Analyse nicht, ist seine Merkliste in der Oberfläche nicht erreichbar (die Einträge
-    bleiben, Phase 4 liest sie je Profil; dort bzw. mit einer eigenen Profil-Auswahl lösen). „Von der Merkliste
+    bleiben, Phase 4 liest sie je Profil; dort bzw. mit einer eigenen Profil-Auswahl lösen). **Gelöst in 4.6:** Der Setup-Assistent zeigt die Merkliste jedes Profils. „Von der Merkliste
     entfernen“ fragt nicht nach (ein erneutes Vormerken trägt dann die Kennzahlen des gewählten Zeitraums). Die
     Zeilenkennung `protected` der Analyse kennt den Fall „Wortgruppe steckt im geschützten Begriff“ nicht (der Server
     lehnt ab, der Dialog fragt danach). Ob ein geschützter Begriff bestätigt wurde, steht nur als Zahl im Audit-Event,
