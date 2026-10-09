@@ -2,7 +2,7 @@
 
 - **Status:** angenommen
 - **Datum:** 2026-10-08 (Start von Phase 3, Doku-Stand vom selben Tag), am 2026-10-09 um Sponsored Brands und
-  Sponsored Display ergänzt (3.2c)
+  Sponsored Display ergänzt (3.2c), am selben Tag um Anlagen über die API (4.4)
 - **Beteiligte:** Dominik
 - **Bezug:** ADR 004 hatte das Schreiben offen gelassen („beim Start von Phase 3 als eigene Entscheidung prüfen“).
 
@@ -132,6 +132,88 @@ nicht kennt (Amazon entscheidet).
   Antwort wird über `index` zugeordnet und über die zurückgegebene ID gegengeprüft; Widersprüche gelten als `unknown`.
 - **Grenzen von Amazon** (Mindest- und Höchstgebot, Tagesbudget je Marktplatz, Wortzahl negativer Keywords) liegen als
   Daten in `limits.ts`, Quelle: Amazon-Doku „Limits, constraints, and quotas“, gelesen am 2026-10-08.
+
+### Anlagen über die API (Phase 4, 4.4)
+
+Neue Kampagnen-Strukturen (aus Preset und Produktgruppe, `docs/tasks/phase-4.md`) legt **nur für Sponsored Products**
+`applySpCreates` in `packages/amazon-ads/src/creates.ts` an: eigenes Modell `AmazonAdsCreateOperation`, Eltern über
+`campaignRef`/`adGroupRef` (eine `ref` derselben Eingabe oder aus `created`, ref → Amazon-ID eines früheren Laufs).
+Geprüft am 2026-10-09 gegen die OpenAPI-Spec `SponsoredProducts_prod_3p.json`.
+
+| Anlage | Endpunkt | Content-Type / Accept | Pflichtfelder laut Spec | ID in der Antwort |
+|---|---|---|---|---|
+| Kampagne | `POST /sp/campaigns` | `application/vnd.spCampaign.v3+json` | `name`, `targetingType`, `state`, `budget` | `campaignId` |
+| Ad Group | `POST /sp/adGroups` | `application/vnd.spAdGroup.v3+json` | `campaignId`, `name`, `defaultBid`, `state` | `adGroupId` |
+| Product Ad | `POST /sp/productAds` | `application/vnd.spProductAd.v3+json` | `campaignId`, `adGroupId`, `state` (+ `sku` bzw. `asin`) | `adId` |
+| Keyword | `POST /sp/keywords` | `application/vnd.spKeyword.v3+json` | `campaignId`, `adGroupId`, `keywordText`, `matchType`, `state` | `keywordId` |
+| Produkt- / Kategorie-Target | `POST /sp/targets` | `application/vnd.spTargetingClause.v3+json` | `campaignId`, `adGroupId`, `expression`, `expressionType`, `state` | `targetId` |
+| Negatives Keyword (Ad Group) | `POST /sp/negativeKeywords` | `application/vnd.spNegativeKeyword.v3+json` | `campaignId`, `adGroupId`, `keywordText`, `matchType`, `state` | `negativeKeywordId` |
+| Negative ASIN (Ad Group) | `POST /sp/negativeTargets` | `application/vnd.spNegativeTargetingClause.v3+json` | `campaignId`, `adGroupId`, `expression`, `state` | `targetId` |
+
+Befunde aus der Spec:
+
+- **Höchstzahl je Aufruf 1000** (`maxItems`) bei allen sieben Endpunkten; Antwort `207` mit
+  `{ <liste>: { success: [{ index, <id>, <entity> }], error: [{ index, errors: [{ errorType, errorValue }] }] } }`
+  wie bei Updates (`indexedReader`). Die Liste heißt bei Targets `targetingClauses`, bei negativen Targets
+  `negativeTargetingClauses`. Mit `Prefer: return=representation` käme die ganze Entity zurück; der Client braucht nur
+  die ID und schickt den Header nicht.
+- **IDs sind Text** (`campaignId`, `adGroupId`, `portfolioId`: `type: string`), Beträge `double`
+  (`budget.budget`, `defaultBid`, `bid`): geschrieben als Zahl-Literal über `jsonDecimal`.
+- **Kampagne:** `budget: { budgetType: DAILY, budget }` (beides Pflicht). `startDate` und `endDate` im Format
+  `YYYY-MM-DD` (`format: date`), `startDate` optional mit Voreinstellung „heute“; der Client schickt es immer.
+  `dynamicBidding: { strategy, placementBidding: [{ placement, percentage }] }` ist optional (ohne Angabe
+  `LEGACY_FOR_SALES`), beim Anlegen ist `strategy` Pflicht, sobald `dynamicBidding` gesendet wird; der Client schickt
+  Strategie und Platzierungen immer (Abbildung und Platzierungen wie bei Updates, ganze Prozent 0–900).
+  `targetingType` `AUTO` | `MANUAL`, Zustand `ENABLED` | `PAUSED` (dazu `PROPOSED`, nicht genutzt).
+- **Off-Amazon:** `offAmazonSettings.offAmazonBudgetControlStrategy` mit `MAXIMIZE_REACH` (Platzierungen auf und
+  außerhalb von Amazon) und `MINIMIZE_SPEND` (nur Amazon-eigene Seiten), optional beim Anlegen und Ändern. Das Modell
+  bildet `increaseReach` → `MAXIMIZE_REACH` und `limitSpend` → `MINIMIZE_SPEND` ab; `null` lässt das Feld weg.
+  Davon getrennt gibt es `siteRestrictions` (`AMAZON_BUSINESS`, `AMAZON_HAUL`; nach dem Anlegen nicht änderbar, nicht
+  mit `offAmazonSettings` kombinierbar): nicht abgebildet.
+- **Product Ads:** `sku` ist laut Spec „nur für Seller“, `asin` „nur für Vendoren“. Der Client verlangt genau eins von
+  beiden (den Kontotyp kennt der Aufrufer); der Mock lehnt die falsche ID je Kontotyp ab (`productIdentifierError`
+  `INVALID_ASIN` bzw. `INVALID_SKU`). `customText` und `globalStoreSetting` sind nicht abgebildet.
+- **Produkt-Targets:** `expression: [{ type, value }]` mit `expressionType: MANUAL` (Pflicht beim Anlegen).
+  `ASIN_SAME_AS` (genau diese ASIN), `ASIN_EXPANDED_FROM` (ähnliche Produkte zur ASIN), `ASIN_CATEGORY_SAME_AS`
+  (`value` = Kategorie-ID). Weitere Verfeinerungen (Marke, Preis, Bewertung, Prime) sind nicht abgebildet.
+  Negative Targets kennen nur `ASIN_SAME_AS` und `ASIN_BRAND_SAME_AS`, ohne `expressionType`.
+- **Keywords:** `matchType` `EXACT` | `PHRASE` | `BROAD`, `bid` optional (ohne Gebot gilt das Standardgebot der
+  Ad Group). Negative Keywords zusätzlich mit `NEGATIVE_BROAD` in der Spec; das Modell nutzt nur `NEGATIVE_EXACT`
+  und `NEGATIVE_PHRASE`.
+- Fehlertypen je Eintrag u. a. `parentEntityError` (`PARENT_ENTITY_NOT_FOUND`, `PARENT_ENTITY_ARCHIVED`),
+  `duplicateValueError`, `entityQuotaError`, `productIdentifierError`, `rangeError`, `biddingError`,
+  `throttledError`, `internalServerError`; gelesen wie bei Updates.
+
+Verhalten:
+
+- **Reihenfolge:** Kampagnen → Ad Groups → Product Ads, Keywords, Targets, negative Keywords, negative Targets; die
+  IDs der Eltern kommen aus der Antwort der vorigen Stufe.
+- **Kaskade:** Kinder einer gescheiterten oder unklaren Elternanlage sind `failed` mit `PARENT_NOT_CREATED` (ohne
+  Amazon zu fragen), Kinder eines nicht gesendeten Elternteils bleiben `unsent`. Eine Anlage, die Amazon ohne ID
+  bestätigt, gilt als `unknown` (sie gibt es vermutlich, ihre Kinder lassen sich aber nicht anlegen).
+- **Nie wiederholt** (5xx, Netzwerkfehler → `unknown`); 429 → Rest `unsent`, `throttled`, `retryAfterMs`; der nächste
+  Lauf übergibt das schon Angelegte in `created` und sendet es nicht erneut. 401/403 → `AmazonAdsWriteAbortedError`
+  mit den Teilergebnissen.
+- **Ungültige Werte** je Eintrag `failed` `INVALID_VALUE` ohne Amazon zu fragen: Betrag kein Decimal-String, Datum
+  ungültig, leerer Text, ASIN nicht 10 Zeichen A–Z/0–9, Kategorie-ID nicht nur Ziffern, Platzierung unbekannt,
+  doppelt oder außerhalb von 0–900, Product Ad ohne bzw. mit beiden Produkt-IDs, unbekannte oder unpassende
+  Eltern-ref (Ad Group einer anderen Kampagne). Eine doppelte `ref` ist `DUPLICATE_OPERATION`.
+- Grenzen des Marktplatzes (Gebote, Budgets, Länge und Wortzahl der Keywords) prüft der Client nicht; Amazon bzw. der
+  Mock lehnen je Eintrag ab. Der Mock merkt sich Anlagen im Prozess und liefert sie im nächsten Export mit.
+
+Offen für den ersten echten Lauf (1.10):
+
+- ob ein `startDate` in der Vergangenheit oder „heute“ in der Zeitzone des Marktplatzes abgelehnt wird (der Client
+  schickt das Datum unverändert);
+- ob `offAmazonSettings` in allen Marktplätzen angenommen wird und was Amazon ohne Angabe voreinstellt;
+- ob Product Ads von Sellern mit `asin` bzw. von Vendoren mit `sku` wirklich abgelehnt werden und ob Vendor-Profile
+  dieselben Endpunkte annehmen;
+- ob Amazon die ID im Erfolgseintrag immer nennt (ohne ID gilt die Anlage als unklar);
+- ob eine Anlage mit gleichem Namen (Kampagne, Ad Group) als `duplicateValueError` abgelehnt wird und wie man sie nach
+  einem unklaren Ausgang (5xx) wiederfindet (Abgleich über den nächsten Export und den Namen);
+- wie streng die Drosselung bei großen Strukturen ist (bis zu 1000 Einträge je Aufruf) und ob `throttledError` je
+  Eintrag vorkommt;
+- ob Keywords und Targets in Auto-Kampagnen sauber je Eintrag abgelehnt werden (der Client prüft das nicht).
 
 ## Begründung
 
