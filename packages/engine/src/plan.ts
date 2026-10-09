@@ -5,6 +5,11 @@ import type {
   PresetBlock,
   StructureCatalog,
 } from '@profitbash/shared/structure-catalog';
+import type {
+  PlannedCampaign,
+  PlannedNegative,
+  PlannedTarget,
+} from '@profitbash/shared/campaign-setup';
 import {
   NEGATIVE_KEYWORD_MAX_LENGTH,
   NEGATIVE_KEYWORD_MAX_WORDS,
@@ -84,37 +89,8 @@ export interface PlanInput {
   unlocks: Readonly<Record<string, { vcpm?: boolean; offAmazon?: boolean }>>;
 }
 
-export type PlannedTarget =
-  | { type: 'keyword'; text: string; matchType: 'broad' | 'phrase' | 'exact'; bid: string }
-  | { type: 'product'; asin: string; match: 'exact' | 'expanded'; bid: string }
-  | { type: 'category'; categoryId: string; name: string; bid: string }
-  | { type: 'audience'; audience: 'views' | 'purchases'; lookbackDays: number; bid: string };
-
-/** Negatives auf Ebene der Ad Group (die Bulk-Datei kennt beide Ebenen; 4.4 schreibt sie in die Ad Group). */
-export type PlannedNegative =
-  | { type: 'keyword'; text: string; matchType: 'negativeExact' | 'negativePhrase' }
-  | { type: 'product'; asin: string; matchType: 'negativeExact' };
-
-export interface PlannedCampaign {
-  /** Schlüssel des Bausteins. */
-  block: string;
-  adProduct: CatalogAdProduct;
-  /** Targeting-Art aus dem Baustein (Bulk: SP `Targeting Type` auto/manuell, SD-Taktik); bleibt, auch wenn sich der Katalog ändert. */
-  targeting: CatalogBlock['targeting'];
-  name: string;
-  state: 'ENABLED';
-  currencyCode: string;
-  dailyBudget: string;
-  biddingStrategy: CatalogBlock['biddingStrategy'];
-  sdOptimization: CatalogBlock['sdOptimization'];
-  costType: 'cpc' | 'vcpm';
-  offAmazon: boolean;
-  placements: CatalogBlock['placements'];
-  adGroup: { name: string; defaultBid: string };
-  ads: { asin: string; sku: string | null }[];
-  targets: PlannedTarget[];
-  negatives: PlannedNegative[];
-}
+/** Formen des Plans aus `@profitbash/shared/campaign-setup` (ein Entwurf speichert sie so). */
+export type { PlannedCampaign, PlannedNegative, PlannedTarget };
 
 export type PlanHint =
   | { severity: 'info'; code: 'noHero' }
