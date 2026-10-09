@@ -341,6 +341,32 @@ describe('buildSpBulkSheet: Anlagen', () => {
     ]);
   });
 
+  it('nimmt für Eltern auch echte IDs (schon angelegte Kampagne bzw. Ad Group)', () => {
+    const { records, skipped } = build([
+      create('ag', {
+        type: 'create',
+        entity: 'adGroup',
+        campaignId: '4401',
+        adGroupId: 'Neue Gruppe',
+        name: 'Neue Gruppe',
+        defaultBid: '0.50',
+        state: 'ENABLED',
+      }),
+      create('kw', {
+        type: 'create',
+        entity: 'keyword',
+        campaignId: '4401',
+        adGroupId: '5501',
+        keywordText: 'flasche',
+        matchType: 'exact',
+        bid: null,
+        state: 'ENABLED',
+      }),
+    ]);
+    expect(skipped).toEqual([]);
+    expect(records[1]).toMatchObject({ 'Campaign ID': '4401', 'Ad Group ID': '5501' });
+  });
+
   it('legt in 4.4 nur Sponsored Products an', () => {
     for (const kind of ['sb', 'sbMultiAdGroup', 'sd'] as const) {
       expect(buildBulkSheet(kind, [create('c', campaign)]).skipped).toEqual([

@@ -252,7 +252,8 @@ type CreateState = AmazonAdsWriteState;
 
 /**
  * Text-IDs von Kampagne und Ad Group einer Anlage (`phase-4.md` 4.4): Neue Entities tragen in `Campaign ID` bzw.
- * `Ad Group ID` eine **vorläufige Text-ID**, die Kinder nennen dieselbe. Amazon vergibt beim Hochladen die echten
+ * `Ad Group ID` eine **vorläufige Text-ID**, die Kinder nennen dieselbe (oder die echte ID eines schon angelegten
+ * Elternteils). Amazon vergibt beim Hochladen die echten
  * IDs; ProfitBash ordnet sie über den Namen zu (nächster Bulk-Import). Eine Text-ID darf nicht nur aus Ziffern
  * bestehen (sonst wäre sie eine echte ID).
  */
@@ -462,6 +463,9 @@ function textId(value: string): string {
   return result;
 }
 
+/** Elternteil einer Anlage: neu (Text-ID) oder schon angelegt (echte ID aus Ziffern). */
+const parentId = (value: string) => (/^\d+$/.test(value) ? value : textId(value));
+
 const asinOf = (value: string) => {
   if (!/^[A-Z0-9]{10}$/.test(value)) throw invalid();
   return value;
@@ -665,8 +669,8 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
   const create = { Operation: 'Create' } as const;
   const state = (value: CreateState) => ({ State: mapped(STATES, value) });
   const parents = (ids: CreateParents): Row => ({
-    'Campaign ID': textId(ids.campaignId),
-    'Ad Group ID': textId(ids.adGroupId),
+    'Campaign ID': parentId(ids.campaignId),
+    'Ad Group ID': parentId(ids.adGroupId),
   });
   switch (change.entity) {
     case 'campaign':
@@ -688,7 +692,7 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
       return {
         Entity: 'Bidding Adjustment',
         ...create,
-        'Campaign ID': textId(change.campaignId),
+        'Campaign ID': parentId(change.campaignId),
         Placement: mapped(PLACEMENTS, change.placement),
         Percentage: percentageOf(change.percentage),
       };
@@ -696,7 +700,7 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
       return {
         Entity: 'Ad Group',
         ...create,
-        'Campaign ID': textId(change.campaignId),
+        'Campaign ID': parentId(change.campaignId),
         'Ad Group ID': textId(change.adGroupId),
         'Ad Group Name': text(change.name),
         ...state(change.state),

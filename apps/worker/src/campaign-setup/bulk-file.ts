@@ -4,10 +4,12 @@ import { writeXlsx } from '@profitbash/sheets';
 import { BULK_FILE_SKIPS } from '../ad-changes/bulk-file';
 
 /**
- * Bulk-Datei einer Setup-Übermittlung (`docs/tasks/phase-4.md` 4.4): je Anlage eine `Create`-Zeile im Blatt
- * „Sponsored Products Campaigns“, Kampagne und Ad Group unter ihrem Namen als vorläufige Text-ID. Die Datei entsteht
- * bei jedem Download neu aus den offenen und angelegten Zeilen (wie bei Änderungen); das Startdatum ist der Tag des
- * Downloads in der Zeitzone des Profils (Amazon lehnt vergangene Tage ab).
+ * Bulk-Datei einer Setup-Übermittlung (`docs/tasks/phase-4.md` 4.4): je offener Anlage eine `Create`-Zeile im
+ * Blatt „Sponsored Products Campaigns“, Kampagne und Ad Group unter ihrem Namen als vorläufige Text-ID. Die Datei
+ * entsteht bei jedem Download neu und enthält nur, was noch nicht angelegt ist: Kinder schon angelegter Eltern nennen
+ * deren echte ID (ein erneuter Upload legt nichts doppelt an); ist die ID noch nicht zugeordnet, warten sie auf den
+ * nächsten Import (`waiting`). Das Startdatum ist der Tag des Downloads in der Zeitzone des Profils (Amazon lehnt
+ * vergangene Tage ab).
  *
  * Off-Amazon (F-S7): Die Spalte gibt es laut Guide nur in den USA. Dort schreibt die Datei „Limit off-Amazon spend“,
  * außer der Baustein wurde bewusst freigeschaltet („Increase reach“); sonst bleibt sie leer (Amazons Standard).
@@ -26,6 +28,8 @@ export interface SetupBulkFile {
   content: Uint8Array | null;
   rows: number;
   skipped: SetupBulkFileSkip[];
+  /** Offene Zeilen, deren Elternteil angelegt, aber noch keiner echten ID zugeordnet ist (nächster Import). */
+  waiting: string[];
 }
 
 export const PARENT_NOT_CREATED = {
@@ -36,9 +40,9 @@ export const PARENT_NOT_CREATED = {
 function toCreate(
   row: CampaignSetupItemRow,
   context: { countryCode: string; startDate: string },
+  parents: { campaignId: string; adGroupId: string },
 ): BulkFileCreate {
   const payload = row.payload;
-  const parents = { campaignId: row.campaignRef, adGroupId: row.adGroupRef ?? '' };
   switch (payload.entity) {
     case 'campaign':
       return {
@@ -64,7 +68,7 @@ function toCreate(
       return {
         type: 'create',
         entity: 'placement',
-        campaignId: row.campaignRef,
+        campaignId: parents.campaignId,
         placement: payload.placement,
         percentage: String(payload.percentage),
       };
@@ -123,32 +127,44 @@ export function buildSetupBulkFile(
   context: { countryCode: string; accountType: string; startDate: string },
 ): SetupBulkFile {
   const skipped: SetupBulkFileSkip[] = [];
+  const waiting: string[] = [];
   const lower = (value: string | null) => (value ?? '').toLowerCase();
-  /** Eltern, die in der Datei stehen (Kampagne bzw. Kampagne + Ad Group). */
-  const written = new Set<string>();
+  const campaignKey = (row: CampaignSetupItemRow) => lower(row.campaignRef);
+  const adGroupKey = (row: CampaignSetupItemRow) =>
+    `${lower(row.campaignRef)}\u0000${lower(row.adGroupRef)}`;
+  /**
+   * Eltern je Schlüssel: ID für die Kinder (Text-ID, wenn die Zeile in der Datei steht; echte ID, wenn sie schon
+   * angelegt ist) oder `waiting` (angelegt, ID noch unbekannt). Fehlt der Schlüssel, wird das Elternteil nicht angelegt.
+   */
+  const parents = new Map<string, string | 'waiting'>();
   const changes: BulkFileChange[] = [];
-  const byRef = new Map<string, CampaignSetupItemRow>();
 
-  // Erst Eltern einzeln prüfen, damit Kinder wissen, ob es sie in der Datei gibt.
-  const parentKey = (row: CampaignSetupItemRow, withAdGroup: boolean) =>
-    withAdGroup
-      ? `${lower(row.campaignRef)}\u0000${lower(row.adGroupRef)}`
-      : lower(row.campaignRef);
-
+  // Die Zeilen sind nach Position sortiert: Eltern stehen vor ihren Kindern.
   for (const row of items) {
-    if (row.status !== 'submitted' && row.status !== 'applied') continue;
     const entity = row.payload.entity;
-    const needs =
-      entity === 'campaign'
-        ? null
-        : entity === 'placement' || entity === 'ad_group'
-          ? parentKey(row, false)
-          : parentKey(row, true);
-    if (needs !== null && !written.has(needs)) {
-      if (row.status === 'submitted') skipped.push({ itemId: row.id, ...PARENT_NOT_CREATED });
+    const ownKey =
+      entity === 'campaign' ? campaignKey(row) : entity === 'ad_group' ? adGroupKey(row) : null;
+    if (row.status === 'applied') {
+      // Schon angelegt: steht nicht mehr in der Datei, Kinder nennen die echte ID.
+      if (ownKey !== null) parents.set(ownKey, row.amazonEntityId ?? 'waiting');
       continue;
     }
-    let create = toCreate(row, context);
+    if (row.status !== 'submitted') continue;
+
+    const campaignId = entity === 'campaign' ? row.campaignRef : parents.get(campaignKey(row));
+    const adGroupId =
+      entity === 'campaign' || entity === 'placement' || entity === 'ad_group'
+        ? (row.adGroupRef ?? '')
+        : parents.get(adGroupKey(row));
+    if (campaignId === undefined || adGroupId === undefined) {
+      skipped.push({ itemId: row.id, ...PARENT_NOT_CREATED });
+      continue;
+    }
+    if (campaignId === 'waiting' || adGroupId === 'waiting') {
+      waiting.push(row.id);
+      continue;
+    }
+    let create = toCreate(row, context, { campaignId, adGroupId });
     // Vendoren bewerben über die ASIN, Seller über die SKU (Guide „Product ad“).
     if (create.entity === 'productAd' && row.payload.entity === 'product_ad') {
       create =
@@ -156,30 +172,27 @@ export function buildSetupBulkFile(
           ? { ...create, sku: null, asin: row.payload.asin }
           : { ...create, sku: row.payload.sku, asin: null };
     }
-    // Jede Zeile einzeln prüfen: So steht fest, ob ein Elternteil in der Datei landet.
-    const ref = row.id;
-    const single = buildSpBulkSheet([{ ref, ...create }]);
-    if (single.skipped.length > 0) {
-      if (row.status === 'submitted') {
-        skipped.push({ itemId: row.id, ...BULK_FILE_SKIPS[single.skipped[0]!.reason] });
-      }
+    const change: BulkFileChange = { ref: row.id, ...create };
+    // Jede Zeile einzeln prüfen: So steht fest, ob ein Elternteil in der Datei landet (Dubletten prüft der
+    // Durchlauf unten; doppelte Kampagnen schließt schon die Prüfung beim Übermitteln aus).
+    const single = buildSpBulkSheet([change]).skipped[0];
+    if (single) {
+      skipped.push({ itemId: row.id, ...BULK_FILE_SKIPS[single.reason] });
       continue;
     }
-    changes.push({ ref, ...create });
-    byRef.set(ref, row);
-    if (entity === 'campaign') written.add(parentKey(row, false));
-    if (entity === 'ad_group') written.add(parentKey(row, true));
+    changes.push(change);
+    if (ownKey !== null)
+      parents.set(ownKey, entity === 'campaign' ? row.campaignRef : row.adGroupRef!);
   }
 
   const sheet = buildSpBulkSheet(changes);
-  for (const { ref, reason } of sheet.skipped) {
-    const row = byRef.get(ref)!;
-    if (row.status === 'submitted') skipped.push({ itemId: row.id, ...BULK_FILE_SKIPS[reason] });
-  }
+  for (const { ref, reason } of sheet.skipped)
+    skipped.push({ itemId: ref, ...BULK_FILE_SKIPS[reason] });
   const count = sheet.rows.length - 1;
   return {
     content: count > 0 ? writeXlsx([{ name: sheet.sheetName, rows: sheet.rows }]) : null,
     rows: count,
     skipped,
+    waiting,
   };
 }
