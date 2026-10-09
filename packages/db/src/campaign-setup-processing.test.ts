@@ -81,7 +81,7 @@ async function submitted(channel: 'api' | 'bulk_file' = 'bulk_file', profileId =
     version: 1,
     channel,
     enqueue: async () => undefined,
-    review: () => null,
+    limitFor: () => null,
   });
   if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
   return result.submission.id;

@@ -92,7 +92,7 @@ const submit = (
     version,
     channel: 'bulk_file',
     enqueue: noEnqueue,
-    review: () => null,
+    limitFor: () => null,
     ...extra,
   });
 
@@ -326,7 +326,13 @@ describe('submitCampaignSetupDraft', () => {
       ],
     });
     const result = await submit(created.id, 1);
-    expect(result).toMatchObject({ status: 'submitted', items: 7, unsupported: 1 });
+    expect(result).toMatchObject({
+      status: 'submitted',
+      items: 7,
+      unsupported: 1,
+      // Hinweise sperren nicht.
+      issues: [{ severity: 'info', code: 'adProductLater', campaign: 'SD | RT | Flaschen' }],
+    });
     if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
     expect(result.submission).toMatchObject({
       kind: 'setup',
@@ -375,24 +381,34 @@ describe('submitCampaignSetupDraft', () => {
     expect(event!.target).toMatchObject({ kind: 'setup', draftId: created.id, items: 7 });
   });
 
-  it('prüft in der Transaktion mit dem aktuellen Stand und übermittelt bei Befunden nichts', async () => {
+  it('prüft mit reviewCampaignPlan gegen den aktuellen Stand und übermittelt bei Fehlern nichts', async () => {
     const created = await save({ campaigns: [campaign('Kampagne 1001')] });
-    let seen: unknown;
-    const result = await submit(created.id, 1, {
-      review: (input) => {
-        seen = input;
-        return input.existing.campaignNames.includes('Kampagne 1001') ? { taken: true } : null;
-      },
-    });
-    expect(result).toEqual({ status: 'rejected', review: { taken: true } });
-    expect(seen).toMatchObject({
-      profile: { accountType: 'seller', countryCode: 'DE' },
-      campaigns: [{ name: 'Kampagne 1001' }],
+    const result = await submit(created.id, 1);
+    expect(result).toEqual({
+      status: 'rejected',
+      issues: [{ severity: 'error', code: 'campaignNameTaken', campaign: 'Kampagne 1001' }],
     });
     expect(await testDb.db.select().from(adChangeSubmissions)).toEqual([]);
     expect(
       (await getCampaignSetupDraft(testDb.db, { ...as(f.ada), draftId: created.id }))!.status,
     ).toBe('draft');
+  });
+
+  it('erkennt Kampagnen offener Setups als vergeben und prüft die Grenzen von Amazon', async () => {
+    const first = await save({ campaigns: [campaign('Neu')] });
+    const second = await save({ campaigns: [campaign('neu')] });
+    expect((await submit(first.id, 1))?.status).toBe('submitted');
+    expect(await submit(second.id, 1)).toMatchObject({
+      status: 'rejected',
+      issues: [{ code: 'campaignNameTaken', campaign: 'neu' }],
+    });
+
+    const expensive = await save({ campaigns: [campaign('Teuer')] });
+    expect(
+      await submit(expensive.id, 1, {
+        limitFor: ({ field }) => (field === 'budget' ? null : { min: '0.02', max: '0.88' }),
+      }),
+    ).toMatchObject({ status: 'rejected', issues: [{ code: 'bidOutOfRange' }] });
   });
 
   it('übermittelt über die API nur Profile mit Connection und plant den Job ein', async () => {
@@ -426,7 +442,7 @@ describe('submitCampaignSetupDraft', () => {
           version: 1,
           channel: 'bulk_file',
           enqueue: noEnqueue,
-          review: () => null,
+          limitFor: () => null,
         }),
       ),
     ).toBe('NOT_FOUND');

@@ -673,7 +673,7 @@ describe('Bulk-Datei eines Setups (4.4)', () => {
       version: 1,
       channel: 'bulk_file',
       enqueue: async () => undefined,
-      review: () => null,
+      limitFor: () => null,
     });
     if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
     return result.submission.id;

@@ -6,7 +6,8 @@ import type {
   SaveCampaignSetupDraft,
   SetupInputs,
 } from '@profitbash/shared';
-import { planSetupItems } from '@profitbash/engine/plan';
+import type { AdChangeLimitLookup } from '@profitbash/engine';
+import { planSetupItems, reviewCampaignPlan, type PlanReviewIssue } from '@profitbash/engine/plan';
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { loadAdChangeSubmissionSummaries, type AdChangeSubmissionSummary } from './ad-changes';
@@ -30,8 +31,8 @@ import { assertPresetKnown, StructureCatalogError } from './structure-catalog';
  * (`write` bzw. `view` im Feature `tools`) prüft die API, die Eingaben `saveCampaignSetupDraftSchema`.
  *
  * Übermitteln: Ein Entwurf wird zu **einer** Übermittlung der Art `setup` (Seite „Änderungen“, ein Entwurf = eine
- * Bulk-Datei) mit je einer Zeile in `campaign_setup_items` pro neuer Entity. Davor prüft `review` den gespeicherten
- * Plan in der Transaktion gegen den aktuellen Stand des Profils (Namen, Grenzen; in der API `reviewCampaignPlan`).
+ * Bulk-Datei) mit je einer Zeile in `campaign_setup_items` pro neuer Entity. Davor prüft `reviewCampaignPlan` den
+ * gespeicherten Plan in der Transaktion gegen den aktuellen Stand des Profils (Namen, Grenzen); Fehler sperren.
  * SB- und SD-Kampagnen legt Phase 4 erst mit 4.9/4.10 an: Sie stehen als gescheiterte Kampagne
  * (`AD_PRODUCT_NOT_SUPPORTED`) in der Übermittlung.
  */
@@ -428,13 +429,6 @@ export async function getCampaignSetupContext(
   return { profile, existing: await loadContext(db, input.profileId) };
 }
 
-/** Was `review` beim Übermitteln bekommt. */
-export interface CampaignSetupReviewInput {
-  campaigns: PlannedCampaign[];
-  profile: CampaignSetupContext['profile'];
-  existing: CampaignSetupContext['existing'];
-}
-
 export type SubmitCampaignSetupResult =
   | {
       status: 'submitted';
@@ -442,20 +436,22 @@ export type SubmitCampaignSetupResult =
       /** Zeilen der Übermittlung, davon nicht anlegbar (SB, SD). */
       items: number;
       unsupported: number;
+      /** Warnungen und Hinweise der Prüfung (sperren nicht). */
+      issues: PlanReviewIssue[];
     }
-  /** `review` hat etwas gemeldet; nichts wurde übermittelt. */
-  | { status: 'rejected'; review: unknown };
+  /** Die Prüfung hat Fehler gemeldet; nichts wurde übermittelt. */
+  | { status: 'rejected'; issues: PlanReviewIssue[] };
 
 class ReviewRejected extends Error {
-  constructor(public readonly verdict: unknown) {
-    super('Prüfung vor dem Übermitteln hat etwas gemeldet.');
+  constructor(public readonly issues: PlanReviewIssue[]) {
+    super('Prüfung vor dem Übermitteln hat Fehler gemeldet.');
   }
 }
 
 /**
  * Übermittelt einen offenen Entwurf (mit seiner aktuellen `version`): eine Übermittlung der Art `setup` und je neuer
  * Entity eine Zeile, alles in einer Transaktion mit Audit `ad_change_submission.create` und dem Einplanen (`enqueue`,
- * nur Weg `api`). Über die API nur mit Connection (`PROFILE_HAS_NO_CONNECTION`). Meldet `review` etwas, bleibt alles
+ * nur Weg `api`). Über die API nur mit Connection (`PROFILE_HAS_NO_CONNECTION`). Meldet die Prüfung Fehler, bleibt alles
  * beim Alten (`rejected`). `null` für Nicht-Mitglieder.
  */
 export async function submitCampaignSetupDraft(
@@ -465,7 +461,8 @@ export async function submitCampaignSetupDraft(
     version: number;
     channel: AdChangeChannel;
     enqueue: (tx: DbOrTx, submission: AdChangeSubmissionSummary) => Promise<unknown>;
-    review: (input: CampaignSetupReviewInput) => unknown;
+    /** Grenzen von Amazon (`amazonAdsValueLimit` aus `@profitbash/amazon-ads`). */
+    limitFor: AdChangeLimitLookup;
   },
 ): Promise<SubmitCampaignSetupResult | null> {
   const scope = await visibleProfilesScope(db, input);
@@ -485,13 +482,13 @@ export async function submitCampaignSetupDraft(
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${`campaign-setup:${profile.id}`}))`,
       );
-      const { connectionId: _connection, id: _id, ...profileData } = profile;
-      const verdict = input.review({
+      const issues = reviewCampaignPlan({
         campaigns: draft.campaigns,
-        profile: profileData,
+        profile,
         existing: await loadContext(tx, profile.id),
+        limitFor: input.limitFor,
       });
-      if (verdict !== null && verdict !== undefined) throw new ReviewRejected(verdict);
+      if (issues.some((issue) => issue.severity === 'error')) throw new ReviewRejected(issues);
 
       const [submission] = await tx
         .insert(adChangeSubmissions)
@@ -560,10 +557,16 @@ export async function submitCampaignSetupDraft(
         eq(adChangeSubmissions.id, submission!.id),
       );
       if (input.channel === 'api') await input.enqueue(tx, summary!);
-      return { status: 'submitted', submission: summary!, items: specs.length, unsupported };
+      return {
+        status: 'submitted',
+        submission: summary!,
+        items: specs.length,
+        unsupported,
+        issues,
+      };
     });
   } catch (error) {
-    if (error instanceof ReviewRejected) return { status: 'rejected', review: error.verdict };
+    if (error instanceof ReviewRejected) return { status: 'rejected', issues: error.issues };
     throw error;
   }
 }

@@ -534,7 +534,7 @@ describe('submitConnectionAdChanges: Setups (4.4)', () => {
       version: 1,
       channel: 'api',
       enqueue: async () => undefined,
-      review: () => null,
+      limitFor: () => null,
     });
     if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
     return result.submission.id;
