@@ -449,7 +449,8 @@ watch(version, () => (savedSnapshot.value = snapshot()));
           {{ issueText(t, te, issue, blockLabel) }}
         </li>
       </ul>
-      <div class="min-w-0 overflow-x-auto">
+      <!-- `relative`: Der unsichtbare Spaltentitel (`sr-only`, absolut) bleibt so im Scroll-Bereich. -->
+      <div class="relative min-w-0 overflow-x-auto">
         <table class="w-full min-w-[40rem] text-left text-body-sm">
           <thead class="text-label-eyebrow uppercase text-ink-tertiary">
             <tr>
