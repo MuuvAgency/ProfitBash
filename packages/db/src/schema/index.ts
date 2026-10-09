@@ -10,3 +10,4 @@ export * from './ad-changes';
 export * from './tags';
 export * from './product-groups';
 export * from './structure-catalog';
+export * from './campaign-setup';

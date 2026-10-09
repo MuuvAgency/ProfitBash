@@ -218,6 +218,13 @@
       "when": 1791559446464,
       "tag": "0030_structure_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791563314641,
+      "tag": "0031_campaign_setup",
+      "breakpoints": true
     }
   ]
 }

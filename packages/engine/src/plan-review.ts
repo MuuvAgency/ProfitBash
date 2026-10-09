@@ -35,11 +35,7 @@ export type PlanReviewIssue =
   | {
       severity: 'error';
       code:
-        | 'currencyMismatch'
-        | 'vcpmNotAvailable'
-        | 'offAmazonNotAvailable'
-        | 'noAds'
-        | 'noTargets';
+        'currencyMismatch' | 'vcpmNotAvailable' | 'offAmazonNotAvailable' | 'noAds' | 'noTargets';
       campaign: string;
     }
   | { severity: 'error'; code: 'missingSku'; asin: string }
@@ -79,14 +75,19 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
   const taken = new Set(input.existing.campaignNames.map((name) => name.toLowerCase()));
   const planned = new Set<string>();
   const exactInProfile = new Map(
-    input.existing.exactKeywords.map((keyword) => [keyword.text.toLowerCase(), keyword.campaignName]),
+    input.existing.exactKeywords.map((keyword) => [
+      keyword.text.toLowerCase(),
+      keyword.campaignName,
+    ]),
   );
 
   for (const campaign of input.campaigns) {
     const name = campaign.name;
     const lower = name.toLowerCase();
-    if (planned.has(lower)) add({ severity: 'error', code: 'campaignNameDuplicate', campaign: name });
-    else if (taken.has(lower)) add({ severity: 'error', code: 'campaignNameTaken', campaign: name });
+    if (planned.has(lower))
+      add({ severity: 'error', code: 'campaignNameDuplicate', campaign: name });
+    else if (taken.has(lower))
+      add({ severity: 'error', code: 'campaignNameTaken', campaign: name });
     planned.add(lower);
     for (const issue of campaignNameIssues(name, maxNameLength)) {
       add({ severity: 'error', code: 'campaignNameInvalid', campaign: name, issue });
@@ -109,7 +110,8 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
         }
       }
     }
-    if (campaign.adProduct !== 'SP') add({ severity: 'info', code: 'adProductLater', campaign: name });
+    if (campaign.adProduct !== 'SP')
+      add({ severity: 'info', code: 'adProductLater', campaign: name });
 
     if (campaign.ads.length === 0) add({ severity: 'error', code: 'noAds', campaign: name });
     if (campaign.adProduct === 'SP' && input.profile.accountType === 'seller') {

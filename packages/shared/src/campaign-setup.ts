@@ -175,3 +175,40 @@ export const saveCampaignSetupDraftSchema = z.strictObject({
   campaigns: z.array(plannedCampaignSchema).min(1).max(MAX_SETUP_CAMPAIGNS),
 });
 export type SaveCampaignSetupDraft = z.output<typeof saveCampaignSetupDraftSchema>;
+
+/** Platzierungen der Gebotsanpassung (wie `AD_CHANGE_PLACEMENTS`). */
+export type CampaignSetupPlacement =
+  'PLACEMENT_TOP' | 'PLACEMENT_PRODUCT_PAGE' | 'PLACEMENT_REST_OF_SEARCH';
+
+/**
+ * Was eine Übermittlung je Entity anlegt (`campaign_setup_items.payload`). Eltern stehen als vorläufige Text-IDs
+ * daneben (`campaign_ref`, `ad_group_ref`): der Name der Kampagne bzw. Ad Group.
+ */
+export type CampaignSetupItemPayload =
+  | {
+      entity: 'campaign';
+      adProduct: (typeof CATALOG_AD_PRODUCTS)[number];
+      name: string;
+      targetingType: 'auto' | 'manual';
+      state: CampaignSetupState;
+      dailyBudget: string;
+      currencyCode: string;
+      biddingStrategy: (typeof BLOCK_BIDDING_STRATEGIES)[number] | null;
+      offAmazon: boolean;
+    }
+  | { entity: 'placement'; placement: CampaignSetupPlacement; percentage: number }
+  | { entity: 'ad_group'; name: string; defaultBid: string }
+  | { entity: 'product_ad'; asin: string; sku: string | null }
+  | {
+      entity: 'keyword';
+      text: string;
+      matchType: (typeof BLOCK_MATCH_TYPES)[number];
+      bid: string;
+    }
+  | {
+      entity: 'product_target';
+      expression: { type: 'asin' | 'asinExpanded' | 'category'; value: string };
+      bid: string;
+    }
+  | { entity: 'negative_keyword'; text: string; matchType: 'negativeExact' | 'negativePhrase' }
+  | { entity: 'negative_product_target'; asin: string };

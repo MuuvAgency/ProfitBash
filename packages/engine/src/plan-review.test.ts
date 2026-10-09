@@ -47,7 +47,11 @@ describe('reviewCampaignPlan', () => {
   it('erkennt Kampagnennamen, die es im Profil oder im Plan schon gibt (ohne Groß/Klein)', () => {
     const issues = reviewCampaignPlan(
       input({
-        campaigns: [campaign(), campaign({ name: 'sp | exact | flaschen' }), campaign({ name: 'Neu' })],
+        campaigns: [
+          campaign(),
+          campaign({ name: 'sp | exact | flaschen' }),
+          campaign({ name: 'Neu' }),
+        ],
         existing: { campaignNames: ['Neu'], exactKeywords: [] },
       }),
     );
@@ -65,7 +69,12 @@ describe('reviewCampaignPlan', () => {
       }),
     );
     expect(issues).toEqual([
-      { severity: 'error', code: 'campaignNameInvalid', campaign: 'x'.repeat(120), issue: 'tooLong' },
+      {
+        severity: 'error',
+        code: 'campaignNameInvalid',
+        campaign: 'x'.repeat(120),
+        issue: 'tooLong',
+      },
     ]);
     expect(reviewCampaignPlan(input({ campaigns: [campaign({ name: 'SP · AUTO' })] }))).toEqual([
       {
@@ -84,7 +93,9 @@ describe('reviewCampaignPlan', () => {
           campaign({
             dailyBudget: '0.50',
             adGroup: { name: 'x', defaultBid: '0.01' },
-            targets: [{ type: 'keyword', text: 'trinkflasche', matchType: 'exact', bid: '1500.00' }],
+            targets: [
+              { type: 'keyword', text: 'trinkflasche', matchType: 'exact', bid: '1500.00' },
+            ],
           }),
         ],
       }),
@@ -150,7 +161,12 @@ describe('reviewCampaignPlan', () => {
       }),
     );
     expect(issues).toEqual([
-      { severity: 'warning', code: 'keywordAlreadyExact', keyword: 'trinkflasche', existing: 'Alt' },
+      {
+        severity: 'warning',
+        code: 'keywordAlreadyExact',
+        keyword: 'trinkflasche',
+        existing: 'Alt',
+      },
     ]);
   });
 
