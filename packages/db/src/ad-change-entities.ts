@@ -1,12 +1,14 @@
-import { comparableSearchTerm } from '@profitbash/engine';
+import { comparableSearchTerm, Dec } from '@profitbash/engine';
 import {
   AD_CHANGE_PLACEMENTS,
   adChangeFieldKind,
+  adChangeValueIssue,
   compareDecimal,
   isAdChangePlacementField,
   type AdChangeCreateNegativeInput,
   type AdChangeEntityType,
   type AdChangeField,
+  type AdChangeInput,
   type AdChangeNegative,
   type AdChangeRejection,
 } from '@profitbash/shared';
@@ -254,6 +256,92 @@ export async function loadComparisonBids(
     if (defaultBid !== undefined) result.set(change.id, defaultBid);
   }
   return result;
+}
+
+export type ResolvedAdChangeInput = Exclude<AdChangeInput, { operation: 'adjust' }>;
+
+/**
+ * Rechnet Anpassungen (±Prozent, ±Betrag; 3.5) in Feldänderungen um. Ausgangswert ist der Stand der Entity, nie ein
+ * schon vorgemerkter Wert (dieselbe Anpassung zweimal ergibt denselben Wert); ein Target ohne eigenes Gebot bietet
+ * mit dem Standardgebot seiner Ad Group. Gerundet wird kaufmännisch auf zwei Nachkommastellen. `null` an der Stelle
+ * einer abgelehnten Anpassung, der Grund steht in `rejected` (nach Index).
+ */
+export async function resolveAdjustments(
+  db: DbOrTx,
+  scope: ProfileScope,
+  inputs: readonly AdChangeInput[],
+): Promise<{
+  changes: (ResolvedAdChangeInput | null)[];
+  rejected: Map<number, AdChangeRejection>;
+}> {
+  const rejected = new Map<number, AdChangeRejection>();
+  const idsByType = new Map<AdChangeEntityType, string[]>();
+  for (const input of inputs) {
+    if (input.operation !== 'adjust') continue;
+    const list = idsByType.get(input.entityType) ?? [];
+    list.push(input.entityId);
+    idsByType.set(input.entityType, list);
+  }
+  if (idsByType.size === 0) return { changes: inputs as ResolvedAdChangeInput[], rejected };
+
+  const entities = new Map<string, EntitySnapshot>();
+  for (const [entityType, entityIds] of idsByType) {
+    for (const [id, entity] of await loadEntities(db, scope, entityType, entityIds)) {
+      entities.set(`${entityType}:${id}`, entity);
+    }
+  }
+  const adGroupIds = new Set<string>();
+  for (const [key, entity] of entities) {
+    if (key.startsWith('target:') && entity.bid == null && entity.adGroupId !== null) {
+      adGroupIds.add(entity.adGroupId);
+    }
+  }
+  const defaultBids = new Map<string, string>();
+  for (const part of chunks([...adGroupIds])) {
+    for (const adGroup of await db
+      .select({ id: amazonAdsAdGroups.id, defaultBid: amazonAdsAdGroups.defaultBid })
+      .from(amazonAdsAdGroups)
+      .where(inArray(amazonAdsAdGroups.id, part))) {
+      if (adGroup.defaultBid !== null) defaultBids.set(adGroup.id, adGroup.defaultBid);
+    }
+  }
+
+  const changes = inputs.map((input, index): ResolvedAdChangeInput | null => {
+    if (input.operation !== 'adjust') return input;
+    const entity = entities.get(`${input.entityType}:${input.entityId}`);
+    const current = currentValue(entity, input.field);
+    if (typeof current === 'string') {
+      rejected.set(index, current);
+      return null;
+    }
+    const base =
+      current.value ??
+      (input.field === 'bid' && entity!.adGroupId !== null
+        ? (defaultBids.get(entity!.adGroupId) ?? null)
+        : null);
+    if (base === null || !DECIMAL.test(base)) {
+      rejected.set(index, 'noCurrentValue');
+      return null;
+    }
+    const start = new Dec(base);
+    const result =
+      input.mode === 'percent'
+        ? start.times(new Dec(input.value).dividedBy(100).plus(1))
+        : start.plus(input.value);
+    const value = result.toDecimalPlaces(2, Dec.ROUND_HALF_UP).toFixed(2);
+    if (result.isNegative() || adChangeValueIssue(input.entityType, input.field, value) !== null) {
+      rejected.set(index, 'resultOutOfRange');
+      return null;
+    }
+    return {
+      operation: 'update',
+      entityType: input.entityType,
+      entityId: input.entityId,
+      field: input.field,
+      value,
+    };
+  });
+  return { changes, rejected };
 }
 
 /** Gleicher Wert? Beträge als Zahl verglichen (`0.5` = `0.50`); eine fehlende Platzierung gilt als 0 %. */

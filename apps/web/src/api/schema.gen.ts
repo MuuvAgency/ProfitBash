@@ -4523,6 +4523,7 @@ export interface components {
                     userId: string;
                     name: string;
                 }[];
+                comparisonBefore: string | null;
             }[];
             check: components["schemas"]["AdChangeCheck"];
         };
@@ -4565,7 +4566,7 @@ export interface components {
                 /** @enum {string} */
                 outcome: "rejected";
                 /** @enum {string} */
-                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
             })[];
             counts: {
                 created: number;
@@ -4589,6 +4590,18 @@ export interface components {
             entityId: string;
             /** @enum {string} */
             field: "state" | "budget" | "bidding_strategy" | "placement_top" | "placement_rest_of_search" | "placement_product_page" | "placement_amazon_business" | "default_bid" | "bid";
+            value: string;
+        } | {
+            /** @enum {string} */
+            operation: "adjust";
+            /** @enum {string} */
+            entityType: "campaign" | "ad_group" | "target" | "product_ad" | "negative_target";
+            /** Format: uuid */
+            entityId: string;
+            /** @enum {string} */
+            field: "budget" | "default_bid" | "bid";
+            /** @enum {string} */
+            mode: "percent" | "amount";
             value: string;
         } | {
             /** @enum {string} */
@@ -4624,7 +4637,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
             }[];
             bulkFileSkipped: {
                 /** Format: uuid */
@@ -4892,7 +4905,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
             }[];
             bulkFileSkipped: {
                 /** Format: uuid */
@@ -4925,7 +4938,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
             }[];
         } | {
             /** @enum {string} */
@@ -4935,7 +4948,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists";
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
             }[];
             bulkFileSkipped: {
                 /** Format: uuid */

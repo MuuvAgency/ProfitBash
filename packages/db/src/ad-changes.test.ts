@@ -530,8 +530,7 @@ describe('stageAdChanges: Feldänderungen', () => {
   });
 });
 
-// TODO 3.5 (Session vom 2026-10-08 am Nutzungslimit beendet): `adjust` in `stageAdChanges` umsetzen, dann `.skip` entfernen.
-describe.skip('stageAdChanges: anpassen (±Prozent, ±Betrag)', () => {
+describe('stageAdChanges: anpassen (±Prozent, ±Betrag)', () => {
   const adjust = (
     entityType: 'campaign' | 'ad_group' | 'target',
     entityId: string,
@@ -549,11 +548,11 @@ describe.skip('stageAdChanges: anpassen (±Prozent, ±Betrag)', () => {
 
     expect(result.counts).toMatchObject({ created: 3, rejected: 0 });
     const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
-    expect(cart!.map((c) => [c.field, c.before, c.after])).toEqual([
+    expect(cart!.map((c) => [c.field, c.before, c.after]).sort()).toEqual([
       // 0.50 − 15 % = 0.425 → 0.43
       ['bid', '0.50', '0.43'],
+      ['budget', '20', '22.50'],
       ['default_bid', '0.40', '0.45'],
-      ['budget', '20.00', '22.50'],
     ]);
   });
 

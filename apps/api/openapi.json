@@ -3999,6 +3999,12 @@
                       "name"
                     ]
                   }
+                },
+                "comparisonBefore": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -4031,7 +4037,8 @@
                 "createdBy",
                 "createdAt",
                 "updatedAt",
-                "otherUsers"
+                "otherUsers",
+                "comparisonBefore"
               ]
             }
           },
@@ -4213,7 +4220,9 @@
                         "entityArchived",
                         "budgetNotDaily",
                         "adProductNotSupported",
-                        "alreadyExists"
+                        "alreadyExists",
+                        "noCurrentValue",
+                        "resultOutOfRange"
                       ]
                     }
                   },
@@ -4331,6 +4340,58 @@
               "entityType",
               "entityId",
               "field",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "adjust"
+                ]
+              },
+              "entityType": {
+                "type": "string",
+                "enum": [
+                  "campaign",
+                  "ad_group",
+                  "target",
+                  "product_ad",
+                  "negative_target"
+                ]
+              },
+              "entityId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "budget",
+                  "default_bid",
+                  "bid"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "percent",
+                  "amount"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "operation",
+              "entityType",
+              "entityId",
+              "field",
+              "mode",
               "value"
             ],
             "additionalProperties": false
@@ -4479,7 +4540,9 @@
                         "entityArchived",
                         "budgetNotDaily",
                         "adProductNotSupported",
-                        "alreadyExists"
+                        "alreadyExists",
+                        "noCurrentValue",
+                        "resultOutOfRange"
                       ]
                     }
                   },
@@ -5714,7 +5777,9 @@
                     "entityArchived",
                     "budgetNotDaily",
                     "adProductNotSupported",
-                    "alreadyExists"
+                    "alreadyExists",
+                    "noCurrentValue",
+                    "resultOutOfRange"
                   ]
                 }
               },
@@ -5873,7 +5938,9 @@
                         "entityArchived",
                         "budgetNotDaily",
                         "adProductNotSupported",
-                        "alreadyExists"
+                        "alreadyExists",
+                        "noCurrentValue",
+                        "resultOutOfRange"
                       ]
                     }
                   },
@@ -5932,7 +5999,9 @@
                         "entityArchived",
                         "budgetNotDaily",
                         "adProductNotSupported",
-                        "alreadyExists"
+                        "alreadyExists",
+                        "noCurrentValue",
+                        "resultOutOfRange"
                       ]
                     }
                   },

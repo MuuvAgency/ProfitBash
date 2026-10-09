@@ -20,6 +20,7 @@ import {
   loadComparisonBids,
   loadEntities,
   negativeKey,
+  resolveAdjustments,
   sameValue,
   valueColumns,
   type EntitySnapshot,
@@ -125,12 +126,15 @@ export async function stageAdChanges(
   return db.transaction(async (tx) => {
     const results: StageAdChangeResult[] = input.changes.map(() => ({ outcome: 'unchanged' }));
     const profileIds = new Set<string>();
+    // Anpassungen (±Prozent, ±Betrag) werden zu Feldänderungen mit dem errechneten Wert.
+    const { changes, rejected } = await resolveAdjustments(tx, scope, input.changes);
+    for (const [index, reason] of rejected) results[index] = { outcome: 'rejected', reason };
 
     // --- Feldänderungen: je Stelle die letzte Angabe -------------------------------------------
     const lastByKey = new Map<string, number>();
     const idsByType = new Map<AdChangeEntityType, string[]>();
-    input.changes.forEach((change, index) => {
-      if (change.operation !== 'update') return;
+    changes.forEach((change, index) => {
+      if (change?.operation !== 'update') return;
       lastByKey.set(pendingKey(change.entityType, change.entityId, change.field), index);
       const list = idsByType.get(change.entityType) ?? [];
       list.push(change.entityId);
@@ -179,7 +183,7 @@ export async function stageAdChanges(
     const toDelete: { index: number; id: string; profileId: string }[] = [];
     const toUpsert: { index: number; key: string; values: typeof adChanges.$inferInsert }[] = [];
     for (const index of lastByKey.values()) {
-      const change = input.changes[index] as AdChangeUpdateInput;
+      const change = changes[index] as AdChangeUpdateInput;
       const key = pendingKey(change.entityType, change.entityId, change.field);
       const entity = entities.get(`${change.entityType}:${change.entityId}`);
       const current = currentValue(entity, change.field);
@@ -277,8 +281,8 @@ export async function stageAdChanges(
     }
 
     // --- Neue Negatives (wenige je Anfrage, deshalb einzeln) -----------------------------------
-    for (const [index, change] of input.changes.entries()) {
-      if (change.operation !== 'create_negative') continue;
+    for (const [index, change] of changes.entries()) {
+      if (change?.operation !== 'create_negative') continue;
       const parent = await checkNegative(tx, scope, change);
       if (typeof parent === 'string') {
         results[index] = { outcome: 'rejected', reason: parent };
