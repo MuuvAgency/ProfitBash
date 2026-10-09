@@ -898,6 +898,39 @@ describe('stageAdChanges: viele Negatives und geschützte Begriffe (3.8)', () =>
       expect(result.results[1]).toMatchObject({ outcome: 'created' });
     });
 
+    it('lehnt eine negative Wortgruppe ab, die einen geschützten Begriff mit abdeckt (3.8, Review)', async () => {
+      await testDb.db
+        .update(clients)
+        .set({ protectedTerms: ['nordwind jacke'] })
+        .where(eq(clients.id, clientId));
+      try {
+        const result = await stage(ids.ada, [
+          negativeKeyword('Nordwind', { matchType: 'PHRASE' }),
+          negativeKeyword('nordwind'),
+          negativeKeyword('jacke nordwind', { matchType: 'PHRASE' }),
+        ]);
+
+        expect(result.results.map((r) => r.outcome)).toEqual(['rejected', 'created', 'created']);
+        expect(result.results[0]).toEqual({ outcome: 'rejected', reason: 'protectedTerm' });
+      } finally {
+        await testDb.db
+          .update(clients)
+          .set({ protectedTerms: ['nordwind'] })
+          .where(eq(clients.id, clientId));
+      }
+    });
+
+    it('hält die Zahl bestätigter geschützter Begriffe im Audit-Event fest', async () => {
+      await testDb.db.delete(auditEvents);
+      await stage(ids.ada, [
+        { ...negativeKeyword('nordwind lampe'), confirmProtected: true } as AdChangeInput,
+        { ...negativeKeyword('ganz normal'), confirmProtected: true } as AdChangeInput,
+      ]);
+
+      const [event] = await auditActions();
+      expect(event!.target).toMatchObject({ created: 2, confirmedProtected: 1 });
+    });
+
     it('legt es mit Bestätigung in den Warenkorb', async () => {
       const result = await stage(ids.ada, [
         { ...negativeKeyword('nordwind lampe'), confirmProtected: true } as AdChangeInput,

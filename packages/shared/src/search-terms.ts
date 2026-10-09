@@ -328,8 +328,11 @@ export type SearchTermAnalysisResponse = z.infer<typeof searchTermAnalysisRespon
 // Harvest-Merkliste (`phase-3.md` 3.8, F9)
 // ---------------------------------------------------------------------------
 
-/** Je Anfrage; die Oberfläche schickt eine größere Auswahl in Stücken (Body-Limit 64 KB). */
-export const MAX_HARVEST_TERMS_PER_REQUEST = 200;
+/**
+ * Je Anfrage; die Oberfläche schickt eine größere Auswahl in Stücken. So bemessen, dass auch Begriffe voller Länge
+ * in Schriften mit drei Bytes je Zeichen unter dem Body-Limit von 64 KB bleiben.
+ */
+export const MAX_HARVEST_TERMS_PER_REQUEST = 80;
 export const MAX_HARVEST_SEARCH_TERM_LENGTH = 200;
 
 /**

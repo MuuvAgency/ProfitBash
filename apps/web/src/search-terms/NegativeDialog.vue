@@ -4,7 +4,7 @@ import Dialog from 'primevue/dialog';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ApiError } from '../api';
-import type { SearchTermRowData, StageAdChangesData } from '../api/client';
+import type { AdChangeInputData, SearchTermRowData, StageAdChangesData } from '../api/client';
 import { useStageChanges } from '../changes/queries';
 import StageResult from '../changes/StageResult.vue';
 import InlineError from '../components/common/InlineError.vue';
@@ -33,6 +33,8 @@ const matchType = ref<NegativeMatchType>('EXACT');
 const confirmProtected = ref(false);
 const result = ref<StageAdChangesData | null>(null);
 const errorKey = ref<string | null>(null);
+/** Was zuletzt gesendet wurde, in der Reihenfolge der Ergebnisse. */
+const sent = ref<AdChangeInputData[]>([]);
 
 watch(
   () => props.visible,
@@ -43,6 +45,7 @@ watch(
     confirmProtected.value = false;
     result.value = null;
     errorKey.value = null;
+    sent.value = [];
     stage.reset();
   },
   { immediate: true },
@@ -61,15 +64,40 @@ const hasAsins = computed(() => props.rows.some((row) => isAsinSearchTerm(row.se
 const single = computed(() => (props.rows.length === 1 ? props.rows[0]! : null));
 const canSubmit = computed(() => prepared.value.inputs.length > 0 && !stage.isPending.value);
 
-async function submit() {
-  if (!canSubmit.value) return;
+/**
+ * Vom Server als geschützt abgelehnt, ohne dass die Zeile so gekennzeichnet war (z. B. eine negative Wortgruppe,
+ * die einen geschützten Begriff mit abdeckt): lässt sich nach dem Ergebnis bestätigen.
+ */
+const rejectedProtected = computed(() =>
+  sent.value.filter((_, index) => {
+    const item = result.value?.results[index];
+    return item?.outcome === 'rejected' && item.reason === 'protectedTerm';
+  }),
+);
+
+async function send(inputs: AdChangeInputData[]) {
   errorKey.value = null;
   try {
-    result.value = await stage.mutateAsync(prepared.value.inputs);
+    const next = await stage.mutateAsync(inputs);
+    sent.value = inputs;
+    result.value = next;
     emit('staged');
   } catch (error) {
     errorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
   }
+}
+
+function submit() {
+  if (canSubmit.value) void send(prepared.value.inputs);
+}
+
+function confirmRejected() {
+  if (stage.isPending.value) return;
+  void send(
+    rejectedProtected.value.map((input) =>
+      input.operation === 'create_negative' ? { ...input, confirmProtected: true } : input,
+    ),
+  );
 }
 </script>
 
@@ -88,7 +116,31 @@ async function submit() {
     @update:visible="(next) => !next && emit('close')"
   >
     <div v-if="result" class="flex flex-col gap-space-lg">
+      <InlineError v-if="errorKey" :message="t(errorKey)" />
       <StageResult :result="result" />
+      <div
+        v-if="rejectedProtected.length > 0"
+        class="flex flex-col items-start gap-space-sm rounded-control bg-well px-space-md py-space-sm"
+      >
+        <p class="text-body-sm text-ink">
+          <i class="pi pi-shield mr-space-xs text-warn" aria-hidden="true" />{{
+            t(
+              'searchTerms.negative.rejectedProtected',
+              { count: rejectedProtected.length },
+              rejectedProtected.length,
+            )
+          }}
+        </p>
+        <Button
+          type="button"
+          data-confirm-rejected
+          size="small"
+          severity="secondary"
+          :label="t('searchTerms.negative.confirmRejected')"
+          :loading="stage.isPending.value"
+          @click="confirmRejected"
+        />
+      </div>
       <p class="text-body-sm text-ink-secondary">{{ t('searchTerms.negative.nextStep') }}</p>
       <div class="flex justify-end">
         <Button type="button" :label="t('common.close')" @click="emit('close')" />

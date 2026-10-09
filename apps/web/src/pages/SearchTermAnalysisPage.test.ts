@@ -1601,6 +1601,72 @@ describe('Suchbegriff-Aktionen (phase-3.md 3.8)', () => {
     );
   });
 
+  it('lässt vom Server als geschützt abgelehnte Negatives nach dem Ergebnis bestätigen', async () => {
+    let calls = 0;
+    const { requests } = await mountPage(
+      PATH,
+      actionRoutes({
+        'POST /api/ads/changes/pending': () =>
+          json(
+            calls++ === 0
+              ? {
+                  results: [
+                    { outcome: 'created', changeId: M1, otherUsers: 0 },
+                    { outcome: 'rejected', reason: 'protectedTerm' },
+                  ],
+                  counts: { created: 1, updated: 0, removed: 0, unchanged: 0, rejected: 1 },
+                }
+              : stageAnswer(1),
+          ),
+      }),
+    );
+    await waitForRow('led lampe warmweiß');
+    await selectAllRows();
+    button('Negativ anlegen')!.click();
+    await flushPromises();
+    radio('PHRASE').click();
+    await flushPromises();
+    document.querySelector<HTMLButtonElement>('[data-negative-submit]')!.click();
+    const confirm = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLButtonElement>('[data-confirm-rejected]');
+      if (!found) throw new Error('keine Bestätigung');
+      return found;
+    });
+    expect(document.body.textContent).toContain('deckt ihn als Wortgruppe mit ab');
+
+    confirm.click();
+    await flushPromises();
+
+    const bodies = posts(requests, '/api/ads/changes/pending') as { changes: unknown[] }[];
+    expect(bodies[1]!.changes).toEqual([
+      {
+        operation: 'create_negative',
+        campaignId: C1,
+        adGroupId: G1,
+        negative: { type: 'keyword', keywordText: 'lampe billig', matchType: 'PHRASE' },
+        confirmProtected: true,
+      },
+    ]);
+    await vi.waitFor(() => expect(document.querySelector('[data-confirm-rejected]')).toBeNull());
+  });
+
+  it('hebt die Markierung im Grid auf, wenn der Filter der Einstufung wechselt', async () => {
+    await mountPage(PATH, actionRoutes());
+    await waitForRow('led lampe warmweiß');
+    await selectAllRows();
+    await vi.waitFor(() => expect(document.body.textContent).toContain('3 markiert'));
+
+    button('Ernten')!.click();
+    await flushPromises();
+    await vi.waitFor(() => expect(document.body.textContent).toContain('0 markiert'));
+    button('Ernten')!.click();
+    await flushPromises();
+    await waitForRow('lampe billig');
+
+    expect(document.body.textContent).toContain('0 markiert');
+    expect(document.querySelectorAll('.ag-row-selected')).toHaveLength(0);
+  });
+
   it('öffnet den Dialog auch für eine einzelne Zeile', async () => {
     const { requests } = await mountPage(PATH, actionRoutes());
     await waitForRow('lampe billig');

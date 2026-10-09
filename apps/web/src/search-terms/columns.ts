@@ -280,7 +280,11 @@ export function termColumns(context: ColumnContext): ColDef<TermGridRow>[] {
       cellRendererParams: {
         onNegative: context.onNegative,
         onHarvest: context.onHarvest,
-        label: (action, row) => t(`searchTerms.actions.row.${action}`, { term: row.searchTerm }),
+        label: (action, row) =>
+          t(
+            `searchTerms.actions.row.${action === 'harvest' && row.harvestMarked ? 'harvestMarked' : action}`,
+            { term: row.searchTerm },
+          ),
       } satisfies RowActionsCellParams,
       pinned: 'right',
       lockPinned: true,
