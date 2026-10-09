@@ -1082,6 +1082,8 @@ export const de = {
       },
       entitiesSyncedAt:
         'Portfolio und Enddatum der Kampagnen stammen vom Stand {date}. Wurden sie seitdem in der Werbekonsole geändert, setzt die Datei sie zurück.',
+      setupBulkHint:
+        'Neue Kampagnen: Datei herunterladen und am selben Tag in der Werbekonsole hochladen (Startdatum heute). Der nächste Bulk-Import ordnet die angelegten Entities über ihren Namen zu; ein erneuter Download enthält nur, was noch fehlt.',
       entitiesNeverSynced:
         'Portfolio und Enddatum der Kampagnen sind nicht bekannt (noch kein Import): Die Datei lässt sie leer.',
       bulkFileHint:
