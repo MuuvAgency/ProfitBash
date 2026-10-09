@@ -28,6 +28,7 @@ function change(patch: Partial<SubmissionChange>): SubmissionChange {
     campaignState: 'ENABLED',
     campaignEndDate: null,
     campaignAmazonPortfolioId: null,
+    campaignMultiAdGroups: null,
     ...patch,
   };
 }

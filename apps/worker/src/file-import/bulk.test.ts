@@ -806,7 +806,8 @@ describe('importBulkFile', () => {
       budgetAmount: '1500',
       budgetType: 'LIFETIME',
       biddingStrategy: null,
-      extra: { costType: 'CPC' },
+      // Das Blatt der Kampagne braucht die Bulk-Datei für Änderungen (3.9).
+      extra: { costType: 'CPC', multiAdGroups: true },
     });
     expect(campaigns.get(SDC)!.row).toMatchObject({
       adProduct: SD,

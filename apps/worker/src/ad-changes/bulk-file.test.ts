@@ -30,6 +30,7 @@ function change(patch: Partial<SubmissionChange>): SubmissionChange {
     campaignState: 'ENABLED',
     campaignEndDate: '2026-12-31',
     campaignAmazonPortfolioId: '700',
+    campaignMultiAdGroups: null,
     ...patch,
   };
 }
@@ -193,7 +194,7 @@ describe('buildBulkFileChanges', () => {
   });
 
   it('lehnt ab, was sich nicht abbilden lässt: andere Ad-Typen, unbekannte Entities, frühere doppelte Angaben', () => {
-    const sb = change({ entityId: 't5', adProduct: 'SPONSORED_BRANDS' });
+    const sb = change({ entityId: 't5', adProduct: 'SPONSORED_TV' });
     const unknown = change({ entityId: 't6', amazonEntityId: null });
     const first = change({ entityId: 't7', amazonEntityId: '307', after: '0.60' });
     const second = change({ entityId: 't7', amazonEntityId: '307', after: '0.90' });
@@ -204,6 +205,125 @@ describe('buildBulkFileChanges', () => {
       [sb.id, 'AD_PRODUCT_NOT_SUPPORTED'],
       [unknown.id, 'ENTITY_NOT_FOUND'],
       [first.id, 'SUPERSEDED'],
+    ]);
+  });
+});
+
+describe('buildBulkFileChanges für Sponsored Brands und Sponsored Display (3.9)', () => {
+  const SB = 'SPONSORED_BRANDS';
+  const SD = 'SPONSORED_DISPLAY';
+
+  it('ordnet jede Änderung dem Blatt ihres Anzeigentyps zu, SB nach der Art der Kampagne', () => {
+    const sp = change({ entityId: 'sp' });
+    const legacy = change({ entityId: 'sb1', adProduct: SB, campaignMultiAdGroups: false });
+    const multi = change({ entityId: 'sb2', adProduct: SB, campaignMultiAdGroups: true });
+    const sd = change({ entityId: 'sd', adProduct: SD, targetType: 'product' });
+
+    const plan = buildBulkFileChanges([sp, legacy, multi, sd]);
+
+    expect(plan.rejected).toEqual([]);
+    expect(plan.changes.map((c) => plan.sheetByRef.get(c.ref))).toEqual([
+      'sp',
+      'sb',
+      'sbMultiAdGroup',
+      'sd',
+    ]);
+  });
+
+  it('lehnt SB-Kampagnen ab, deren Blatt unbekannt ist (noch kein Bulk-Import)', () => {
+    const unknown = change({ adProduct: SB, campaignMultiAdGroups: null });
+    const { changes, rejected } = buildBulkFileChanges([unknown]);
+    expect(changes).toEqual([]);
+    expect(rejected).toEqual([
+      { changeId: unknown.id, code: 'BULK_FILE_SHEET_UNKNOWN', message: expect.any(String) },
+    ]);
+  });
+
+  it('SB, älteres Blatt: Targets und Negatives dürfen ohne Ad Group sein', () => {
+    const base = { adProduct: SB, campaignMultiAdGroups: false, amazonAdGroupId: null };
+    const keyword = change({ ...base, entityId: 'k' });
+    const archive = change({
+      ...base,
+      entityType: 'negative_target',
+      entityId: 'n',
+      amazonEntityId: '95',
+      targetType: 'keyword',
+      negativeLevel: 'campaign',
+      field: 'state',
+      after: 'ARCHIVED',
+    });
+
+    const { changes, rejected } = buildBulkFileChanges([keyword, archive]);
+
+    expect(rejected).toEqual([]);
+    expect(changes).toEqual([
+      {
+        ref: 'target:k',
+        type: 'keyword',
+        amazonCampaignId: '100',
+        amazonAdGroupId: null,
+        amazonTargetId: '300',
+        bid: '0.75',
+      },
+      {
+        ref: 'negative_target:n',
+        type: 'archive',
+        entity: 'campaignNegativeKeyword',
+        amazonCampaignId: '100',
+        amazonId: '95',
+      },
+    ]);
+  });
+
+  it('SB, Blatt mit mehreren Ad Groups: ein Target ohne Ad Group ist unbekannt', () => {
+    const keyword = change({ adProduct: SB, campaignMultiAdGroups: true, amazonAdGroupId: null });
+    expect(buildBulkFileChanges([keyword]).rejected.map((r) => r.code)).toEqual([
+      'ENTITY_NOT_FOUND',
+    ]);
+  });
+
+  it('SD: nennt je Target die Art des Targetings, auch beim Archivieren', () => {
+    const contextual = change({ adProduct: SD, entityId: 'a', targetType: 'category' });
+    const audience = change({
+      adProduct: SD,
+      entityId: 'b',
+      amazonEntityId: '301',
+      targetType: 'audience',
+      field: 'state',
+      after: 'ARCHIVED',
+    });
+
+    const { changes, rejected } = buildBulkFileChanges([contextual, audience]);
+
+    expect(rejected).toEqual([]);
+    expect(changes).toEqual([
+      {
+        ref: 'target:a',
+        type: 'productTarget',
+        amazonCampaignId: '100',
+        amazonAdGroupId: '200',
+        amazonTargetId: '300',
+        bid: '0.75',
+        sdTargeting: 'contextual',
+      },
+      {
+        ref: 'target:b',
+        type: 'archive',
+        entity: 'productTarget',
+        amazonCampaignId: '100',
+        amazonAdGroupId: '200',
+        amazonId: '301',
+        sdTargeting: 'audience',
+      },
+    ]);
+  });
+
+  it('lehnt Targets ab, deren Art das Blatt nicht kennt (SB-Themen, unbekannte SD-Targets)', () => {
+    const theme = change({ adProduct: SB, campaignMultiAdGroups: true, targetType: 'theme' });
+    const odd = change({ adProduct: SD, entityId: 'x', targetType: 'content_category' });
+    expect(buildBulkFileChanges([theme, odd]).rejected.map((r) => [r.changeId, r.code])).toEqual([
+      [theme.id, 'TARGET_TYPE_NOT_SUPPORTED'],
+      [odd.id, 'TARGET_TYPE_NOT_SUPPORTED'],
     ]);
   });
 });
@@ -233,7 +353,7 @@ describe('buildSubmissionBulkFile', () => {
       targetType: null,
       negative: { type: 'product', asin: 'B000000001' },
     });
-    const sb = change({ entityId: 't5', adProduct: 'SPONSORED_BRANDS' });
+    const sb = change({ entityId: 't5', adProduct: 'SPONSORED_TV' });
 
     const file = buildSubmissionBulkFile([bid, create, campaignAsin, sb]);
 
@@ -257,10 +377,98 @@ describe('buildSubmissionBulkFile', () => {
   });
 
   it('liefert keine Datei, wenn keine Zeile übrig bleibt', () => {
-    const sb = change({ adProduct: 'SPONSORED_BRANDS' });
+    const sb = change({ adProduct: 'SPONSORED_TV' });
     const file = buildSubmissionBulkFile([sb]);
     expect(file.content).toBeNull();
     expect(file.rows).toBe(0);
     expect(file.skipped).toHaveLength(1);
+  });
+
+  it('schreibt je Anzeigentyp ein eigenes Blatt und überspringt, was ein Blatt nicht kennt', async () => {
+    const sp = change({ entityId: 'sp' });
+    const sbBudget = change({
+      adProduct: 'SPONSORED_BRANDS',
+      campaignMultiAdGroups: true,
+      entityType: 'campaign',
+      entityId: 'sbc',
+      amazonCampaignId: '110',
+      amazonEntityId: '110',
+      amazonAdGroupId: null,
+      targetType: null,
+      field: 'budget',
+      after: '120.00',
+    });
+    const sbLegacy = change({
+      adProduct: 'SPONSORED_BRANDS',
+      campaignMultiAdGroups: false,
+      entityId: 'sbk',
+      amazonCampaignId: '120',
+      amazonAdGroupId: null,
+      amazonEntityId: '320',
+    });
+    const sdBid = change({
+      adProduct: 'SPONSORED_DISPLAY',
+      entityId: 'sdt',
+      amazonCampaignId: '130',
+      amazonAdGroupId: '230',
+      amazonEntityId: '330',
+      targetType: 'audience',
+      after: '1.10',
+    });
+    // Das Standardgebot einer SB-Ad-Group gibt es nicht.
+    const sbDefaultBid = change({
+      adProduct: 'SPONSORED_BRANDS',
+      campaignMultiAdGroups: true,
+      entityType: 'ad_group',
+      entityId: 'sbg',
+      amazonCampaignId: '110',
+      amazonAdGroupId: '210',
+      amazonEntityId: '210',
+      targetType: null,
+      field: 'default_bid',
+      after: '0.50',
+    });
+
+    const file = buildSubmissionBulkFile([sp, sbBudget, sbLegacy, sdBid, sbDefaultBid]);
+
+    expect(file.rows).toBe(4);
+    expect(file.skipped).toEqual([
+      { changeId: sbDefaultBid.id, code: 'BULK_FILE_NOT_SUPPORTED', message: expect.any(String) },
+    ]);
+    const workbook = await openXlsx(file.content!);
+    expect(workbook.sheets.map((sheet) => sheet.name)).toEqual([
+      'Sponsored Products Campaigns',
+      'Sponsored Brands Campaigns',
+      'SB Multi Ad Group Campaigns',
+      'Sponsored Display Campaigns',
+    ]);
+    const dataRows = (name: string) => {
+      const rows: string[][] = [];
+      workbook.forEachRow(name, (row) => rows.push(row.map((cell) => String(cell ?? ''))));
+      return rows.slice(1);
+    };
+    expect(dataRows('Sponsored Brands Campaigns')).toEqual([
+      expect.arrayContaining(['Sponsored Brands', 'Keyword', 'Update', '120', '320', '0.75']),
+    ]);
+    expect(dataRows('SB Multi Ad Group Campaigns')).toEqual([
+      expect.arrayContaining(['Sponsored Brands', 'Campaign', 'Update', '110', '120.00']),
+    ]);
+    expect(dataRows('Sponsored Display Campaigns')).toEqual([
+      expect.arrayContaining([
+        'Sponsored Display',
+        'Audience Targeting',
+        'Update',
+        '130',
+        '230',
+        '330',
+        '1.10',
+      ]),
+    ]);
+  });
+
+  it('lässt Blätter ohne Zeile weg', async () => {
+    const sd = change({ adProduct: 'SPONSORED_DISPLAY', targetType: 'product' });
+    const workbook = await openXlsx(buildSubmissionBulkFile([sd]).content!);
+    expect(workbook.sheets.map((sheet) => sheet.name)).toEqual(['Sponsored Display Campaigns']);
   });
 });

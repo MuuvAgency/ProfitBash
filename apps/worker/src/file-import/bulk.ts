@@ -32,6 +32,7 @@ import {
   BUDGET_POLICIES,
   BUDGET_TYPES,
   classifySheet,
+  isSbMultiAdGroupSheet,
   columnLabel,
   COST_TYPES,
   entityKind,
@@ -564,7 +565,7 @@ class BulkCollector {
   ): void {
     switch (kind) {
       case 'campaign':
-        return this.addCampaign(sheetKind, adProduct, cells);
+        return this.addCampaign(sheetKind, adProduct, cells, position.sheet);
       case 'adGroup': {
         const defaultBid = cells.amount('adGroupDefaultBid');
         this.adGroups.push({
@@ -666,6 +667,7 @@ class BulkCollector {
     sheetKind: Exclude<BulkSheetKind, 'portfolios'>,
     adProduct: string,
     cells: Cells,
+    sheetName: string,
   ): void {
     const budgetAmount = cells.amount('dailyBudget') ?? cells.amount('budget');
     const budgetType =
@@ -692,7 +694,11 @@ class BulkCollector {
       biddingStrategy: cells.value('biddingStrategy', BIDDING_STRATEGIES),
       startDate: cells.date('startDate'),
       endDate: cells.date('endDate'),
-      extra: costType === null ? {} : { costType },
+      extra: {
+        ...(costType !== null && { costType }),
+        // In welchem der beiden SB-Blätter die Kampagne steht (für die Bulk-Datei der Änderungen, 3.9).
+        ...(sheetKind === 'sb' && { multiAdGroups: isSbMultiAdGroupSheet(sheetName) }),
+      },
     });
   }
 

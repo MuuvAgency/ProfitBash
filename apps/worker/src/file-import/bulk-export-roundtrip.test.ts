@@ -1,10 +1,16 @@
-import { buildSpBulkSheet, type BulkFileChange } from '@profitbash/amazon-ads';
+import {
+  buildBulkSheet,
+  buildSpBulkSheet,
+  type BulkFileChange,
+  type BulkFileSheetKind,
+} from '@profitbash/amazon-ads';
 import { openXlsx, writeXlsx } from '@profitbash/sheets';
 import { describe, expect, it } from 'vitest';
 import {
   BIDDING_STRATEGIES,
   classifySheet,
   entityKind,
+  isSbMultiAdGroupSheet,
   mapHeader,
   mapValue,
   MATCH_TYPES,
@@ -204,6 +210,213 @@ describe('Bulk-Datei: Rundlauf mit dem Leser des Bulk-Imports', () => {
     expect(parseTargetExpression(cell(8, 'productTargetingExpression'), '')).toMatchObject({
       targetType: 'product',
       expression: { asin: 'B0FREMD001' },
+    });
+  });
+});
+
+/**
+ * Rundlauf für Sponsored Brands und Sponsored Display (`phase-3.md` 3.9): eine Arbeitsmappe mit den drei Blättern,
+ * gelesen mit denselben Abbildungen wie oben.
+ */
+describe('Bulk-Datei für SB und SD: Rundlauf mit dem Leser des Bulk-Imports', () => {
+  const CAMPAIGN = '9007199254740993456';
+  const campaign = {
+    amazonCampaignId: CAMPAIGN,
+    amazonPortfolioId: '9001',
+    endDate: '2027-01-31',
+    state: 'ENABLED',
+  };
+  const ids = { amazonCampaignId: CAMPAIGN, amazonAdGroupId: '1201' };
+  const bySheet: Record<Exclude<BulkFileSheetKind, 'sp'>, BulkFileChange[]> = {
+    sb: [
+      { ref: 'c', type: 'campaign', campaign, set: { dailyBudget: '150.00', state: 'PAUSED' } },
+      {
+        ref: 'k',
+        type: 'keyword',
+        amazonCampaignId: CAMPAIGN,
+        amazonAdGroupId: null,
+        amazonTargetId: '2101',
+        bid: '1.20',
+      },
+      {
+        ref: 'n',
+        type: 'createNegative',
+        amazonCampaignId: CAMPAIGN,
+        amazonAdGroupId: null,
+        negative: { type: 'keyword', keywordText: 'gratis lampe', matchType: 'EXACT' },
+      },
+      {
+        ref: 'a',
+        type: 'archive',
+        entity: 'campaignNegativeProductTarget',
+        amazonCampaignId: CAMPAIGN,
+        amazonId: '2102',
+      },
+    ],
+    sbMultiAdGroup: [
+      { ref: 'g', type: 'adGroup', ...ids, state: 'PAUSED' },
+      { ref: 't', type: 'productTarget', ...ids, amazonTargetId: '2201', bid: '0.95' },
+      {
+        ref: 'n',
+        type: 'createNegative',
+        ...ids,
+        negative: { type: 'product', asin: 'B0FREMD002' },
+      },
+    ],
+    sd: [
+      { ref: 'c', type: 'campaign', campaign, set: { dailyBudget: '20' } },
+      { ref: 'g', type: 'adGroup', ...ids, defaultBid: '0.55' },
+      { ref: 'p', type: 'productAd', ...ids, amazonAdId: '4101', state: 'PAUSED' },
+      {
+        ref: 't1',
+        type: 'productTarget',
+        ...ids,
+        amazonTargetId: '2301',
+        bid: '0.70',
+        sdTargeting: 'contextual',
+      },
+      {
+        ref: 't2',
+        type: 'archive',
+        entity: 'productTarget',
+        ...ids,
+        amazonId: '2302',
+        sdTargeting: 'audience',
+      },
+      {
+        ref: 'n',
+        type: 'createNegative',
+        ...ids,
+        negative: { type: 'product', asin: 'B0FREMD003' },
+      },
+    ],
+  };
+
+  function readSheets() {
+    const built = (['sb', 'sbMultiAdGroup', 'sd'] as const).map((kind) => {
+      const sheet = buildBulkSheet(kind, bySheet[kind]);
+      expect(sheet.skipped, kind).toEqual([]);
+      return { name: sheet.sheetName, rows: sheet.rows };
+    });
+    const workbook = openXlsx(writeXlsx(built));
+    const read = (name: string) => {
+      const rows: { cells: string[]; numeric: ReadonlySet<number> }[] = [];
+      workbook.forEachRow(name, (cells, _rowNumber, info) =>
+        rows.push({ cells, numeric: new Set(info.numericColumns) }),
+      );
+      const [header, ...data] = rows;
+      const columns = mapHeader(header!.cells);
+      const cell = (row: number, column: BulkColumn) =>
+        data[row]!.cells[columns.get(column)!] ?? '';
+      return {
+        columns,
+        cell,
+        isNumeric: (row: number, column: BulkColumn) =>
+          data[row]!.numeric.has(columns.get(column)!),
+        entity: (row: number) => entityKind(cell(row, 'entity')),
+        // Die Spalte „Operation“ liest der Import nicht (heruntergeladene Dateien lassen sie leer).
+        operations: data.map((row) => row.cells[header!.cells.indexOf('Operation')] ?? ''),
+      };
+    };
+    const [sb, multi, sd] = built.map((sheet) => read(sheet.name)) as [
+      ReturnType<typeof read>,
+      ReturnType<typeof read>,
+      ReturnType<typeof read>,
+    ];
+    return { workbook, sb, multi, sd };
+  }
+
+  it('erkennt die drei Blätter, das SB-Blatt mit mehreren Ad Groups und die Kopfzeilen', () => {
+    const { workbook, sb, multi, sd } = readSheets();
+
+    expect(workbook.sheets.map((sheet) => classifySheet(sheet.name))).toEqual(['sb', 'sb', 'sd']);
+    expect(workbook.sheets.map((sheet) => isSbMultiAdGroupSheet(sheet.name))).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    const common = ['entity', 'campaignId', 'portfolioId', 'adGroupId'] as const;
+    const targets = ['keywordId', 'productTargetingId', 'productTargetingExpression'] as const;
+    for (const column of [...common, ...targets, 'endDate', 'state', 'budget', 'bid'] as const) {
+      expect(sb.columns.has(column), `sb ${column}`).toBe(true);
+      expect(multi.columns.has(column), `multi ${column}`).toBe(true);
+    }
+    for (const column of [
+      ...common,
+      'adId',
+      'targetingId',
+      'targetingExpression',
+      'endDate',
+      'state',
+      'budget',
+      'adGroupDefaultBid',
+      'bid',
+    ] as const) {
+      expect(sd.columns.has(column), `sd ${column}`).toBe(true);
+    }
+  });
+
+  it('liest das ältere SB-Blatt zurück: Kampagne, Keyword ohne Ad Group, Negatives', () => {
+    const { sb } = readSheets();
+
+    expect(sb.operations).toEqual(['Update', 'Update', 'Create', 'Archive']);
+    expect(sb.entity(0)).toBe('campaign');
+    expect(parseBulkId(sb.cell(0, 'campaignId'), sb.isNumeric(0, 'campaignId'))).toBe(CAMPAIGN);
+    expect(sb.cell(0, 'portfolioId')).toBe('9001');
+    expect(parseBulkDate(sb.cell(0, 'endDate'))).toBe('2027-01-31');
+    expect(parseBulkAmount(sb.cell(0, 'budget'))).toBe('150');
+    expect(sb.isNumeric(0, 'budget')).toBe(true);
+    expect(mapValue(STATES, sb.cell(0, 'state'))).toEqual({ value: 'PAUSED', known: true });
+
+    expect(sb.entity(1)).toBe('keyword');
+    expect(sb.cell(1, 'adGroupId')).toBe('');
+    expect(sb.cell(1, 'keywordId')).toBe('2101');
+    expect(sb.cell(1, 'bid')).toBe('1.20');
+
+    expect(sb.entity(2)).toBe('negativeKeyword');
+    expect(sb.cell(2, 'keywordText')).toBe('gratis lampe');
+    expect(mapValue(MATCH_TYPES, sb.cell(2, 'matchType'))).toEqual({ value: 'EXACT', known: true });
+
+    expect(sb.entity(3)).toBe('negativeProductTargeting');
+    expect(sb.cell(3, 'productTargetingId')).toBe('2102');
+  });
+
+  it('liest das SB-Blatt mit mehreren Ad Groups zurück', () => {
+    const { multi } = readSheets();
+
+    expect(multi.entity(0)).toBe('adGroup');
+    expect(multi.cell(0, 'adGroupId')).toBe('1201');
+    expect(mapValue(STATES, multi.cell(0, 'state'))).toEqual({ value: 'PAUSED', known: true });
+    expect(multi.entity(1)).toBe('productTargeting');
+    expect(multi.cell(1, 'productTargetingId')).toBe('2201');
+    expect(parseBulkAmount(multi.cell(1, 'bid'))).toBe('0.95');
+    expect(multi.entity(2)).toBe('negativeProductTargeting');
+    expect(parseTargetExpression(multi.cell(2, 'productTargetingExpression'), '')).toMatchObject({
+      targetType: 'product',
+      expression: { asin: 'B0FREMD002' },
+    });
+  });
+
+  it('liest das SD-Blatt zurück: Kampagne, Ad Group, Product Ad, Targets je Art, negative ASIN', () => {
+    const { sd } = readSheets();
+
+    expect(sd.operations).toEqual(['Update', 'Update', 'Update', 'Update', 'Archive', 'Create']);
+    expect(sd.entity(0)).toBe('campaign');
+    expect(parseBulkAmount(sd.cell(0, 'budget'))).toBe('20');
+    expect(sd.cell(0, 'portfolioId')).toBe('9001');
+    expect(sd.entity(1)).toBe('adGroup');
+    expect(parseBulkAmount(sd.cell(1, 'adGroupDefaultBid'))).toBe('0.55');
+    expect(sd.entity(2)).toBe('productAd');
+    expect(sd.cell(2, 'adId')).toBe('4101');
+    expect(sd.entity(3)).toBe('contextualTargeting');
+    expect(sd.cell(3, 'targetingId')).toBe('2301');
+    expect(sd.cell(3, 'bid')).toBe('0.70');
+    expect(sd.entity(4)).toBe('audienceTargeting');
+    expect(sd.cell(4, 'targetingId')).toBe('2302');
+    expect(sd.entity(5)).toBe('negativeProductTargeting');
+    expect(parseTargetExpression(sd.cell(5, 'targetingExpression'), '')).toMatchObject({
+      targetType: 'product',
+      expression: { asin: 'B0FREMD003' },
     });
   });
 });

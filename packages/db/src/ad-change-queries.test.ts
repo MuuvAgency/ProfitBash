@@ -218,6 +218,7 @@ describe('getBulkFileSubmissionRows', () => {
       campaignAmazonPortfolioId: '7001',
       campaignEndDate: '2026-12-31',
       campaignState: 'ENABLED',
+      campaignMultiAdGroups: null,
     });
   });
 
