@@ -36,6 +36,9 @@ export type SearchTermAnalysisData = Schemas['SearchTermAnalysisResponse'];
 export type SearchTermRowData = Schemas['SearchTermRow'];
 export type HarvestMarkData = Schemas['HarvestMark'];
 export type TagData = Schemas['Tag'];
+export type ProductGroupData = Schemas['ProductGroup'];
+export type ProductGroupListData = Schemas['ProductGroupListResponse'];
+export type AdvertisedProductsData = Schemas['AdvertisedProductsResponse'];
 export type AssignTagsInput = Schemas['AssignTagsRequest'];
 export type AssignTagsData = Schemas['AssignTagsResponse'];
 export type HarvestListData = Schemas['HarvestListResponse'];
@@ -284,6 +287,32 @@ export function createApi(options: ApiOptions = {}) {
         remove: (ids: string[]) =>
           unwrap(client.POST('/api/ads/search-terms/harvest/remove', { body: { ids } })),
       },
+    },
+
+    /** Tools (`phase-4.md`): Produktgruppen und die beworbenen Produkte eines Profils als Auswahl. */
+    tools: {
+      productGroups: {
+        list: (): Promise<ProductGroupListData> =>
+          unwrap(client.GET('/api/ads/tools/product-groups')),
+        create: (input: Schemas['CreateProductGroupRequest']): Promise<ProductGroupData> =>
+          unwrap(client.POST('/api/ads/tools/product-groups', { body: input })),
+        update: (
+          id: string,
+          input: Schemas['UpdateProductGroupRequest'],
+        ): Promise<ProductGroupData> =>
+          unwrap(
+            client.PATCH('/api/ads/tools/product-groups/{id}', {
+              params: { path: { id } },
+              body: input,
+            }),
+          ),
+        remove: (id: string) =>
+          unwrap(client.DELETE('/api/ads/tools/product-groups/{id}', { params: { path: { id } } })),
+      },
+      advertisedProducts: (profileId: string): Promise<AdvertisedProductsData> =>
+        unwrap(
+          client.GET('/api/ads/tools/advertised-products', { params: { query: { profileId } } }),
+        ),
     },
 
     /** Eigene Tags der Organisation (`phase-3.md` 3.7): verwalten und Entities zuweisen. */

@@ -89,6 +89,14 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/SearchTermAnalysisPage.vue'),
         meta: { feature: 'sp-explorer', navItemId: 'explorer', titleKey: 'searchTerms.title' },
       },
+      // Tools (Phase 4): Produktgruppen (4.1) sind die Einstiegsseite; weitere Unterseiten folgen mit ihren Aufgaben.
+      { path: 'ads/tools', redirect: '/ads/tools/product-groups' },
+      {
+        path: 'ads/tools/product-groups',
+        name: 'product-groups',
+        component: () => import('../pages/ProductGroupsPage.vue'),
+        meta: { feature: 'tools', navItemId: 'tools', titleKey: 'productGroups.title' },
+      },
       ...NAVIGATION.flatMap((group) => group.items.map(navRoute)),
       {
         path: SETTINGS_PATH.slice(1),
