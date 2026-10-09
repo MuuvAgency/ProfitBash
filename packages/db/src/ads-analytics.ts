@@ -612,7 +612,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
         json_build_object('portfolioId', e.portfolio_id, 'portfolioName', pf.name, 'targetingType', e.targeting_type,
           'budgetAmount', e.budget_amount::text, 'budgetCurrencyCode', e.budget_currency_code, 'budgetType', e.budget_type,
           'biddingStrategy', e.bidding_strategy, 'costType', e.extra->>'costType', 'startDate', e.start_date,
-          'endDate', e.end_date) as attributes`,
+          'endDate', e.end_date, 'placementBidAdjustments', e.extra->'placementBidAdjustments') as attributes`,
     }),
   },
   adGroup: {

@@ -237,7 +237,10 @@ beforeAll(async () => {
   const [spDe, sbDe, sdDe, spUk, spSe, spHidden, spForeign] = await db
     .insert(amazonAdsCampaigns)
     .values([
-      campaign(ids.de, 'c1', SP, 'SP DE', { portfolioId: ids.portfolio }),
+      campaign(ids.de, 'c1', SP, 'SP DE', {
+        portfolioId: ids.portfolio,
+        extra: { placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 50 }] },
+      }),
       campaign(ids.de, 'c2', SB, 'SB DE ohne Kennzahlen'),
       campaign(ids.de, 'c3', SD, 'SD DE vCPM', { extra: { costType: 'VCPM' } }),
       campaign(ids.uk, 'c4', SP, 'SP UK'),
@@ -777,6 +780,20 @@ describe('queryExplorerRows: Kennzahlen und Attribution', () => {
     expect(clicks.rows.find((row) => row.id === ids.spDe)!.current.sales).toBe('130.10');
     expect(clicks.rows.find((row) => row.id === ids.sdDe)!.current.sales).toBe('30');
     expect(clicks.totals.attribution.mixed).toBe(false);
+  });
+
+  it('liefert die Gebotsanpassungen je Platzierung der Kampagne (für den Dialog in 3.5)', async () => {
+    const result = await queryExplorerRows(testDb.db, {
+      ...base(),
+      level: 'campaign',
+      clientIds: [ids.clientA],
+    });
+    expect(result.rows.find((row) => row.id === ids.spDe)!.attributes).toMatchObject({
+      placementBidAdjustments: [{ placement: 'PLACEMENT_TOP', percentage: 50 }],
+    });
+    expect(result.rows.find((row) => row.id === ids.sdDe)!.attributes).toMatchObject({
+      placementBidAdjustments: null,
+    });
   });
 
   it('zeigt SD-vCPM-Grundlagen nur bei SD und SB-Kampagnen ohne Kennzahlen mit 0 und Kennzeichen', async () => {

@@ -215,7 +215,11 @@ describe('Warenkorb', () => {
     });
     expect(cart.body.check).toEqual({
       violations: [{ changeId: tooLow, code: 'belowMinimum', min: '0.02', max: '1000' }],
-      largeChanges: [{ changeId: bid, changePercent: '60' }],
+      // Ohne eigenes Gebot zählt das Standardgebot der Ad Group (0.40) als Vergleichswert.
+      largeChanges: expect.arrayContaining([
+        { changeId: bid, changePercent: '60' },
+        { changeId: tooLow, changePercent: '-97.5' },
+      ]),
       tooMany: null,
     });
     // Der Warenkorb gehört dem Nutzer (F4).
@@ -239,6 +243,42 @@ describe('Warenkorb', () => {
       status: 'needsConfirmation',
       check: { largeChanges: [{ changeId, changePercent: '125' }] },
     });
+  });
+
+  it('passt Beträge um Prozent oder Betrag an und rechnet dabei selbst (kein Wert aus der Anfrage)', async () => {
+    const adjust = (
+      entityId: string,
+      mode: 'percent' | 'amount',
+      value: string,
+    ): AdChangeInput => ({
+      operation: 'adjust',
+      entityType: 'target',
+      entityId,
+      field: 'bid',
+      mode,
+      value,
+    });
+    const staged = await stage(editor, [
+      adjust(f.keyword, 'percent', '-10'),
+      adjust(f.productTarget, 'amount', '0.05'),
+      adjust(other.keyword, 'percent', '10'),
+    ]);
+
+    expect(staged.status).toBe(200);
+    expect(staged.body.results.map((result) => result.reason ?? result.outcome)).toEqual([
+      'created',
+      'created',
+      'notFound',
+    ]);
+    const cart = await call<PendingAdChangesResponse>('GET', '/pending', editor);
+    const byEntity = new Map(cart.body.changes.map((change) => [change.entityId, change]));
+    expect(byEntity.get(f.keyword)).toMatchObject({ before: '0.50', after: '0.45' });
+    // Ohne eigenes Gebot: Standardgebot der Ad Group (0.40) als Ausgangswert.
+    expect(byEntity.get(f.productTarget)).toMatchObject({ before: null, after: '0.45' });
+
+    const invalid = await stage(editor, [adjust(f.keyword, 'percent', '-100')]);
+    expect(invalid.status).toBe(400);
+    expect((await stage(viewer, [adjust(f.keyword, 'percent', '5')])).status).toBe(403);
   });
 
   it('lehnt fremde und ausgeblendete Entities je Änderung ab und prüft die Eingabe', async () => {
