@@ -1,12 +1,16 @@
 import { createRoute, z, type OpenAPIHono } from '@hono/zod-openapi';
 import { amazonAdsValueLimit } from '@profitbash/amazon-ads';
 import {
+  assertCampaignSetupProfile,
   CampaignSetupError,
   discardCampaignSetupDraft,
   fxRatesOnOrBefore,
   getCampaignSetupDraft,
+  HARVEST_MARK_LIST_LIMIT,
   listCampaignSetupDrafts,
+  listHarvestMarks,
   listSubmissionConnections,
+  loadHarvestMarkSources,
   loadCampaignSetupPlanSource,
   loadProfileBidSuggestions,
   saveCampaignSetupDraft,
@@ -15,7 +19,12 @@ import {
   type DbOrTx,
 } from '@profitbash/db';
 import type { AdChangeLimitLookup } from '@profitbash/engine';
-import { buildCampaignPlan } from '@profitbash/engine/plan';
+import {
+  buildCampaignPlan,
+  harvestCpc,
+  harvestInputs,
+  planSourceNegatives,
+} from '@profitbash/engine/plan';
 import {
   campaignSetupDraftListResponseSchema,
   campaignSetupDraftSchema,
@@ -24,6 +33,7 @@ import {
   planCampaignSetupRequestSchema,
   planCampaignSetupResponseSchema,
   saveCampaignSetupDraftSchema,
+  setupHarvestListResponseSchema,
   submitCampaignSetupDraftRequestSchema,
   submitCampaignSetupResponseSchema,
   todayInTimezone,
@@ -72,6 +82,19 @@ const planRoute = createRoute({
     200: { description: 'Plan.', content: json(planCampaignSetupResponseSchema) },
     ...errors,
     409: conflict,
+  },
+});
+
+const harvestRoute = createRoute({
+  method: 'get',
+  path: '/ads/tools/setup/harvest',
+  tags: TAGS,
+  summary:
+    'Harvest-Merkliste eines Profils als Eingang des Setups (4.6), mit CPC als Gebotsvorschlag',
+  request: { query: z.object({ profileId: z.uuid() }) },
+  responses: {
+    200: { description: 'Merkliste.', content: json(setupHarvestListResponseSchema) },
+    ...errors,
   },
 });
 
@@ -245,15 +268,21 @@ export function registerCampaignSetupRoutes(app: OpenAPIHono<AppEnv>, deps: AppD
       ? await loadProfileBidSuggestions(db, { profileId: body.profileId, today })
       : {};
     const { inputs } = body;
+    // Harvest von der Merkliste (4.6): Begriffe mit CPC als Gebot (F8), Negativ in der Quelle (F7).
+    const marks = await loadHarvestMarkSources(db, {
+      profileId: body.profileId,
+      markIds: inputs.harvest.map((entry) => entry.markId),
+    });
+    const harvest = harvestInputs({ marks, selections: inputs.harvest, currencyCode: currency });
     const result = buildCampaignPlan({
       catalog: source.catalog,
       preset,
       productGroup: source.productGroup,
       profile: source.profile,
       eurRate: rate.rate,
-      keywords: inputs.keywords,
+      keywords: [...harvest.keywords, ...inputs.keywords],
       brandTerms: inputs.brandTerms,
-      productTargets: inputs.productTargets,
+      productTargets: [...harvest.productTargets, ...inputs.productTargets],
       categories: inputs.categories,
       // Die Wettbewerber-Liste je Client (F-S9) gibt es noch nicht: Conquesting fällt mit Hinweis weg.
       conquestAsins: [],
@@ -262,12 +291,50 @@ export function registerCampaignSetupRoutes(app: OpenAPIHono<AppEnv>, deps: AppD
       unlocks: inputs.unlocks,
       profileBids,
     });
+    const sources = planSourceNegatives({
+      marks,
+      campaigns: result.campaigns,
+      protectedTerms: source.protectedTerms,
+      deselected: body.deselectedSources,
+    });
     return c.json(
       {
         campaigns: result.campaigns,
-        hints: result.hints,
+        sourceNegatives: sources.sourceNegatives,
+        hints: [...harvest.hints, ...result.hints, ...sources.hints],
         eurRate: { rate: rate.rate, date: rate.date },
         profileBids,
+      },
+      200,
+    );
+  });
+
+  app.openapi({ ...harvestRoute, middleware: guard('view') }, async (c) => {
+    const { profileId } = c.req.valid('query');
+    await run(() => assertCampaignSetupProfile(db, { ...actor(c), profileId }));
+    const marks = await run(() => listHarvestMarks(db, { ...actor(c), profileId }));
+    return c.json(
+      {
+        marks: marks.map((mark) => {
+          const clicks = Number(mark.clicks);
+          return {
+            id: mark.id,
+            searchTerm: mark.searchTerm,
+            adProduct: mark.adProduct,
+            campaignName: mark.campaignName,
+            adGroupName: mark.adGroupName,
+            periodStart: mark.periodStart,
+            periodEnd: mark.periodEnd,
+            clicks,
+            cost: mark.cost,
+            sales: mark.sales,
+            purchases: Number(mark.purchases),
+            currencyCode: mark.currencyCode,
+            cpc: harvestCpc(clicks, mark.cost),
+            createdAt: mark.createdAt.toISOString(),
+          };
+        }),
+        truncated: marks.length >= HARVEST_MARK_LIST_LIMIT,
       },
       200,
     );

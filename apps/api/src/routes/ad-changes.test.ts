@@ -643,7 +643,15 @@ describe('Bulk-Datei eines Setups (4.4)', () => {
         presetKey: 'muuv-standard',
         name: 'Lampen',
         campaignState: 'ENABLED',
-        inputs: { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} },
+        inputs: {
+          keywords: [],
+          brandTerms: [],
+          productTargets: [],
+          categories: [],
+          harvest: [],
+          unlocks: {},
+        },
+        sourceNegatives: [],
         campaigns: [
           {
             block: 'SP-KW-EXACT',

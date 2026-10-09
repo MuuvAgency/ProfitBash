@@ -59,12 +59,17 @@ export function isAsinSearchTerm(searchTerm: string): boolean {
   return /^b0[a-z0-9]{8}$/i.test(searchTerm.trim());
 }
 
-/** CPC der Merkliste als Gebot (F8), nur mit Kosten und Klicks. */
+/** CPC der Merkliste (Kosten ÷ Klicks, half-even auf zwei Stellen); `null` ohne Klicks bzw. Kosten. */
+export function harvestCpc(clicks: number, cost: string): string | null {
+  const amount = new Dec(cost);
+  if (clicks <= 0 || amount.lte(0)) return null;
+  return amount.div(clicks).toDecimalPlaces(2, Dec.ROUND_HALF_EVEN).toFixed(2);
+}
+
+/** CPC als Gebot (F8), nur in der Währung des Profils. */
 function cpc(mark: HarvestMarkSource, currencyCode: string): string | undefined {
-  if (mark.currencyCode !== currencyCode || mark.clicks <= 0) return undefined;
-  const cost = new Dec(mark.cost);
-  if (cost.lte(0)) return undefined;
-  return cost.div(mark.clicks).toDecimalPlaces(2, Dec.ROUND_HALF_EVEN).toFixed(2);
+  if (mark.currencyCode !== currencyCode) return undefined;
+  return harvestCpc(mark.clicks, mark.cost) ?? undefined;
 }
 
 export function harvestInputs(input: {

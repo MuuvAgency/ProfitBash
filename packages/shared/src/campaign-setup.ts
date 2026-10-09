@@ -279,6 +279,8 @@ export const planCampaignSetupRequestSchema = z
     inputs: setupInputsSchema,
     /** Gebote aus den Daten des Profils vorschlagen (F13). */
     useProfileBids: z.boolean().default(true),
+    /** Abgewählte Negatives in der Quelle (IDs der Merkliste), bleiben beim neuen Planen abgewählt (4.6). */
+    deselectedSources: z.array(z.uuid()).max(MAX_SETUP_INPUTS).default([]),
   })
   .meta({ id: 'PlanCampaignSetupRequest' });
 export type PlanCampaignSetupRequest = z.input<typeof planCampaignSetupRequestSchema>;
@@ -373,3 +375,31 @@ export const campaignSetupItemSchema = z
   })
   .meta({ id: 'CampaignSetupItem' });
 export type CampaignSetupItem = z.infer<typeof campaignSetupItemSchema>;
+
+/** Merkliste eines Profils als Eingang des Setups (4.6): Stand beim Vormerken, CPC als Gebotsvorschlag (F8). */
+export const setupHarvestListResponseSchema = z
+  .object({
+    marks: z.array(
+      z.object({
+        id: z.uuid(),
+        searchTerm: z.string(),
+        adProduct: z.string(),
+        /** Namen der Quelle; `null`, wenn sie im Profil fehlt. */
+        campaignName: z.string().nullable(),
+        adGroupName: z.string().nullable(),
+        periodStart: z.string(),
+        periodEnd: z.string(),
+        clicks: z.number().int(),
+        cost: z.string(),
+        sales: z.string(),
+        purchases: z.number().int(),
+        currencyCode: z.string(),
+        /** Kosten ÷ Klicks, zwei Stellen; `null` ohne Klicks bzw. Kosten. */
+        cpc: z.string().nullable(),
+        createdAt: timestamp,
+      }),
+    ),
+    truncated: z.boolean(),
+  })
+  .meta({ id: 'SetupHarvestList' });
+export type SetupHarvestListResponse = z.infer<typeof setupHarvestListResponseSchema>;
