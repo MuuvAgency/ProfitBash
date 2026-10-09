@@ -6,7 +6,8 @@
   "description": "Fachlogik ohne I/O (Regeln, Pacing, Berechnungen)",
   "exports": {
     ".": "./src/index.ts",
-    "./naming": "./src/naming.ts"
+    "./naming": "./src/naming.ts",
+    "./plan": "./src/plan.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

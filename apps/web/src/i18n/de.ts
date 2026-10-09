@@ -1311,6 +1311,7 @@ export const de = {
       autoOnlySp: '{key}: Automatisch nur bei Sponsored Products',
       lookbackOnlyAudience: '{key}: Rückblick nur bei Zielgruppen',
       audienceNeedsLookback: '{key}: Zielgruppen brauchen einen Rückblick',
+      audienceKind: '{key}: Art der Zielgruppe (Ansichten oder Käufe) nur und immer bei Zielgruppen',
       duplicateEdge: 'Kante {from} → {to} gibt es zweimal',
       edgeUnknownBlock: 'Kante {from} → {to}: unbekannter Baustein',
       edgeFromBrand: 'Kante {from} → {to}: Marken-Bausteine graduieren nie',

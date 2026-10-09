@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1, 4.2. Nächster Schritt: 4.3.
+> Datei). Fertig: 4.1, 4.2, 4.3. Nächster Schritt: 4.4.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -195,10 +195,41 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     Schließen oder Neuladen des Tabs).
 
 ### 4.3 Plan-Engine (`packages/engine`, ohne I/O)
-- [ ] Eingabe: Preset, Produktgruppe, Keywords bzw. Targets (von Hand oder von der Merkliste), vorhandene Entities des
+- [x] Eingabe: Preset, Produktgruppe, Keywords bzw. Targets (von Hand oder von der Merkliste), vorhandene Entities des
       Profils. Ausgabe: Plan mit Kampagnen, Ad Groups, Anzeigen, Targets, Negatives, Platzierungen, Namen, Geboten und
       Budgets, dazu Hinweise (schon vorhanden, Grenze verletzt, gesperrt nach E).
-- [ ] Leitplanken: vCPM und Off-Amazon gesperrt (F-S7), Conquesting nur aus der von Hand gepflegten Liste (F-S9).
+- [x] Leitplanken: vCPM und Off-Amazon gesperrt (F-S7), Conquesting nur aus der von Hand gepflegten Liste (F-S9).
+- [x] Umsetzung (Stand für 4.4 und später): `buildCampaignPlan` in `packages/engine/src/plan.ts` (Einstieg
+  `@profitbash/engine/plan`), reine Funktion. Die Regeln stehen im Kopf der Datei; das Wichtigste:
+  - **Eingabe:** Katalog, wirksames Preset, Produktgruppe (Name, Produkte mit Hero), Profil (Land, Währung, Kontoart,
+    Client), `eurRate` (1 EUR in Profilwährung, liefert in 4.5 die Tabelle `fx_rates`), allgemeine Keywords (`single`
+    für eine eigene Kampagne, `bid` in Profilwährung, z. B. CPC der Merkliste nach F8), Marken-Begriffe, fremde
+    Produkte, Kategorien (ID und Name), Wettbewerber-Liste des Clients, Vorhandenes im Profil (Kampagnennamen, exakte
+    Keywords), `limitFor` (dieselbe Grenzen-Abfrage wie Phase 3) und Freischaltungen je Baustein.
+  - **Verteilung:** Keywords in Breit und Phrase; exakt gesammelt, markierte einzeln; fehlt einer der beiden
+    Exakt-Bausteine, nimmt der andere alle (Preset „Kontrolle“: jedes Keyword einzeln). Produkt-Targets ebenso
+    (Sammlung und Einzel-Kampagnen); Wettbewerber nur aus der Liste des Clients; eigene Produkte für „schützen“
+    (alle ASINs der Gruppe) und „ähnlich wie eigene“ (Hero, erweitert); SD-Zielgruppen mit Rückblick aus Preset bzw.
+    Baustein (Katalog-Feld `audience`: Ansichten oder Käufe, neu in 4.3). Ohne passende Eingaben fällt ein Baustein mit
+    Hinweis weg.
+  - **Trennung:** Exakt geplante Begriffe sind negativ exakt in Auto, Breit und Phrase, Einzel-Begriffe auch in der
+    Exakt-Sammlung; mit Marken-Baustein im Preset sind die Marken-Begriffe negativ Phrase in allen allgemeinen
+    Keyword- und Auto-Kampagnen.
+  - **Anzeigen:** der Hero (ohne markierten Hero das erste Produkt, Hinweis), bei `1:n:1` und Sponsored Display alle
+    Produkte; Vendoren ohne SKU, bei Sellern fehlt keine SKU (sonst Fehler).
+  - **Beträge:** Eingabe (Profilwährung) vor Preset vor Baustein; Katalogwerte EUR × `eurRate`, zwei Nachkommastellen
+    (half-even, ADR 003). Ad Group mit Standardgebot, Name der Ad Group = Name der Kampagne.
+  - **Hinweise** mit Schwere `error` (Grenzen von Amazon für Budget und Gebote, Keyword über 10 Wörter oder 80 Zeichen,
+    Name ungültig, fehlende SKU, vCPM bei SP bzw. Off-Amazon außerhalb SP), `warning` (Kampagnenname im Profil schon
+    vergeben, der Plan zählt ihn hoch; Keyword schon exakt gebucht; vCPM bzw. Off-Amazon freigeschaltet) und `info`
+    (Baustein weggelassen, Werbemittel für SB nötig, kein Hero). Die Oberfläche (4.5) sperrt das Übermitteln bei
+    `error`.
+  - **Leitplanken:** immer CPC und ohne Off-Amazon; `unlocks` je Baustein (gilt für alle Kampagnen des Bausteins im
+    Entwurf) schaltet vCPM (nur SB und SD) bzw. Off-Amazon (nur SP) mit Warnung frei. Neue Kampagnen sind aktiv (F6);
+    „pausiert“ setzt der Entwurf (4.5).
+  - **Offen für 4.4/4.5:** Auto-Kampagnen ohne eigene Gebote je Zielgruppe (es gilt das Standardgebot der Ad Group);
+    die Harvest-Merkliste (4.6) liefert Keywords mit CPC als `bid`; Grenzen für Keyword-Länge sind Annahmen wie in
+    Phase 3.
 
 ### 4.4 Schreibschicht für Anlagen (`packages/db`, `packages/amazon-ads`, `apps/worker`)
 - [ ] Entwürfe speichern, prüfen, übermitteln (eigene Tabellen; Übermittlungen wie in Phase 3, damit Seite und Verlauf
