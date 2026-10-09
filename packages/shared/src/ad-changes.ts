@@ -278,6 +278,9 @@ export type AdChangeChannel = (typeof AD_CHANGE_CHANNELS)[number];
  */
 export const AD_CHANGE_SUBMISSION_STATUSES = ['pending', 'running', 'finished', 'failed'] as const;
 export type AdChangeSubmissionStatus = (typeof AD_CHANGE_SUBMISSION_STATUSES)[number];
+/** Art einer Übermittlung: Änderungen (Phase 3) oder Anlagen eines Setup-Entwurfs (Phase 4, 4.4). */
+export const AD_CHANGE_SUBMISSION_KINDS = ['changes', 'setup'] as const;
+export type AdChangeSubmissionKind = (typeof AD_CHANGE_SUBMISSION_KINDS)[number];
 
 /** Warum eine Änderung nicht in den Warenkorb kam. */
 export const AD_CHANGE_REJECTIONS = [

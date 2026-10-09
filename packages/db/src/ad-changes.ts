@@ -7,6 +7,7 @@ import {
   type AdChangeOrigin,
   type AdChangeRejection,
   type AdChangeStatus,
+  type AdChangeSubmissionKind,
   type AdChangeSubmissionStatus,
   type AdChangeUpdateInput,
 } from '@profitbash/shared';
@@ -41,6 +42,7 @@ import {
   amazonAdsProductAds,
   amazonAdsProfiles,
   amazonAdsTargets,
+  campaignSetupItems,
   users,
 } from './schema';
 
@@ -710,6 +712,8 @@ export interface AdChangeSubmissionSummary {
   accountName: string;
   countryCode: string;
   channel: AdChangeChannel;
+  /** `changes`: Änderungen; `setup`: Anlagen eines Setup-Entwurfs (`phase-4.md` 4.4). */
+  kind: AdChangeSubmissionKind;
   status: AdChangeSubmissionStatus;
   /** Grund, wenn die Übermittlung als Ganzes gescheitert ist. */
   error: string | null;
@@ -718,7 +722,7 @@ export interface AdChangeSubmissionSummary {
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
-  /** Änderungen der Übermittlung, gesamt und je Status. */
+  /** Änderungen bzw. Anlagen der Übermittlung, gesamt und je Status. */
   changes: number;
   counts: { submitted: number; applied: number; failed: number; dismissed: number };
 }
@@ -730,8 +734,14 @@ export async function loadAdChangeSubmissionSummaries(
   limit?: number,
 ): Promise<AdChangeSubmissionSummary[]> {
   const s = adChangeSubmissions;
+  const items = campaignSetupItems;
+  // Anlagen eines Setups zählen wie Änderungen (eigene Tabelle, deshalb als Unterabfrage statt Join).
+  const setupCount = (status?: AdChangeStatus) =>
+    sql`(select count(*) from ${items} where ${items.submissionId} = ${s.id}${
+      status === undefined ? sql`` : sql` and ${items.status} = ${status}`
+    })`;
   const count = (status: AdChangeStatus) =>
-    sql<number>`count(*) filter (where ${adChanges.status} = ${status})::int`;
+    sql<number>`(count(*) filter (where ${adChanges.status} = ${status}) + ${setupCount(status)})::int`;
   const query = db
     .select({
       id: s.id,
@@ -739,6 +749,7 @@ export async function loadAdChangeSubmissionSummaries(
       accountName: p.accountName,
       countryCode: p.countryCode,
       channel: s.channel,
+      kind: s.kind,
       status: s.status,
       error: s.error,
       createdBy: s.createdBy,
@@ -746,7 +757,7 @@ export async function loadAdChangeSubmissionSummaries(
       createdAt: s.createdAt,
       startedAt: s.startedAt,
       finishedAt: s.finishedAt,
-      changes: sql<number>`count(${adChanges.id})::int`,
+      changes: sql<number>`(count(${adChanges.id}) + ${setupCount()})::int`,
       submitted: count('submitted'),
       applied: count('applied'),
       failed: count('failed'),
@@ -763,6 +774,7 @@ export async function loadAdChangeSubmissionSummaries(
   return rows.map(({ submitted, applied, failed, dismissed, ...row }) => ({
     ...row,
     channel: row.channel as AdChangeChannel,
+    kind: row.kind as AdChangeSubmissionKind,
     status: row.status as AdChangeSubmissionStatus,
     counts: { submitted, applied, failed, dismissed },
   }));
