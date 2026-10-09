@@ -25,7 +25,8 @@ Rechner. `AMAZON_ADS_MOCK_SCALE` wählt den Datenumfang:
 | `default` (Standard) | 4 EU-Profile + 1 US-Profil, 3 SP-Kampagnen je Profil, SB und SD nur beim DE-Profil | Tests, schnelle Prüfung der Logik |
 | `large` | 6 Demo-Profile (EUR, GBP, SEK, PLN), 300 Kampagnen (SP, SB, SD), rund 12 200 Targets (ohne Negatives), Kennzahlen für 95 Tage | Layout, Filter und Tempo von Dashboard und Explorer |
 
-Der Mock nimmt auch Änderungen an (Phase 3, Sponsored Products): Updates, Archivieren und neue Negatives enden mit
+Der Mock nimmt auch Änderungen und Anlagen an (Phase 3 und 4, Sponsored Products): Updates, Archivieren, neue
+Negatives und neue Kampagnen samt Ad Group, Anzeigen und Targets (Setup, 4.4) enden mit
 einem Ergebnis je Eintrag wie bei Amazon; Gebote und Budgets außerhalb der Grenzen des Marktplatzes lehnt er je Eintrag
 ab (Teilfehler). Angenommene Änderungen merkt er sich **im laufenden Prozess** (Phase 3, 3.3): Der nächste Export
 liefert sie mit, die Demo bleibt nach einem Sync stimmig. Nach einem Neustart (auch durch `tsx watch` bei einer

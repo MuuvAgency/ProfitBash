@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1, 4.2, 4.3. Nächster Schritt: 4.4.
+> Datei). Fertig: 4.1, 4.2, 4.3, 4.4. Nächster Schritt: 4.5.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -253,25 +253,75 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     Freischalten gilt je Baustein, nicht je einzelner Kampagne (mit Dominik in 4.5 klären).
 
 ### 4.4 Schreibschicht für Anlagen (`packages/db`, `packages/amazon-ads`, `apps/worker`)
-- [ ] Entwürfe speichern, prüfen, übermitteln (eigene Tabellen; Übermittlungen wie in Phase 3, damit Seite und Verlauf
+- [x] Entwürfe speichern, prüfen, übermitteln (eigene Tabellen; Übermittlungen wie in Phase 3, damit Seite und Verlauf
       dieselben bleiben).
-- [ ] Bulk-Datei um Anlagen für **Sponsored Products** erweitern: `Create` für Kampagne, Ad Group, Product Ad, Keyword,
+- [x] Bulk-Datei um Anlagen für **Sponsored Products** erweitern: `Create` für Kampagne, Ad Group, Product Ad, Keyword,
       Produkt-Target, Gebotsanpassung, mit den vorläufigen Text-IDs der Guides für Eltern und Kinder; Rundlauf-Test.
-- [ ] Bestätigung durch den nächsten Bulk-Import (Zuordnung über Namen, danach echte IDs).
-- [ ] API-Weg gegen den Mock (SP v3 `POST /sp/campaigns` usw.), ADR 005 ergänzen.
-- **Stand (2026-10-09, unterbrochen, Branch `4-4-setup-write-layer`):** fertig und getestet: Create-Zeilen der
-  Bulk-Datei (`BulkFileCreate`, Spalte `Off-Amazon ad serving`), Rundlauf; Namen nach der Limits-Seite (Zeichen,
-  Vendoren 116); Schema für Plan und Entwurf (`@profitbash/shared/campaign-setup`); `reviewCampaignPlan` und
-  `planSetupItems` (Engine); Tabellen `campaign_setup_drafts`/`campaign_setup_items`, `ad_change_submissions.kind`
-  (Migration `0031_campaign_setup`); `packages/db/src/campaign-setup.ts` (speichern, lesen, verwerfen, übermitteln)
-  und `campaign-setup-processing.ts` (Ergebnisse, Bestätigung über Namen beim Bulk-Import, Abschluss von Hand,
-  unterbrochener Lauf = unklar); `buildSetupBulkFile` im Worker; Download und Abschluss über die Endpunkte der Seite
-  „Änderungen“; `applySpCreates` + Mock (ADR 005 ergänzt).
-  **Offen:** Job `ad-changes-submit` für `kind = setup` (`applySpCreates` in `AmazonAdsClient` und
-  `stubAmazonAdsClient` aufnehmen, `claimNextAdChangeSubmission` liefert `kind`, Platzierungen gehen mit der
-  Kampagne, `created` aus angelegten Zeilen, Startdatum heute in der Zeitzone des Profils), Ende-zu-Ende-Test gegen
-  den Mock, Umsetzungsnotiz und Häkchen, Review, Verifikation, PR. Für 4.5: Detail einer Setup-Übermittlung
-  (`getAdChangeSubmission` liefert für Setups keine Zeilen) und API für Entwürfe.
+- [x] Bestätigung durch den nächsten Bulk-Import (Zuordnung über Namen, danach echte IDs).
+- [x] API-Weg gegen den Mock (SP v3 `POST /sp/campaigns` usw.), ADR 005 ergänzen.
+- [x] Umsetzung (Stand für 4.5 und später):
+  - **Quellen (2026-10-09):** „Config“-Blatt der echten Bulk-Datei (Pflichtspalten je Entity und Operation, nur
+    Kopfzeilen und Werte-Listen gelesen), Guide „How to create Sponsored Products campaigns“, Limits-Seite von Amazon,
+    SP-v3-Spec (ADR 005, Abschnitt „Anlagen über die API“). Pflicht bei `Create`: Kampagne ID, Name, Tagesbudget,
+    Targeting-Typ, Zustand, Startdatum, Gebotsstrategie; Ad Group Kampagne, ID, Name, Standardgebot, Zustand; Product
+    Ad Kampagne, Ad Group, SKU (Seller) bzw. ASIN (Vendor), Zustand; Keyword und Produkt-Target Kampagne, Ad Group,
+    Zustand, Text und Match-Typ bzw. Ausdruck (Gebot optional); Gebotsanpassung Kampagne und Platzierung.
+  - **Limits-Seite:** Kampagnenname höchstens 128 Zeichen bei Sellern, **116 bei Vendoren**; nur die dort genannten
+    Zeichen (Buchstaben, Ziffern, Leerzeichen, `- $ " ' & ( ) * + , . / : ; = ? @ \ [ ] _ ` ~ { } |`, Umlaute und
+    weitere Latin-Bereiche; **nicht** `·`, `%`, `!`, `#`, Emoji). `campaignNameIssues(name, maxLength)`,
+    `campaignNameMaxLength(accountType)`; die Plan-Engine und die Vorschau des Namensschemas prüfen danach (der
+    Trenner `·` im Namensschema ergibt deshalb einen Fehler). Keywords: 80 Zeichen, 10 Wörter, negativ Phrase 4.
+  - **Off-Amazon:** per Bulk-Datei setzbar, laut Guide nur in den USA (`Off-Amazon ad serving`: `Increase reach` |
+    `Limit off-Amazon spend`), über die API `offAmazonSettings`. Ohne Freischaltung schreibt ProfitBash in den USA
+    „Limit off-Amazon spend“ (F-S7), sonst bleibt das Feld leer (Amazons Standard); freigeschaltet außerhalb der USA
+    ergibt einen Hinweis `offAmazonOnlyUs`. Das Ideen-Dokument E („kein Bulk“) ist damit überholt.
+  - **Datenmodell** (Migration `0031_campaign_setup`): `campaign_setup_drafts` (Profil, Produktgruppe, Preset, Name,
+    Status `draft` → `submitted` | `discarded`, Zustand neuer Kampagnen `ENABLED`/`PAUSED`, Eingaben `inputs`, Plan
+    `campaigns`, `version`, Übermittlung) und `campaign_setup_items` (je neuer Entity eine Zeile: Art, Kampagne und
+    Ad Group als Text-ID = Name, `payload`, Status wie `ad_changes`, `amazon_entity_id`, Fehler).
+    `ad_change_submissions.kind` (`changes` | `setup`): Setups erscheinen auf der Seite „Änderungen“, die Zähler
+    zählen ihre Zeilen (`loadAdChangeSubmissionSummaries`). Schemas in `@profitbash/shared/campaign-setup`
+    (`plannedCampaignSchema`, `setupInputsSchema`, `saveCampaignSetupDraftSchema`); die Engine leitet ihre Typen
+    davon ab.
+  - **Engine:** `reviewCampaignPlan` prüft einen gespeicherten (vielleicht geänderten) Plan beim Übermitteln: Name im
+    Profil bzw. im Plan schon vergeben (`campaignNameTaken`/`…Duplicate`, Fehler), Name ungültig, Grenzen von Budget
+    und Geboten, Keyword zu lang, fehlende Anzeige, SKU (Seller) oder Ziele, fremde Währung, vCPM bei SP,
+    Off-Amazon außerhalb SP (Fehler); Keyword schon exakt gebucht, Off-Amazon freigeschaltet (Warnung); SB und SD
+    erst mit 4.9/4.10 (`adProductLater`). `planSetupItems` macht aus dem Plan die Zeilen (Kampagne, Platzierungen über
+    0 %, Ad Group, Anzeigen, Targets, Negatives; SB und SD nur als Kampagne mit `supported: false`).
+  - **Datenbank** (`campaign-setup.ts`): `saveCampaignSetupDraft` (anlegen; ändern mit Version, 409-artig
+    `VERSION_CONFLICT`; Profil fest, Produktgruppe desselben Profils, Preset aus dem Katalog), `list…`, `get…`,
+    `discard…`, `getCampaignSetupContext` (Profil, vorhandene Kampagnennamen auch archivierter Kampagnen und offener
+    bzw. angelegter Setups, exakte Keywords), `submitCampaignSetupDraft` (Sperre je Profil, `review` in der
+    Transaktion mit dem aktuellen Stand, eine Übermittlung `setup`, Zeilen, Audit `ad_change_submission.create` mit
+    `kind`, `draftId`, `items`; Weg `api` nur mit Connection). SB/SD-Kampagnen stehen sofort als `failed`
+    `AD_PRODUCT_NOT_SUPPORTED` in der Übermittlung. Audit `campaign_setup_draft.create|update|discard`.
+  - **Ablauf** (`campaign-setup-processing.ts`): `recordCampaignSetupResults`, `closeAdChangeSubmission` zählt
+    Setup-Zeilen mit (auch `failRemaining`), ein unterbrochener API-Lauf lässt offene Anlagen als `UNKNOWN_OUTCOME`
+    scheitern, `closeBulkFileSubmission` schließt Setup-Zeilen als angelegt bzw. verworfen ab.
+    **Bestätigung durch den Bulk-Import** (`confirmCampaignSetupItems`, aus `confirmBulkFileAdChanges`): Kampagne über
+    den Namen im Profil (ohne Groß/Klein), Ad Group über den Namen in der Kampagne, darunter Anzeige (SKU bzw. ASIN),
+    Keyword (Text, Match-Typ), Produkt-Target (ASIN, exakt bzw. „ähnlich“), Kategorie und Negatives; Gebotsanpassung,
+    wenn die Kampagne den Prozentsatz zeigt. Bestätigte Zeilen tragen die echte Amazon-ID.
+  - **Bulk-Datei** (`buildSetupBulkFile` im Worker, Blatt SP): je Zeile `Create`, Text-ID = Name (der Guide macht es
+    so; eine Text-ID nur aus Ziffern wird abgelehnt), Startdatum = Tag des Downloads in der Zeitzone des Profils
+    (Amazon lehnt vergangene Tage ab, deshalb nicht beim Übermitteln festgelegt), Vendoren mit ASIN. Was nicht in die
+    Datei passt, scheitert mit Code, Kinder ohne Eltern mit `PARENT_NOT_CREATED`. Download und Abschluss über die
+    vorhandenen Endpunkte `GET /api/ads/changes/submissions/{id}/bulk-file` (Dateiname `profitbash-setup-…`) und
+    `POST …/close`; die API nennt `kind` je Übermittlung.
+  - **API-Weg** (`applySpCreates`, ADR 005): Kampagnen (mit Platzierungen in `dynamicBidding`) → Ad Groups → Anzeigen,
+    Keywords, Targets, Negatives; Eltern-IDs aus der Antwort, Kinder gescheiterter Eltern `PARENT_NOT_CREATED`,
+    keine Wiederholung bei 5xx. Der Job `ad-changes-submit` erkennt `kind = setup` (`buildSetupOperations`):
+    Drosselung lässt Zeilen offen, der nächste Lauf setzt mit den angelegten Eltern fort (`created`); Abbruch wie bei
+    Änderungen. Der Mock nimmt Anlagen an und liefert sie im nächsten Export (Ende-zu-Ende in
+    `ad-changes-flow.test.ts`).
+  - **Offen bzw. bewusst so:** Erster echter Upload einer Anlage-Datei steht aus (Pflichtspalten laut Config sind
+    erfüllt; ob `Bidding Adjustment` mit `Create` ohne Strategie und die Spalte „Off-Amazon ad serving“ außerhalb
+    der USA leer angenommen werden, zeigt der Upload). Ein Portfolio setzt das Setup noch nicht (4.7). Die Datei
+    entsteht bei jedem Download neu aus offenen **und** angelegten Zeilen: Wer sie nach einer Bestätigung erneut
+    hochlädt, bekommt Fehlerzeilen bzw. doppelte Kinder (wie bei Änderungen). Auto-Kampagnen ohne eigene Gebote je
+    Zielgruppe (Amazon legt die vier an). Der Detail-Endpunkt einer Übermittlung liefert für Setups noch keine Zeilen
+    (kommt mit 4.5, ebenso die API für Entwürfe). Kampagnennamen im Profil zählen ohne Rücksicht auf den Anzeigentyp.
 
 ### 4.5 Kampagnen-Setup (`apps/api`, `apps/web`)
 - [ ] Assistent unter `/ads/tools/setup`: Client und Profil → Produktgruppe → Preset → Keywords und Targets → Vorschau der
