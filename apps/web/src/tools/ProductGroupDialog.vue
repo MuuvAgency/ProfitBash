@@ -217,10 +217,10 @@ const labelClass = 'text-label-eyebrow uppercase text-ink-tertiary';
             v-for="item in items"
             :key="productGroupItemKey(item)"
             data-item
-            class="flex min-h-11 flex-wrap items-center gap-x-space-md border-b border-line py-space-xs last:border-b-0"
+            class="flex min-h-11 items-center gap-x-space-sm border-b border-line py-space-xs last:border-b-0"
           >
             <label
-              class="flex min-w-0 flex-1 basis-56 items-center gap-space-sm text-body-md text-ink"
+              class="flex min-w-0 flex-1 flex-wrap items-center gap-x-space-sm text-body-md text-ink"
             >
               <input
                 type="radio"

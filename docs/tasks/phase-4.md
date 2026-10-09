@@ -5,13 +5,13 @@
 > `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` (Abschnitte C, D, E; entschieden: F-S7, F-S8, F-S9),
 > `design/DESIGN.md`.
 >
-> **Status: geplant (2026-10-09), noch nichts gebaut.** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten
-> nur in dieser Datei). Nächster Schritt: 4.1.
+> **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
+> Datei). Fertig: 4.1. Nächster Schritt: 4.2.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
-> Der echte Upload der Bulk-Datei aus Phase 3 ist noch nicht ausprobiert (Stand 2026-10-09); seine offenen Punkte
-> (`phase-3.md` 3.2b, 3.9) gelten für Phase 4 erst recht, weil Anlagen mehr Pflichtfelder haben als Änderungen.
+> Ein echter Upload der SP-Bulk-Datei aus Phase 3 ging am 2026-10-09 ohne Fehler durch (`phase-3.md` 3.2b). Für Anlagen ist
+> das nur ein schwacher Beleg: `Create` hat mehr Pflichtfelder als Änderungen, und SB- und SD-Blätter (3.9) sind ungeprüft.
 
 ## Ziel
 
@@ -108,9 +108,30 @@ Standardwerte, Namensbaustein). Eine **Graduation-Kante** verbindet zwei Baustei
 geprüfte, noch nicht übermittelte Plan eines Setups.
 
 ### 4.1 Produktgruppen (`packages/db`, `apps/api`, `apps/web`)
-- [ ] Tabellen für Produktgruppen und ihre Produkte (Client, Profil bzw. Marktplatz, ASIN, SKU, Hero), Access-Layer, Audit.
-- [ ] API hinter `requireFeature('tools', …)`; Liste der schon beworbenen Produkte eines Profils als Auswahl (F2).
-- [ ] Seite „Produktgruppen“ unter `/ads/tools/product-groups` (Liste, Anlegen, Ändern, Löschen; Loading, Empty, Error).
+- [x] Tabellen für Produktgruppen und ihre Produkte (Client, Profil bzw. Marktplatz, ASIN, SKU, Hero), Access-Layer, Audit.
+- [x] API hinter `requireFeature('tools', …)`; Liste der schon beworbenen Produkte eines Profils als Auswahl (F2).
+- [x] Seite „Produktgruppen“ unter `/ads/tools/product-groups` (Liste, Anlegen, Ändern, Löschen; Loading, Empty, Error).
+- [x] Umsetzung (Stand für 4.2 und später):
+  - **Datenmodell:** `product_groups` (Organisation, **Profil**, Name; ein Name je Profil ohne Groß/Klein) und
+    `product_group_items` (ASIN, SKU, Hero, Reihenfolge; ein Produkt je ASIN und SKU, höchstens ein Hero je Gruppe,
+    Migration `0029_product_groups`). Eine Gruppe gehört zu **genau einem Profil** und wechselt es nicht; der Client kommt
+    über das Profil (keine eigene Spalte, nichts läuft auseinander). Gruppen über mehrere Marktplätze gibt es bewusst
+    nicht: Kampagnen, SKUs und Gebote sind je Profil. Zugriffe nur über `packages/db/src/product-groups.ts`
+    (`visibleProfilesScope()`): Gruppen ausgeblendeter Profile sind unsichtbar und nicht änderbar.
+  - **SKU-Regel:** Seller-Profile verlangen je Produkt eine SKU (Product Ads laufen über die SKU), Vendor-Profile erlauben
+    keine; andere Kontoarten (`agency`) ohne Regel. Prüfung in der Handeingabe und in der Datenbankschicht
+    (`PRODUCT_GROUP_SKU_REQUIRED` bzw. `…_SKU_NOT_ALLOWED`, 400).
+  - **Grenzen** (`packages/shared/src/product-groups.ts`): Name 80 Zeichen, 100 Produkte je Gruppe, 2000 Gruppen je
+    Organisation, SKU 40 Zeichen; Auswahl höchstens 5000 beworbene Produkte je Profil (`truncated`).
+  - **API** (Feature `tools`, Lesen `view`, sonst `write`): `GET/POST /api/ads/tools/product-groups`,
+    `PATCH/DELETE …/{id}` (Produkte werden als Ganzes ersetzt), `GET /api/ads/tools/advertised-products?profileId=`
+    (Product Ads aller Anzeigentypen je ASIN und SKU ohne entfernte und Platzhalter, mit „aktiv“ und den Gruppen, die das
+    Produkt schon enthalten). Audit `product_group.create|update|delete` (Update mit vorher/nachher, ohne Änderung kein
+    Event).
+  - **Seite:** `/ads/tools` leitet auf `/ads/tools/product-groups` um (weitere Unterseiten kommen mit 4.2, 4.5, 4.7). Filter
+    nach Profil, Dialog mit Profil (nur beim Anlegen), Name, gewählten Produkten mit Hero-Auswahl, Liste der beworbenen
+    Produkte (Suche, Hinweis „auch in“ anderen Gruppen) und Handeingabe. Geprüft im Browser-Pane (Anlegen mit
+    Demo-Daten, Handy, Tablet, Hell-Modus, Konsole); Testgruppe danach gelöscht.
 
 ### 4.2 Struktur-Katalog, Presets und Namensschema (`packages/shared`, `packages/db`, `packages/engine`)
 - [ ] Bausteine, Graduation-Kanten und Presets als Daten je Organisation mit eigenen Startwerten (Seed), sechs Presets
@@ -169,7 +190,7 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
 
 ## Offen vor dem Bau (nicht von Dominik zu entscheiden)
 
-- Der echte Upload der Bulk-Datei aus Phase 3 (Pflichtspalten, Schreibweisen, leere Spalten). Für Anlagen besonders wichtig:
+- Der echte Upload der Bulk-Datei aus Phase 3 ging am 2026-10-09 durch (SP, ohne Fehlermeldung); für Anlagen bleibt offen:
   Laut dem „Config“-Blatt der echten Datei braucht `Create` für eine Kampagne ID, Name, Tagesbudget, Targeting-Typ, Zustand,
   Startdatum und Gebotsstrategie, für eine Product Ad Kampagne, Ad Group, SKU und Zustand.
 - Welche Stammdaten ein Vendor-Profil statt der SKU braucht.
