@@ -458,8 +458,9 @@ ist damit bis auf diese Punkte abgeschlossen; weiter geht es mit Phase 3.
     ergeben eine Datei nur mit Kopfzeile (wie im Explorer). Kontonamen ohne lateinische Zeichen fallen im Dateinamen
     weg. Datei-Zeiträume über 400 Tage (nur über umbenannte Dateien denkbar) nimmt der Explorer nicht an und zeigt
     seinen Standard-Zeitraum. Dass der Knopf vor „Grid bereit“ gesperrt ist, deckt nur der Test des Grids ab.
-  - **Offen:** Blick in die Browser-Pane (Knopf, Links, Sprung in den Explorer mit echten Daten): in dieser Session war
-    der Zugriff auf die Browser-Pane gesperrt. Gerade der Sprung sollte einmal mit den Demo-Daten geklickt werden.
+  - **Browser-Pane nachgeholt (2026-10-08 und 2026-10-09):** Knopf, Links und Sprung sind geklickt, der Download und die
+    Währung nach dem Sprung geprüft; Ergebnis in `phase-3.md` („Nachprüfung im Browser“). Offen bleibt nur die Summenzeile
+    in EUR bei Clients mit mehreren Währungen.
 
 #### Später (nur mit Datei, am Ende des Projekts)
 - [ ] Impression-Share/-Rang je Suchbegriff neben ACoS, falls der Konsolen-Bericht „Suchbegriff-Impression-Share“ vorliegt
