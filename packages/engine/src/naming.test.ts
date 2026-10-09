@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   campaignNameIssues,
+  campaignNameMaxLength,
   MAX_CAMPAIGN_NAME_LENGTH,
   renderCampaignName,
   uniqueCampaignName,
@@ -52,6 +53,23 @@ describe('campaignNameIssues', () => {
     expect(campaignNameIssues('x'.repeat(MAX_CAMPAIGN_NAME_LENGTH + 1))).toEqual(['tooLong']);
     expect(campaignNameIssues('SP\tAUTO')).toEqual(['invalidCharacters']);
   });
+
+  it('nimmt nur die Zeichen an, die Amazon für Namen nennt (Limits-Seite, 2026-10-09)', () => {
+    expect(campaignNameIssues('SP | EXACT1 | Größe XL (2er) - Café & Co. / 50 $ @ [a]_{b}~`\'\\')).toEqual([]);
+    expect(campaignNameIssues('Łódź Ærø Œuvre ß ÿ')).toEqual(['invalidCharacters']);
+    expect(campaignNameIssues('Łódź Œuvre ß ÿ')).toEqual([]);
+    for (const name of ['SP · AUTO', 'Rabatt 20%', 'Neu!', '#1', 'a < b', 'Emoji 🙂']) {
+      expect(campaignNameIssues(name), name).toEqual(['invalidCharacters']);
+    }
+  });
+
+  it('erlaubt Vendoren nur 116 Zeichen', () => {
+    expect(campaignNameMaxLength('seller')).toBe(128);
+    expect(campaignNameMaxLength('vendor')).toBe(116);
+    expect(campaignNameMaxLength('agency')).toBe(128);
+    expect(campaignNameIssues('x'.repeat(117), 116)).toEqual(['tooLong']);
+    expect(campaignNameIssues('x'.repeat(116), 116)).toEqual([]);
+  });
 });
 
 describe('uniqueCampaignName', () => {
@@ -73,5 +91,10 @@ describe('uniqueCampaignName', () => {
     const result = uniqueCampaignName(long, [long]);
     expect(result).toHaveLength(MAX_CAMPAIGN_NAME_LENGTH);
     expect(result.endsWith(' 2')).toBe(true);
+  });
+
+  it('kürzt auf die Höchstlänge des Kontos', () => {
+    const long = 'x'.repeat(116);
+    expect(uniqueCampaignName(long, [long], 116)).toHaveLength(116);
   });
 });

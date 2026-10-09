@@ -34,9 +34,7 @@ const examples = computed(() => {
 });
 /** `{name}` als Text (geschweifte Klammern im Template wären Mustache-Syntax). */
 const placeholderText = (name: string) => '{' + name + '}';
-const tooLong = computed(() =>
-  examples.value.some((name) => campaignNameIssues(name).includes('tooLong')),
-);
+const issues = computed(() => new Set(examples.value.flatMap((name) => campaignNameIssues(name))));
 </script>
 
 <template>
@@ -76,8 +74,16 @@ const tooLong = computed(() =>
           {{ name }}
         </li>
       </ul>
-      <p v-if="tooLong" role="alert" class="text-body-sm text-on-loss-wash">
+      <p v-if="issues.has('tooLong')" role="alert" class="text-body-sm text-on-loss-wash">
         {{ t('catalog.naming.tooLong', { max: MAX_CAMPAIGN_NAME_LENGTH }) }}
+      </p>
+      <p
+        v-if="issues.has('invalidCharacters')"
+        data-naming-invalid
+        role="alert"
+        class="text-body-sm text-on-loss-wash"
+      >
+        {{ t('catalog.naming.invalidCharacters') }}
       </p>
     </div>
   </section>

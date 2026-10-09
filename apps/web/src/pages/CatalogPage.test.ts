@@ -147,6 +147,10 @@ describe('Seite „Struktur-Katalog“', () => {
     );
     await type('[data-naming-pattern]', '{country}-{adType}-{block}');
     expect((await found('[data-naming-preview]')).textContent).toContain('DE-SP-EXACT1');
+    expect(document.querySelector('[data-naming-invalid]')).toBeNull();
+
+    await type('[data-naming-pattern]', '{adType} · {block}');
+    expect((await found('[data-naming-invalid]')).textContent).toContain('nicht zulässt');
   });
 
   it('meldet einen Konflikt beim Speichern', async () => {

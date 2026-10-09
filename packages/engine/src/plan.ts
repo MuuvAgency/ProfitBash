@@ -11,7 +11,12 @@ import {
   type AdChangeLimitLookup,
 } from './ad-changes';
 import { Dec, parseDecimal } from './decimal';
-import { campaignNameIssues, renderCampaignName, uniqueCampaignName } from './naming';
+import {
+  campaignNameIssues,
+  campaignNameMaxLength,
+  renderCampaignName,
+  uniqueCampaignName,
+} from './naming';
 
 /**
  * Plan-Engine des Kampagnen-Setups (`docs/tasks/phase-4.md` 4.3), ohne I/O: Preset + Produktgruppe + Eingaben →
@@ -428,6 +433,7 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
     return list.map((item) => ({ asin: item.asin, sku: vendor ? null : item.sku }));
   };
 
+  const maxNameLength = campaignNameMaxLength(input.profile.accountType);
   for (const entry of presetBlocks) {
     const block = blocks.get(entry.block)!;
     const slots = slotsFor(block, entry);
@@ -441,7 +447,7 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
         client: input.profile.clientName,
         country: input.profile.countryCode,
       });
-      const name = uniqueCampaignName(rendered, [...takenNames, ...planned]);
+      const name = uniqueCampaignName(rendered, [...takenNames, ...planned], maxNameLength);
       planned.push(name);
       if (takenNames.has(rendered.toLowerCase())) {
         hint({
@@ -451,7 +457,7 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
           existing: rendered,
         });
       }
-      for (const issue of campaignNameIssues(name)) {
+      for (const issue of campaignNameIssues(name, maxNameLength)) {
         hint({ severity: 'error', code: 'campaignNameInvalid', campaign: name, issue });
       }
 

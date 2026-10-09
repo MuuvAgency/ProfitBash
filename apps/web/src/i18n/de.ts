@@ -1430,6 +1430,8 @@ export const de = {
       },
       preview: 'Vorschau',
       tooLong: 'Zu lang: Amazon erlaubt höchstens {max} Zeichen.',
+      invalidCharacters:
+        'Enthält Zeichen, die Amazon in Kampagnennamen nicht zulässt (z. B. Mittelpunkt ·, Prozent, Ausrufezeichen, Raute). Erlaubt sind Buchstaben, Ziffern, Leerzeichen und übliche Satzzeichen.',
     },
     assignments: {
       description:
