@@ -321,9 +321,51 @@ describe('buildBulkFileChanges für Sponsored Brands und Sponsored Display (3.9)
   it('lehnt Targets ab, deren Art das Blatt nicht kennt (SB-Themen, unbekannte SD-Targets)', () => {
     const theme = change({ adProduct: SB, campaignMultiAdGroups: true, targetType: 'theme' });
     const odd = change({ adProduct: SD, entityId: 'x', targetType: 'content_category' });
-    expect(buildBulkFileChanges([theme, odd]).rejected.map((r) => [r.changeId, r.code])).toEqual([
+    const auto = change({ adProduct: SD, entityId: 'y', targetType: 'auto' });
+    // Bei Sponsored Products bleibt jedes Target, das kein Keyword ist, ein Produkt-Target (wie vor 3.9).
+    const spTheme = change({ entityId: 'z', targetType: 'theme' });
+    const plan = buildBulkFileChanges([theme, odd, auto, spTheme]);
+    expect(plan.rejected.map((r) => [r.changeId, r.code])).toEqual([
       [theme.id, 'TARGET_TYPE_NOT_SUPPORTED'],
       [odd.id, 'TARGET_TYPE_NOT_SUPPORTED'],
+      [auto.id, 'TARGET_TYPE_NOT_SUPPORTED'],
+    ]);
+    expect(plan.changes).toMatchObject([{ ref: 'target:z', type: 'productTarget' }]);
+  });
+
+  it.each(['audience', 'product_audience', 'category_audience'])(
+    'SD: %s ist ein Zielgruppen-Target',
+    (targetType) => {
+      const { changes } = buildBulkFileChanges([change({ adProduct: SD, targetType })]);
+      expect(changes).toMatchObject([{ type: 'productTarget', sdTargeting: 'audience' }]);
+    },
+  );
+
+  it('SB: schreibt den Zustand einer Ad Group, auch wenn dieselbe Übermittlung ihr Standardgebot ändert', () => {
+    const base = {
+      adProduct: SB,
+      campaignMultiAdGroups: true,
+      entityType: 'ad_group',
+      entityId: 'g',
+      amazonEntityId: '200',
+      targetType: null,
+    } as const;
+    const state = change({ ...base, field: 'state', after: 'PAUSED' });
+    const defaultBid = change({ ...base, field: 'default_bid', after: '0.50' });
+
+    const { changes, rejected } = buildBulkFileChanges([state, defaultBid]);
+
+    expect(changes).toEqual([
+      {
+        ref: 'ad_group:g',
+        type: 'adGroup',
+        amazonCampaignId: '100',
+        amazonAdGroupId: '200',
+        state: 'PAUSED',
+      },
+    ]);
+    expect(rejected.map((r) => [r.changeId, r.code])).toEqual([
+      [defaultBid.id, 'BULK_FILE_NOT_SUPPORTED'],
     ]);
   });
 });

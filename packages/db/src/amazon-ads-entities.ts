@@ -184,8 +184,16 @@ export async function upsertCampaigns(
         r.amazonPortfolioId ? [{ amazonPortfolioId: r.amazonPortfolioId }] : [],
       ),
     );
+    const sheets = await knownBulkSheets(
+      tx,
+      scope,
+      unique.flatMap((r) => ('multiAdGroups' in r.extra ? [] : [r.amazonCampaignId])),
+    );
     const rows = unique.map(({ amazonPortfolioId, ...record }) => ({
       ...record,
+      ...(sheets.has(record.amazonCampaignId) && {
+        extra: { ...record.extra, multiAdGroups: sheets.get(record.amazonCampaignId) },
+      }),
       ...rowScope(scope),
       portfolioId: amazonPortfolioId ? portfolios.ids.get(amazonPortfolioId)! : null,
     }));
@@ -197,6 +205,37 @@ export async function upsertCampaigns(
       portfolios.created,
     );
   });
+}
+
+/**
+ * `extra.multiAdGroups` vorhandener Kampagnen: in welchem SB-Blatt der Bulk-Datei eine Kampagne steht
+ * (`phase-3.md` 3.9). Das weiß nur der Bulk-Import; der Export über die API ersetzt `extra` sonst ohne die Angabe,
+ * und Änderungen per Bulk-Datei scheiterten bis zum nächsten Import.
+ */
+async function knownBulkSheets(
+  tx: DbOrTx,
+  scope: EntityWriteScope,
+  amazonCampaignIds: readonly string[],
+): Promise<Map<string, unknown>> {
+  const known = new Map<string, unknown>();
+  const c = amazonAdsCampaigns;
+  for (const chunk of chunks(amazonCampaignIds)) {
+    const found = await tx
+      .select({
+        amazonCampaignId: c.amazonCampaignId,
+        value: sql<unknown>`${c.extra}->'multiAdGroups'`,
+      })
+      .from(c)
+      .where(
+        and(
+          eq(c.profileId, scope.profileId),
+          inArray(c.amazonCampaignId, chunk),
+          sql`${c.extra} ? 'multiAdGroups'`,
+        ),
+      );
+    for (const row of found) known.set(row.amazonCampaignId, row.value);
+  }
+  return known;
 }
 
 export async function upsertAdGroups(

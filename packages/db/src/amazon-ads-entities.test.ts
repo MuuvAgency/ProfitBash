@@ -276,6 +276,27 @@ describe('upsertCampaigns', () => {
     expect(await campaignRow(BIG_ID)).toMatchObject({ name: 'Groß', budgetAmount: '0.1' });
   });
 
+  it('behält das SB-Blatt der Bulk-Datei, wenn eine spätere Quelle es nicht nennt (3.9)', async () => {
+    // Der Bulk-Import nennt das Blatt, der Export über die API kennt es nicht.
+    await upsertCampaigns(testDb.db, scope(), [
+      campaign({ amazonCampaignId: 'c-sb', extra: { costType: 'CPC', multiAdGroups: true } }),
+    ]);
+    await upsertCampaigns(testDb.db, scope({ now: t2 }), [
+      campaign({ amazonCampaignId: 'c-sb', extra: { costType: 'CPC', brandEntityId: 'B1' } }),
+    ]);
+    expect((await campaignRow('c-sb'))?.extra).toEqual({
+      costType: 'CPC',
+      brandEntityId: 'B1',
+      multiAdGroups: true,
+    });
+
+    // Nennt die neue Quelle das Blatt selbst, gilt ihre Angabe.
+    await upsertCampaigns(testDb.db, scope({ now: t2 }), [
+      campaign({ amazonCampaignId: 'c-sb', extra: { multiAdGroups: false } }),
+    ]);
+    expect((await campaignRow('c-sb'))?.extra).toEqual({ multiAdGroups: false });
+  });
+
   it('legt ein unbekanntes Portfolio als Platzhalter an', async () => {
     const result = await upsertCampaigns(testDb.db, scope(), [
       campaign({ amazonCampaignId: 'c-pf', amazonPortfolioId: 'pf-unbekannt' }),

@@ -41,7 +41,16 @@ const REJECTIONS = {
 } as const;
 
 /** Blätter in der Reihenfolge der Datei der Werbekonsole. */
-const SHEET_ORDER: readonly BulkFileSheetKind[] = ['sp', 'sb', 'sbMultiAdGroup', 'sd'];
+const SHEET_POSITION: Record<BulkFileSheetKind, number> = {
+  sp: 0,
+  sb: 1,
+  sbMultiAdGroup: 2,
+  sd: 3,
+};
+// Über `Record` vollständig: Ein neues Blatt ohne Platz fiele beim Typecheck auf, statt in der Datei zu fehlen.
+const SHEET_ORDER = (Object.keys(SHEET_POSITION) as BulkFileSheetKind[]).sort(
+  (a, b) => SHEET_POSITION[a] - SHEET_POSITION[b],
+);
 
 /** Blatt einer Änderung; ein Ablehnungsgrund, wenn es keines gibt. */
 function sheetOf(row: SubmissionChange): BulkFileSheetKind | keyof typeof REJECTIONS {
@@ -181,7 +190,8 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
     if (
       first.entityType === 'target' &&
       first.targetType !== 'keyword' &&
-      ((sheet === 'sd' && targeting === null) || (sheet !== 'sd' && first.targetType === 'theme'))
+      ((sheet === 'sd' && targeting === null) ||
+        ((sheet === 'sb' || sheet === 'sbMultiAdGroup') && first.targetType === 'theme'))
     ) {
       for (const row of group) reject(row, 'TARGET_TYPE_NOT_SUPPORTED');
       continue;
@@ -253,7 +263,15 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
         );
       }
     } else if (first.entityType === 'ad_group') {
-      const defaultBid = value('default_bid');
+      // Ad Groups von Sponsored Brands haben kein Standardgebot: Nur diese Änderung entfällt, der Zustand geht raus.
+      const noDefaultBid = sheet === 'sb' || sheet === 'sbMultiAdGroup';
+      const kept = noDefaultBid ? group.filter((row) => row.field !== 'default_bid') : group;
+      for (const row of group) {
+        if (!kept.includes(row))
+          rejected.push({ changeId: row.id, ...SKIPS.notSupportedInBulkFile });
+      }
+      if (kept.length === 0) continue;
+      const defaultBid = noDefaultBid ? undefined : value('default_bid');
       add(
         {
           ref,
@@ -262,7 +280,7 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
           ...(defaultBid !== undefined && { defaultBid }),
           ...(state !== undefined && { state }),
         },
-        group,
+        kept,
       );
     } else if (first.entityType === 'target') {
       const bid = value('bid');

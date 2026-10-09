@@ -570,6 +570,7 @@ describe('importBulkFile', () => {
 
   it('liest englische Kopfzeilen und Werte, SB- und SD-Blätter', async () => {
     const SBC = '310000000000001';
+    const SBC_LEGACY = '310000000000009';
     const SBAG = '410000000000001';
     const SBKW = '610000000000001';
     const SBNK = '610000000000002';
@@ -579,6 +580,7 @@ describe('importBulkFile', () => {
     const SDAD = '520000000000001';
     const SDT1 = '720000000000001';
     const SDT2 = '720000000000002';
+    const SDT3 = '720000000000003';
     const SPC = '330000000000001';
     const SPCNK = '630000000000001';
     const spHeader = [
@@ -727,6 +729,19 @@ describe('importBulkFile', () => {
         },
         { Entity: 'Video Ad', 'Campaign ID': SBC, 'Ad Group ID': SBAG, 'Ad ID': '510000000000001' },
       ]),
+      // Älteres SB-Blatt: Kampagnen ohne eigene Ad-Group-Zeilen.
+      sheet('Sponsored Brands Campaigns', sbHeader, [
+        {
+          Product: 'Sponsored Brands',
+          Entity: 'Campaign',
+          'Campaign ID': SBC_LEGACY,
+          'Campaign Name': 'Waldkauz Marke alt',
+          'Start Date': '20260401',
+          State: 'enabled',
+          'Budget Type': 'daily',
+          Budget: 40,
+        },
+      ]),
       sheet('Sponsored Display Campaigns', sdHeader, [
         {
           Entity: 'Campaign',
@@ -772,15 +787,25 @@ describe('importBulkFile', () => {
           Bid: 0.45,
           State: 'enabled',
         },
+        // Zielgruppe mit einem Ausdruck, den der Leser nicht kennt: Die Entity der Zeile entscheidet.
+        {
+          Entity: 'Audience Targeting',
+          'Campaign ID': SDC,
+          'Ad Group ID': SDAG,
+          'Targeting ID': SDT3,
+          'Targeting Expression': 'neueZielgruppe=(irgendwas)',
+          Bid: 0.5,
+          State: 'enabled',
+        },
       ]),
     ]);
 
     const counters = await run(file);
     expect(counters).toMatchObject({
       portfolios: 0,
-      campaigns: 3,
+      campaigns: 4,
       adGroups: 2,
-      targets: 4,
+      targets: 5,
       negatives: 2,
       productAds: 1,
       invalidRows: 0,
@@ -809,6 +834,12 @@ describe('importBulkFile', () => {
       // Das Blatt der Kampagne braucht die Bulk-Datei für Änderungen (3.9).
       extra: { costType: 'CPC', multiAdGroups: true },
     });
+    expect(campaigns.get(SBC_LEGACY)!.row).toMatchObject({
+      adProduct: SB,
+      extra: { multiAdGroups: false },
+    });
+    // Nur SB-Kampagnen tragen die Angabe.
+    expect(campaigns.get(SDC)!.row.extra).toEqual({ costType: 'VCPM' });
     expect(campaigns.get(SDC)!.row).toMatchObject({
       adProduct: SD,
       state: 'PAUSED',
@@ -850,6 +881,7 @@ describe('importBulkFile', () => {
       targetType: 'product',
       expression: { matchType: 'PRODUCT_EXACT', asin: 'B0FREMD0003' },
     });
+    expect(targets.get(SDT3)!.row).toMatchObject({ adProduct: SD, targetType: 'audience' });
 
     const negatives = await byAmazonId(
       db
