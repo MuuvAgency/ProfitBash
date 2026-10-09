@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1. Nächster Schritt: 4.2.
+> Datei). Fertig: 4.1, 4.2. Nächster Schritt: 4.3.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -65,6 +65,9 @@ Jede Frage mit Empfehlung. Antworten werden hier mit Datum eingetragen („Entsc
   Produktgruppe, Match-Typ, laufende Nummer), je Client überschreibbar. **Ich schlage ein Startschema vor, du passt es in der
   Oberfläche an.** Alternative: Du gibst mir das Schema aus dem Sheets-Tool vorab (Kürzel und Reihenfolge).
   **Entschieden (Dominik, 2026-10-09): Claude schlägt ein Startschema vor, Dominik passt es in der Oberfläche an.**
+  **Startschema (Dominik, 2026-10-09): eigene englische Kürzel** statt der Kürzel des Sheets-Tools, Muster
+  `{adType} | {block} | {group} | {target}`, z. B. `SP | EXACT1 | Flaschen | trinkflasche 1l` (Kürzel: AUTO, BROAD,
+  PHRASE, EXACT, EXACT1, BRAND, CAT, PAT, PAT-EXP, PAT1, PAT-COMP, PAT-DEF, HEADER, VIDEO, RT-VIEW, RT-BUY).
 - **F4 – Startwerte der sechs Presets** (Bausteine je Preset, Startgebote, Tagesbudgets, Gebotsstrategie). Entschieden ist,
   dass es alle sechs gibt (F-S8). Empfehlung: **Ich lege eigene Startwerte fest, du korrigierst sie in der Oberfläche**; die
   Presets bleiben Daten und sind jederzeit änderbar.
@@ -136,12 +139,47 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     Demo-Daten, Handy, Tablet, Hell-Modus, Konsole); Testgruppe danach gelöscht.
 
 ### 4.2 Struktur-Katalog, Presets und Namensschema (`packages/shared`, `packages/db`, `packages/engine`)
-- [ ] Bausteine, Graduation-Kanten und Presets als Daten je Organisation mit eigenen Startwerten (Seed), sechs Presets
+- [x] Bausteine, Graduation-Kanten und Presets als Daten je Organisation mit eigenen Startwerten (Seed), sechs Presets
       (F-S8); Phrase optional, Standard Breit-Cluster; `BRAND-DEF` ohne ausgehende Kante.
-- [ ] Zuordnung Preset → Client und Produktgruppe.
-- [ ] Namensschema als Muster mit Platzhaltern; Engine-Funktion Name aus Baustein, Produktgruppe und Eingaben, mit Prüfung
+- [x] Zuordnung Preset → Client und Produktgruppe.
+- [x] Namensschema als Muster mit Platzhaltern; Engine-Funktion Name aus Baustein, Produktgruppe und Eingaben, mit Prüfung
       der Grenzen von Amazon (Länge, Zeichen) und auf Eindeutigkeit im Profil.
-- [ ] Verwaltung für Admins (Katalog, Presets, Namensschema) unter `/ads/tools/catalog` (F11).
+- [x] Verwaltung für Admins (Katalog, Presets, Namensschema) unter `/ads/tools/catalog` (F11).
+- [x] Umsetzung (Stand für 4.3 und später):
+  - **Ein Dokument je Organisation** (`structure_catalogs`: `catalog` jsonb, `version`, Migration
+    `0030_structure_catalog`), geprüft mit `structureCatalogSchema` (`packages/shared/src/structure-catalog.ts`, auch als
+    Einstieg `@profitbash/shared/structure-catalog`). Ohne Zeile gelten die Startwerte `DEFAULT_STRUCTURE_CATALOG`
+    (Version 0, kein Seed in der Datenbank: neue Organisationen bekommen sie ohne Migration). Ein gespeichertes Dokument,
+    das nicht mehr zum Schema passt, fällt mit seiner Version auf die Startwerte zurück. Speichern als Ganzes mit
+    Version (409 bei gleichzeitiger Änderung), Audit `structure_catalog.update` mit vorher/nachher.
+  - **Prüfung im Schema:** eindeutige Schlüssel, Kanten nur zwischen bekannten Bausteinen, ohne Schleife und nie aus einem
+    Baustein mit `source: 'brand'`, Presets nur aus bekannten Bausteinen, genau ein Standard-Preset, Felder passend zum
+    Anzeigentyp (Strategie und Platzierungen nur SP, Optimierung nur SD und dort nur `clicks`/`conversions`, also nur
+    CPC), nur bekannte Platzhalter. vCPM und Off-Amazon kennt der Katalog nicht (F-S7: Freischalten je Kampagne im Setup).
+  - **Beträge in EUR** (Decimal-Strings): Der Katalog gilt für alle Marktplätze; die Plan-Engine (4.3) rechnet Gebote und
+    Budgets mit dem Tageskurs in die Währung des Profils um und prüft dann die Grenzen von Amazon.
+  - **Bausteine** (19, Schlüssel wie im Ideen-Dokument mit Präfix `SP-`/`SB-`/`SD-`): Werte änderbar (Bezeichnung,
+    Kürzel, Gebot, Budget, Strategie, Platzierungen, Optimierung, Rückblick), Art und Targeting fest. Neue Arten von
+    Bausteinen kommen mit dem Setup, das sie anlegen kann (4.4, 4.9, 4.10). Phrase gibt es als Baustein, kein
+    Start-Preset nutzt sie. Startwerte von Gebot und Budget sind eigene Schätzungen (F4), Dominik korrigiert sie.
+  - **Presets:** sechs (Muuv-Standard als Standard, Kontrolle, Funnel-Hub, Launch, Profit und Verteidigung,
+    Verbrauchsgut), je Baustein optional abweichendes Gebot, Budget, Platzierung oben und Rückblick. Wirksames Preset:
+    Produktgruppe vor Client vor Standard (`effectivePreset`); ein gelöschtes Preset fällt still zurück.
+  - **Zuordnung:** `client_presets` (Client → Preset) und `product_groups.preset_key`; setzen dürfen Admins und Editoren
+    (`write`), Katalog ändern nur Org-Admins (F11, 403 `STRUCTURE_CATALOG_FORBIDDEN`). Ein Namensschema je Client gibt
+    es nicht (F3 nannte es als Empfehlung, entschieden war nur das Startschema); bei Bedarf als Platzhalter `{client}`.
+  - **Namen** (`packages/engine/src/naming.ts`, Einstieg `@profitbash/engine/naming`): `renderCampaignName` (leerer
+    Platzhalter fällt samt Trenner davor weg), `campaignNameIssues` (leer, länger als 128 Zeichen, Steuerzeichen),
+    `uniqueCampaignName` (ohne Groß/Klein, hängt ` 2`, ` 3` an und kürzt vorne). **Annahme:** 128 Zeichen für SP, SB und
+    SD, noch gegen die Limits-Seite von Amazon zu prüfen (siehe „Offen vor dem Bau“).
+  - **API** (Feature `tools`): `GET/PUT /api/ads/tools/catalog`, `PUT /api/ads/tools/client-presets/{clientId}`,
+    `presetKey` an `POST/PATCH /api/ads/tools/product-groups` (400 `PRODUCT_GROUP_UNKNOWN_PRESET`).
+  - **Seite** `/ads/tools/catalog` mit Reitern Presets, Bausteine, Graduation, Namensschema (Vorschau an drei Beispielen)
+    und Zuordnung; Entwurf mit Prüfung vor dem Speichern, „Verwerfen“, „Startwerte laden“ (nur in den Entwurf),
+    klebende Aktionsleiste. Nicht-Admins sehen alles lesend und setzen nur Presets je Client. Die Tools haben Reiter
+    (Produktgruppen · Struktur-Katalog); der Produktgruppen-Dialog wählt das Preset der Gruppe. Das Web nutzt dafür
+    `@profitbash/engine` (Workspace-Paket, keine neue externe Abhängigkeit). Geprüft im Browser-Pane (Speichern,
+    Handy, Tablet, Hell-Modus); der Testkatalog ist aus der Dev-DB gelöscht.
 
 ### 4.3 Plan-Engine (`packages/engine`, ohne I/O)
 - [ ] Eingabe: Preset, Produktgruppe, Keywords bzw. Targets (von Hand oder von der Merkliste), vorhandene Entities des

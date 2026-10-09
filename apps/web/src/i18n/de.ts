@@ -1262,7 +1262,7 @@ export const de = {
       assignments: 'Zuordnung',
     },
     save: 'Katalog speichern',
-    discard: 'Änderungen verwerfen',
+    discard: 'Verwerfen',
     defaults: 'Startwerte laden',
     defaultsHint:
       'Ersetzt den Entwurf durch die Startwerte; gespeichert wird erst mit „Katalog speichern“.',
