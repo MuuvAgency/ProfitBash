@@ -671,13 +671,78 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
 ### 3.7 Tags (`/ads/tags/*`, F7)
 - [ ] Eigene Tags je Organisation (Name, Farbe) für Kampagnen, Ad Groups, Targets und Product Ads: verwalten, zuweisen (auch per
       Bulk), Filter im Explorer und in der Filterleiste des Dashboards; Amazon-Tags nur anzeigen.
+- **Entschieden (Dominik, 2026-10-09):** Farben aus einer **festen Palette** der Design-Tokens (kein freier Farbwähler).
 
 ### 3.8 Suchbegriff-Aktionen (F9)
-- [ ] „Negativ anlegen“ in der Suchbegriff-Analyse: Dialog mit Standard „negativ exakt“ in der Ad Group der Zeile, umstellbar
+- [x] „Negativ anlegen“ in der Suchbegriff-Analyse: Dialog mit Standard „negativ exakt“ in der Ad Group der Zeile, umstellbar
       auf Kampagnenebene und Wortgruppe; legt die Änderung in den Warenkorb. Hinweis, wenn der Begriff dort schon negiert ist;
       geschützte Begriffe nur mit Bestätigung.
-- [ ] „Harvest vormerken“: Merkliste je Profil (Suchbegriff, Quelle, Kennzahlen zum Zeitpunkt des Vormerkens), ansehen und
+- [x] „Harvest vormerken“: Merkliste je Profil (Suchbegriff, Quelle, Kennzahlen zum Zeitpunkt des Vormerkens), ansehen und
       wieder entfernen; keine Änderung bei Amazon. Phase 4 (Kampagnen-Setup) liest die Merkliste.
+- **Entschieden (Dominik, 2026-10-09):**
+  - **Mehrfachauswahl:** Zeilen per Checkbox markieren, ein Dialog legt alle als Negativ in den Warenkorb; dazu die Aktion
+    je Zeile.
+  - **Merkliste:** dritte Ansicht „Merkliste“ auf der Seite der Suchbegriff-Analyse (kein eigener Eintrag in der Sidebar).
+- [x] Umsetzung (Stand für 3.7, Phase 4 und später):
+  - **Negatives gebündelt** (`packages/db/src/ad-change-entities.ts`, `checkNegatives`; `stageAdChanges`): Kampagnen,
+    Ad Groups, vorhandene Negatives und die offenen Anlagen aller betroffenen Kampagnen werden je Anfrage einmal
+    gelesen (vorher einige Abfragen je Negative, offener Punkt aus 3.1), die Sperren je Nutzer und Kampagne sortiert
+    genommen, die Anlagen in Stücken zu 500 eingefügt. Verhalten wie bisher: Ergebnis je Eingabe in derselben
+    Reihenfolge, dasselbe Negative zweimal (auch in einer Anfrage) ist `unchanged`, `otherUsers` zählt andere Nutzer mit
+    demselben offenen Negative. `checkNegative` (Übermitteln, erneuter Versuch) ruft dieselbe Prüfung für eine Eingabe.
+  - **Geschützte Begriffe** (Server): `create_negative` nimmt `confirmProtected` (`adChangeInputSchema`). Enthält das
+    Keyword bzw. die ASIN einen geschützten Begriff des Clients (`clients.protected_terms`, `createProtectedTermMatcher`
+    aus der Engine: ganze Wortfolge, Satzzeichen trennen), lehnt das Vormerken ohne Bestätigung mit dem neuen Grund
+    `protectedTerm` ab; das gilt für jede Herkunft, auch den Explorer. Reihenfolge: erst Kampagne, Ad Group und „gibt
+    es schon“ (`alreadyExists`), dann der eigene Warenkorb (`unchanged`), dann der Schutz. Geprüft wird beim
+    Vormerken; Übermitteln, erneuter Versuch und Revert prüfen ihn nicht noch einmal.
+  - **Merkliste** (Migration `0027_search_term_harvest_marks`, `packages/db/src/schema/search-terms.ts`,
+    `packages/db/src/search-term-harvest.ts`): `search_term_harvest_marks`, je Profil und Begriff ein Eintrag
+    (`term_key` = `comparableSearchTerm`: klein, NFC, Leerraum zusammengefasst; Unique je Profil). Felder: Suchbegriff
+    in der Schreibweise der Quelle, **Quelle** als Amazon-IDs von Kampagne, Ad Group und Target samt Ad-Typ (die Zeile
+    des Begriffs mit dem höchsten Spend; Namen kommen beim Lesen über die IDs, fehlende Entities bleiben leer),
+    Datei-Zeitraum, `source_rows`, **Kennzahlen** (Impressionen, Klicks, Spend, Umsatz, Käufe, Einheiten als Summe über
+    **alle** Zeilen des Begriffs im Zeitraum, Währung des Profils), wer und wann. Fremdschlüssel auf Profil und
+    Organisation mit `ON DELETE CASCADE` (wie die Regeln je Profil). `markSearchTermsForHarvest` liest Quelle und
+    Kennzahlen selbst aus den Zeilen des Zeitraums (die Anfrage nennt nur Begriffe), Ergebnis je Begriff `added` |
+    `alreadyMarked` (die Kennzahlen von damals bleiben) | `notFound`; `listHarvestMarks` (sichtbare Profile, optional
+    eines, neueste zuerst, höchstens 5000), `removeHarvestMarks`, `listMarkedHarvestTermKeys` (für die Kennzeichnung
+    in der Analyse). Alles über `visibleProfilesScope()`; Audit `search_term_harvest.add` bzw. `.remove`, nur wenn
+    sich etwas geändert hat. ADR 002 ergänzt.
+  - **API** (`routes/search-terms.ts`, Feature `sp-explorer`, Schemas in `packages/shared/src/search-terms.ts`):
+    `POST /api/ads/search-terms/harvest` (`write`; `profileId`, `periodStart`, `periodEnd`, `searchTerms` mit
+    höchstens 200 Begriffen je Anfrage, wegen des Body-Limits von 64 KB; nicht sichtbares Profil `404
+    PROFILE_NOT_FOUND`), `POST …/harvest/list` (`view`; optional `profileId`; Kennzahlen mit ACoS, CVR usw. wie die
+    Analyse; `truncated`, `maxMarks`), `POST …/harvest/remove` (`write`; `ids`, höchstens 1000). Die Analyse nennt je
+    Zeile `harvestMarked`. Negatives gehen über den vorhandenen Endpunkt `POST /api/ads/changes/pending` mit
+    `origin: 'search_terms'` (Recht `write` im Feature `changes`).
+  - **Logik ohne I/O** (`apps/web/src/search-terms/actions.ts`): `negativeInputs(rows, { level, matchType,
+    confirmProtected })` (dieselbe Stelle nur einmal; ASIN-Suchbegriffe werden zu negativen Produkt-Targets;
+    übersprungen werden Zeilen ohne bekannte Kampagne bzw. Ad Group, geschützte ohne Bestätigung und Begriffe über 80
+    Zeichen), `harvestTerms`, `isAsinSearchTerm`.
+  - **Oberfläche** (`pages/SearchTermAnalysisPage.vue`): Im Grid der Suchbegriffe lassen sich Zeilen markieren
+    (`SearchTermGrid` mit `selectable`; die Kopf-Checkbox meint die gefilterten Zeilen, ein Wechsel von Filter,
+    Ansicht, Profil oder Zeitraum hebt die Markierung auf). Leiste über dem Grid: „n markiert“, „Negativ anlegen“ (nur
+    mit `write` im Feature `changes`) und „Harvest vormerken“ (nur mit `write` in `sp-explorer`); dieselben Aktionen
+    je Zeile in der Spalte „Aktionen“ (`RowActionsCell.vue`, rechts fest, nie im CSV). **Dialog**
+    (`NegativeDialog.vue`): „Wo“ (Ad Group der Zeile | Kampagne der Zeile), „Wie“ (negativ exakt | Wortgruppe),
+    Hinweis auf geschützte Begriffe mit Häkchen „trotzdem negieren“ (ohne Häkchen bleiben sie weg), Hinweise auf
+    übersprungene Zeilen, Zahl der Negatives; danach das Ergebnis des Vormerkens (`StageResult.vue`, mit „gibt es dort
+    schon“ und „geschützter Begriff“ als Ablehnungsgründe). **Harvest vormerken** geht ohne Dialog (in Stücken zu 200),
+    das Ergebnis steht über dem Grid („2 Suchbegriffe vorgemerkt“, „stand schon auf der Merkliste“) mit Sprung zur
+    Merkliste. Neue Spalte „Merkliste“ („Vorgemerkt“, filter- und sortierbar, auch im CSV). **Ansicht „Merkliste“**
+    (`view=harvest`): Einträge des gewählten Profils mit Quelle, Datei-Zeitraum, Kennzahlen, „Vorgemerkt am“ und
+    „Von“; markieren und „Von der Merkliste entfernen“; Skeleton, Leerzustand, Fehler mit „Erneut versuchen“, CSV.
+    Viewer sehen weder Auswahl noch Aktionen.
+  - **Tests:** `ad-changes.test.ts` (gebündelte Negatives, Schutz mit und ohne Bestätigung, Reihenfolge der Gründe),
+    `search-term-harvest.test.ts` in `packages/db` und `apps/api` (fremde Organisation, ausgeblendetes Profil, Recht
+    `write`, Entitlement, Kennzeichnung in der Analyse), `search-terms/actions.test.ts`,
+    `pages/SearchTermAnalysisPage.test.ts` (Auswahl, Dialog, Ebene und Match-Typ, geschützte Begriffe, Ergebnis,
+    Aktion je Zeile, Vormerken, Merkliste mit Entfernen, Leer- und Fehlerzustand, Viewer).
+  - Browser-Pane geprüft (Demo-Daten, 2026-10-09): drei Zeilen markiert, Dialog mit den Standardwerten, drei
+    Negatives im Warenkorb (Zähler in der Sidebar), dieselben noch einmal: „3 unverändert“; zwei Suchbegriffe
+    vorgemerkt (Spalte „Merkliste“, Ansicht „Merkliste“ mit Quelle), entfernt; 1440 px dunkel und Handy ohne
+    waagerechtes Scrollen, Konsole ohne Fehler. Testdaten danach verworfen.
 
 ## Bewusst nicht in Phase 3
 
