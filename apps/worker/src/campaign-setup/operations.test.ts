@@ -169,4 +169,31 @@ describe('buildSetupOperations', () => {
       [keyword.id, 'PARENT_NOT_CREATED'],
     ]);
   });
+
+  it('negiert in der Quelle unter den echten IDs der bestehenden Kampagne (4.6)', () => {
+    const source = item(
+      {
+        entity: 'source_negative',
+        amazonCampaignId: '111',
+        amazonAdGroupId: '222',
+        negative: { type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' },
+        harvestMarkId: '00000000-0000-4000-8000-000000000001',
+      },
+      { campaignRef: 'SP | AUTO | Flaschen', adGroupRef: 'Auto' },
+    );
+    const result = buildSetupOperations([source], context);
+    expect(result.rejected).toEqual([]);
+    expect(result.operations).toEqual([
+      {
+        ref: source.id,
+        entity: 'negativeKeyword',
+        campaignRef: 'amazon-campaign:111',
+        adGroupRef: 'amazon-ad-group:222',
+        keywordText: 'trinkflasche 1l',
+        matchType: 'NEGATIVE_EXACT',
+      },
+    ]);
+    expect(result.created.get('amazon-campaign:111')).toBe('111');
+    expect(result.created.get('amazon-ad-group:222')).toBe('222');
+  });
 });

@@ -14,6 +14,8 @@ import { BULK_FILE_SKIPS } from '../ad-changes/bulk-file';
  * Off-Amazon (F-S7): Die Spalte gibt es laut Guide nur in den USA. Dort schreibt die Datei „Limit off-Amazon spend“,
  * außer der Baustein wurde bewusst freigeschaltet („Increase reach“); sonst bleibt sie leer (Amazons Standard).
  *
+ * Negatives in der Quelle eines Harvest-Begriffs (4.6) nennen die echten IDs der bestehenden Kampagne und Ad Group.
+ *
  * Was nicht in die Datei passt, scheitert mit Grund (`skipped`); Kinder einer Kampagne oder Ad Group, die nicht in
  * der Datei steht (ungültig oder schon gescheitert), mit `PARENT_NOT_CREATED`.
  */
@@ -119,6 +121,21 @@ function toCreate(
       };
     case 'negative_product_target':
       return { type: 'create', entity: 'negativeProductTarget', ...parents, asin: payload.asin };
+    case 'source_negative':
+      return payload.negative.type === 'keyword'
+        ? {
+            type: 'create',
+            entity: 'negativeKeyword',
+            ...parents,
+            keywordText: payload.negative.text,
+            matchType: payload.negative.matchType,
+          }
+        : {
+            type: 'create',
+            entity: 'negativeProductTarget',
+            ...parents,
+            asin: payload.negative.asin,
+          };
   }
 }
 
@@ -151,9 +168,16 @@ export function buildSetupBulkFile(
     }
     if (row.status !== 'submitted') continue;
 
-    const campaignId = entity === 'campaign' ? row.campaignRef : parents.get(campaignKey(row));
-    const adGroupId =
-      entity === 'campaign' || entity === 'placement' || entity === 'ad_group'
+    // Negatives in der Quelle (4.6) gehören zu bestehenden Kampagnen: echte IDs aus der Zeile.
+    const source = row.payload.entity === 'source_negative' ? row.payload : null;
+    const campaignId = source
+      ? source.amazonCampaignId
+      : entity === 'campaign'
+        ? row.campaignRef
+        : parents.get(campaignKey(row));
+    const adGroupId = source
+      ? source.amazonAdGroupId
+      : entity === 'campaign' || entity === 'placement' || entity === 'ad_group'
         ? (row.adGroupRef ?? '')
         : parents.get(adGroupKey(row));
     if (campaignId === undefined || adGroupId === undefined) {
