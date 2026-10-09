@@ -35,7 +35,7 @@ import {
   connections,
   campaignSetupItems,
 } from './schema';
-import { confirmCampaignSetupItems } from './campaign-setup-processing';
+import { confirmCampaignSetupItems, releaseHarvestMarks } from './campaign-setup-processing';
 
 /**
  * Verarbeitung der Übermittlungen (`docs/tasks/phase-3.md` 3.3). Systemzugriff des Jobs `ad-changes-submit` und
@@ -762,6 +762,8 @@ export async function closeAdChangeSubmission(
       finishedAt: open > 0 ? null : input.now,
     })
     .where(eq(adChangeSubmissions.id, input.submissionId));
+  // Setup abgeschlossen: angelegte Harvest-Begriffe verlassen die Merkliste (`phase-4.md` 4.6, F7).
+  if (open === 0) await releaseHarvestMarks(tx, { submissionId: input.submissionId });
   return { status, open, failed };
 }
 

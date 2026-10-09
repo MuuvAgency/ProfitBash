@@ -5,6 +5,7 @@ import type {
   PlannedCampaign,
   SaveCampaignSetupDraft,
   SetupInputs,
+  SourceNegative,
   StructureCatalog,
 } from '@profitbash/shared';
 import { Dec, type AdChangeLimitLookup } from '@profitbash/engine';
@@ -17,6 +18,7 @@ import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
 import {
   adChangeSubmissions,
+  amazonAdsAdGroups,
   amazonAdsCampaigns,
   amazonAdsProfiles,
   amazonAdsTargetDailyMetrics,
@@ -89,6 +91,7 @@ export interface CampaignSetupDraftRecord {
   campaignState: CampaignSetupState;
   inputs: SetupInputs;
   campaigns: PlannedCampaign[];
+  sourceNegatives: SourceNegative[];
   version: number;
   submissionId: string | null;
   createdBy: string | null;
@@ -99,7 +102,10 @@ export interface CampaignSetupDraftRecord {
 }
 
 /** Eintrag der Liste: ohne Plan, mit Zahl der Kampagnen und Namen des Erstellers. */
-export type CampaignSetupDraftSummary = Omit<CampaignSetupDraftRecord, 'inputs' | 'campaigns'> & {
+export type CampaignSetupDraftSummary = Omit<
+  CampaignSetupDraftRecord,
+  'inputs' | 'campaigns' | 'sourceNegatives'
+> & {
   campaigns: number;
   createdByName: string | null;
 };
@@ -115,6 +121,7 @@ const record = (row: typeof d.$inferSelect): CampaignSetupDraftRecord => ({
   campaignState: row.campaignState as CampaignSetupState,
   inputs: row.inputs,
   campaigns: row.campaigns,
+  sourceNegatives: row.sourceNegatives,
   version: row.version,
   submissionId: row.submissionId,
   createdBy: row.createdBy,
@@ -209,6 +216,7 @@ export async function saveCampaignSetupDraft(
       campaignState: draft.campaignState,
       inputs: draft.inputs,
       campaigns: draft.campaigns,
+      sourceNegatives: draft.sourceNegatives,
       updatedBy: input.userId,
     };
 
@@ -507,11 +515,19 @@ export async function submitCampaignSetupDraft(
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${`campaign-setup:${profile.id}`}))`,
       );
+      const sourceNegatives = draft.sourceNegatives.filter((source) => source.selected);
       const issues = reviewCampaignPlan({
         campaigns: draft.campaigns,
         profile,
         existing: await loadContext(tx, profile.id),
         limitFor: input.limitFor,
+        sourceNegatives,
+        protectedTerms: await loadProtectedTerms(tx, profile.id),
+        sourceAdGroups: await loadSourceAdGroups(
+          tx,
+          profile.id,
+          sourceNegatives.map((source) => source.amazonAdGroupId),
+        ),
       });
       if (issues.some((issue) => issue.severity === 'error')) throw new ReviewRejected(issues);
 
@@ -527,6 +543,7 @@ export async function submitCampaignSetupDraft(
         .returning({ id: adChangeSubmissions.id });
       const specs = planSetupItems(draft.campaigns, {
         campaignState: draft.campaignState as CampaignSetupState,
+        sourceNegatives,
       });
       const now = new Date();
       for (let start = 0; start < specs.length; start += 1000) {
@@ -601,6 +618,49 @@ export async function submitCampaignSetupDraft(
   }
 }
 
+/** Geschützte Begriffe des Clients eines Profils (leer ohne Client). */
+async function loadProtectedTerms(db: DbOrTx, profileId: string): Promise<string[]> {
+  const [row] = await db
+    .select({ terms: clients.protectedTerms })
+    .from(amazonAdsProfiles)
+    .innerJoin(clients, eq(clients.id, amazonAdsProfiles.clientId))
+    .where(eq(amazonAdsProfiles.id, profileId));
+  return row?.terms ?? [];
+}
+
+/**
+ * Bestehende SP-Ad-Groups des Profils unter den genannten Amazon-IDs, als `amazonCampaignId:amazonAdGroupId`
+ * (Quellen der Negatives, 4.6).
+ */
+async function loadSourceAdGroups(
+  db: DbOrTx,
+  profileId: string,
+  amazonAdGroupIds: readonly string[],
+): Promise<Set<string>> {
+  const result = new Set<string>();
+  const ids = [...new Set(amazonAdGroupIds)];
+  for (let start = 0; start < ids.length; start += 1000) {
+    const rows = await db
+      .select({
+        campaign: amazonAdsCampaigns.amazonCampaignId,
+        adGroup: amazonAdsAdGroups.amazonAdGroupId,
+      })
+      .from(amazonAdsAdGroups)
+      .innerJoin(amazonAdsCampaigns, eq(amazonAdsCampaigns.id, amazonAdsAdGroups.campaignId))
+      .where(
+        and(
+          eq(amazonAdsAdGroups.profileId, profileId),
+          inArray(amazonAdsAdGroups.amazonAdGroupId, ids.slice(start, start + 1000)),
+          eq(amazonAdsAdGroups.adProduct, 'SPONSORED_PRODUCTS'),
+          isNull(amazonAdsAdGroups.removedAt),
+          isNull(amazonAdsCampaigns.removedAt),
+        ),
+      );
+    for (const row of rows) result.add(`${row.campaign}:${row.adGroup}`);
+  }
+  return result;
+}
+
 /** Rückblick und Mindestdaten für Gebote aus dem Profil (F13). */
 export const PROFILE_BID_LOOKBACK_DAYS = 60;
 export const PROFILE_BID_MIN_CLICKS = 30;
@@ -667,6 +727,8 @@ export async function loadProfileBidSuggestions(
 
 export interface CampaignSetupPlanSource {
   profile: CampaignSetupContext['profile'] & { clientName: string | null };
+  /** Geschützte Begriffe des Clients (Negativ in der Quelle nie, 4.6). */
+  protectedTerms: string[];
   productGroup: { name: string; items: { asin: string; sku: string | null; isHero: boolean }[] };
   catalog: StructureCatalog;
   existing: CampaignSetupContext['existing'];
@@ -690,6 +752,7 @@ export async function loadCampaignSetupPlanSource(
       accountType: amazonAdsProfiles.accountType,
       timezone: amazonAdsProfiles.timezone,
       clientName: clients.name,
+      protectedTerms: clients.protectedTerms,
     })
     .from(amazonAdsProfiles)
     .leftJoin(clients, eq(clients.id, amazonAdsProfiles.clientId))
@@ -714,8 +777,10 @@ export async function loadCampaignSetupPlanSource(
     .where(eq(productGroupItems.productGroupId, group.id))
     .orderBy(productGroupItems.position);
   const { catalog } = await loadStructureCatalog(db, input.orgId);
+  const { protectedTerms, ...profileFields } = profile;
   return {
-    profile,
+    profile: profileFields,
+    protectedTerms: protectedTerms ?? [],
     productGroup: { name: group.name, items },
     catalog,
     existing: await loadContext(db, input.profileId),

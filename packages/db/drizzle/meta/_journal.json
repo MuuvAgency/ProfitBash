@@ -225,6 +225,13 @@
       "when": 1791576677120,
       "tag": "0031_campaign_setup",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791579910542,
+      "tag": "0032_harvest_setup",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,7 @@ import {
   auditEvents,
   campaignSetupDrafts,
   campaignSetupItems,
+  searchTermHarvestMarks,
 } from './schema';
 import { createTestDatabase, type TestDatabase } from './testing';
 
@@ -68,6 +69,7 @@ async function submitted(
   channel: 'api' | 'bulk_file' = 'bulk_file',
   profileId = f.profile,
   name = NAME,
+  extra: Partial<SaveCampaignSetupDraft> = {},
 ) {
   const draft: SaveCampaignSetupDraft = {
     profileId,
@@ -75,8 +77,17 @@ async function submitted(
     presetKey: 'muuv-standard',
     name: 'Flaschen',
     campaignState: 'ENABLED',
-    inputs: { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} },
+    inputs: {
+      keywords: [],
+      brandTerms: [],
+      productTargets: [],
+      categories: [],
+      harvest: [],
+      unlocks: {},
+    },
     campaigns: [{ ...plan, name, adGroup: { ...plan.adGroup, name } }],
+    sourceNegatives: [],
+    ...extra,
   };
   const saved = (await saveCampaignSetupDraft(testDb.db, { ...who(), draft }))!;
   const result = await submitCampaignSetupDraft(testDb.db, {
@@ -118,6 +129,7 @@ beforeEach(async () => {
   const { db } = testDb;
   await db.delete(campaignSetupItems);
   await db.delete(campaignSetupDrafts);
+  await db.delete(searchTermHarvestMarks);
   await db.delete(adChangeSubmissions);
   await db.delete(auditEvents);
   await db
@@ -126,6 +138,9 @@ beforeEach(async () => {
   await db
     .delete(amazonAdsNegativeTargets)
     .where(eq(amazonAdsNegativeTargets.amazonTargetId, '8802'));
+  await db
+    .delete(amazonAdsNegativeTargets)
+    .where(eq(amazonAdsNegativeTargets.amazonTargetId, '8803'));
   for (const id of ['7701', '7702', '7703']) {
     await db.delete(amazonAdsTargets).where(eq(amazonAdsTargets.amazonTargetId, id));
   }
@@ -400,5 +415,119 @@ describe('closeBulkFileSubmission für Setups', () => {
       ['negative_keyword', '8801'],
       ['negative_product_target', '8802'],
     ]);
+  });
+});
+
+describe('Harvest von der Merkliste (4.6)', () => {
+  async function harvestMark(searchTerm: string) {
+    const [row] = await testDb.db
+      .insert(searchTermHarvestMarks)
+      .values({
+        organizationId: f.org,
+        profileId: f.profile,
+        searchTerm,
+        termKey: searchTerm.toLowerCase(),
+        adProduct: SP,
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '2001',
+        amazonTargetId: '3001',
+        periodStart: '2026-09-01',
+        periodEnd: '2026-09-30',
+        sourceRows: 1,
+        currencyCode: 'EUR',
+        impressions: 100,
+        clicks: 10,
+        cost: '7.80',
+        sales: '30.00',
+        purchases: 2,
+        units: 2,
+        createdBy: f.ada,
+      })
+      .returning({ id: searchTermHarvestMarks.id });
+    return row!.id;
+  }
+  const remaining = async () =>
+    (
+      await testDb.db
+        .select({ term: searchTermHarvestMarks.searchTerm })
+        .from(searchTermHarvestMarks)
+    )
+      .map((row) => row.term)
+      .sort();
+
+  async function harvestSubmission() {
+    const used = await harvestMark('trinkflasche');
+    const asin = await harvestMark('b0fremd001');
+    const notPlanned = await harvestMark('becher');
+    await harvestMark('nicht gewählt');
+    return submitted('bulk_file', f.profile, NAME, {
+      inputs: {
+        keywords: [],
+        brandTerms: [],
+        productTargets: [],
+        categories: [],
+        harvest: [{ markId: used }, { markId: asin }, { markId: notPlanned }],
+        unlocks: {},
+      },
+      sourceNegatives: [
+        {
+          markId: used,
+          searchTerm: 'trinkflasche',
+          amazonCampaignId: '1001',
+          amazonAdGroupId: '2001',
+          campaignName: 'Kampagne 1001',
+          adGroupName: 'AG 2001',
+          negative: { type: 'keyword', text: 'trinkflasche', matchType: 'negativeExact' },
+          selected: true,
+        },
+      ],
+    });
+  }
+
+  it('bestätigt das Negativ in der Quelle über den nächsten Import', async () => {
+    const id = await harvestSubmission();
+    const [adGroup] = await testDb.db
+      .select({ id: amazonAdsAdGroups.id, campaignId: amazonAdsAdGroups.campaignId })
+      .from(amazonAdsAdGroups)
+      .where(eq(amazonAdsAdGroups.amazonAdGroupId, '2001'));
+    await testDb.db.insert(amazonAdsNegativeTargets).values({
+      organizationId: f.org,
+      profileId: f.profile,
+      level: 'ad_group',
+      campaignId: adGroup!.campaignId,
+      adGroupId: adGroup!.id,
+      amazonTargetId: '8803',
+      adProduct: SP,
+      targetType: 'keyword',
+      keywordText: 'Trinkflasche',
+      matchType: 'EXACT',
+      state: 'ENABLED',
+    });
+    await confirmBulkFileAdChanges(testDb.db, {
+      organizationId: f.org,
+      profileId: f.profile,
+      now: new Date(),
+    });
+    const source = (await items(id)).find((row) => row.entityType === 'source_negative');
+    expect(source).toMatchObject({ status: 'applied', amazonEntityId: '8803' });
+  });
+
+  it('nimmt angelegte Begriffe nach Abschluss von der Merkliste, mit Audit', async () => {
+    const id = await harvestSubmission();
+    expect(await remaining()).toEqual(['b0fremd001', 'becher', 'nicht gewählt', 'trinkflasche']);
+    await closeBulkFileSubmission(testDb.db, { ...who(), submissionId: id, outcome: 'applied' });
+    // Angelegt: das Keyword und das Produkt-Ziel; „becher“ legt der Plan nicht an, „nicht gewählt“ gehört nicht dazu.
+    expect(await remaining()).toEqual(['becher', 'nicht gewählt']);
+    const [event] = await testDb.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'search_term_harvest.remove'));
+    expect(event!.target).toMatchObject({ removed: 2, submissionId: id });
+  });
+
+  it('lässt die Merkliste stehen, wenn die Übermittlung verworfen wird', async () => {
+    const id = await harvestSubmission();
+    await closeBulkFileSubmission(testDb.db, { ...who(), submissionId: id, outcome: 'discarded' });
+    expect(await remaining()).toHaveLength(4);
   });
 });

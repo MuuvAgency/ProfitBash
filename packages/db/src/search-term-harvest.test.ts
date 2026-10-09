@@ -4,6 +4,7 @@ import { replaceSearchTermPeriodMetrics, type SearchTermPeriodMetric } from './a
 import {
   amazonAdsAdGroups,
   amazonAdsCampaigns,
+  amazonAdsNegativeTargets,
   amazonAdsProfiles,
   amazonAdsTargets,
   auditEvents,
@@ -14,6 +15,7 @@ import {
 } from './schema';
 import {
   listHarvestMarks,
+  loadHarvestMarkSources,
   listMarkedHarvestTermKeys,
   markSearchTermsForHarvest,
   removeHarvestMarks,
@@ -296,6 +298,66 @@ describe('listHarvestMarks', () => {
     await mark(ids.ada, ids.de, ['LED  Lampe']);
 
     expect(await listMarkedHarvestTermKeys(testDb.db, ids.de)).toEqual(new Set(['led lampe']));
+  });
+});
+
+describe('loadHarvestMarkSources (4.6)', () => {
+  it('liefert je Eintrag Quelle, Kennzahlen und ob der Begriff dort schon negativ exakt ist', async () => {
+    await mark(ids.ada, ids.de, ['LED Lampe', 'lampe holz']);
+    const before = await loadHarvestMarkSources(testDb.db, { profileId: ids.de });
+    const byTerm = new Map(before.map((entry) => [entry.searchTerm, entry]));
+    expect(byTerm.get('led lampe')).toMatchObject({
+      adProduct: SP,
+      amazonCampaignId: 'C1',
+      amazonAdGroupId: 'AG1',
+      campaignName: 'SP Lampen',
+      adGroupName: 'AG Lampen',
+      sourceKeyword: { text: 'lampe', matchType: 'BROAD' },
+      clicks: 35,
+      cost: '14.75',
+      currencyCode: 'EUR',
+      alreadyNegative: false,
+    });
+    expect(byTerm.get('lampe holz')).toMatchObject({
+      campaignName: null,
+      adGroupName: null,
+      sourceKeyword: null,
+    });
+
+    const [adGroup] = await testDb.db
+      .select({ id: amazonAdsAdGroups.id, campaignId: amazonAdsAdGroups.campaignId })
+      .from(amazonAdsAdGroups)
+      .where(eq(amazonAdsAdGroups.amazonAdGroupId, 'AG1'));
+    await testDb.db.insert(amazonAdsNegativeTargets).values({
+      organizationId: ids.org,
+      profileId: ids.de,
+      level: 'ad_group',
+      campaignId: adGroup!.campaignId,
+      adGroupId: adGroup!.id,
+      amazonTargetId: 'N1',
+      adProduct: SP,
+      targetType: 'keyword',
+      keywordText: 'LED Lampe',
+      matchType: 'EXACT',
+      state: 'ENABLED',
+    });
+    const after = await loadHarvestMarkSources(testDb.db, { profileId: ids.de });
+    expect(after.find((entry) => entry.searchTerm === 'led lampe')?.alreadyNegative).toBe(true);
+    await testDb.db.delete(amazonAdsNegativeTargets);
+  });
+
+  it('liest nur die genannten Einträge des Profils', async () => {
+    const result = await mark(ids.ada, ids.de, ['LED Lampe', 'lampe holz']);
+    const first = result!.results[0]!;
+    if (first.outcome !== 'added') throw new Error('nicht vorgemerkt');
+    const loaded = await loadHarvestMarkSources(testDb.db, {
+      profileId: ids.de,
+      markIds: [first.id],
+    });
+    expect(loaded.map((entry) => entry.id)).toEqual([first.id]);
+    expect(
+      await loadHarvestMarkSources(testDb.db, { profileId: ids.hidden, markIds: [first.id] }),
+    ).toEqual([]);
   });
 });
 

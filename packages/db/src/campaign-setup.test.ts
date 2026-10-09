@@ -1,4 +1,4 @@
-import type { PlannedCampaign, SaveCampaignSetupDraft } from '@profitbash/shared';
+import type { PlannedCampaign, SaveCampaignSetupDraft, SourceNegative } from '@profitbash/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seedAdChangeFixture, type AdChangeFixture } from './ad-change-fixture';
@@ -19,6 +19,7 @@ import {
   amazonAdsTargetDailyMetrics,
   auditEvents,
   campaignSetupDrafts,
+  clients,
   campaignSetupItems,
   members,
   productGroups,
@@ -74,8 +75,16 @@ const draftInput = (overrides: Partial<SaveCampaignSetupDraft> = {}): SaveCampai
   presetKey: 'muuv-standard',
   name: 'Flaschen',
   campaignState: 'ENABLED',
-  inputs: { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} },
+  inputs: {
+    keywords: [],
+    brandTerms: [],
+    productTargets: [],
+    categories: [],
+    harvest: [],
+    unlocks: {},
+  },
   campaigns: [campaign('SP | EXACT | Flaschen')],
+  sourceNegatives: [],
   ...overrides,
 });
 
@@ -343,6 +352,101 @@ describe('loadProfileBidSuggestions (F13)', () => {
       ).toEqual({ keyword: { broad: '0.56' } });
     } finally {
       await db.delete(amazonAdsTargetDailyMetrics);
+    }
+  });
+});
+
+const sourceNegative = (overrides: Partial<SourceNegative> = {}): SourceNegative => ({
+  markId: '00000000-0000-4000-8000-000000000001',
+  searchTerm: 'trinkflasche 1l',
+  amazonCampaignId: '1001',
+  amazonAdGroupId: '2001',
+  campaignName: 'Kampagne 1001',
+  adGroupName: 'AG 2001',
+  negative: { type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' },
+  selected: true,
+  ...overrides,
+});
+
+describe('Negatives in der Quelle (4.6)', () => {
+  it('speichert die Vorschläge mit Auswahl im Entwurf', async () => {
+    const created = await save({
+      sourceNegatives: [sourceNegative(), sourceNegative({ selected: false })],
+    });
+    const draft = (await getCampaignSetupDraft(testDb.db, { ...as(f.ada), draftId: created.id }))!;
+    expect(draft.sourceNegatives.map((entry) => entry.selected)).toEqual([true, false]);
+  });
+
+  it('übermittelt gewählte Negatives als Zeilen nach den Kampagnen', async () => {
+    const created = await save({
+      sourceNegatives: [
+        sourceNegative(),
+        sourceNegative({
+          selected: false,
+          negative: { type: 'keyword', text: 'becher', matchType: 'negativeExact' },
+        }),
+      ],
+    });
+    const result = await submit(created.id, 1);
+    if (result?.status !== 'submitted') throw new Error(JSON.stringify(result));
+    const items = await testDb.db
+      .select()
+      .from(campaignSetupItems)
+      .where(eq(campaignSetupItems.submissionId, result.submission.id))
+      .orderBy(campaignSetupItems.position);
+    expect(items.at(-1)).toMatchObject({
+      entityType: 'source_negative',
+      campaignRef: 'Kampagne 1001',
+      adGroupRef: 'AG 2001',
+      status: 'submitted',
+      payload: { amazonCampaignId: '1001', amazonAdGroupId: '2001' },
+    });
+    expect(items.filter((item) => item.entityType === 'source_negative')).toHaveLength(1);
+  });
+
+  it('sperrt fehlende Quellen und geschützte Begriffe des Clients', async () => {
+    const [client] = await testDb.db
+      .insert(clients)
+      .values({
+        organizationId: f.org,
+        name: 'Flaschen GmbH',
+        slug: 'flaschen',
+        protectedTerms: ['trinkflasche'],
+      })
+      .returning({ id: clients.id });
+    await testDb.db
+      .update(amazonAdsProfiles)
+      .set({ clientId: client!.id })
+      .where(eq(amazonAdsProfiles.id, f.profile));
+    try {
+      const created = await save({
+        sourceNegatives: [
+          sourceNegative(),
+          sourceNegative({
+            amazonAdGroupId: '9002',
+            adGroupName: 'AG 9002',
+            negative: { type: 'keyword', text: 'becher', matchType: 'negativeExact' },
+          }),
+        ],
+      });
+      expect(await submit(created.id, 1)).toEqual({
+        status: 'rejected',
+        issues: [
+          { severity: 'error', code: 'sourceNegativeProtected', keyword: 'trinkflasche 1l' },
+          {
+            severity: 'error',
+            code: 'sourceNegativeMissing',
+            campaign: 'Kampagne 1001',
+            target: 'becher',
+          },
+        ],
+      });
+    } finally {
+      await testDb.db
+        .update(amazonAdsProfiles)
+        .set({ clientId: null })
+        .where(eq(amazonAdsProfiles.id, f.profile));
+      await testDb.db.delete(clients);
     }
   });
 });
