@@ -2,7 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, type Ref } from 'vue';
 import { api } from '../api';
 import { activeOrgRole } from '../navigation/navigation';
-import type { ProductGroupData, StructureCatalogData } from '../api/client';
+import type {
+  AdChangeChannelData,
+  PlanSetupInput,
+  ProductGroupData,
+  SaveSetupDraftInput,
+  StructureCatalogData,
+} from '../api/client';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
 
 /**
@@ -114,5 +120,71 @@ export function useSetClientPreset() {
     mutationFn: (input: { clientId: string; presetKey: string | null }) =>
       api.tools.catalog.setClientPreset(input.clientId, input.presetKey),
     onSettled: () => queryClient.invalidateQueries({ queryKey: [CATALOG_KEY] }),
+  });
+}
+
+// --- Kampagnen-Setup (4.5) ---------------------------------------------------------------
+
+const SETUP_KEY = 'setup-drafts';
+
+/** Offene und übermittelte Entwürfe des Teams (F13). */
+export function useSetupDrafts() {
+  const orgId = useActiveOrgId();
+  const { canView } = useToolRights();
+  return useQuery({
+    queryKey: computed(() => [SETUP_KEY, orgId.value] as const),
+    queryFn: () => api.tools.setup.list(),
+    enabled: computed(() => canView.value && orgId.value !== null),
+    staleTime: 15_000,
+  });
+}
+
+export function usePlanSetup() {
+  return useMutation({ mutationFn: (input: PlanSetupInput) => api.tools.setup.plan(input) });
+}
+
+export function useSaveSetupDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      version,
+      draft,
+    }: {
+      id: string | null;
+      version: number;
+      draft: SaveSetupDraftInput;
+    }) => (id ? api.tools.setup.update(id, version, draft) : api.tools.setup.create(draft)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: [SETUP_KEY] }),
+  });
+}
+
+export function useDiscardSetupDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: string; version: number }) =>
+      api.tools.setup.discard(id, version),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: [SETUP_KEY] }),
+  });
+}
+
+/** Übermitteln: Entwürfe und die Übermittlungen der Seite „Änderungen“ neu laden. */
+export function useSubmitSetupDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      version,
+      channel,
+    }: {
+      id: string;
+      version: number;
+      channel: AdChangeChannelData;
+    }) => api.tools.setup.submit(id, version, channel),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: [SETUP_KEY] }),
+        queryClient.invalidateQueries({ queryKey: ['ad-changes'] }),
+      ]),
   });
 }
