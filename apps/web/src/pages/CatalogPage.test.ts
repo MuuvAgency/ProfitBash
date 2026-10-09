@@ -80,7 +80,8 @@ describe('Seite „Struktur-Katalog“', () => {
 
   it('speichert Änderungen am Preset mit der gelesenen Version', async () => {
     const { requests } = await mountPage({
-      'PUT /api/ads/tools/catalog': json(catalogResponse({ version: 4 })),
+      'PUT /api/ads/tools/catalog': (request) =>
+        json(catalogResponse({ version: 4, catalog: (request.body as { catalog: unknown }).catalog })),
     });
     await type('[data-preset="launch"] [data-preset-name]', 'Neustart');
     (
@@ -100,6 +101,9 @@ describe('Seite „Struktur-Katalog“', () => {
     const launch = body!.catalog.presets.find((preset) => preset.key === 'launch')!;
     expect(launch.name).toBe('Neustart');
     expect(launch.blocks.map((entry) => entry.block)).toContain('SP-KW-PHRASE');
+    // Danach ist der Entwurf der gespeicherte Stand.
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Gespeichert.'));
+    expect(document.body.textContent).not.toContain('Ungespeicherte Änderungen');
   });
 
   it('ändert Werte eines Bausteins (Komma als Dezimaltrenner)', async () => {

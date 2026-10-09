@@ -38,7 +38,16 @@ const clone = (catalog: StructureCatalog): StructureCatalog =>
   JSON.parse(JSON.stringify(catalog)) as StructureCatalog;
 const draft = ref<StructureCatalog>(clone(DEFAULT_STRUCTURE_CATALOG));
 const loaded = ref(false);
-const serialize = (catalog: StructureCatalog) => JSON.stringify(catalog);
+/**
+ * Vergleich unabhängig von der Reihenfolge der Schlüssel: Vue Query übernimmt beim Aktualisieren unveränderte
+ * Teilobjekte aus den alten Daten (samt deren Reihenfolge), der Entwurf hat die des Servers.
+ */
+const serialize = (catalog: StructureCatalog) =>
+  JSON.stringify(catalog, (_key, value: unknown) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+      : value,
+  );
 const dirty = computed(
   () => data.value !== undefined && serialize(draft.value) !== serialize(data.value.catalog),
 );
@@ -128,6 +137,18 @@ function loadDefaults() {
         <span v-else-if="savedNotice" role="status" class="text-body-sm text-lime-deep">
           {{ t('catalog.saved') }}
         </span>
+        <Button
+          v-if="canEditCatalog"
+          data-catalog-defaults
+          class="ml-auto"
+          severity="secondary"
+          variant="text"
+          size="small"
+          :label="t('catalog.defaults')"
+          :title="t('catalog.defaultsHint')"
+          :disabled="save.isPending.value"
+          @click="loadDefaults"
+        />
       </div>
       <p v-if="!canEditCatalog" class="text-body-md text-ink-secondary">
         {{ t('catalog.readOnly') }}
@@ -178,7 +199,10 @@ function loadDefaults() {
         <CatalogAssignments v-else :data="data" />
       </div>
 
-      <div v-if="canEditCatalog" class="flex flex-wrap items-center gap-space-sm">
+      <div
+        v-if="canEditCatalog"
+        class="sticky bottom-0 z-10 flex flex-nowrap items-center gap-space-sm bg-canvas/85 py-space-sm backdrop-blur-xl"
+      >
         <Button
           data-catalog-save
           icon="pi pi-check"
@@ -194,15 +218,6 @@ function loadDefaults() {
           :label="t('catalog.discard')"
           :disabled="!dirty || save.isPending.value"
           @click="discard"
-        />
-        <Button
-          data-catalog-defaults
-          severity="secondary"
-          variant="text"
-          :label="t('catalog.defaults')"
-          :title="t('catalog.defaultsHint')"
-          :disabled="save.isPending.value"
-          @click="loadDefaults"
         />
       </div>
     </template>
