@@ -1865,6 +1865,342 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/ads/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tags der Organisation nach Name, mit den Zuweisungen in sichtbaren Profilen */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tags. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["TagListResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Tag anlegen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateTagRequest"];
+                };
+            };
+            responses: {
+                /** @description Angelegt. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Tag"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Name vergeben oder Höchstzahl erreicht. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/tags/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Tag samt allen Zuweisungen löschen (Recht „write“) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gelöscht. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Tag nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Name und/oder Farbe eines Tags ändern (Recht „write“) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["UpdateTagRequest"];
+                };
+            };
+            responses: {
+                /** @description Geändert. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Tag"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Tag nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Name vergeben oder Höchstzahl erreicht. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/ads/tags/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tags an Entities einer Art hängen und von ihnen lösen (Recht „write“)
+         * @description Nur Entities sichtbarer Profile; unbekannte und unsichtbare zählt `skippedEntities`. Nennt die Anfrage ein Tag, das nicht der Organisation gehört, wird nichts geändert (`404 TAG_NOT_FOUND`).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AssignTagsRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AssignTagsResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Tag nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/search-terms/periods": {
         parameters: {
             query?: never;
@@ -4285,6 +4621,7 @@ export interface components {
             withoutClient?: boolean;
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            tagIds?: string[];
             period: components["schemas"]["DateRange"];
             comparison?: components["schemas"]["DateRange"] | null;
             currency?: "auto" | string;
@@ -4311,6 +4648,7 @@ export interface components {
             withoutClient?: boolean;
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            tagIds?: string[];
             period: components["schemas"]["DateRange"];
             comparison?: components["schemas"]["DateRange"] | null;
             currency?: "auto" | string;
@@ -4340,6 +4678,7 @@ export interface components {
             withoutClient?: boolean;
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            tagIds?: string[];
             period: components["schemas"]["DateRange"];
             comparison?: components["schemas"]["DateRange"] | null;
             currency?: "auto" | string;
@@ -4400,6 +4739,7 @@ export interface components {
             withoutClient?: boolean;
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
+            tagIds?: string[];
             period: components["schemas"]["DateRange"];
             comparison?: components["schemas"]["DateRange"] | null;
             currency?: "auto" | string;
@@ -4482,6 +4822,47 @@ export interface components {
             name?: string;
             shared?: boolean;
             state?: components["schemas"]["SavedViewState"];
+        };
+        TagListResponse: {
+            tags: components["schemas"]["Tag"][];
+            maxTags: number;
+        };
+        Tag: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            color: "violet" | "lime" | "amber" | "red" | "ink" | "grey";
+            counts: {
+                campaign: number;
+                ad_group: number;
+                target: number;
+                product_ad: number;
+            };
+            createdAt: string;
+            updatedAt: string;
+        };
+        CreateTagRequest: {
+            name: string;
+            /** @enum {string} */
+            color: "violet" | "lime" | "amber" | "red" | "ink" | "grey";
+        };
+        UpdateTagRequest: {
+            name?: string;
+            /** @enum {string} */
+            color?: "violet" | "lime" | "amber" | "red" | "ink" | "grey";
+        };
+        AssignTagsResponse: {
+            added: number;
+            removed: number;
+            skippedEntities: number;
+        };
+        AssignTagsRequest: {
+            /** @enum {string} */
+            entityType: "campaign" | "ad_group" | "target" | "product_ad";
+            entityIds: string[];
+            addTagIds?: string[];
+            removeTagIds?: string[];
         };
         SearchTermPeriodsResponse: {
             periods: components["schemas"]["SearchTermPeriod"][];

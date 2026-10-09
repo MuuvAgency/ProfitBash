@@ -14,8 +14,8 @@ export type TagEntityType = (typeof TAG_ENTITY_TYPES)[number];
 
 export const MAX_TAG_NAME_LENGTH = 40;
 export const MAX_TAGS_PER_ORGANIZATION = 200;
-/** Markierte Zeilen eines Bulk-Dialogs (der Explorer lädt bis 10 000; die Oberfläche schickt Stücke). */
-export const MAX_TAG_ASSIGN_ENTITIES = 5000;
+/** Entities je Anfrage (Body-Limit 64 KB); die Oberfläche schickt eine größere Markierung in Stücken. */
+export const MAX_TAG_ASSIGN_ENTITIES = 1000;
 export const MAX_TAG_ASSIGN_TAGS = 50;
 /** Tags in der Filterleiste (`analyticsSelectionSchema.tagIds`). */
 export const MAX_TAG_FILTER_IDS = 50;
