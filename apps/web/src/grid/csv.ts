@@ -7,6 +7,9 @@ import type { GridApi, ProcessCellForExportParams } from 'ag-grid-community';
  * Spalte `currency` (auch ausgeblendet).
  */
 
+/** Spalte mit Knöpfen je Zeile: nie im CSV. */
+export const ACTIONS_COLUMN_ID = 'actions';
+
 const DECIMAL_STRING = /^-?\d+(\.\d+)?$/;
 /**
  * Text für den CSV-Export ohne Formel-Wirkung in Tabellenkalkulationen: Werte, die mit `=`, `+`, `-`, `@`, Tab oder
@@ -41,7 +44,7 @@ export function gridCsv<Row>(gridApi: GridApi<Row>, note?: string): string {
     .getAllGridColumns()
     .filter((column) => column.isVisible() || column.getColId() === 'currency')
     .map((column) => column.getColId())
-    .filter((id) => !id.startsWith('ag-Grid-'));
+    .filter((id) => !id.startsWith('ag-Grid-') && id !== ACTIONS_COLUMN_ID);
   return (
     gridApi.getDataAsCsv({
       columnKeys,

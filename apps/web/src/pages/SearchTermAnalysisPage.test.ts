@@ -71,6 +71,7 @@ const row = (searchTerm: string, patch: Partial<SearchTermRow> = {}): SearchTerm
   classification: 'watch',
   reason: 'tooFewData',
   protected: false,
+  harvestMarked: false,
   alreadyTargeted: false,
   // Ohne eigene Angabe: ein Target, über alle Targets wie die Zeile.
   termClassification: patch.classification ?? 'watch',
@@ -1116,10 +1117,10 @@ describe('CSV-Export', () => {
     button(EXPORT)!.click();
     const csv = await download.text();
     // BOM, damit Excel UTF-8 erkennt.
-    expect(csv.startsWith('\uFEFF"Suchbegriff","Einstufung","Kampagne","Ad Group","Target"')).toBe(
-      true,
-    );
-    expect(csv).toContain('"led lampe warmweiß","Ernten","SP Lampen","AG Lampen"');
+    expect(
+      csv.startsWith('\uFEFF"Suchbegriff","Einstufung","Merkliste","Kampagne","Ad Group","Target"'),
+    ).toBe(true);
+    expect(csv).toContain('"led lampe warmweiß","Ernten","","SP Lampen","AG Lampen"');
     expect(csv).toContain('"nordwind lampe","Beobachten · Geschützter Begriff"');
     expect(csv).not.toMatch(/harvest|negate|watch|protected/);
     // Formeln in Suchbegriffen entschärft, Betrag roh (nicht „25,50 €“), fehlender Wert leer (nicht „–“).
@@ -1154,9 +1155,9 @@ describe('CSV-Export', () => {
     button(EXPORT)!.click();
     const csv = await download.text();
     expect(csv).toContain(
-      `"lampe ""groß"", 2er\nset","Beobachten · Zu wenig Daten","'=Kampagne","'+AG"`,
+      `"lampe ""groß"", 2er\nset","Beobachten · Zu wenig Daten","","'=Kampagne","'+AG"`,
     );
-    expect(csv).toContain(`"leuchte","Beobachten · Zu wenig Daten","'-Kampagne","'@AG"`);
+    expect(csv).toContain(`"leuchte","Beobachten · Zu wenig Daten","","'-Kampagne","'@AG"`);
     // Kopfzeile und zwei Zeilen: Der Zeilenumbruch im Suchbegriff beginnt keine neue.
     expect(csv.split('\r\n')).toHaveLength(3);
   });
@@ -1443,5 +1444,298 @@ describe('Sprung in den Explorer', () => {
     await waitForRow('SP Lampen');
     await waitForRow('AG Lampen');
     expect(document.querySelectorAll('.ag-root a')).toHaveLength(0);
+  });
+});
+
+describe('Suchbegriff-Aktionen (phase-3.md 3.8)', () => {
+  const C1 = '00000000-0000-4000-8000-0000000000c1';
+  const G1 = '00000000-0000-4000-8000-0000000000b1';
+  const withEntities = () => {
+    const base = analysisResponse();
+    return { ...base, rows: base.rows.map((r) => ({ ...r, campaignId: C1, adGroupId: G1 })) };
+  };
+  const stageAnswer = (created: number) => ({
+    results: Array.from({ length: created }, (_, i) => ({
+      outcome: 'created',
+      changeId: `00000000-0000-4000-8000-00000000d${String(i).padStart(3, '0')}`,
+      otherUsers: 0,
+    })),
+    counts: { created, updated: 0, removed: 0, unchanged: 0, rejected: 0 },
+  });
+  const mark = (searchTerm: string, id: string) => ({
+    id,
+    profileId: P1,
+    accountName: 'Demo DE',
+    countryCode: 'DE',
+    searchTerm,
+    adProduct: 'SPONSORED_PRODUCTS',
+    amazonCampaignId: 'C1',
+    amazonAdGroupId: 'AG1',
+    amazonTargetId: 'T1',
+    campaignId: null,
+    campaignName: 'SP Lampen',
+    adGroupId: null,
+    adGroupName: 'AG Lampen',
+    targetId: null,
+    keywordText: 'lampe',
+    matchType: 'BROAD',
+    expression: null,
+    periodStart: '2026-09-01',
+    periodEnd: '2026-09-30',
+    sourceRows: 2,
+    currencyCode: 'EUR',
+    ...sums,
+    createdByName: 'Dominik',
+    createdAt: '2026-10-09T08:00:00.000Z',
+  });
+  const M1 = '00000000-0000-4000-8000-0000000000e1';
+  const M2 = '00000000-0000-4000-8000-0000000000e2';
+  const actionRoutes = (overrides: Record<string, Responder | Response> = {}) => ({
+    'POST /api/ads/search-terms/analysis': json(withEntities()),
+    'GET /api/ads/changes/pending': json({ changes: [], check: null }),
+    'POST /api/ads/changes/pending': json(stageAnswer(2)),
+    'POST /api/ads/search-terms/harvest/list': json({
+      marks: [mark('led lampe warmweiß', M1), mark('lampe holz', M2)],
+      truncated: false,
+      maxMarks: 5000,
+    }),
+    ...overrides,
+  });
+  const posts = (requests: RecordedRequest[], path: string) =>
+    requests.filter((r) => r.method === 'POST' && r.path === path).map((r) => r.body);
+  async function selectAllRows() {
+    const box = await vi.waitFor(() => {
+      const input = document.querySelector<HTMLInputElement>('.ag-header-select-all input');
+      if (!input) throw new Error('keine Auswahl-Checkbox');
+      return input;
+    });
+    box.click();
+    await flushPromises();
+  }
+  const radio = (value: string) =>
+    document.querySelector<HTMLInputElement>(`input[type="radio"][value="${value}"]`)!;
+
+  it('legt markierte Suchbegriffe als „negativ exakt“ in der Ad Group der Zeile in den Warenkorb; geschützte bleiben ohne Bestätigung weg', async () => {
+    const { requests } = await mountPage(PATH, actionRoutes());
+    await waitForRow('led lampe warmweiß');
+    await selectAllRows();
+    await vi.waitFor(() => expect(document.body.textContent).toContain('3 markiert'));
+
+    button('Negativ anlegen')!.click();
+    await flushPromises();
+    expect(radio('adGroup').checked).toBe(true);
+    expect(radio('EXACT').checked).toBe(true);
+    expect(document.body.textContent).toContain('1 geschützter Begriff');
+    document.querySelector<HTMLButtonElement>('[data-negative-submit]')!.click();
+    await flushPromises();
+
+    expect(posts(requests, '/api/ads/changes/pending')).toEqual([
+      {
+        origin: 'search_terms',
+        changes: ['led lampe warmweiß', 'lampe billig'].map((keywordText) => ({
+          operation: 'create_negative',
+          campaignId: C1,
+          adGroupId: G1,
+          negative: { type: 'keyword', keywordText, matchType: 'EXACT' },
+        })),
+      },
+    ]);
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-stage-result]')?.textContent).toContain(
+        '2 Änderungen vorgemerkt',
+      ),
+    );
+  });
+
+  it('stellt auf Kampagnenebene und Wortgruppe um und sendet geschützte Begriffe nur bestätigt', async () => {
+    const { requests } = await mountPage(PATH, actionRoutes());
+    await waitForRow('led lampe warmweiß');
+    await selectAllRows();
+    button('Negativ anlegen')!.click();
+    await flushPromises();
+
+    radio('campaign').click();
+    radio('PHRASE').click();
+    document.querySelector<HTMLInputElement>('[data-confirm-protected]')!.click();
+    await flushPromises();
+    document.querySelector<HTMLButtonElement>('[data-negative-submit]')!.click();
+    await flushPromises();
+
+    const [body] = posts(requests, '/api/ads/changes/pending') as [
+      { changes: Record<string, unknown>[] },
+    ];
+    expect(body.changes).toHaveLength(3);
+    expect(body.changes.every((change) => change.adGroupId === null)).toBe(true);
+    expect(body.changes[2]).toEqual({
+      operation: 'create_negative',
+      campaignId: C1,
+      adGroupId: null,
+      negative: { type: 'keyword', keywordText: 'nordwind lampe', matchType: 'PHRASE' },
+      confirmProtected: true,
+    });
+  });
+
+  it('nennt im Ergebnis, was es dort schon gibt', async () => {
+    await mountPage(
+      PATH,
+      actionRoutes({
+        'POST /api/ads/changes/pending': json({
+          results: [
+            { outcome: 'created', changeId: M1, otherUsers: 0 },
+            { outcome: 'rejected', reason: 'alreadyExists' },
+          ],
+          counts: { created: 1, updated: 0, removed: 0, unchanged: 0, rejected: 1 },
+        }),
+      }),
+    );
+    await waitForRow('led lampe warmweiß');
+    await selectAllRows();
+    button('Negativ anlegen')!.click();
+    await flushPromises();
+    document.querySelector<HTMLButtonElement>('[data-negative-submit]')!.click();
+
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-stage-result]')?.textContent).toContain(
+        '1 abgelehnt: Das Negative gibt es dort schon.',
+      ),
+    );
+  });
+
+  it('öffnet den Dialog auch für eine einzelne Zeile', async () => {
+    const { requests } = await mountPage(PATH, actionRoutes());
+    await waitForRow('lampe billig');
+    const rowButton = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLButtonElement>(
+        'button[aria-label="„lampe billig“ negativ anlegen"]',
+      );
+      if (!found) throw new Error('kein Knopf');
+      return found;
+    });
+    rowButton.click();
+    await flushPromises();
+    document.querySelector<HTMLButtonElement>('[data-negative-submit]')!.click();
+    await flushPromises();
+
+    const [body] = posts(requests, '/api/ads/changes/pending') as [{ changes: unknown[] }];
+    expect(body.changes).toHaveLength(1);
+  });
+
+  it('merkt markierte Suchbegriffe für den Harvest vor und nennt das Ergebnis', async () => {
+    const { requests } = await mountPage(
+      PATH,
+      actionRoutes({
+        'POST /api/ads/search-terms/harvest': json({
+          results: [
+            { outcome: 'added', id: M1 },
+            { outcome: 'added', id: M2 },
+            { outcome: 'alreadyMarked' },
+          ],
+          counts: { added: 2, alreadyMarked: 1, notFound: 0 },
+        }),
+      }),
+    );
+    await waitForRow('led lampe warmweiß');
+    await selectAllRows();
+    const before = analysisRequests(requests).length;
+
+    button('Harvest vormerken')!.click();
+    await flushPromises();
+
+    expect(posts(requests, '/api/ads/search-terms/harvest')).toEqual([
+      {
+        profileId: P1,
+        periodStart: '2026-09-01',
+        periodEnd: '2026-09-30',
+        searchTerms: ['led lampe warmweiß', 'lampe billig', 'nordwind lampe'],
+      },
+    ]);
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-harvest-result]')?.textContent).toContain(
+        '2 Suchbegriffe vorgemerkt',
+      ),
+    );
+    expect(document.querySelector('[data-harvest-result]')?.textContent).toContain(
+      '1 stand schon auf der Merkliste',
+    );
+    // Die Kennzeichnung in den Zeilen kommt vom Server: Analyse neu laden.
+    expect(analysisRequests(requests).length).toBeGreaterThan(before);
+  });
+
+  it('kennzeichnet vorgemerkte Suchbegriffe in der Spalte „Merkliste“', async () => {
+    const base = withEntities();
+    await mountPage(
+      PATH,
+      actionRoutes({
+        'POST /api/ads/search-terms/analysis': json({
+          ...base,
+          rows: base.rows.map((r, i) => ({ ...r, harvestMarked: i === 0 })),
+        }),
+      }),
+    );
+    await waitForRow('led lampe warmweiß');
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('.ag-cell[col-id="harvest"]').length).toBeGreaterThan(0),
+    );
+    const cells = [...document.querySelectorAll('.ag-cell[col-id="harvest"]')].map((cell) =>
+      cell.textContent?.trim(),
+    );
+    expect(cells.filter((text) => text === 'Vorgemerkt')).toHaveLength(1);
+  });
+
+  it('Merkliste: zeigt die vorgemerkten Suchbegriffe des Profils und entfernt markierte', async () => {
+    const { requests } = await mountPage(
+      `${PATH}?view=harvest`,
+      actionRoutes({ 'POST /api/ads/search-terms/harvest/remove': json({ removed: 2 }) }),
+    );
+    await waitForRow('lampe holz');
+    expect(posts(requests, '/api/ads/search-terms/harvest/list')[0]).toEqual({ profileId: P1 });
+    expect(document.body.textContent).toContain('01.09.2026 – 30.09.2026');
+
+    await selectAllRows();
+    button('Von der Merkliste entfernen')!.click();
+    await flushPromises();
+
+    expect(posts(requests, '/api/ads/search-terms/harvest/remove')).toEqual([{ ids: [M1, M2] }]);
+    expect(posts(requests, '/api/ads/search-terms/harvest/list').length).toBeGreaterThan(1);
+  });
+
+  it('Merkliste: Leerzustand', async () => {
+    await mountPage(
+      `${PATH}?view=harvest`,
+      actionRoutes({
+        'POST /api/ads/search-terms/harvest/list': json({
+          marks: [],
+          truncated: false,
+          maxMarks: 5000,
+        }),
+      }),
+    );
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Noch nichts vorgemerkt'));
+  });
+
+  it('Merkliste: Fehler mit „Erneut versuchen“', async () => {
+    await mountPage(
+      `${PATH}?view=harvest`,
+      actionRoutes({
+        'POST /api/ads/search-terms/harvest/list': json(
+          { error: { code: 'INTERNAL', message: 'kaputt' } },
+          500,
+        ),
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Die Merkliste konnte nicht geladen werden.'),
+    );
+    expect(button('Erneut versuchen')).toBeDefined();
+  });
+
+  it('Viewer sehen weder Auswahl noch Aktionen', async () => {
+    await mountPage(PATH, actionRoutes({ 'GET /api/me': json(meFixture({ orgRole: 'viewer' })) }));
+    await waitForRow('led lampe warmweiß');
+    await flushPromises();
+
+    expect(document.querySelector('.ag-header-select-all')).toBeNull();
+    expect(document.querySelector('button[aria-label*="negativ anlegen"]')).toBeNull();
+    expect(button('Harvest vormerken')).toBeUndefined();
   });
 });

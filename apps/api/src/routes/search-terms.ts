@@ -2,8 +2,13 @@ import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 import {
   deleteSearchTermPeriod,
   getSearchTermRules,
+  HARVEST_MARK_LIST_LIMIT,
+  listHarvestMarks,
+  listMarkedHarvestTermKeys,
   listSearchTermPeriods,
+  markSearchTermsForHarvest,
   querySearchTermPeriod,
+  removeHarvestMarks,
   saveSearchTermRuleOverrides,
   saveSearchTermRules,
   type SearchTermRulesRecord,
@@ -20,6 +25,12 @@ import {
 } from '@profitbash/engine';
 import {
   errorResponseSchema,
+  harvestListRequestSchema,
+  harvestListResponseSchema,
+  harvestMarkRequestSchema,
+  harvestMarkResponseSchema,
+  harvestRemoveRequestSchema,
+  harvestRemoveResponseSchema,
   MAX_SEARCH_TERM_NGRAMS,
   MAX_SEARCH_TERM_ROWS,
   resolveSearchTermRules,
@@ -43,8 +54,8 @@ import { orgAdminOnly, requireFeature, requireSession } from '../middleware';
  * Suchbegriff-Analyse (`docs/tasks/phase-2b.md` 2b.2), Feature `sp-explorer`: Datei-Zeiträume je Profil, Analyse
  * **eines** Zeitraums (Zeilen mit Einstufung, N-Gramme, Summen) und die Regeln der Einstufung je Organisation,
  * je Profil überschreibbar (2b.2g).
- * Nur lesend bis auf die Regeln und das Löschen eines Datei-Zeitraums (2b.2d, nur Org-Admins); Aktionen auf Suchbegriffe kommen mit
- * dem Warenkorb (Phase 3). Gelesen wird über `@profitbash/db` (Access-Layer), gerechnet in `@profitbash/engine`.
+ * Dazu die Harvest-Merkliste je Profil (`phase-3.md` 3.8): vormerken, ansehen, entfernen, ohne Änderung bei Amazon.
+ * Negatives aus der Analyse gehen über den Warenkorb (`routes/ad-changes.ts`). Gelesen wird über `@profitbash/db` (Access-Layer), gerechnet in `@profitbash/engine`.
  */
 
 const json = <T>(schema: T) => ({ 'application/json': { schema } });
@@ -145,6 +156,50 @@ const putProfileRulesRoute = createRoute({
   },
 });
 
+const harvestMarkRoute = createRoute({
+  method: 'post',
+  path: '/ads/search-terms/harvest',
+  tags: ['Suchbegriffe'],
+  summary:
+    'Suchbegriffe eines Datei-Zeitraums auf die Harvest-Merkliste des Profils setzen (Recht „write“)',
+  description:
+    'Keine Änderung bei Amazon. Quelle (Zeile mit dem höchsten Spend) und Kennzahlen (Summe über alle Zeilen des ' +
+    'Begriffs im Zeitraum) liest der Server; je Profil und Begriff gibt es einen Eintrag.',
+  request: { body: { content: json(harvestMarkRequestSchema), required: true } },
+  responses: {
+    200: { description: 'Ergebnis je Begriff.', content: json(harvestMarkResponseSchema) },
+    ...errors,
+    404: { description: 'Profil nicht gefunden.', content: json(errorResponseSchema) },
+  },
+});
+
+const harvestListRoute = createRoute({
+  method: 'post',
+  path: '/ads/search-terms/harvest/list',
+  tags: ['Suchbegriffe'],
+  summary: 'Harvest-Merkliste der sichtbaren Profile oder eines Profils, neueste zuerst',
+  request: { body: { content: json(harvestListRequestSchema), required: true } },
+  responses: {
+    200: { description: 'Merkliste.', content: json(harvestListResponseSchema) },
+    ...errors,
+  },
+});
+
+const harvestRemoveRoute = createRoute({
+  method: 'post',
+  path: '/ads/search-terms/harvest/remove',
+  tags: ['Suchbegriffe'],
+  summary: 'Einträge von der Harvest-Merkliste entfernen (Recht „write“)',
+  request: { body: { content: json(harvestRemoveRequestSchema), required: true } },
+  responses: {
+    200: {
+      description: 'Zahl der entfernten Einträge.',
+      content: json(harvestRemoveResponseSchema),
+    },
+    ...errors,
+  },
+});
+
 const SUM_KEYS = ['impressions', 'clicks', 'cost', 'sales', 'purchases', 'units'] as const;
 
 function derived(sums: SearchTermSums) {
@@ -233,6 +288,7 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     if (!result) throw new ApiError(404, 'PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
     if (!rulesRecord) throw noMember();
     const { profile, protectedTerms, ruleOverrides } = result;
+    const harvestMarked = await listMarkedHarvestTermKeys(db, profile.id);
     // Geltende Regeln des Profils: Organisation, je Feld vom Profil überschrieben (2b.2g).
     const rules = resolveSearchTermRules(rulesRecord.rules, ruleOverrides);
 
@@ -266,6 +322,7 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
         termReason: term.reason,
         termTargets: term.targets,
         termOnlyAcrossTargets: term.onlyAcrossTargets,
+        harvestMarked: harvestMarked.has(comparableSearchTerm(flagged.searchTerm)),
       };
     });
     const totalSums = Object.fromEntries(
@@ -340,5 +397,39 @@ export function registerSearchTermRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
       },
       200,
     );
+  });
+
+  app.openapi({ ...harvestMarkRoute, middleware: guard('write') }, async (c) => {
+    const body = c.req.valid('json');
+    const result = await markSearchTermsForHarvest(db, { ...visibility(c), ...body });
+    if (!result) throw new ApiError(404, 'PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
+    return c.json(result, 200);
+  });
+
+  app.openapi({ ...harvestListRoute, middleware: guard('view') }, async (c) => {
+    const { profileId } = c.req.valid('json');
+    const marks = await listHarvestMarks(db, { ...visibility(c), ...(profileId && { profileId }) });
+    if (!marks) throw noMember();
+    return c.json(
+      {
+        marks: marks.map((mark) => ({
+          ...mark,
+          ...derived(mark),
+          createdAt: mark.createdAt.toISOString(),
+        })),
+        truncated: marks.length >= HARVEST_MARK_LIST_LIMIT,
+        maxMarks: HARVEST_MARK_LIST_LIMIT,
+      },
+      200,
+    );
+  });
+
+  app.openapi({ ...harvestRemoveRoute, middleware: guard('write') }, async (c) => {
+    const removed = await removeHarvestMarks(db, {
+      ...visibility(c),
+      ids: c.req.valid('json').ids,
+    });
+    if (removed === null) throw noMember();
+    return c.json({ removed }, 200);
   });
 }

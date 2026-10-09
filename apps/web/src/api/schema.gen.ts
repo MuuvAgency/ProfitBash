@@ -2271,6 +2271,219 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/search-terms/harvest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suchbegriffe eines Datei-Zeitraums auf die Harvest-Merkliste des Profils setzen (Recht „write“)
+         * @description Keine Änderung bei Amazon. Quelle (Zeile mit dem höchsten Spend) und Kennzahlen (Summe über alle Zeilen des Begriffs im Zeitraum) liest der Server; je Profil und Begriff gibt es einen Eintrag.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["HarvestMarkRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis je Begriff. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HarvestMarkResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/search-terms/harvest/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Harvest-Merkliste der sichtbaren Profile oder eines Profils, neueste zuerst */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["HarvestListRequest"];
+                };
+            };
+            responses: {
+                /** @description Merkliste. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HarvestListResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/search-terms/harvest/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Einträge von der Harvest-Merkliste entfernen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["HarvestRemoveRequest"];
+                };
+            };
+            responses: {
+                /** @description Zahl der entfernten Einträge. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HarvestRemoveResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/changes/pending": {
         parameters: {
             query?: never;
@@ -4406,6 +4619,7 @@ export interface components {
             reason: "protected" | "alreadyTargeted" | "acosAboveTarget" | "noSales" | "tooFewData" | null;
             protected: boolean;
             alreadyTargeted: boolean;
+            harvestMarked: boolean;
             /** @enum {string} */
             termClassification: "harvest" | "negate" | "watch";
             /** @enum {string|null} */
@@ -4453,6 +4667,86 @@ export interface components {
             /** Format: uuid */
             profileId: string;
             overrides: components["schemas"]["SearchTermRuleOverrides"];
+        };
+        HarvestMarkResponse: {
+            results: {
+                /** @enum {string} */
+                outcome: "added" | "alreadyMarked" | "notFound";
+                /** Format: uuid */
+                id?: string;
+            }[];
+            counts: {
+                added: number;
+                alreadyMarked: number;
+                notFound: number;
+            };
+        };
+        HarvestMarkRequest: {
+            /** Format: uuid */
+            profileId: string;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            searchTerms: string[];
+        };
+        HarvestListResponse: {
+            marks: components["schemas"]["HarvestMark"][];
+            truncated: boolean;
+            maxMarks: number;
+        };
+        HarvestMark: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            profileId: string;
+            accountName: string;
+            countryCode: string;
+            searchTerm: string;
+            adProduct: string;
+            amazonCampaignId: string;
+            amazonAdGroupId: string;
+            amazonTargetId: string;
+            /** Format: uuid */
+            campaignId: string | null;
+            campaignName: string | null;
+            /** Format: uuid */
+            adGroupId: string | null;
+            adGroupName: string | null;
+            /** Format: uuid */
+            targetId: string | null;
+            keywordText: string | null;
+            matchType: string | null;
+            expression?: unknown;
+            /** Format: date */
+            periodStart: string;
+            /** Format: date */
+            periodEnd: string;
+            sourceRows: number;
+            currencyCode: string;
+            impressions: string;
+            clicks: string;
+            cost: string;
+            sales: string;
+            purchases: string;
+            units: string;
+            ctr: string | null;
+            cpc: string | null;
+            cvr: string | null;
+            acos: string | null;
+            roas: string | null;
+            createdByName: string | null;
+            createdAt: string;
+        };
+        HarvestListRequest: {
+            /** Format: uuid */
+            profileId?: string;
+        };
+        HarvestRemoveResponse: {
+            removed: number;
+        };
+        HarvestRemoveRequest: {
+            ids: string[];
         };
         PendingAdChangesResponse: {
             changes: {
@@ -4566,7 +4860,7 @@ export interface components {
                 /** @enum {string} */
                 outcome: "rejected";
                 /** @enum {string} */
-                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
+                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "protectedTerm" | "noCurrentValue" | "resultOutOfRange";
             })[];
             counts: {
                 created: number;
@@ -4621,6 +4915,7 @@ export interface components {
                 type: "product";
                 asin: string;
             };
+            confirmProtected?: boolean;
         };
         DiscardAdChangesResponse: {
             discarded: number;
@@ -4637,7 +4932,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
+                reason: "notFound" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "protectedTerm" | "noCurrentValue" | "resultOutOfRange";
             }[];
             bulkFileSkipped: {
                 /** Format: uuid */
@@ -4905,7 +5200,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "protectedTerm" | "noCurrentValue" | "resultOutOfRange";
             }[];
             bulkFileSkipped: {
                 /** Format: uuid */
@@ -4938,7 +5233,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "protectedTerm" | "noCurrentValue" | "resultOutOfRange";
             }[];
         } | {
             /** @enum {string} */
@@ -4948,7 +5243,7 @@ export interface components {
                 /** Format: uuid */
                 changeId: string;
                 /** @enum {string} */
-                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "noCurrentValue" | "resultOutOfRange";
+                reason: "notFound" | "notFailed" | "notApplied" | "alreadyRetried" | "alreadyReverted" | "archiveNotRevertible" | "noPreviousValue" | "nothingToChange" | "superseded" | "outcomeUnknown" | "alreadySubmitted" | "entityRemoved" | "entityArchived" | "budgetNotDaily" | "adProductNotSupported" | "alreadyExists" | "protectedTerm" | "noCurrentValue" | "resultOutOfRange";
             }[];
             bulkFileSkipped: {
                 /** Format: uuid */

@@ -5,15 +5,17 @@ import {
   formatDay,
   formatNumber,
   formatPercent,
+  MAX_HARVEST_TERMS_PER_REQUEST,
 } from '@profitbash/shared';
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import { computed, ref, shallowRef, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
-import { api } from '../api';
-import type { SearchTermPeriodData, SearchTermRowData } from '../api/client';
+import { api, ApiError } from '../api';
+import type { HarvestMarkResultData, SearchTermPeriodData, SearchTermRowData } from '../api/client';
+import { useChangeRights } from '../changes/queries';
 import EmptyState from '../components/common/EmptyState.vue';
 import InlineError from '../components/common/InlineError.vue';
 import PageHeader from '../components/common/PageHeader.vue';
@@ -26,9 +28,12 @@ import {
   SEARCH_TERM_ANALYSIS_TAB,
 } from '../explorer/state';
 import { downloadCsv, fileNamePart } from '../grid/csv';
+import { errorMessageKey } from '../i18n';
 import { canAccess } from '../navigation/navigation';
+import { harvestTerms } from '../search-terms/actions';
 import {
   formatSearchTermMetric,
+  harvestColumns,
   ngramColumns,
   termColumns,
   totalRow,
@@ -39,6 +44,7 @@ import {
 import { fractionToPercent } from '../search-terms/decimal-input';
 import DeletePeriodDialog from '../search-terms/DeletePeriodDialog.vue';
 import { explorerEntityLink } from '../search-terms/explorer-link';
+import NegativeDialog from '../search-terms/NegativeDialog.vue';
 import RulesDialog from '../search-terms/RulesDialog.vue';
 import SearchTermGrid from '../search-terms/SearchTermGrid.vue';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
@@ -46,8 +52,10 @@ import { useActiveOrgId, useSessionStore } from '../stores/session';
 /**
  * Suchbegriff-Analyse (`phase-2b.md` 2b.2b): Suchbegriffe eines Profils für **einen** Datei-Zeitraum (aus den
  * Suchbegriff-Blättern der Bulk-Datei) mit Einstufung Ernten / Negieren / Beobachten und den Wortbausteinen
- * (N-Gramme). Kein freier Zeitraum: Zeiträume verschiedener Dateien überlappen sich und werden nie addiert. Nur
- * lesend; Aktionen kommen mit dem Warenkorb (Phase 3). Zustand in der URL (`profile`, `from`, `to`, `view`, `class`).
+ * (N-Gramme). Kein freier Zeitraum: Zeiträume verschiedener Dateien überlappen sich und werden nie addiert.
+ * Aktionen (`phase-3.md` 3.8, F9): markierte Suchbegriffe als Negativ in den Warenkorb legen oder für den Harvest
+ * vormerken; die Merkliste des Profils ist die dritte Ansicht. Zustand in der URL (`profile`, `from`, `to`, `view`,
+ * `class`).
  */
 const { t, te } = useI18n();
 const route = useRoute();
@@ -58,6 +66,9 @@ const queryClient = useQueryClient();
 const id = useId();
 const locale = computed(() => session.preferences.locale);
 const canWrite = computed(() => session.me?.features['sp-explorer']?.write ?? false);
+// Negatives sind Änderungen bei Amazon: Recht `write` im Feature `changes` (wie das Bearbeiten im Explorer).
+const { canWrite: canWriteChanges } = useChangeRights();
+const canSelect = computed(() => canWrite.value || canWriteChanges.value);
 // Einen Zeitraum löschen darf nur, wer die Datei auch wieder hochladen kann: Org-Admins (wie die Seite
 // „Clients & Connections“ mit dem Upload), so prüft es auch die API.
 const canDeletePeriod = computed(
@@ -199,8 +210,9 @@ const currency = computed(() => meta.value?.currency ?? selected.value?.currency
 
 // --- Ansicht und Filter -------------------------------------------------------------------
 
-type View = 'terms' | 'ngrams';
-const view = computed<View>(() => (route.query.view === 'ngrams' ? 'ngrams' : 'terms'));
+const VIEWS = ['terms', 'ngrams', 'harvest'] as const;
+type View = (typeof VIEWS)[number];
+const view = computed<View>(() => VIEWS.find((entry) => entry === route.query.view) ?? 'terms');
 const CLASSES = ['harvest', 'negate', 'watch'] as const;
 type Classification = SearchTermRowData['classification'];
 /**
@@ -220,6 +232,7 @@ const isAcrossFilter = (value: ClassFilter): value is AcrossFilter => value in A
 // Die Einstufung filtert nur die Suchbegriffe: Die Wortbausteine nehmen sie nicht mit.
 const setView = (next: View) =>
   navigate(next === 'terms' ? { view: undefined } : { view: next, class: undefined });
+
 const toggleClass = (next: ClassFilter) =>
   navigate({ class: classFilter.value === next ? undefined : next, view: undefined });
 
@@ -237,6 +250,8 @@ const columnContext = computed<ColumnContext>(() => ({
   locale: locale.value,
   currency: currency.value,
   explorerLink: explorerLink.value,
+  ...(canWriteChanges.value && { onNegative: (row) => openNegative([row]) }),
+  ...(canWrite.value && { onHarvest: (row) => void markForHarvest([row]) }),
 }));
 const termDefs = computed(() => termColumns(columnContext.value));
 const ngramDefs = computed(() => ngramColumns(columnContext.value));
@@ -327,16 +342,125 @@ const overrideText = computed(() => {
   };
 });
 
-// --- CSV -----------------------------------------------------------------------------------
+// --- Aktionen auf Suchbegriffe (3.8) ---------------------------------------------------------
 
 /** Das Grid der gewählten Ansicht (es gibt immer nur eines). */
-const grid = shallowRef<{ csv: (note?: string) => string; ready: boolean }>();
-// Ohne Zeilen gibt es kein Grid; bis seine API bereit ist, wäre die Datei leer.
-const canExport = computed(
-  () =>
-    grid.value?.ready === true &&
-    (view.value === 'terms' ? termRows.value.length > 0 : ngramRows.value.length > 0),
+const grid = shallowRef<{
+  csv: (note?: string) => string;
+  ready: boolean;
+  clearSelection: () => void;
+}>();
+
+const selectedIds = ref<string[]>([]);
+// Die Markierung gilt für die gezeigten Zeilen: Mit Ansicht, Filter, Profil oder Zeitraum fällt sie weg.
+// Über den Inhalt der Auswahl, nicht das Objekt: Der URL-Abgleich erzeugt es neu, ohne dass sich etwas ändert.
+const requestKey = computed(() => JSON.stringify(request.value));
+watch([view, classFilter, requestKey], () => (selectedIds.value = []));
+const selectedTermRows = computed(() => {
+  const ids = new Set(selectedIds.value);
+  return (data.value?.rows ?? []).filter((row) => ids.has(row.id));
+});
+function clearSelection() {
+  grid.value?.clearSelection();
+  selectedIds.value = [];
+}
+
+const negativeOpen = ref(false);
+/** Die Zeilen, für die der Dialog fragt: beim Öffnen festgehalten (eine Zeile oder die Markierung). */
+const negativeRows = shallowRef<SearchTermRowData[]>([]);
+function openNegative(rows: SearchTermRowData[]) {
+  if (rows.length === 0) return;
+  negativeRows.value = rows;
+  negativeOpen.value = true;
+}
+
+const harvestKey = computed(
+  () => ['search-terms', orgId.value, 'harvest', selected.value?.profileId ?? null] as const,
 );
+const harvestResult = ref<HarvestMarkResultData['counts'] | null>(null);
+const harvestErrorKey = ref<string | null>(null);
+const markHarvest = useMutation({
+  /** In Stücken (`MAX_HARVEST_TERMS_PER_REQUEST`); scheitert ein Stück, sind die früheren schon vorgemerkt. */
+  mutationFn: async (input: { period: NonNullable<typeof request.value>; terms: string[] }) => {
+    const counts = { added: 0, alreadyMarked: 0, notFound: 0 };
+    for (let start = 0; start < input.terms.length; start += MAX_HARVEST_TERMS_PER_REQUEST) {
+      const part = await api.searchTerms.harvest.mark({
+        ...input.period,
+        searchTerms: input.terms.slice(start, start + MAX_HARVEST_TERMS_PER_REQUEST),
+      });
+      for (const key of Object.keys(counts) as (keyof typeof counts)[]) {
+        counts[key] += part.counts[key];
+      }
+    }
+    return counts;
+  },
+  // Die Kennzeichnung der Zeilen und die Merkliste kommen vom Server.
+  onSettled: () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'analysis'] }),
+      queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'harvest'] }),
+    ]),
+});
+async function markForHarvest(rows: SearchTermRowData[]) {
+  const period = request.value;
+  if (!period || rows.length === 0 || markHarvest.isPending.value) return;
+  harvestResult.value = null;
+  harvestErrorKey.value = null;
+  try {
+    harvestResult.value = await markHarvest.mutateAsync({ period, terms: harvestTerms(rows) });
+    clearSelection();
+  } catch (error) {
+    harvestErrorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
+  }
+}
+watch([view, requestKey], () => {
+  harvestResult.value = null;
+  harvestErrorKey.value = null;
+});
+
+// --- Harvest-Merkliste (3.8) ---------------------------------------------------------------
+
+const harvestList = useQuery({
+  queryKey: harvestKey,
+  queryFn: () => api.searchTerms.harvest.list(selected.value!.profileId),
+  enabled: computed(() => view.value === 'harvest' && selected.value !== null),
+  placeholderData: keepPreviousData,
+});
+const harvestRows = computed(() => harvestList.data.value?.marks ?? []);
+const harvestDefs = computed(() =>
+  harvestColumns({ t, te, locale: locale.value }, selected.value?.currencyCode ?? ''),
+);
+const removeHarvest = useMutation({
+  mutationFn: (ids: string[]) => api.searchTerms.harvest.remove(ids),
+  onSettled: () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'harvest'] }),
+      queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value, 'analysis'] }),
+    ]),
+});
+async function removeSelectedMarks() {
+  if (selectedIds.value.length === 0 || removeHarvest.isPending.value) return;
+  harvestErrorKey.value = null;
+  try {
+    await removeHarvest.mutateAsync(selectedIds.value);
+    clearSelection();
+  } catch (error) {
+    harvestErrorKey.value = errorMessageKey(error instanceof ApiError ? error.code : 'UNKNOWN');
+  }
+}
+
+// --- CSV -----------------------------------------------------------------------------------
+
+const viewRowCount = computed(
+  () =>
+    ({
+      terms: termRows.value.length,
+      ngrams: ngramRows.value.length,
+      harvest: harvestRows.value.length,
+    })[view.value],
+);
+// Ohne Zeilen gibt es kein Grid; bis seine API bereit ist, wäre die Datei leer.
+const canExport = computed(() => grid.value?.ready === true && viewRowCount.value > 0);
 
 /**
  * CSV der Ansicht, wie das Grid sie zeigt (Einstufung, Spaltenfilter, Sortierung), in der Schreibweise des Explorers.
@@ -344,7 +468,15 @@ const canExport = computed(
  */
 function exportCsv() {
   const m = meta.value;
-  if (!grid.value?.ready || !m) return;
+  if (!grid.value?.ready) return;
+  if (view.value === 'harvest') {
+    const profile = selected.value;
+    if (!profile) return;
+    const part = fileNamePart(`${profile.accountName} ${profile.countryCode}`);
+    downloadCsv(`profitbash-search-term-harvest-${part}.csv`, grid.value.csv());
+    return;
+  }
+  if (!m) return;
   const terms = view.value === 'terms';
   const note = terms
     ? m.truncated
@@ -636,7 +768,7 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
           <div class="flex flex-wrap items-center gap-space-sm">
             <div role="group" :aria-label="t('searchTerms.view.label')" class="flex gap-space-xs">
               <button
-                v-for="entry in ['terms', 'ngrams'] as const"
+                v-for="entry in VIEWS"
                 :key="entry"
                 type="button"
                 :aria-pressed="view === entry"
@@ -709,13 +841,146 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
                 )
               }}
             </p>
-            <SearchTermGrid
-              v-else
-              ref="grid"
-              :rows="termRows"
-              :column-defs="termDefs"
-              :total="total"
+            <template v-else>
+              <div
+                v-if="canSelect"
+                role="toolbar"
+                :aria-label="t('searchTerms.actions.toolbar')"
+                class="flex flex-wrap items-center gap-space-sm"
+              >
+                <span class="font-data text-body-sm text-ink-secondary" aria-live="polite">
+                  {{ t('explorer.bulk.selected', { count: count(selectedIds.length) }) }}
+                </span>
+                <Button
+                  v-if="canWriteChanges"
+                  icon="pi pi-ban"
+                  :label="t('searchTerms.actions.negative')"
+                  size="small"
+                  severity="secondary"
+                  :disabled="selectedTermRows.length === 0"
+                  @click="openNegative(selectedTermRows)"
+                />
+                <Button
+                  v-if="canWrite"
+                  icon="pi pi-bookmark"
+                  :label="t('searchTerms.actions.harvest')"
+                  size="small"
+                  severity="secondary"
+                  :disabled="selectedTermRows.length === 0"
+                  :loading="markHarvest.isPending.value"
+                  @click="markForHarvest(selectedTermRows)"
+                />
+                <span v-if="selectedIds.length === 0" class="text-body-sm text-ink-secondary">
+                  {{ t('searchTerms.actions.hint') }}
+                </span>
+              </div>
+              <InlineError v-if="harvestErrorKey" :message="t(harvestErrorKey)" />
+              <p
+                v-if="harvestResult"
+                data-harvest-result
+                role="status"
+                class="flex flex-wrap items-center gap-x-space-sm rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
+              >
+                <span>
+                  <i class="pi pi-check-circle mr-space-xs text-lime-deep" aria-hidden="true" />{{
+                    t(
+                      'searchTerms.harvest.result.added',
+                      { count: count(harvestResult.added) },
+                      harvestResult.added,
+                    )
+                  }}
+                </span>
+                <span v-if="harvestResult.alreadyMarked > 0" class="text-ink-secondary">
+                  {{
+                    t(
+                      'searchTerms.harvest.result.alreadyMarked',
+                      { count: count(harvestResult.alreadyMarked) },
+                      harvestResult.alreadyMarked,
+                    )
+                  }}
+                </span>
+                <span v-if="harvestResult.notFound > 0" class="text-ink-secondary">
+                  {{
+                    t(
+                      'searchTerms.harvest.result.notFound',
+                      { count: count(harvestResult.notFound) },
+                      harvestResult.notFound,
+                    )
+                  }}
+                </span>
+                <button
+                  type="button"
+                  class="min-h-11 rounded-control px-space-sm font-medium text-violet hover:underline"
+                  @click="setView('harvest')"
+                >
+                  {{ t('searchTerms.harvest.open') }}
+                </button>
+              </p>
+              <SearchTermGrid
+                ref="grid"
+                :rows="termRows"
+                :column-defs="termDefs"
+                :total="total"
+                :selectable="canSelect"
+                @selection="(ids) => (selectedIds = ids)"
+              />
+            </template>
+          </template>
+
+          <template v-else-if="view === 'harvest'">
+            <p class="max-w-prose text-body-sm text-ink-secondary">
+              {{ t('searchTerms.harvest.hint') }}
+            </p>
+            <InlineError
+              v-if="harvestList.isError.value"
+              :message="t('searchTerms.harvest.error')"
+              retryable
+              :retrying="harvestList.isFetching.value"
+              @retry="harvestList.refetch()"
             />
+            <SkeletonBlock v-else-if="!harvestList.data.value" shape="tile" height="12rem" />
+            <EmptyState
+              v-else-if="harvestRows.length === 0"
+              icon="bookmark"
+              :title="t('searchTerms.harvest.empty.title')"
+              :text="t('searchTerms.harvest.empty.text')"
+            />
+            <template v-else>
+              <p v-if="harvestList.data.value.truncated" class="text-body-sm text-ink-secondary">
+                {{
+                  t('searchTerms.harvest.truncated', {
+                    max: count(harvestList.data.value.maxMarks),
+                  })
+                }}
+              </p>
+              <div
+                v-if="canWrite"
+                role="toolbar"
+                :aria-label="t('searchTerms.harvest.toolbar')"
+                class="flex flex-wrap items-center gap-space-sm"
+              >
+                <span class="font-data text-body-sm text-ink-secondary" aria-live="polite">
+                  {{ t('explorer.bulk.selected', { count: count(selectedIds.length) }) }}
+                </span>
+                <Button
+                  icon="pi pi-trash"
+                  :label="t('searchTerms.harvest.remove')"
+                  size="small"
+                  severity="secondary"
+                  :disabled="selectedIds.length === 0"
+                  :loading="removeHarvest.isPending.value"
+                  @click="removeSelectedMarks"
+                />
+              </div>
+              <InlineError v-if="harvestErrorKey" :message="t(harvestErrorKey)" />
+              <SearchTermGrid
+                ref="grid"
+                :rows="harvestRows"
+                :column-defs="harvestDefs"
+                :selectable="canWrite"
+                @selection="(ids) => (selectedIds = ids)"
+              />
+            </template>
           </template>
 
           <template v-else>
@@ -738,6 +1003,13 @@ async function onPeriodDeleted(period: SearchTermPeriodData) {
         </section>
       </template>
 
+      <NegativeDialog
+        v-if="canWriteChanges"
+        :visible="negativeOpen"
+        :rows="negativeRows"
+        @close="negativeOpen = false"
+        @staged="clearSelection"
+      />
       <RulesDialog
         v-if="meta && canWrite"
         :visible="rulesOpen"

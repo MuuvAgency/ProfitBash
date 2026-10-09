@@ -744,7 +744,7 @@ export const de = {
     title: 'Suchbegriff-Analyse',
     tab: 'Suchbegriff-Analyse',
     description:
-      'Welche Suchbegriffe und Wortbausteine tragen, welche verbrennen Geld? Aus den Suchbegriff-Blättern der Bulk-Datei, nur zum Lesen.',
+      'Welche Suchbegriffe und Wortbausteine tragen, welche verbrennen Geld? Aus den Suchbegriff-Blättern der Bulk-Datei. Negatives gehen in den Warenkorb, Harvest-Kandidaten auf die Merkliste.',
     profile: 'Profil',
     period: 'Zeitraum der Datei',
     periodOption: '{range} · {rows} Zeilen',
@@ -760,6 +760,72 @@ export const de = {
     empty: {
       title: 'Noch keine Suchbegriffe',
       text: 'Lade unter „Clients & Connections“ eine Bulk-Datei der Werbekonsole mit Leistungsdaten hoch. Der Dateiname muss den Zeitraum tragen (bulk-…-von-bis-….xlsx).',
+    },
+    actions: {
+      toolbar: 'Markierte Suchbegriffe',
+      column: 'Aktionen',
+      negative: 'Negativ anlegen',
+      harvest: 'Harvest vormerken',
+      hint: 'Zeilen markieren, um sie zu negieren oder für den Harvest vorzumerken.',
+      row: {
+        negative: '„{term}“ negativ anlegen',
+        harvest: '„{term}“ für den Harvest vormerken',
+      },
+    },
+    negative: {
+      title: 'Suchbegriff negativ anlegen | {count} Suchbegriffe negativ anlegen',
+      titleOne: '„{term}“ negativ anlegen',
+      level: {
+        label: 'Wo',
+        adGroup: 'In der Ad Group der Zeile',
+        campaign: 'In der Kampagne der Zeile (gilt für alle ihre Ad Groups)',
+      },
+      matchType: {
+        label: 'Wie',
+        EXACT: 'Negativ exakt (nur genau dieser Suchbegriff)',
+        PHRASE: 'Negativ Wortgruppe (alle Suchbegriffe, die ihn enthalten)',
+      },
+      asinHint: 'ASINs werden als negatives Produkt-Target angelegt.',
+      protected:
+        '{count} geschützter Begriff des Clients in der Auswahl. | {count} geschützte Begriffe des Clients in der Auswahl.',
+      confirmProtected: 'Trotzdem negieren | Geschützte Begriffe trotzdem negieren',
+      skipped: {
+        noEntity:
+          '{count} Zeile wird übersprungen: Kampagne oder Ad Group ist im Profil nicht bekannt. | {count} Zeilen werden übersprungen: Kampagne oder Ad Group ist im Profil nicht bekannt.',
+        tooLong:
+          '{count} Suchbegriff ist für ein negatives Keyword zu lang (über 80 Zeichen). | {count} Suchbegriffe sind für ein negatives Keyword zu lang (über 80 Zeichen).',
+      },
+      summary:
+        'Es kommt kein Negative in den Warenkorb. | {count} Negative kommt in den Warenkorb. | {count} Negatives kommen in den Warenkorb.',
+      existingHint: 'Was es an der Stelle schon gibt, wird nicht doppelt angelegt.',
+      submit: 'In den Warenkorb',
+      nextStep:
+        'An Amazon geht erst etwas, wenn du die Änderungen unter „Änderungen“ übermittelst.',
+    },
+    harvest: {
+      column: 'Merkliste',
+      marked: 'Vorgemerkt',
+      open: 'Merkliste ansehen',
+      hint: 'Suchbegriffe, aus denen später eine Exakt-Kampagne werden soll. Die Merkliste ändert nichts bei Amazon. Die Kennzahlen sind der Stand beim Vormerken, über alle Zeilen des Suchbegriffs im Datei-Zeitraum.',
+      period: 'Zeitraum der Datei',
+      markedAt: 'Vorgemerkt am',
+      markedBy: 'Von',
+      toolbar: 'Markierte Einträge',
+      remove: 'Von der Merkliste entfernen',
+      error: 'Die Merkliste konnte nicht geladen werden.',
+      truncated: 'Die Merkliste zeigt die neuesten {max} Einträge.',
+      empty: {
+        title: 'Noch nichts vorgemerkt',
+        text: 'Markiere in der Ansicht „Suchbegriffe“ Zeilen und wähle „Harvest vormerken“.',
+      },
+      result: {
+        added:
+          'Kein Suchbegriff vorgemerkt | {count} Suchbegriff vorgemerkt | {count} Suchbegriffe vorgemerkt',
+        alreadyMarked:
+          '{count} stand schon auf der Merkliste | {count} standen schon auf der Merkliste',
+        notFound:
+          '{count} gibt es in diesem Zeitraum nicht mehr | {count} gibt es in diesem Zeitraum nicht mehr',
+      },
     },
     classification: 'Einstufung',
     class: {
@@ -841,6 +907,7 @@ export const de = {
       label: 'Ansicht',
       terms: 'Suchbegriffe',
       ngrams: 'Wortbausteine',
+      harvest: 'Merkliste',
     },
     ngramSize: {
       label: 'Länge der Wortbausteine',
@@ -1099,6 +1166,7 @@ export const de = {
       adProductNotSupported:
         'Gebotsstrategie und Platzierungen gibt es nur für Sponsored Products.',
       alreadyExists: 'Das Negative gibt es dort schon.',
+      protectedTerm: 'Geschützter Begriff des Clients (nur mit Bestätigung).',
       noCurrentValue: 'Es gibt keinen Wert, auf den sich rechnen ließe.',
       resultOutOfRange: 'Das Ergebnis wäre kein gültiger Betrag über 0.',
     },

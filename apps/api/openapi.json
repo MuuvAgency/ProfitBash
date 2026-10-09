@@ -3460,6 +3460,9 @@
           "alreadyTargeted": {
             "type": "boolean"
           },
+          "harvestMarked": {
+            "type": "boolean"
+          },
           "termClassification": {
             "type": "string",
             "enum": [
@@ -3518,6 +3521,7 @@
           "reason",
           "protected",
           "alreadyTargeted",
+          "harvestMarked",
           "termClassification",
           "termReason",
           "termTargets",
@@ -3698,6 +3702,338 @@
         "required": [
           "profileId",
           "overrides"
+        ],
+        "additionalProperties": false
+      },
+      "HarvestMarkResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "added",
+                    "alreadyMarked",
+                    "notFound"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "outcome"
+              ]
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "added": {
+                "type": "integer"
+              },
+              "alreadyMarked": {
+                "type": "integer"
+              },
+              "notFound": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "added",
+              "alreadyMarked",
+              "notFound"
+            ]
+          }
+        },
+        "required": [
+          "results",
+          "counts"
+        ]
+      },
+      "HarvestMarkRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "searchTerms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "minItems": 1,
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "profileId",
+          "periodStart",
+          "periodEnd",
+          "searchTerms"
+        ],
+        "additionalProperties": false
+      },
+      "HarvestListResponse": {
+        "type": "object",
+        "properties": {
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarvestMark"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "maxMarks": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marks",
+          "truncated",
+          "maxMarks"
+        ]
+      },
+      "HarvestMark": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "searchTerm": {
+            "type": "string"
+          },
+          "adProduct": {
+            "type": "string"
+          },
+          "amazonCampaignId": {
+            "type": "string"
+          },
+          "amazonAdGroupId": {
+            "type": "string"
+          },
+          "amazonTargetId": {
+            "type": "string"
+          },
+          "campaignId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "campaignName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adGroupId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "adGroupName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "keywordText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "matchType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expression": {},
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "sourceRows": {
+            "type": "integer"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "impressions": {
+            "type": "string"
+          },
+          "clicks": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "string"
+          },
+          "sales": {
+            "type": "string"
+          },
+          "purchases": {
+            "type": "string"
+          },
+          "units": {
+            "type": "string"
+          },
+          "ctr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cpc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cvr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roas": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdByName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "accountName",
+          "countryCode",
+          "searchTerm",
+          "adProduct",
+          "amazonCampaignId",
+          "amazonAdGroupId",
+          "amazonTargetId",
+          "campaignId",
+          "campaignName",
+          "adGroupId",
+          "adGroupName",
+          "targetId",
+          "keywordText",
+          "matchType",
+          "periodStart",
+          "periodEnd",
+          "sourceRows",
+          "currencyCode",
+          "impressions",
+          "clicks",
+          "cost",
+          "sales",
+          "purchases",
+          "units",
+          "ctr",
+          "cpc",
+          "cvr",
+          "acos",
+          "roas",
+          "createdByName",
+          "createdAt"
+        ]
+      },
+      "HarvestListRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HarvestRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed"
+        ]
+      },
+      "HarvestRemoveRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "ids"
         ],
         "additionalProperties": false
       },
@@ -4221,6 +4557,7 @@
                         "budgetNotDaily",
                         "adProductNotSupported",
                         "alreadyExists",
+                        "protectedTerm",
                         "noCurrentValue",
                         "resultOutOfRange"
                       ]
@@ -4465,6 +4802,9 @@
                     "additionalProperties": false
                   }
                 ]
+              },
+              "confirmProtected": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -4541,6 +4881,7 @@
                         "budgetNotDaily",
                         "adProductNotSupported",
                         "alreadyExists",
+                        "protectedTerm",
                         "noCurrentValue",
                         "resultOutOfRange"
                       ]
@@ -5778,6 +6119,7 @@
                     "budgetNotDaily",
                     "adProductNotSupported",
                     "alreadyExists",
+                    "protectedTerm",
                     "noCurrentValue",
                     "resultOutOfRange"
                   ]
@@ -5939,6 +6281,7 @@
                         "budgetNotDaily",
                         "adProductNotSupported",
                         "alreadyExists",
+                        "protectedTerm",
                         "noCurrentValue",
                         "resultOutOfRange"
                       ]
@@ -6000,6 +6343,7 @@
                         "budgetNotDaily",
                         "adProductNotSupported",
                         "alreadyExists",
+                        "protectedTerm",
                         "noCurrentValue",
                         "resultOutOfRange"
                       ]
@@ -8511,6 +8855,197 @@
           },
           "404": {
             "description": "Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/harvest": {
+      "post": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Suchbegriffe eines Datei-Zeitraums auf die Harvest-Merkliste des Profils setzen (Recht „write“)",
+        "description": "Keine Änderung bei Amazon. Quelle (Zeile mit dem höchsten Spend) und Kennzahlen (Summe über alle Zeilen des Begriffs im Zeitraum) liest der Server; je Profil und Begriff gibt es einen Eintrag.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HarvestMarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis je Begriff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarvestMarkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/harvest/list": {
+      "post": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Harvest-Merkliste der sichtbaren Profile oder eines Profils, neueste zuerst",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HarvestListRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Merkliste.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarvestListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/search-terms/harvest/remove": {
+      "post": {
+        "tags": [
+          "Suchbegriffe"
+        ],
+        "summary": "Einträge von der Harvest-Merkliste entfernen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HarvestRemoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Zahl der entfernten Einträge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarvestRemoveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
             "content": {
               "application/json": {
                 "schema": {

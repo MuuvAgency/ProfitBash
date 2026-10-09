@@ -44,6 +44,7 @@ const row = (patch: Partial<SearchTermRowData> = {}): SearchTermRowData => ({
   classification: 'watch',
   reason: 'tooFewData',
   protected: false,
+  harvestMarked: false,
   alreadyTargeted: false,
   termClassification: 'watch',
   termReason: 'tooFewData',
