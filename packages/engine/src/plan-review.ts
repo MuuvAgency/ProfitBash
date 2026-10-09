@@ -1,4 +1,4 @@
-import type { PlannedCampaign } from '@profitbash/shared/campaign-setup';
+import type { PlannedCampaign, SourceNegative } from '@profitbash/shared/campaign-setup';
 import {
   NEGATIVE_KEYWORD_MAX_LENGTH,
   NEGATIVE_KEYWORD_MAX_WORDS,
@@ -6,6 +6,7 @@ import {
 } from './ad-changes';
 import { Dec } from './decimal';
 import { campaignNameIssues, campaignNameMaxLength } from './naming';
+import { createProtectedTermMatcher } from './search-terms';
 
 /**
  * Prüfung eines gespeicherten Plans vor dem Übermitteln (`docs/tasks/phase-4.md` 4.4), ohne I/O. Ein Entwurf kann
@@ -16,6 +17,9 @@ import { campaignNameIssues, campaignNameMaxLength } from './naming';
  *   Keyword zu lang, fehlende Anzeige, SKU oder Ziele, fremde Währung, Leitplanken nach F-S7 verletzt.
  * - `warning`: Keyword schon exakt gebucht, Off-Amazon freigeschaltet.
  * - `info`: Off-Amazon nur in den USA einstellbar; SB und SD legt Phase 4 erst mit 4.9/4.10 an.
+ *
+ * Gewählte Negatives in der Quelle (4.6, F7): Die Ad Group der Quelle muss als SP-Ad-Group im Profil bestehen,
+ * geschützte Begriffe sperren (der Vorschlag nennt sie nie, ein geänderter Entwurf könnte es), Dubletten auch.
  */
 
 export interface PlanReviewInput {
@@ -27,6 +31,12 @@ export interface PlanReviewInput {
     exactKeywords: readonly { text: string; campaignName: string }[];
   };
   limitFor: AdChangeLimitLookup;
+  /** Negatives in der Quelle des Entwurfs (nur gewählte werden geprüft). */
+  sourceNegatives?: readonly SourceNegative[];
+  /** Geschützte Begriffe des Clients. */
+  protectedTerms?: readonly string[];
+  /** Bestehende SP-Ad-Groups des Profils als `amazonCampaignId:amazonAdGroupId`. */
+  sourceAdGroups?: ReadonlySet<string>;
 }
 
 export type PlanReviewIssue =
@@ -46,6 +56,8 @@ export type PlanReviewIssue =
   | { severity: 'error'; code: 'adGroupNameInvalid'; campaign: string; issue: string }
   | { severity: 'error'; code: 'duplicateTarget'; campaign: string; target: string }
   | { severity: 'error'; code: 'missingSku'; asin: string }
+  | { severity: 'error'; code: 'sourceNegativeMissing'; campaign: string; target: string }
+  | { severity: 'error'; code: 'sourceNegativeProtected'; keyword: string }
   | {
       severity: 'error';
       code: 'bidOutOfRange' | 'budgetOutOfRange';
@@ -213,6 +225,29 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
         add({ severity: 'error', code: 'duplicateTarget', campaign: name, target: label });
       }
       keys.add(key);
+    }
+  }
+
+  const isProtected = createProtectedTermMatcher(input.protectedTerms ?? []);
+  const sourceKeys = new Set<string>();
+  for (const source of input.sourceNegatives ?? []) {
+    if (!source.selected) continue;
+    const negative = source.negative;
+    const label = negative.type === 'keyword' ? negative.text : negative.asin;
+    const key = `${source.amazonAdGroupId}:${negative.type}:${negative.matchType}:${label.toLowerCase()}`;
+    const campaign = source.campaignName;
+    if (sourceKeys.has(key)) {
+      add({ severity: 'error', code: 'duplicateTarget', campaign, target: label });
+      continue;
+    }
+    sourceKeys.add(key);
+    if (!input.sourceAdGroups?.has(`${source.amazonCampaignId}:${source.amazonAdGroupId}`)) {
+      add({ severity: 'error', code: 'sourceNegativeMissing', campaign, target: label });
+    }
+    if (isProtected(label))
+      add({ severity: 'error', code: 'sourceNegativeProtected', keyword: label });
+    if (negative.type === 'keyword' && tooLong(negative.text, MAX_WORDS[negative.matchType])) {
+      add({ severity: 'error', code: 'keywordTooLong', keyword: negative.text });
     }
   }
   return issues;

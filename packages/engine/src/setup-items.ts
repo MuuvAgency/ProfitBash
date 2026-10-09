@@ -4,6 +4,7 @@ import type {
   CampaignSetupPlacement,
   CampaignSetupState,
   PlannedCampaign,
+  SourceNegative,
 } from '@profitbash/shared/campaign-setup';
 
 /**
@@ -14,6 +15,9 @@ import type {
  *
  * Phase 4 legt zuerst nur Sponsored Products an (F1): SB- und SD-Kampagnen erscheinen als Kampagne mit
  * `supported: false` (die Übermittlung meldet sie als nicht angelegt) und ohne Kinder.
+ *
+ * Gewählte Negatives in der Quelle eines Harvest-Begriffs (4.6, F7) stehen am Ende: Sie gehören zu bestehenden
+ * Kampagnen und nennen deren echte IDs; `campaignRef` und `adGroupRef` sind dort nur die Namen zur Anzeige.
  */
 
 export interface SetupItemSpec {
@@ -35,7 +39,7 @@ const PLACEMENTS: readonly [
 
 export function planSetupItems(
   campaigns: readonly PlannedCampaign[],
-  options: { campaignState: CampaignSetupState },
+  options: { campaignState: CampaignSetupState; sourceNegatives?: readonly SourceNegative[] },
 ): SetupItemSpec[] {
   const items: SetupItemSpec[] = [];
   for (const campaign of campaigns) {
@@ -115,6 +119,22 @@ export function planSetupItems(
           : { entity: 'negative_product_target', asin: negative.asin },
       );
     }
+  }
+  for (const source of options.sourceNegatives ?? []) {
+    if (!source.selected) continue;
+    items.push({
+      entityType: 'source_negative',
+      campaignRef: source.campaignName,
+      adGroupRef: source.adGroupName,
+      supported: true,
+      payload: {
+        entity: 'source_negative',
+        amazonCampaignId: source.amazonCampaignId,
+        amazonAdGroupId: source.amazonAdGroupId,
+        negative: source.negative,
+        harvestMarkId: source.markId,
+      },
+    });
   }
   return items;
 }

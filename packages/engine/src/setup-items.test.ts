@@ -190,4 +190,39 @@ describe('planSetupItems', () => {
       },
     ]);
   });
+
+  it('hängt gewählte Negatives in der Quelle mit den echten IDs an (4.6, F7)', () => {
+    const negative = {
+      markId: '00000000-0000-4000-8000-000000000001',
+      searchTerm: 'trinkflasche 1l',
+      amazonCampaignId: '111',
+      amazonAdGroupId: '222',
+      campaignName: 'SP | AUTO | Flaschen',
+      adGroupName: 'Auto',
+      negative: { type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' },
+      selected: true,
+    } as const;
+    const items = planSetupItems([], {
+      campaignState: 'ENABLED',
+      sourceNegatives: [
+        negative,
+        { ...negative, markId: '00000000-0000-4000-8000-000000000002', selected: false },
+      ],
+    });
+    expect(items).toEqual([
+      {
+        entityType: 'source_negative',
+        campaignRef: 'SP | AUTO | Flaschen',
+        adGroupRef: 'Auto',
+        supported: true,
+        payload: {
+          entity: 'source_negative',
+          amazonCampaignId: '111',
+          amazonAdGroupId: '222',
+          negative: { type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' },
+          harvestMarkId: '00000000-0000-4000-8000-000000000001',
+        },
+      },
+    ]);
+  });
 });
