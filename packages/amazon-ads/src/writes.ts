@@ -287,7 +287,13 @@ const ARCHIVE_ENDPOINTS: Record<AmazonAdsArchiveEntity, Endpoint> = {
 type CreateKind =
   'negativeKeyword' | 'campaignNegativeKeyword' | 'negativeTarget' | 'campaignNegativeTarget';
 
-const create = (path: string, entity: string, idKey: string, listKey: string): Endpoint =>
+/** Anlage-Endpunkt von SP v3 (auch für neue Kampagnen-Strukturen in `creates.ts`): nie wiederholt. */
+export const spCreateEndpoint = (
+  path: string,
+  entity: string,
+  idKey: string,
+  listKey: string,
+): Endpoint =>
   spEndpoint(
     `sp.${path}.create`,
     'POST',
@@ -299,26 +305,26 @@ const create = (path: string, entity: string, idKey: string, listKey: string): E
     list(listKey),
   );
 
-const CREATE_ENDPOINTS: Record<CreateKind, Endpoint> = {
-  negativeKeyword: create(
+export const SP_NEGATIVE_CREATE_ENDPOINTS: Record<CreateKind, Endpoint> = {
+  negativeKeyword: spCreateEndpoint(
     'negativeKeywords',
     'NegativeKeyword',
     'negativeKeywordId',
     'negativeKeywords',
   ),
-  campaignNegativeKeyword: create(
+  campaignNegativeKeyword: spCreateEndpoint(
     'campaignNegativeKeywords',
     'CampaignNegativeKeyword',
     'campaignNegativeKeywordId',
     'campaignNegativeKeywords',
   ),
-  negativeTarget: create(
+  negativeTarget: spCreateEndpoint(
     'negativeTargets',
     'NegativeTargetingClause',
     'targetId',
     'negativeTargetingClauses',
   ),
-  campaignNegativeTarget: create(
+  campaignNegativeTarget: spCreateEndpoint(
     'campaignNegativeTargets',
     'CampaignNegativeTargetingClause',
     'campaignNegativeTargetingClauseId',
@@ -326,7 +332,8 @@ const CREATE_ENDPOINTS: Record<CreateKind, Endpoint> = {
   ),
 };
 
-const STRATEGIES: Record<AmazonAdsBiddingStrategy, string> = {
+/** Gebotsstrategie des eigenen Modells → `dynamicBidding.strategy` von SP v3. */
+export const SP_BIDDING_STRATEGIES: Record<AmazonAdsBiddingStrategy, string> = {
   SALES_DOWN_ONLY: 'LEGACY_FOR_SALES',
   SALES_UP_AND_DOWN: 'AUTO_FOR_SALES',
   NONE: 'MANUAL',
@@ -342,7 +349,7 @@ function updateItem(op: AmazonAdsUpdateOperation): Record<string, unknown> | nul
     }
     if (op.bidding !== undefined) {
       item.dynamicBidding = {
-        strategy: STRATEGIES[op.bidding.strategy],
+        strategy: SP_BIDDING_STRATEGIES[op.bidding.strategy],
         placementBidding: op.bidding.placements.map(({ placement, percentage }) => ({
           placement,
           // Ganze Prozent (`integer` in der Spec); `jsonDecimal` prüft die Schreibweise.
@@ -373,7 +380,8 @@ function createTarget(op: AmazonAdsCreateNegativeOperation): MappedOperation {
   const onCampaign = op.amazonAdGroupId === null;
   if (op.negative.type === 'keyword') {
     return {
-      endpoint: CREATE_ENDPOINTS[onCampaign ? 'campaignNegativeKeyword' : 'negativeKeyword'],
+      endpoint:
+        SP_NEGATIVE_CREATE_ENDPOINTS[onCampaign ? 'campaignNegativeKeyword' : 'negativeKeyword'],
       amazonId: null,
       item: {
         ...parent,
@@ -384,7 +392,8 @@ function createTarget(op: AmazonAdsCreateNegativeOperation): MappedOperation {
     };
   }
   return {
-    endpoint: CREATE_ENDPOINTS[onCampaign ? 'campaignNegativeTarget' : 'negativeTarget'],
+    endpoint:
+      SP_NEGATIVE_CREATE_ENDPOINTS[onCampaign ? 'campaignNegativeTarget' : 'negativeTarget'],
     amazonId: null,
     item: {
       ...parent,
@@ -409,7 +418,7 @@ const SP_DIALECT: WriteDialect = {
   order: [
     ...Object.values(UPDATE_ENDPOINTS),
     ...Object.values(ARCHIVE_ENDPOINTS),
-    ...Object.values(CREATE_ENDPOINTS),
+    ...Object.values(SP_NEGATIVE_CREATE_ENDPOINTS),
   ],
 };
 
@@ -531,7 +540,7 @@ export async function applyChanges(
   return { results, throttled, retryAfterMs };
 }
 
-type BatchOutcome =
+export type BatchOutcome =
   { type: 'throttled'; retryAfterMs: number | null } | { type: 'done'; results: ItemOutcome[] };
 
 /** Die Form der Antwort kennt erst der Endpunkt (`read`). */
@@ -541,7 +550,7 @@ const anyResponseSchema = z.unknown();
  * Sendet ein Stück an einen Endpunkt. Wirft, wenn der Lauf nicht weitergehen kann: kein Zugriff (401, 403), Fehler
  * beim Holen des Access-Tokens (dann wurde nichts gesendet) oder Unerwartetes.
  */
-async function sendBatch(
+export async function sendBatch(
   deps: AdsEndpointDeps,
   connection: ConnectionRef,
   amazonProfileId: string,
