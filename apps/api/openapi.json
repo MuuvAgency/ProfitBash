@@ -7362,6 +7362,18 @@
                   "minimum": 1,
                   "maximum": 365,
                   "default": null
+                },
+                "audience": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "views",
+                    "purchases",
+                    null
+                  ],
+                  "default": null
                 }
               },
               "required": [

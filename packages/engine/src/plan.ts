@@ -5,7 +5,11 @@ import type {
   PresetBlock,
   StructureCatalog,
 } from '@profitbash/shared/structure-catalog';
-import type { AdChangeLimitLookup } from './ad-changes';
+import {
+  NEGATIVE_KEYWORD_MAX_LENGTH,
+  NEGATIVE_KEYWORD_MAX_WORDS,
+  type AdChangeLimitLookup,
+} from './ad-changes';
 import { Dec, parseDecimal } from './decimal';
 import { campaignNameIssues, renderCampaignName, uniqueCampaignName } from './naming';
 
@@ -30,9 +34,9 @@ import { campaignNameIssues, renderCampaignName, uniqueCampaignName } from './na
  *   (schon vorhanden, freigeschaltet), `info` erklärt (weggelassen, Werbemittel nötig).
  */
 
-/** Höchstwerte eines Keywords (Amazon, wie bei negativen Keywords in Phase 3). */
-export const KEYWORD_MAX_WORDS = 10;
-export const KEYWORD_MAX_LENGTH = 80;
+/** Grenzen eines Keywords wie bei negativen Keywords in Phase 3 (exakt 10 Wörter, Phrase 4, 80 Zeichen). */
+const tooLong = (text: string, maxWords: number) =>
+  text.split(' ').length > maxWords || [...text].length > NEGATIVE_KEYWORD_MAX_LENGTH;
 
 const AD_PRODUCT: Record<CatalogAdProduct, string> = {
   SP: 'SPONSORED_PRODUCTS',
@@ -81,16 +85,17 @@ export type PlannedTarget =
   | { type: 'category'; categoryId: string; name: string; bid: string }
   | { type: 'audience'; audience: 'views' | 'purchases'; lookbackDays: number; bid: string };
 
-export type PlannedNegative = {
-  type: 'keyword';
-  text: string;
-  matchType: 'negativeExact' | 'negativePhrase';
-};
+/** Negatives auf Ebene der Ad Group (die Bulk-Datei kennt beide Ebenen; 4.4 schreibt sie in die Ad Group). */
+export type PlannedNegative =
+  | { type: 'keyword'; text: string; matchType: 'negativeExact' | 'negativePhrase' }
+  | { type: 'product'; asin: string; matchType: 'negativeExact' };
 
 export interface PlannedCampaign {
   /** Schlüssel des Bausteins. */
   block: string;
   adProduct: CatalogAdProduct;
+  /** Targeting-Art aus dem Baustein (Bulk: SP `Targeting Type` auto/manuell, SD-Taktik); bleibt, auch wenn sich der Katalog ändert. */
+  targeting: CatalogBlock['targeting'];
   name: string;
   state: 'ENABLED';
   currencyCode: string;
@@ -108,6 +113,11 @@ export interface PlannedCampaign {
 
 export type PlanHint =
   | { severity: 'info'; code: 'noHero' }
+  | { severity: 'info'; code: 'keywordIsBrand'; keyword: string }
+  | { severity: 'warning'; code: 'ownAsinAsTarget'; asin: string }
+  | { severity: 'warning'; code: 'vcpmBidPerThousand'; campaign: string }
+  | { severity: 'error'; code: 'noProducts' }
+  | { severity: 'error'; code: 'brandTermTooLong'; keyword: string }
   | {
       severity: 'info';
       code:
@@ -148,6 +158,28 @@ const isConquest = (block: CatalogBlock) => block.key === 'SP-PAT-CONQUEST';
 const clean = (text: string) => text.normalize('NFC').split(/\s+/u).filter(Boolean).join(' ');
 const money = (value: Dec) => value.toFixed(2);
 
+/**
+ * Doppelte (ohne Groß/Klein) zusammenführen, leere fallen weg: erste Schreibweise, `single`, wenn einer der Einträge es
+ * ist, das erste angegebene Gebot.
+ */
+function merged<T extends { single?: boolean; bid?: string }>(
+  entries: readonly T[],
+  key: (entry: T) => string,
+): T[] {
+  const byKey = new Map<string, T>();
+  for (const entry of entries) {
+    const id = key(entry).toLowerCase();
+    if (id === '') continue;
+    const known = byKey.get(id);
+    if (!known) byKey.set(id, { ...entry });
+    else {
+      if (entry.single) known.single = true;
+      if (known.bid === undefined && entry.bid !== undefined) known.bid = entry.bid;
+    }
+  }
+  return [...byKey.values()];
+}
+
 /** Doppelte (ohne Groß/Klein) und leere Einträge fallen weg, die erste Schreibweise bleibt. */
 function unique<T>(entries: readonly T[], key: (entry: T) => string): T[] {
   const seen = new Set<string>();
@@ -185,34 +217,60 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
     presetBlocks.some((entry) => test(blocks.get(entry.block)!));
 
   // --- Eingaben bereinigen ---------------------------------------------------------------------------------------
-  const keywords = unique(
+  const hasBrand = inPreset((block) => block.source === 'brand');
+  const brandTerms = unique(input.brandTerms.map(clean), (term) => term);
+  /** Enthält das Keyword einen Marken-Begriff als Wortfolge (wie ein negatives Phrase-Keyword)? */
+  const isBrand = (text: string) => {
+    const padded = ` ${text.toLowerCase()} `;
+    return brandTerms.some((term) => padded.includes(` ${term.toLowerCase()} `));
+  };
+  const keywords = merged(
     input.keywords.map((keyword) => ({ ...keyword, text: clean(keyword.text) })),
     (keyword) => keyword.text,
+  ).filter((keyword) => {
+    // Mit Marken-Baustein sind Marken-Suchen getrennt: In allgemeinen Kampagnen wären sie negativ und liefen nie.
+    if (!hasBrand || !isBrand(keyword.text)) return true;
+    hint({ severity: 'info', code: 'keywordIsBrand', keyword: keyword.text });
+    return false;
+  });
+  const items = input.productGroup.items.map((item) => ({
+    ...item,
+    asin: item.asin.trim().toUpperCase(),
+  }));
+  const ownAsins = unique(
+    items.map((item) => item.asin),
+    (asin) => asin,
   );
-  const brandTerms = unique(input.brandTerms.map(clean), (term) => term);
-  const productTargets = unique(
+  const productTargets = merged(
     input.productTargets.map((target) => ({ ...target, asin: target.asin.trim().toUpperCase() })),
     (target) => target.asin,
-  );
+  ).filter((target) => {
+    if (!ownAsins.includes(target.asin)) return true;
+    hint({ severity: 'warning', code: 'ownAsinAsTarget', asin: target.asin });
+    return false;
+  });
   const conquest = unique(
     input.conquestAsins.map((asin) => asin.trim().toUpperCase()),
     (asin) => asin,
   );
   const categories = unique(input.categories, (category) => category.id);
-  for (const keyword of [...keywords.map((k) => k.text), ...brandTerms]) {
-    if (keyword.split(' ').length > KEYWORD_MAX_WORDS || [...keyword].length > KEYWORD_MAX_LENGTH) {
-      hint({ severity: 'error', code: 'keywordTooLong', keyword });
+  for (const { text } of keywords) {
+    if (tooLong(text, NEGATIVE_KEYWORD_MAX_WORDS.EXACT)) {
+      hint({ severity: 'error', code: 'keywordTooLong', keyword: text });
+    }
+  }
+  // Marken-Begriffe stehen als negative Phrase in den allgemeinen Kampagnen: deren Grenze gilt.
+  for (const term of brandTerms) {
+    if (
+      tooLong(term, hasBrand ? NEGATIVE_KEYWORD_MAX_WORDS.PHRASE : NEGATIVE_KEYWORD_MAX_WORDS.EXACT)
+    ) {
+      hint({ severity: 'error', code: 'brandTermTooLong', keyword: term });
     }
   }
 
-  const items = input.productGroup.items;
   const hero = items.find((item) => item.isHero) ?? items[0];
-  if (items.length > 0 && !items.some((item) => item.isHero))
-    hint({ severity: 'info', code: 'noHero' });
-  const ownAsins = unique(
-    items.map((item) => item.asin),
-    (asin) => asin,
-  );
+  if (items.length === 0) hint({ severity: 'error', code: 'noProducts' });
+  else if (!items.some((item) => item.isHero)) hint({ severity: 'info', code: 'noHero' });
 
   // Exakt-Verteilung: markierte einzeln, Rest gesammelt; fehlt ein Baustein, nimmt der andere alle.
   const isExact = (single: boolean) => (block: CatalogBlock) =>
@@ -240,7 +298,6 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
     hasPatSingle ? target.single === true || !hasPatMulti : false,
   );
   const multiProducts = productTargets.filter((target) => !singleProducts.includes(target));
-  const hasBrand = inPreset((block) => block.source === 'brand');
 
   // --- Ziele je Baustein -----------------------------------------------------------------------------------------
   function slotsFor(block: CatalogBlock, entry: PresetBlock): Slot[] | null {
@@ -363,7 +420,8 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
       block.structure === '1:n:1' || block.adProduct === 'SD' ? items : hero ? [hero] : [];
     const vendor = input.profile.accountType === 'vendor';
     for (const item of list) {
-      if (input.profile.accountType === 'seller' && item.sku === null) {
+      // Sponsored Brands bewerben über die ASIN.
+      if (input.profile.accountType === 'seller' && item.sku === null && block.adProduct !== 'SB') {
         hint({ severity: 'error', code: 'missingSku', asin: item.asin });
       }
     }
@@ -405,6 +463,7 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
         else {
           costType = 'vcpm';
           hint({ severity: 'warning', code: 'vcpmUnlocked', campaign: name });
+          hint({ severity: 'warning', code: 'vcpmBidPerThousand', campaign: name });
         }
       }
       let offAmazon = false;
@@ -422,6 +481,7 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
       campaigns.push({
         block: block.key,
         adProduct: block.adProduct,
+        targeting: block.targeting,
         name,
         state: 'ENABLED',
         currencyCode: input.profile.currencyCode,
@@ -449,28 +509,43 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
     .map((keyword) => keyword.text);
   const negativeExact = (texts: readonly string[]): PlannedNegative[] =>
     texts.map((text) => ({ type: 'keyword', text, matchType: 'negativeExact' }));
+  const brandNegatives = brandTerms.map((text): PlannedNegative => ({
+    type: 'keyword',
+    text,
+    matchType: 'negativePhrase',
+  }));
+  // Geplante fremde Produkte (Sammlung und einzeln) in Auto und Kategorie negativ, einzelne auch in der Sammlung.
+  const productNegatives = (list: readonly { asin: string }[]): PlannedNegative[] =>
+    list.map(({ asin }) => ({ type: 'product', asin, matchType: 'negativeExact' }));
+  const plannedProducts = productTargets.filter(
+    (target) =>
+      (hasPatMulti && multiProducts.includes(target)) ||
+      (hasPatSingle && singleProducts.includes(target)),
+  );
   for (const campaign of campaigns) {
     const block = blocks.get(campaign.block)!;
-    if (block.adProduct !== 'SP' || block.source !== 'generic') continue;
-    const keywordOrAuto = block.targeting === 'auto' || block.targeting === 'keyword';
-    if (!keywordOrAuto) continue;
-    if (
-      block.targeting === 'auto' ||
-      (block.matchType !== 'exact' && block.targeting === 'keyword')
-    ) {
-      campaign.negatives.push(...negativeExact(exactTexts));
-    } else if (block.structure !== '1:1:1') {
-      campaign.negatives.push(...negativeExact(exactSingle.map((keyword) => keyword.text)));
+    if (block.source !== 'generic' && block.source !== 'competitor') continue;
+    if (block.adProduct === 'SP') {
+      if (
+        block.targeting === 'auto' ||
+        (block.targeting === 'keyword' && block.matchType !== 'exact')
+      ) {
+        campaign.negatives.push(...negativeExact(exactTexts));
+      } else if (block.targeting === 'keyword' && block.structure !== '1:1:1') {
+        campaign.negatives.push(...negativeExact(exactSingle.map((keyword) => keyword.text)));
+      }
+      if (block.targeting === 'auto' || block.targeting === 'category') {
+        campaign.negatives.push(...productNegatives(plannedProducts));
+      } else if (isProductBlock(false)(block) && hasPatSingle) {
+        campaign.negatives.push(...productNegatives(singleProducts));
+      }
     }
-    if (hasBrand) {
-      campaign.negatives.push(
-        ...brandTerms.map((text): PlannedNegative => ({
-          type: 'keyword',
-          text,
-          matchType: 'negativePhrase',
-        })),
-      );
-    }
+    // Marke getrennt: allgemeine Keyword- und Auto-Kampagnen (SP und SB) bekommen die Marken-Begriffe negativ.
+    const generalKeywords =
+      block.source === 'generic' &&
+      (block.targeting === 'auto' || block.targeting === 'keyword') &&
+      block.adProduct !== 'SD';
+    if (hasBrand && generalKeywords) campaign.negatives.push(...brandNegatives);
   }
 
   // --- Dubletten und Grenzen ------------------------------------------------------------------------------------

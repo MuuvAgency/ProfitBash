@@ -104,6 +104,7 @@ describe('buildCampaignPlan: Struktur und Namen', () => {
     expect(negatives('SP-AUTO')).toEqual([
       { type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' },
       { type: 'keyword', text: 'trinkflasche edelstahl', matchType: 'negativeExact' },
+      { type: 'product', asin: 'B0FREMD001', matchType: 'negativeExact' },
       { type: 'keyword', text: 'waldkauz', matchType: 'negativePhrase' },
     ]);
     expect(negatives('SP-KW-EXACT')).toEqual([
@@ -359,5 +360,155 @@ describe('buildCampaignPlan: Dubletten und Leitplanken', () => {
       'SP Flaschen',
       'SP Flaschen 2',
     ]);
+  });
+});
+
+describe('buildCampaignPlan: Review-Befunde', () => {
+  it('nimmt Keywords mit Marken-Begriff aus den allgemeinen Listen (Marke ist getrennt)', () => {
+    const plan = buildCampaignPlan(
+      base({
+        brandTerms: ['Waldkauz'],
+        keywords: [{ text: 'waldkauz' }, { text: 'Waldkauz flasche' }, { text: 'trinkflasche' }],
+      }),
+    );
+    expect(
+      one(plan.campaigns, 'SP-KW-BROAD-CLUSTER').targets.map((t) => t.type === 'keyword' && t.text),
+    ).toEqual(['trinkflasche']);
+    expect(
+      one(plan.campaigns, 'SP-BRAND-DEF').targets.map((t) => t.type === 'keyword' && t.text),
+    ).toEqual(['Waldkauz']);
+    expect(plan.hints).toEqual(
+      expect.arrayContaining([
+        { severity: 'info', code: 'keywordIsBrand', keyword: 'waldkauz' },
+        { severity: 'info', code: 'keywordIsBrand', keyword: 'Waldkauz flasche' },
+      ]),
+    );
+  });
+
+  it('führt doppelte Eingaben zusammen (einzeln, wenn eine davon einzeln ist; erstes Gebot)', () => {
+    const plan = buildCampaignPlan(
+      base({
+        keywords: [
+          { text: '  Trinkflasche ' },
+          { text: 'trinkflasche', single: true, bid: '0.99' },
+        ],
+        productTargets: [{ asin: 'b0fremd001' }, { asin: 'B0FREMD001', single: true }],
+        preset: onlyBlocks('SP-KW-EXACT', 'SP-KW-EXACT-SINGLE', 'SP-PAT', 'SP-PAT-SINGLE-ASIN'),
+      }),
+    );
+    expect(one(plan.campaigns, 'SP-KW-EXACT-SINGLE').targets).toEqual([
+      { type: 'keyword', text: 'Trinkflasche', matchType: 'exact', bid: '0.99' },
+    ]);
+    expect(one(plan.campaigns, 'SP-PAT-SINGLE-ASIN').name).toBe(
+      'SP | PAT1 | Flaschen | B0FREMD001',
+    );
+  });
+
+  it('isoliert Produkt-Targets: geplante fremde ASINs negativ in Auto und Kategorie, einzelne auch in der Sammlung', () => {
+    const plan = buildCampaignPlan(
+      base({
+        preset: onlyBlocks('SP-AUTO', 'SP-CAT', 'SP-PAT', 'SP-PAT-SINGLE-ASIN'),
+        productTargets: [{ asin: 'B0FREMD001', single: true }, { asin: 'B0FREMD002' }],
+      }),
+    );
+    const products = (block: string) =>
+      one(plan.campaigns, block).negatives.filter((negative) => negative.type === 'product');
+    expect(products('SP-AUTO')).toEqual([
+      { type: 'product', asin: 'B0FREMD001', matchType: 'negativeExact' },
+      { type: 'product', asin: 'B0FREMD002', matchType: 'negativeExact' },
+    ]);
+    expect(products('SP-CAT')).toHaveLength(2);
+    expect(products('SP-PAT')).toEqual([
+      { type: 'product', asin: 'B0FREMD001', matchType: 'negativeExact' },
+    ]);
+  });
+
+  it('trägt die Targeting-Art in jede Kampagne (für die Bulk-Datei, unabhängig vom späteren Katalog)', () => {
+    const { campaigns } = buildCampaignPlan(base());
+    expect(one(campaigns, 'SP-AUTO').targeting).toBe('auto');
+    expect(one(campaigns, 'SP-KW-EXACT').targeting).toBe('keyword');
+    expect(one(campaigns, 'SD-RT-VIEWS').targeting).toBe('audience');
+  });
+
+  it('verlangt keine SKU für Sponsored Brands und meldet eine leere Gruppe als Fehler', () => {
+    const sb = buildCampaignPlan(
+      base({
+        preset: onlyBlocks('SB-VIDEO-KW'),
+        productGroup: {
+          name: 'Flaschen',
+          items: [{ asin: 'B0FLASCHE1', sku: null, isHero: true }],
+        },
+      }),
+    );
+    expect(sb.hints.some((hint) => hint.code === 'missingSku')).toBe(false);
+    const empty = buildCampaignPlan(base({ productGroup: { name: 'Flaschen', items: [] } }));
+    expect(empty.hints).toContainEqual({ severity: 'error', code: 'noProducts' });
+  });
+
+  it('prüft Marken-Begriffe gegen die Grenze negativer Phrasen (4 Wörter)', () => {
+    const plan = buildCampaignPlan(base({ brandTerms: ['eins zwei drei vier fünf'] }));
+    expect(plan.hints).toContainEqual({
+      severity: 'error',
+      code: 'brandTermTooLong',
+      keyword: 'eins zwei drei vier fünf',
+    });
+  });
+
+  it('meldet eigene ASINs unter den fremden Produkten und plant sie dort nicht', () => {
+    const plan = buildCampaignPlan(
+      base({ productTargets: [{ asin: 'b0flasche1' }, { asin: 'B0FREMD001' }] }),
+    );
+    expect(
+      one(plan.campaigns, 'SP-PAT').targets.map((t) => t.type === 'product' && t.asin),
+    ).toEqual(['B0FREMD001']);
+    expect(plan.hints).toContainEqual({
+      severity: 'warning',
+      code: 'ownAsinAsTarget',
+      asin: 'B0FLASCHE1',
+    });
+  });
+
+  it('gibt allgemeinen SB-Keyword-Kampagnen die Marken-Negatives', () => {
+    const plan = buildCampaignPlan(base({ preset: onlyBlocks('SP-BRAND-DEF', 'SB-HEADER-KW') }));
+    expect(one(plan.campaigns, 'SB-HEADER-KW').negatives).toEqual([
+      { type: 'keyword', text: 'waldkauz', matchType: 'negativePhrase' },
+    ]);
+  });
+
+  it('warnt bei freigeschaltetem vCPM, dass das Gebot dann je 1000 sichtbare Impressionen gilt', () => {
+    const plan = buildCampaignPlan(base({ unlocks: { 'SD-RT-VIEWS': { vcpm: true } } }));
+    expect(plan.hints).toContainEqual({
+      severity: 'warning',
+      code: 'vcpmBidPerThousand',
+      campaign: 'SD | RT-VIEW | Flaschen | 30D',
+    });
+  });
+
+  it('rechnet Gebote aus der Eingabe nicht um, nur Katalogwerte; Rückblick aus dem Preset; Phrase isoliert', () => {
+    const plan = buildCampaignPlan(
+      base({
+        preset: {
+          ...preset('consumable'),
+          blocks: [...preset('consumable').blocks, { block: 'SP-KW-PHRASE' }],
+        },
+        profile: {
+          countryCode: 'PL',
+          currencyCode: 'PLN',
+          accountType: 'seller',
+          clientName: null,
+        },
+        eurRate: '4.3',
+        keywords: [{ text: 'trinkflasche', bid: '2.15' }],
+      }),
+    );
+    expect(one(plan.campaigns, 'SP-KW-EXACT').targets[0]).toMatchObject({ bid: '2.15' });
+    expect(one(plan.campaigns, 'SP-KW-BROAD-CLUSTER').targets[0]).toMatchObject({ bid: '2.15' });
+    expect(one(plan.campaigns, 'SP-AUTO').adGroup.defaultBid).toBe('1.94');
+    expect(one(plan.campaigns, 'SD-RT-PURCHASE').targets[0]).toMatchObject({ lookbackDays: 90 });
+    expect(one(plan.campaigns, 'SP-KW-PHRASE').negatives).toContainEqual({
+      type: 'keyword',
+      text: 'trinkflasche',
+      matchType: 'negativeExact',
+    });
   });
 });
