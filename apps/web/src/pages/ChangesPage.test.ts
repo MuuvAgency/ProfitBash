@@ -404,6 +404,22 @@ describe('Änderungen: Übermittlungen', () => {
               errorCode: 'PARENT_NOT_CREATED',
               errorMessage: 'Die Kampagne wird nicht angelegt.',
             }),
+            item(2, {
+              entityType: 'source_negative',
+              campaignRef: 'SP | AUTO | Alt',
+              adGroupRef: 'Auto',
+              payload: {
+                entity: 'source_negative',
+                amazonCampaignId: '111',
+                amazonAdGroupId: '222',
+                negative: {
+                  type: 'keyword',
+                  text: 'trinkflasche glas',
+                  matchType: 'negativeExact',
+                },
+                harvestMarkId: '00000000-0000-4000-8000-0000000000f1',
+              },
+            }),
           ],
           entitiesSyncedAt: null,
         }),
@@ -413,8 +429,11 @@ describe('Änderungen: Übermittlungen', () => {
     await vi.waitFor(() => expect(wrapper.find(`[data-submission="${S1}"]`).exists()).toBe(true));
     expect(wrapper.get(`[data-submission="${S1}"]`).text()).toContain('Kampagnen-Setup');
     const panel = await vi.waitFor(() => wrapper.get('[data-submission-detail]'));
-    await vi.waitFor(() => expect(panel.findAll('[data-setup-item]')).toHaveLength(2));
-    const [campaignRow, keywordRow] = panel.findAll('[data-setup-item]');
+    await vi.waitFor(() => expect(panel.findAll('[data-setup-item]')).toHaveLength(3));
+    const [campaignRow, keywordRow, sourceRow] = panel.findAll('[data-setup-item]');
+    expect(sourceRow!.text()).toContain('Negativ in der Quelle');
+    expect(sourceRow!.text()).toContain('trinkflasche glas (negativ exakt)');
+    expect(sourceRow!.text()).toContain('SP | AUTO | Alt');
     expect(campaignRow!.text()).toContain('Kampagne');
     expect(campaignRow!.text()).toContain('SP | EXACT | Flaschen');
     expect(campaignRow!.text()).toContain('Angelegt');

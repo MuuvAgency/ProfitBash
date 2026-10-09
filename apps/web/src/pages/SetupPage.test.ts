@@ -32,7 +32,43 @@ const campaign = (name: string, overrides: Record<string, unknown> = {}) => ({
   negatives: [],
   ...overrides,
 });
-const inputs = { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} };
+const inputs = {
+  keywords: [],
+  brandTerms: [],
+  productTargets: [],
+  categories: [],
+  harvest: [],
+  unlocks: {},
+};
+const M1 = '00000000-0000-4000-8000-0000000000f1';
+const M2 = '00000000-0000-4000-8000-0000000000f2';
+const harvestMark = (id: string, searchTerm: string, overrides: Record<string, unknown> = {}) => ({
+  id,
+  searchTerm,
+  adProduct: 'SPONSORED_PRODUCTS',
+  campaignName: 'SP | AUTO | Alt',
+  adGroupName: 'Auto',
+  periodStart: '2026-09-01',
+  periodEnd: '2026-09-30',
+  clicks: 10,
+  cost: '7.80',
+  sales: '30.00',
+  purchases: 2,
+  currencyCode: 'EUR',
+  cpc: '0.78',
+  createdAt: '2026-10-01T08:00:00.000Z',
+  ...overrides,
+});
+const sourceNegative = {
+  markId: M1,
+  searchTerm: 'trinkflasche glas',
+  amazonCampaignId: '111',
+  amazonAdGroupId: '222',
+  campaignName: 'SP | AUTO | Alt',
+  adGroupName: 'Auto',
+  negative: { type: 'keyword', text: 'trinkflasche glas', matchType: 'negativeExact' },
+  selected: true,
+};
 const draft = {
   id: D1,
   profileId: P1,
@@ -50,6 +86,7 @@ const draft = {
   updatedAt: '2026-10-09T08:00:00.000Z',
   inputs,
   campaigns: [campaign('SP | EXACT | Flaschen')],
+  sourceNegatives: [],
 };
 
 type Responder = (request: RecordedRequest) => Response | Promise<Response>;
@@ -108,9 +145,11 @@ function routes(overrides: Record<string, Responder | Response> = {}) {
           existing: 'Alt',
         },
       ],
+      sourceNegatives: [],
       eurRate: { rate: '1', date: '2026-10-09' },
       profileBids: {},
     }),
+    'GET /api/ads/tools/setup/harvest': json({ marks: [], truncated: false }),
     'POST /api/ads/tools/setup/drafts': json({ ...draft, id: D1 }, 201),
     ...overrides,
   };
@@ -283,6 +322,7 @@ describe('Seite „Kampagnen-Setup“', () => {
     await mountPage({
       'POST /api/ads/tools/setup/plan': json({
         campaigns: [campaign('A'), campaign('B')],
+        sourceNegatives: [],
         hints: [
           {
             severity: 'error',
@@ -326,5 +366,89 @@ describe('Seite „Kampagnen-Setup“', () => {
     await click('[data-setup-confirm-close] [data-confirm]');
     expect(document.querySelector('[data-setup-editor]')).toBeNull();
     expect(document.querySelector('[data-draft-open]')).not.toBeNull();
+  });
+
+  describe('Harvest von der Merkliste (4.6)', () => {
+    const harvestRoutes = {
+      'GET /api/ads/tools/setup/harvest': json({
+        marks: [
+          harvestMark(M1, 'trinkflasche glas'),
+          harvestMark(M2, 'b0fremd001', { cpc: null, clicks: 0, cost: '0.00' }),
+        ],
+        truncated: false,
+      }),
+      'POST /api/ads/tools/setup/plan': json({
+        campaigns: [campaign('SP | EXACT | Flaschen')],
+        sourceNegatives: [sourceNegative],
+        hints: [{ severity: 'info', code: 'sourceProtected', keyword: 'nordwind becher' }],
+        eurRate: { rate: '1', date: '2026-10-09' },
+        profileBids: {},
+      }),
+    };
+
+    it('übernimmt Begriffe der Merkliste mit Gebot und schlägt das Negativ in der Quelle vor', async () => {
+      const { requests } = await mountPage(harvestRoutes);
+      await click('[data-setup-new]');
+      await choose('[data-setup-profile]', P1);
+      await choose('[data-setup-group]', G1);
+      const row = await found(`[data-harvest-mark="${M1}"]`);
+      expect(row.textContent).toContain('trinkflasche glas');
+      expect(row.textContent).toContain('SP | AUTO | Alt');
+      await click(`[data-harvest-mark="${M1}"] [data-harvest-pick]`);
+      await type(`[data-harvest-mark="${M1}"] [data-harvest-bid]`, '1.10');
+      await click(`[data-harvest-mark="${M2}"] [data-harvest-pick]`);
+      await click(`[data-harvest-mark="${M2}"] [data-harvest-single]`);
+      await click('[data-setup-plan]');
+
+      expect(body(requests, 'POST', '/api/ads/tools/setup/plan')).toMatchObject({
+        inputs: {
+          harvest: [
+            { markId: M1, bid: '1.10' },
+            { markId: M2, single: true },
+          ],
+        },
+        deselectedSources: [],
+      });
+      const proposal = await found('[data-source-negative]');
+      expect(proposal.textContent).toContain('trinkflasche glas');
+      expect(proposal.textContent).toContain('SP | AUTO | Alt');
+      expect((await found('[data-setup-hints]')).textContent).toContain('nordwind becher');
+
+      await click('[data-source-negative] input[type="checkbox"]');
+      await type('[data-setup-name]', 'Harvest');
+      await click('[data-setup-save]');
+      expect(body(requests, 'POST', '/api/ads/tools/setup/drafts')).toMatchObject({
+        inputs: {
+          harvest: [
+            { markId: M1, bid: '1.10' },
+            { markId: M2, single: true },
+          ],
+        },
+        sourceNegatives: [{ markId: M1, selected: false }],
+      });
+
+      requests.length = 0;
+      await click('[data-setup-plan]');
+      expect(body(requests, 'POST', '/api/ads/tools/setup/plan')).toMatchObject({
+        deselectedSources: [M1],
+      });
+    });
+
+    it('zeigt einen leeren Zustand ohne vorgemerkte Begriffe', async () => {
+      await mountPage();
+      await click('[data-setup-new]');
+      await choose('[data-setup-profile]', P1);
+      expect((await found('[data-harvest-empty]')).textContent).toContain('Keine Begriffe');
+    });
+
+    it('zeigt einen Fehler der Merkliste, ohne den Assistenten zu sperren', async () => {
+      await mountPage({
+        'GET /api/ads/tools/setup/harvest': json({ error: { code: 'X', message: 'x' } }, 500),
+      });
+      await click('[data-setup-new]');
+      await choose('[data-setup-profile]', P1);
+      await found('[data-harvest-error]');
+      expect(document.querySelector('[data-setup-keywords]')).not.toBeNull();
+    });
   });
 });

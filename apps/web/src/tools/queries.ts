@@ -139,6 +139,20 @@ export function useSetupDrafts() {
   });
 }
 
+/** Harvest-Merkliste eines Profils als Eingang des Setups (4.6). */
+export function useSetupHarvest(profileId: Ref<string | null>) {
+  const orgId = useActiveOrgId();
+  const { canView } = useToolRights();
+  return useQuery({
+    queryKey: computed(
+      () => ['search-terms', orgId.value, 'harvest', 'setup', profileId.value] as const,
+    ),
+    queryFn: () => api.tools.setup.harvest(profileId.value!),
+    enabled: computed(() => canView.value && orgId.value !== null && profileId.value !== null),
+    staleTime: 15_000,
+  });
+}
+
 export function usePlanSetup() {
   return useMutation({ mutationFn: (input: PlanSetupInput) => api.tools.setup.plan(input) });
 }

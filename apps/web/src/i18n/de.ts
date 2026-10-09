@@ -961,6 +961,7 @@ export const de = {
       product_target: 'Produkt-Target',
       negative_keyword: 'Negatives Keyword',
       negative_product_target: 'Negative ASIN',
+      source_negative: 'Negativ in der Quelle',
     },
     setupStatus: {
       submitted: 'Offen',
@@ -1285,6 +1286,31 @@ export const de = {
     catalog: 'Struktur-Katalog',
   },
   setup: {
+    harvest: {
+      title: 'Von der Merkliste',
+      hint: 'Vorgemerkte Suchbegriffe dieses Profils. Gewählte Begriffe plant das Preset wie Keywords; das Gebot ist der CPC der Merkliste, wenn du keines einträgst.',
+      empty:
+        'Keine Begriffe auf der Merkliste dieses Profils. Vormerken geht in der Suchbegriff-Analyse.',
+      loadFailed: 'Die Merkliste ließ sich nicht laden.',
+      truncated: 'Es werden nur die neuesten {count} Einträge gezeigt.',
+      selected: '{count} gewählt',
+      term: 'Suchbegriff',
+      source: 'Quelle',
+      sourceMissing: 'nicht mehr im Profil',
+      clicks: 'Klicks',
+      cost: 'Kosten',
+      cpc: 'CPC',
+      bid: 'Gebot',
+      single: 'Eigene Kampagne',
+      pickLabel: '„{term}“ übernehmen',
+      bidLabel: 'Gebot für „{term}“',
+      singleLabel: '„{term}“ als eigene Kampagne',
+    },
+    sources: {
+      title: 'In der Quelle negieren',
+      hint: 'Damit der Begriff nur noch in der neuen Kampagne läuft, wird er dort negativ exakt, wo er herkam. Abwählen lässt ihn in der Quelle weiterlaufen. Nach dem Abschluss der Übermittlung verlassen angelegte Begriffe die Merkliste.',
+      label: '„{term}“ in {campaign} · {adGroup} negieren',
+    },
     eyebrow: 'Tools',
     title: 'Kampagnen-Setup',
     description:
@@ -1433,6 +1459,18 @@ export const de = {
       duplicateTarget: '{campaign}: „{target}“ steht doppelt in der Ad Group.',
       offAmazonOnlyUs: '{campaign}: Off-Amazon lässt sich nur in den USA einstellen.',
       adProductLater: '{campaign}: Sponsored Brands und Display legt das Setup noch nicht an.',
+      harvestMarkMissing: 'Ein gewählter Begriff steht nicht mehr auf der Merkliste.',
+      sourceProtected: '„{keyword}“ ist geschützt und wird in der Quelle nie negiert.',
+      sourceMissing: '„{keyword}“: Die Quelle gibt es im Profil nicht mehr; kein Negativ dort.',
+      sourceNotSp:
+        '„{keyword}“: Die Quelle ist keine Sponsored-Products-Kampagne; kein Negativ dort.',
+      sourceAlreadyNegative: '„{keyword}“ ist in der Quelle schon negativ exakt.',
+      sourceIsExact: '„{keyword}“ ist in der Quelle selbst exakt gebucht; kein Negativ dort.',
+      sourceNotPlanned:
+        '„{keyword}“ legt der Plan nicht an; ohne neue Kampagne bleibt die Quelle unverändert.',
+      sourceNegativeMissing:
+        '{campaign}: Die Ad Group für das Negativ „{target}“ gibt es nicht mehr.',
+      sourceNegativeProtected: '„{keyword}“ ist geschützt und darf nicht negiert werden.',
       unknown: 'Hinweis {code}',
     },
     nameIssue: {

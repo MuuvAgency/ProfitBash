@@ -48,6 +48,9 @@ export type SaveSetupDraftInput = Schemas['SaveCampaignSetupDraftRequest'];
 export type SubmitSetupData = Schemas['SubmitCampaignSetupResponse'];
 export type SetupIssueData = Schemas['SetupIssue'];
 export type PlannedCampaignData = SetupDraftData['campaigns'][number];
+export type SourceNegativeData = Schemas['SourceNegative'];
+export type SetupHarvestListData = Schemas['SetupHarvestList'];
+export type SetupHarvestMarkData = SetupHarvestListData['marks'][number];
 export type AssignTagsInput = Schemas['AssignTagsRequest'];
 export type AssignTagsData = Schemas['AssignTagsResponse'];
 export type HarvestListData = Schemas['HarvestListResponse'];
@@ -336,6 +339,8 @@ export function createApi(options: ApiOptions = {}) {
         plan: (input: PlanSetupInput): Promise<PlanSetupData> =>
           unwrap(client.POST('/api/ads/tools/setup/plan', { body: input })),
         list: (): Promise<SetupDraftListData> => unwrap(client.GET('/api/ads/tools/setup/drafts')),
+        harvest: (profileId: string): Promise<SetupHarvestListData> =>
+          unwrap(client.GET('/api/ads/tools/setup/harvest', { params: { query: { profileId } } })),
         get: (id: string): Promise<SetupDraftData> =>
           unwrap(client.GET('/api/ads/tools/setup/drafts/{id}', { params: { path: { id } } })),
         create: (draft: SaveSetupDraftInput): Promise<SetupDraftData> =>

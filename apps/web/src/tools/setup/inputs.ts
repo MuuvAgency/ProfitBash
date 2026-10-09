@@ -31,8 +31,13 @@ const lines = (text: string) =>
     .map((line) => line.trim())
     .filter(Boolean);
 
-export function textsToInputs(texts: SetupTexts, unlocks: SetupInputs['unlocks']): SetupInputs {
+export function textsToInputs(
+  texts: SetupTexts,
+  unlocks: SetupInputs['unlocks'],
+  harvest: SetupInputs['harvest'] = [],
+): SetupInputs {
   return {
+    harvest,
     keywords: [
       ...lines(texts.keywords).map((text) => ({ text })),
       ...lines(texts.single).map((text) => ({ text, single: true })),
