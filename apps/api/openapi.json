@@ -2705,6 +2705,15 @@
               "console",
               "clicks14d"
             ]
+          },
+          "tagIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 10
           }
         },
         "required": [

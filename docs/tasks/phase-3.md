@@ -725,6 +725,25 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Explorer, Portfolios, Tagesreihe, Negatives, fremdes Tag), `analytics/filters.test.ts`, `tags/row-tags.test.ts`,
     `pages/TagsPage.test.ts`, `pages/ExplorerEditing.test.ts` (Spalte, Zuweisen mit „manche“, Lösen, Filter aus der
     URL, Viewer, ohne Feature).
+  - Review (unabhängig): keine kritischen Befunde; Mandantentrennung (Zuweisen, Zähler, Filter je Ebene und
+    Dashboard, Tags je Zeile), SQL der Vererbung, Migration, Rechte und i18n-Keys bestätigt. Übernommen: Der
+    Tag-Filter gehört zu gespeicherten Ansichten (`savedViewFiltersSchema.tagIds`, nur mit Filter gesetzt; vorher
+    ließ eine Ansicht ihn fallen und galt trotz Filter als aktiv); scheitert der Abruf der Tags, gilt kein
+    Tag-Filter (vorher gefilterte Auswertungen ohne sichtbares Feld); `tagIds` der Zeilen werden erst an den
+    gelieferten Zeilen gelesen (nach `limit`, vorher für jede Entity der Ebene); Portfolios zählen entfernte
+    Kampagnen mit Tag nur mit „Entfernte anzeigen“; Anlegen je Organisation nacheinander (Höchstzahl), Zuweisungen
+    in fester Reihenfolge (kein Deadlock zweier Bulk-Anfragen), kein Audit-Event ohne Änderung; Text der
+    Lösch-Rückfrage („überall gelöst“, Zahl nur der eigenen Profile); Merker `singleTable` statt Vergleich der
+    Ebene; Tests für Ad-Group-Vererbung und Ansichten.
+  - **Offen bzw. bewusst so:** Der Filter `tagIds` und `attributes.tagIds` hängen nicht am Feature `tags` (jede
+    Auswertung nimmt sie an; ohne das Feature sieht die Oberfläche weder Namen noch Feld). Wer seine Spalten im
+    Explorer schon einmal gewählt hat, muss „Tags“ unter „Spalten“ selbst einschalten (die gespeicherte Auswahl kennt
+    die Spalte nicht). Ein angefasstes Häkchen im Zuweisen-Dialog lässt sich nicht auf „unverändert“ zurückstellen
+    (abbrechen und neu öffnen). Ein Farbwechsel zeichnet schon sichtbare Zellen erst nach dem Neuladen der Zeilen
+    neu. Tags an Portfolios, Negatives und Suchbegriffen gibt es nicht (F7). Die gespeicherte Ansicht prüft Tags
+    nicht gegen die Organisation (die Oberfläche lässt unbekannte weg). Nicht getestet: Tag-Filter zusammen mit
+    Ad-Typ, Portfolio mit einer Kampagne mit und einer ohne Tag, `ready` und gescheiterter Tag-Abruf in
+    `useAnalyticsFilters`, die Mehrfachauswahl der Filterleiste, gleichzeitiges Anlegen und Zuweisen.
   - Browser-Pane geprüft (Demo-Daten, 2026-10-09): zwei Tags angelegt, zwei Kampagnen im Explorer zugewiesen
     („2 Zuweisungen hinzugefügt“), Filter über die URL: 2 Kampagnen, 101 Targets darunter, Dashboard mit Feld
     „Tags“ und Hinweis; Konsole ohne Fehler, kein waagerechtes Scrollen. Test-Tags danach gelöscht.

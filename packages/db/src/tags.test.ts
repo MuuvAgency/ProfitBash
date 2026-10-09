@@ -49,14 +49,12 @@ beforeAll(async () => {
     .returning({ id: users.id });
   other.otto = otto!.id;
   stranger = niemand!.id;
-  await db
-    .insert(members)
-    .values({
-      organizationId: other.org,
-      userId: other.otto,
-      role: 'admin',
-      createdAt: new Date(),
-    });
+  await db.insert(members).values({
+    organizationId: other.org,
+    userId: other.otto,
+    role: 'admin',
+    createdAt: new Date(),
+  });
   const [profile] = await db
     .insert(amazonAdsProfiles)
     .values({
@@ -131,6 +129,21 @@ describe('Tags verwalten', () => {
     expect(
       await updateTag(testDb.db, { ...as(f.ada), id: winter.id, name: 'WINTER' }),
     ).toMatchObject({ name: 'WINTER' });
+  });
+
+  it('schreibt kein Audit-Event, wenn sich nichts ändert', async () => {
+    const winter = await tag('Winter');
+    await testDb.db.delete(auditEvents);
+
+    const same = await updateTag(testDb.db, {
+      ...as(f.ada),
+      id: winter.id,
+      name: 'Winter',
+      color: 'violet',
+    });
+
+    expect(same).toMatchObject({ name: 'Winter', color: 'violet' });
+    expect(await testDb.db.select().from(auditEvents)).toHaveLength(0);
   });
 
   it('löscht ein Tag samt Zuweisungen, mit Audit-Event', async () => {

@@ -4791,6 +4791,7 @@ export interface components {
             currency: "auto" | string;
             /** @enum {string} */
             attribution: "console" | "clicks14d";
+            tagIds?: string[];
         };
         SavedViewExplorer: {
             /** @enum {string} */

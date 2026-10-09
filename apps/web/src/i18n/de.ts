@@ -1220,7 +1220,7 @@ export const de = {
     delete: {
       action: 'Tag „{name}“ löschen',
       title: 'Tag löschen',
-      text: 'Das Tag „{name}“ wird gelöscht. Es ist noch nirgends zugewiesen. | Das Tag „{name}“ wird gelöscht und von {count} Eintrag gelöst. | Das Tag „{name}“ wird gelöscht und von {count} Einträgen gelöst.',
+      text: 'Das Tag „{name}“ wird gelöscht und überall gelöst, wo es zugewiesen ist. | Das Tag „{name}“ wird gelöscht und überall gelöst, wo es zugewiesen ist (in deinen Profilen: {count} Eintrag). | Das Tag „{name}“ wird gelöscht und überall gelöst, wo es zugewiesen ist (in deinen Profilen: {count} Einträge).',
       confirm: 'Löschen',
     },
     assign: {

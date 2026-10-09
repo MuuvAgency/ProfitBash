@@ -1382,6 +1382,33 @@ describe('Tags (phase-3.md 3.7)', () => {
     }
   });
 
+  it('vererbt das Tag einer Ad Group an ihre Targets, Product Ads und Negatives, nicht an die Kampagne', async () => {
+    const [group] = await testDb.db
+      .insert(tags)
+      .values({ organizationId: ids.org, name: 'Gruppe', color: 'ink' })
+      .returning({ id: tags.id });
+    await testDb.db.insert(tagAssignments).values(assign(group!.id, ids.de, 'ad_group', ids.agDe));
+    const query = { ...base(), tagIds: [group!.id] };
+
+    for (const level of ['target', 'productAd'] as const) {
+      const all = await queryExplorerRows(testDb.db, {
+        ...base(),
+        level,
+        filter: { adGroupIds: [ids.agDe] },
+      });
+      const tagged = await queryExplorerRows(testDb.db, { ...query, level });
+      expect(tagged.rows.map((row) => row.id).sort(), level).toEqual(
+        all.rows.map((row) => row.id).sort(),
+      );
+    }
+    const negatives = await queryNegatives(testDb.db, query);
+    expect(negatives.rows.every((row) => row.attributes.adGroupId === ids.agDe)).toBe(true);
+    expect((await queryExplorerRows(testDb.db, { ...query, level: 'campaign' })).rows).toEqual([]);
+    const adGroups = await queryExplorerRows(testDb.db, { ...query, level: 'adGroup' });
+    expect(adGroups.rows.map((row) => row.id)).toEqual([ids.agDe]);
+    expect(adGroups.rows[0]!.attributes.tagIds).toEqual([group!.id]);
+  });
+
   it('ein Tag am Target gilt für das Target und seine Suchbegriffe, nicht für die Kampagne', async () => {
     const query = { ...base(), tagIds: [tagIds.target] };
 

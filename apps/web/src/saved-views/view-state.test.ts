@@ -110,3 +110,24 @@ describe('Zustand einer Ansicht (F8)', () => {
     ).toBeNull();
   });
 });
+
+describe('Tag-Filter in Ansichten (phase-3.md 3.7)', () => {
+  const T1 = '00000000-0000-4000-8000-0000000000d1';
+  const T2 = '00000000-0000-4000-8000-0000000000d2';
+
+  it('gehört zur Ansicht und kommt beim Laden zurück', () => {
+    const state = viewState('dashboard', { ...DEFAULT_FILTER_STATE, tagIds: [T2, T1] });
+    expect(state.filters.tagIds).toEqual([T1, T2]);
+    expect(filtersFromView(state).tagIds).toEqual([T1, T2]);
+  });
+
+  it('ohne Tag-Filter bleibt die Ansicht wie vor 3.7 gespeichert (aktive Ansicht wird erkannt)', () => {
+    const plain = viewState('dashboard', DEFAULT_FILTER_STATE);
+    expect('tagIds' in plain.filters).toBe(false);
+    const views = [{ id: 'ohne', state: plain }];
+    expect(matchingView(views, viewState('dashboard', DEFAULT_FILTER_STATE))?.id).toBe('ohne');
+    expect(
+      matchingView(views, viewState('dashboard', { ...DEFAULT_FILTER_STATE, tagIds: [T1] })),
+    ).toBeNull();
+  });
+});

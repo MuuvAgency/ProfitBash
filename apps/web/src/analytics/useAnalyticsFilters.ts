@@ -81,7 +81,10 @@ export function useAnalyticsFilters() {
   // Änderung auf (kein eigener Verlaufseintrag dafür).
   const { canView: canViewTags } = useTagRights();
   const tags = useTags();
-  const knownTags = computed(() => (canViewTags.value ? tags.data.value : []));
+  // Scheitert der Abruf der Tags, gilt kein Tag-Filter: Die Filterleiste könnte ihn weder zeigen noch aufheben.
+  const knownTags = computed(() =>
+    canViewTags.value && !tags.isError.value ? tags.data.value : [],
+  );
 
   /** Letzte eigene Änderung: gilt vor einer gespeicherten Auswahl, die erst danach ankommt. */
   const local = shallowRef<FilterState | null>(null);
