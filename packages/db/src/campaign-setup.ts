@@ -11,6 +11,7 @@ import { planSetupItems, reviewCampaignPlan, type PlanReviewIssue } from '@profi
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { loadAdChangeSubmissionSummaries, type AdChangeSubmissionSummary } from './ad-changes';
+import { closeAdChangeSubmission } from './ad-change-processing';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
 import {
@@ -552,11 +553,16 @@ export async function submitCampaignSetupDraft(
           unsupported,
         },
       });
+      // Nichts anlegbar (nur SB/SD): sofort abgeschlossen, sonst hinge sie ohne Datei bzw. Job offen.
+      if (specs.every((spec) => !spec.supported)) {
+        await closeAdChangeSubmission(tx, { submissionId: submission!.id, now });
+      }
       const [summary] = await loadAdChangeSubmissionSummaries(
         tx,
         eq(adChangeSubmissions.id, submission!.id),
       );
-      if (input.channel === 'api') await input.enqueue(tx, summary!);
+      if (input.channel === 'api' && summary!.status === 'pending')
+        await input.enqueue(tx, summary!);
       return {
         status: 'submitted',
         submission: summary!,
