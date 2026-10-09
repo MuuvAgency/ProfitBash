@@ -8,6 +8,7 @@ import type {
   PlanCampaignSetupResponse,
   SubmitCampaignSetupResponse,
 } from '@profitbash/shared';
+import { todayInTimezone } from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -22,6 +23,7 @@ import {
 const {
   adChangeSubmissions,
   amazonAdsProfiles,
+  amazonAdsTargetDailyMetrics,
   auditEvents,
   campaignSetupDrafts,
   campaignSetupItems,
@@ -278,6 +280,137 @@ describe('Entwürfe (/api/ads/tools/setup/drafts)', () => {
       await ctx.testDb.db
         .insert(orgEntitlements)
         .values({ organizationId: other.org, feature: 'tools' });
+    }
+  });
+});
+
+describe('Rechte, fremde Organisation und ausgeblendete Profile je Endpunkt', () => {
+  const update = (id: string, version = 1) => ({
+    version,
+    draft: {
+      profileId: f.profile,
+      productGroupId: groupId,
+      presetKey: 'control',
+      name: 'Neu',
+      campaignState: 'ENABLED',
+      inputs,
+      campaigns: [],
+    },
+  });
+
+  it('Viewer legen nicht an und verwerfen nicht', async () => {
+    const saved = await draft();
+    const planned = await plan(viewer);
+    expect(
+      (
+        await call('POST', '/drafts', viewer, {
+          profileId: f.profile,
+          productGroupId: groupId,
+          presetKey: 'control',
+          name: 'X',
+          campaignState: 'ENABLED',
+          inputs,
+          campaigns: planned.body.campaigns,
+        })
+      ).status,
+    ).toBe(403);
+    expect((await call('POST', `/drafts/${saved.id}/discard`, viewer, { version: 1 })).status).toBe(
+      403,
+    );
+  });
+
+  it('fremde Organisationen sehen und ändern nichts', async () => {
+    const saved = await draft();
+    const body = update(saved.id);
+    body.draft.campaigns = saved.campaigns as never[];
+    expect(
+      (await call<CampaignSetupDraftListResponse>('GET', '/drafts', foreign)).body.drafts,
+    ).toEqual([]);
+    expect((await call('PUT', `/drafts/${saved.id}`, foreign, body)).status).toBe(404);
+    expect(
+      (await call('POST', `/drafts/${saved.id}/discard`, foreign, { version: 1 })).status,
+    ).toBe(404);
+    expect(
+      (
+        await call('POST', `/drafts/${saved.id}/submit`, foreign, {
+          version: 1,
+          channel: 'bulk_file',
+        })
+      ).status,
+    ).toBe(404);
+  });
+
+  it('ausgeblendete Profile verbergen ihre Entwürfe, auch vor Admins', async () => {
+    const saved = await draft();
+    const body = update(saved.id);
+    body.draft.campaigns = saved.campaigns as never[];
+    await ctx.testDb.db.update(amazonAdsProfiles).set({ isHidden: true });
+    expect(
+      (await call<CampaignSetupDraftListResponse>('GET', '/drafts', admin)).body.drafts,
+    ).toEqual([]);
+    expect((await call('GET', `/drafts/${saved.id}`, admin)).status).toBe(404);
+    expect((await call('PUT', `/drafts/${saved.id}`, admin, body)).status).toBe(404);
+    expect((await call('POST', `/drafts/${saved.id}/discard`, admin, { version: 1 })).status).toBe(
+      404,
+    );
+    expect(
+      (
+        await call('POST', `/drafts/${saved.id}/submit`, admin, {
+          version: 1,
+          channel: 'bulk_file',
+        })
+      ).status,
+    ).toBe(404);
+  });
+});
+
+describe('Planen: Kurs und Gebote aus dem Profil (F13)', () => {
+  it('meldet einen fehlenden Tageskurs außerhalb von EUR', async () => {
+    await ctx.testDb.db
+      .update(amazonAdsProfiles)
+      .set({ currencyCode: 'SEK' })
+      .where(eq(amazonAdsProfiles.id, f.profile));
+    try {
+      const res = await plan(editor);
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('CAMPAIGN_SETUP_FX_RATE_MISSING');
+    } finally {
+      await ctx.testDb.db
+        .update(amazonAdsProfiles)
+        .set({ currencyCode: 'EUR' })
+        .where(eq(amazonAdsProfiles.id, f.profile));
+    }
+  });
+
+  it('schlägt Gebote aus den Kennzahlen des Profils vor und lässt sich abschalten', async () => {
+    const { db } = ctx.testDb;
+    const yesterday = new Date(`${todayInTimezone('Europe/Berlin', new Date())}T12:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    await db.insert(amazonAdsTargetDailyMetrics).values({
+      organizationId: ctx.seeded.organizationId,
+      profileId: f.profile,
+      targetId: f.keyword,
+      date: yesterday.toISOString().slice(0, 10),
+      adProduct: 'SPONSORED_PRODUCTS',
+      currencyCode: 'EUR',
+      importedAt: new Date(),
+      impressions: 400,
+      clicks: 40,
+      cost: '22.40',
+    });
+    try {
+      const res = await plan(editor);
+      expect(res.body.profileBids).toEqual({ keyword: { broad: '0.56' } });
+      const off = await call<PlanCampaignSetupResponse>('POST', '/plan', editor, {
+        profileId: f.profile,
+        productGroupId: groupId,
+        presetKey: 'control',
+        inputs,
+        useProfileBids: false,
+      });
+      expect(off.body.profileBids).toEqual({});
+    } finally {
+      await db.delete(amazonAdsTargetDailyMetrics);
     }
   });
 });

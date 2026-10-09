@@ -264,4 +264,67 @@ describe('Seite „Kampagnen-Setup“', () => {
     expect((await found('[data-setup-issues]')).textContent).toContain('schon vergeben');
     expect(document.querySelector('[data-setup-submitted]')).toBeNull();
   });
+
+  it('nennt den fehlenden Tageskurs und gleichzeitige Änderungen verständlich', async () => {
+    await mountPage({
+      'POST /api/ads/tools/setup/plan': json(
+        { error: { code: 'CAMPAIGN_SETUP_FX_RATE_MISSING', message: 'x' } },
+        409,
+      ),
+    });
+    await click('[data-setup-new]');
+    await choose('[data-setup-profile]', P1);
+    await choose('[data-setup-group]', G1);
+    await click('[data-setup-plan]');
+    expect((await found('[data-setup-editor]')).textContent).toContain('Tageskurs');
+  });
+
+  it('gibt das Übermitteln frei, wenn der Nutzer die gemeldete Kampagne korrigiert oder entfernt', async () => {
+    await mountPage({
+      'POST /api/ads/tools/setup/plan': json({
+        campaigns: [campaign('A'), campaign('B')],
+        hints: [
+          {
+            severity: 'error',
+            code: 'budgetOutOfRange',
+            campaign: 'A',
+            value: '25.00',
+            min: '30',
+            max: '1000',
+          },
+          { severity: 'error', code: 'campaignNameInvalid', campaign: 'B', issue: 'tooLong' },
+        ],
+        eurRate: { rate: '1', date: '2026-10-09' },
+        profileBids: { keyword: { exact: '0.71' } },
+      }),
+    });
+    await click('[data-setup-new]');
+    await choose('[data-setup-profile]', P1);
+    await choose('[data-setup-group]', G1);
+    await click('[data-setup-plan]');
+    await type('[data-setup-name]', 'X');
+    const submit = () => document.querySelector<HTMLButtonElement>('[data-setup-submit]')!;
+    expect(submit().disabled).toBe(true);
+    // Gebote aus dem Profil: übersetzt und als Zahl formatiert.
+    expect(document.body.textContent).toContain('exakt 0,71');
+
+    await type('[data-campaign-budget="A"]', '35.00');
+    expect(submit().disabled).toBe(true);
+    await click('[data-campaign-remove="B"]');
+    expect(submit().disabled).toBe(false);
+    expect(document.querySelector('[data-setup-hints]')).toBeNull();
+  });
+
+  it('schützt ungespeicherte Änderungen beim Schließen; „Öffnen“ gibt es erst nach dem Schließen', async () => {
+    await mountPage();
+    await click(`[data-draft="${D1}"] [data-draft-open]`);
+    expect(document.querySelector('[data-draft-open]')).toBeNull();
+    await type('[data-setup-name]', 'Neuer Name');
+    await click('[data-setup-close]');
+    expect(document.querySelector('[data-setup-editor]')).not.toBeNull();
+    expect((await found('[data-setup-confirm-close]')).textContent).toContain('nicht gespeichert');
+    await click('[data-setup-confirm-close] [data-confirm]');
+    expect(document.querySelector('[data-setup-editor]')).toBeNull();
+    expect(document.querySelector('[data-draft-open]')).not.toBeNull();
+  });
 });

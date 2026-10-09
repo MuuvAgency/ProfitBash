@@ -164,6 +164,7 @@ async function openDraft(id: string) {
               {{ t('setup.drafts.toChanges') }}
             </RouterLink>
             <Button
+              v-if="editing === undefined"
               data-draft-open
               severity="secondary"
               variant="text"

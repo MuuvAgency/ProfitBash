@@ -372,10 +372,20 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     speichern, als Bulk-Datei übermitteln (45 Anlagen, eine SD-Kampagne als „noch nicht“), Detail auf der Seite
     „Änderungen“, Download (`profitbash-setup-…xlsx`), Handy und Hell-Modus (die Tabelle lief am Handy über:
     behoben), Konsole ohne Fehler. Testdaten danach gelöscht.
+  - **Review-Befunde (eingearbeitet):** Fehlertexte für alle `CAMPAIGN_SETUP_*` (fehlender Kurs, gleichzeitige
+    Änderung, keine Verbindung …). Hinweise einer Kampagne fallen weg, wenn der Nutzer sie entfernt bzw. Budget oder
+    Standardgebot korrigiert (sonst blieb das Übermitteln gesperrt; der Server prüft beim Übermitteln erneut). Gebote
+    aus dem Profil und der Kurs-Hinweis übersetzt und als Betrag bzw. Datum formatiert. Ungespeicherte Änderungen:
+    „Schließen“ fragt nach, „Öffnen“ anderer Entwürfe gibt es erst nach dem Schließen, „Verwerfen“ fragt nach.
+    „Gebote aus dem Profil“ umschalten verlangt neues Planen; Gruppe und Preset zählen als ungespeicherte
+    Änderung. Detail auf der Seite „Änderungen“: Match-Typ, Ausdruck und Platzierung übersetzt, eigene Fehlercodes
+    übersetzt. API-Tests je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`), fehlender Kurs und
+    Gebote aus dem Profil über die API.
   - **Offen bzw. bewusst so:** Gebote einzelner Keywords lassen sich in der Vorschau nicht ändern (nur Budget und
     Standardgebot je Kampagne; feiner über „Neu planen“ mit Geboten in der Eingabe später). Ein Ändern der Eingaben
     verlangt „Neu planen“, das manuelle Änderungen der Vorschau überschreibt. Die Kanalwahl „API“ prüft die
-    Verbindung erst beim Übermitteln (`409`). Startdatum ist der Tag des Downloads (Hinweis auf der Seite).
+    Verbindung erst beim Übermitteln (`409`). Startdatum ist der Tag des Downloads (Hinweis auf der Seite). Ein
+    geöffneter, gespeicherter Entwurf zeigt Hinweise erst nach „Neu planen“ bzw. beim Übermitteln.
 
 ### 4.6 Harvest von der Merkliste
 - [ ] Merkliste als Eingang des Setups (Auswahl je Profil), Vorschlag für das Negieren in der Quelle (F7), Einträge nach
