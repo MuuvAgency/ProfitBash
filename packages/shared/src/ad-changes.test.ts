@@ -234,6 +234,12 @@ describe('Anpassen (±Prozent, ±Betrag; 3.5)', () => {
       expect(adChangeAdjustmentIssue('percent', value), value).toBe('invalidValue');
     }
     expect(adChangeAdjustmentIssue('amount', '-250')).toBeNull();
+    // Führende Nullen sind keine gültige Schreibweise (sonst gälte „-050“ als −100 % oder weniger).
+    for (const value of ['050', '-050', '-099.5', '00.5']) {
+      expect(adChangeAdjustmentIssue('percent', value), value).toBe('invalidValue');
+    }
+    expect(adChangeAdjustmentIssue('percent', '-99.5')).toBeNull();
+    expect(adChangeAdjustmentIssue('percent', '-0.5')).toBeNull();
   });
 
   it('gilt nur für Budget und Gebote der passenden Entity', () => {

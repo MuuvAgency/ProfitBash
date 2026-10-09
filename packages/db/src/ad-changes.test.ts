@@ -565,6 +565,34 @@ describe('stageAdChanges: anpassen (±Prozent, ±Betrag)', () => {
     expect(cart!.map((c) => c.after)).toEqual(['0.55']);
   });
 
+  it('lässt bei Angaben zur selben Stelle die letzte gelten, auch wenn sie eine abgelehnte Anpassung ist', async () => {
+    const result = await stage(ids.ada, [
+      update('target', ids.target, 'bid', '1.00'),
+      adjust('target', ids.target, 'bid', 'percent', '-99.9'),
+    ]);
+    expect(result.results).toEqual([
+      { outcome: 'unchanged' },
+      { outcome: 'rejected', reason: 'resultOutOfRange' },
+    ]);
+    expect(await listPendingAdChanges(testDb.db, as(ids.ada))).toEqual([]);
+
+    const both = await stage(ids.ada, [
+      adjust('target', ids.target, 'bid', 'percent', '10'),
+      adjust('target', ids.target, 'bid', 'amount', '0.20'),
+    ]);
+    expect(both.results.map((r) => r.outcome)).toEqual(['unchanged', 'created']);
+    expect((await listPendingAdChanges(testDb.db, as(ids.ada)))!.map((c) => c.after)).toEqual([
+      '0.70',
+    ]);
+  });
+
+  it('nimmt eine Vormerkung zurück, wenn das gerundete Ergebnis dem Stand entspricht', async () => {
+    await stage(ids.ada, [update('target', ids.target, 'bid', '0.80')]);
+    // 0.50 + 0.1 % = 0.5005 → 0.50
+    const result = await stage(ids.ada, [adjust('target', ids.target, 'bid', 'percent', '0.1')]);
+    expect(result.results).toEqual([{ outcome: 'removed' }]);
+  });
+
   it('nimmt für ein Target ohne eigenes Gebot das Standardgebot der Ad Group als Ausgangswert', async () => {
     await stage(ids.ada, [adjust('target', ids.targetWithoutBid, 'bid', 'percent', '50')]);
 

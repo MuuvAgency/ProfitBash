@@ -1003,6 +1003,8 @@ export const de = {
         decrease: 'Senken',
       },
       percentLabel: 'Prozent',
+      invalidPercent:
+        'Bitte Prozent über 0 mit höchstens zwei Nachkommastellen eingeben. Beim Senken weniger als 100.',
       amountLabel: {
         fixed: 'Neuer Wert in {currency}',
         amount: 'Betrag in {currency}',
@@ -1019,6 +1021,8 @@ export const de = {
     bidding: {
       title: 'Gebotsstrategie und Platzierungen',
       noStrategy: 'Keine Strategie',
+      notReady:
+        'Erst wenn die offenen Änderungen geladen sind, lässt sich hier speichern: Sonst ginge eine eigene Vormerkung verloren.',
       strategyMissing:
         'Diese Strategie lässt sich hier nicht setzen. Ohne eine der drei wählbaren Strategien nimmt Amazon keine Gebotsanpassungen an.',
       placements: 'Gebotsanpassung je Platzierung',

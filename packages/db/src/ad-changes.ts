@@ -134,8 +134,12 @@ export async function stageAdChanges(
     const lastByKey = new Map<string, number>();
     const idsByType = new Map<AdChangeEntityType, string[]>();
     changes.forEach((change, index) => {
+      // Auch eine abgelehnte Anpassung ist die letzte Angabe zu ihrer Stelle: Frühere gelten dann nicht.
+      const given = input.changes[index]!;
+      if (given.operation !== 'create_negative') {
+        lastByKey.set(pendingKey(given.entityType, given.entityId, given.field), index);
+      }
       if (change?.operation !== 'update') return;
-      lastByKey.set(pendingKey(change.entityType, change.entityId, change.field), index);
       const list = idsByType.get(change.entityType) ?? [];
       list.push(change.entityId);
       idsByType.set(change.entityType, list);
@@ -183,6 +187,7 @@ export async function stageAdChanges(
     const toDelete: { index: number; id: string; profileId: string }[] = [];
     const toUpsert: { index: number; key: string; values: typeof adChanges.$inferInsert }[] = [];
     for (const index of lastByKey.values()) {
+      if (!changes[index]) continue;
       const change = changes[index] as AdChangeUpdateInput;
       const key = pendingKey(change.entityType, change.entityId, change.field);
       const entity = entities.get(`${change.entityType}:${change.entityId}`);

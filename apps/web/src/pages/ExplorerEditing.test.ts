@@ -310,6 +310,8 @@ describe('Explorer: Inline-Bearbeitung', () => {
         ],
       },
     ]);
+    // Der Fokus bleibt im Grid (Pfeiltasten gehen weiter).
+    expect(document.activeElement).toBe(cell('nistkasten meise', 'bid'));
     // Danach werden die offenen Änderungen und der Warenkorb neu geladen.
     await vi.waitFor(() =>
       expect(requests.filter((r) => r.path === '/api/ads/changes/open').length).toBeGreaterThan(1),
@@ -330,6 +332,7 @@ describe('Explorer: Inline-Bearbeitung', () => {
 
     await type(await open(), '0,90', 'Escape');
     expect(cell('nistkasten meise', 'bid').querySelector('input')).toBeNull();
+    expect(document.activeElement).toBe(cell('nistkasten meise', 'bid'));
     await type(await open(), '0,5');
     expect(cell('nistkasten meise', 'bid').querySelector('input')).toBeNull();
 
@@ -340,6 +343,60 @@ describe('Explorer: Inline-Bearbeitung', () => {
       'höchstens zwei Nachkommastellen',
     );
     expect(staged(requests)).toEqual([]);
+  });
+
+  it('übernimmt beim Verlassen der Zelle; eine ungültige Eingabe verfällt dabei', async () => {
+    const { requests } = stubFetch(routes());
+    await mountExplorer('/ads/explorer/targets');
+    await waitForRow('nistkasten meise');
+    const open = async () => {
+      cell('nistkasten meise', 'bid').querySelector<HTMLElement>('[data-edit]')!.click();
+      await flushPromises();
+      return cell('nistkasten meise', 'bid').querySelector<HTMLInputElement>(
+        'input[data-edit-input]',
+      )!;
+    };
+    const leave = async (input: HTMLInputElement, text: string) => {
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('blur'));
+      await flushPromises();
+    };
+
+    await leave(await open(), 'abc');
+    expect(cell('nistkasten meise', 'bid').querySelector('input')).toBeNull();
+    expect(staged(requests)).toEqual([]);
+
+    await leave(await open(), '0,65');
+    expect(staged(requests).map((r) => r.body)).toMatchObject([
+      { changes: [{ entityId: T1, field: 'bid', value: '0.65' }] },
+    ]);
+  });
+
+  it('übernimmt den Status per Tastatur erst mit Enter (Pfeiltasten blättern nur)', async () => {
+    const { requests } = stubFetch(routes());
+    await mountExplorer('/ads/explorer/targets');
+    await waitForRow('vogelhaus');
+    cell('vogelhaus', 'state').querySelector<HTMLElement>('[data-edit]')!.click();
+    await flushPromises();
+    const select = cell('vogelhaus', 'state').querySelector<HTMLSelectElement>(
+      'select[data-edit-input]',
+    )!;
+    select.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    select.value = 'PAUSED';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    select.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    select.value = 'ARCHIVED';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushPromises();
+    expect(staged(requests)).toEqual([]);
+
+    select.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await flushPromises();
+    expect(staged(requests).map((r) => r.body)).toMatchObject([
+      { changes: [{ entityId: T2, field: 'state', value: 'ARCHIVED' }] },
+    ]);
+    expect(document.activeElement).toBe(cell('vogelhaus', 'state'));
   });
 
   it('ändert den Status über eine Auswahl in der Zelle', async () => {
@@ -651,13 +708,89 @@ describe('Explorer: markierte Zeilen', () => {
     });
     expect(staged(requests)[0]!.body).toEqual({
       origin: 'explorer',
-      changes: [
-        update('bidding_strategy', 'SALES_UP_AND_DOWN'),
-        update('placement_top', '50'),
-        update('placement_rest_of_search', '0'),
-        update('placement_product_page', '0'),
-        update('placement_amazon_business', '0'),
-      ],
+      // Nur, was im Dialog geändert wurde: Unberührte Felder könnten sonst eine Vormerkung zurücknehmen.
+      changes: [update('bidding_strategy', 'SALES_UP_AND_DOWN'), update('placement_top', '50')],
     });
+  });
+
+  it('sperrt Strategie und Platzierungen, solange die offenen Änderungen fehlen, und meldet das', async () => {
+    stubFetch({
+      ...routes(),
+      'GET /api/ads/changes/open': json({ error: { code: 'INTERNAL_ERROR', message: 'x' } }, 500),
+    });
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Nistkasten');
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain(
+        'Die offenen Änderungen konnten nicht geladen werden.',
+      ),
+    );
+    // Das Grid bleibt nutzbar.
+    expect(cell('SP Nistkasten', 'budget').querySelector('[data-edit]')).not.toBeNull();
+    const sbRow = cell('SP Nistkasten', 'name').closest('.ag-row')!.getAttribute('row-index');
+    document
+      .querySelector<HTMLInputElement>(
+        `.ag-row[row-index="${sbRow}"] .ag-selection-checkbox input`,
+      )!
+      .click();
+    await flushPromises();
+    await (await vi.waitFor(() => wrapper.get('[data-bulk="bidding"]'))).trigger('click');
+    await flushPromises();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    const top = dialog.querySelector<HTMLInputElement>('input[data-placement="placement_top"]')!;
+    top.value = '50';
+    top.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPromises();
+    expect(dialog.querySelector<HTMLButtonElement>('[data-bidding-submit]')!.disabled).toBe(true);
+    expect(dialog.textContent).toContain('Erst wenn die offenen Änderungen geladen sind');
+  });
+
+  it('erklärt ungültige Eingaben im Bulk-Dialog und leert das Feld beim Wechsel der Art', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountExplorer('/ads/explorer/targets');
+    await waitForRow('nistkasten meise');
+    await selectAllRows();
+    await (await vi.waitFor(() => wrapper.get('[data-bulk="bid"]'))).trigger('click');
+    await flushPromises();
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+    const value = () => dialog.querySelector<HTMLInputElement>('input[data-bulk-value]')!;
+    value().value = '1,234';
+    value().dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPromises();
+    expect(value().getAttribute('aria-invalid')).toBe('true');
+    expect(dialog.textContent).toContain('höchstens zwei Nachkommastellen');
+
+    dialog.querySelector<HTMLInputElement>('input[value="amount"]')!.click();
+    await flushPromises();
+    expect(value().value).toBe('');
+    dialog.querySelector<HTMLInputElement>('input[value="percent"]')!.click();
+    await flushPromises();
+    dialog.querySelector<HTMLInputElement>('input[value="decrease"]')!.click();
+    value().value = '100';
+    value().dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPromises();
+    expect(dialog.textContent).toContain('Beim Senken weniger als 100');
+    expect(dialog.querySelector<HTMLButtonElement>('[data-bulk-submit]')!.disabled).toBe(true);
+  });
+
+  it('markiert mit der Kopf-Checkbox nur gefilterte Zeilen und hebt die Markierung beim Filtern auf', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountExplorer('/ads/explorer/targets');
+    await waitForRow('nistkasten meise');
+    const grid = wrapper.findComponent({ name: 'AgGridVue' }).vm as unknown as {
+      api: {
+        setFilterModel: (model: unknown) => void;
+        getSelectedRows: () => unknown[];
+      };
+    };
+    await selectAllRows();
+    await vi.waitFor(() => expect(wrapper.get('[data-bulk-bar]').text()).toContain('3 markiert'));
+
+    grid.api.setFilterModel({ name: { filterType: 'text', type: 'contains', filter: 'vogel' } });
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.find('[data-bulk-bar]').exists()).toBe(false));
+
+    await selectAllRows();
+    await vi.waitFor(() => expect(wrapper.get('[data-bulk-bar]').text()).toContain('1 markiert'));
   });
 });

@@ -185,7 +185,8 @@ export const AD_CHANGE_ADJUSTABLE_FIELDS = ['budget', 'default_bid', 'bid'] as c
 export const AD_CHANGE_ADJUST_MODES = ['percent', 'amount'] as const;
 export type AdChangeAdjustMode = (typeof AD_CHANGE_ADJUST_MODES)[number];
 
-const SIGNED_AMOUNT = /^-?\d{1,9}(\.\d{1,2})?$/;
+/** Ohne führende Nullen: Sonst ließe sich die Größe einer Prozentangabe nicht an den Stellen ablesen. */
+const SIGNED_AMOUNT = /^-?(0|[1-9]\d{0,8})(\.\d{1,2})?$/;
 
 /** Prüft die Angabe einer Anpassung: Decimal-String mit Vorzeichen, nicht 0, Prozent über −100. */
 export function adChangeAdjustmentIssue(

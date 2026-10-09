@@ -84,6 +84,12 @@ watch(
   { immediate: true },
 );
 
+// Ein Wert für „fester Wert“ ist kein Betrag für „erhöhen um“: beim Wechsel der Art leeren.
+watch(mode, () => {
+  percentText.value = '';
+  amountTexts.value = {};
+});
+
 /** Prozent: Decimal-String über 0 mit höchstens zwei Nachkommastellen, beim Senken unter 100. */
 const percent = computed(() => {
   const value = parseDecimalInput(percentText.value);
@@ -99,6 +105,10 @@ const amounts = computed(() => {
   }
   return values;
 });
+
+const percentInvalid = computed(() => percentText.value.trim() !== '' && percent.value === null);
+const amountInvalid = (currency: string) =>
+  (amountTexts.value[currency] ?? '').trim() !== '' && amounts.value[currency] === undefined;
 
 const edit = computed<BulkEdit | null>(() => {
   if (props.field === 'state') {
@@ -243,8 +253,20 @@ async function submit() {
             type="text"
             inputmode="decimal"
             autocomplete="off"
-            class="h-11 w-40 rounded-control bg-well px-space-md font-data text-ink outline-none focus-visible:ring-2 focus-visible:ring-violet"
+            :aria-invalid="percentInvalid ? 'true' : undefined"
+            :aria-describedby="percentInvalid ? `${id}-percent-hint` : undefined"
+            :class="[
+              'h-11 w-40 rounded-control bg-well px-space-md font-data text-ink outline-none focus-visible:ring-2',
+              percentInvalid ? 'ring-2 ring-loss' : 'focus-visible:ring-violet',
+            ]"
           />
+          <p
+            v-if="percentInvalid"
+            :id="`${id}-percent-hint`"
+            class="text-body-sm text-on-loss-wash"
+          >
+            {{ t('explorer.bulk.invalidPercent') }}
+          </p>
         </div>
         <div v-else class="flex flex-wrap gap-space-md">
           <div v-for="currency in currencies" :key="currency" class="flex flex-col gap-space-xs">
@@ -261,9 +283,21 @@ async function submit() {
               type="text"
               inputmode="decimal"
               autocomplete="off"
-              class="h-11 w-40 rounded-control bg-well px-space-md font-data text-ink outline-none focus-visible:ring-2 focus-visible:ring-violet"
+              :aria-invalid="amountInvalid(currency) ? 'true' : undefined"
+              :aria-describedby="amountInvalid(currency) ? `${id}-amount-hint` : undefined"
+              :class="[
+                'h-11 w-40 rounded-control bg-well px-space-md font-data text-ink outline-none focus-visible:ring-2',
+                amountInvalid(currency) ? 'ring-2 ring-loss' : 'focus-visible:ring-violet',
+              ]"
             />
           </div>
+          <p
+            v-if="currencies.some(amountInvalid)"
+            :id="`${id}-amount-hint`"
+            class="w-full text-body-sm text-on-loss-wash"
+          >
+            {{ t('explorer.edit.invalidMoney') }}
+          </p>
         </div>
         <p class="text-body-sm text-ink-secondary">
           {{ t(mode === 'fixed' ? 'explorer.bulk.hint.fixed' : 'explorer.bulk.hint.relative') }}
