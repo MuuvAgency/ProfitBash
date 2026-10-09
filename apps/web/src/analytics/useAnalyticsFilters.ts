@@ -7,6 +7,7 @@ import {
   type LocationQuery,
   type RouteLocationRaw,
 } from 'vue-router';
+import { useTagRights, useTags } from '../tags/queries';
 import { api } from '../api';
 import {
   filterStateFromQuery,
@@ -75,11 +76,22 @@ export function useAnalyticsFilters() {
     staleTime: 5 * 60_000,
   });
 
+  // Tags (3.7): Ein Tag-Filter, den der Nutzer nicht auflösen kann (gelöschtes Tag, Link eines Kollegen, kein
+  // Recht), ergäbe leere Auswertungen ohne sichtbaren Grund. Solche Tags gelten nicht; die URL räumt die nächste
+  // Änderung auf (kein eigener Verlaufseintrag dafür).
+  const { canView: canViewTags } = useTagRights();
+  const tags = useTags();
+  const knownTags = computed(() => (canViewTags.value ? tags.data.value : []));
+
   /** Letzte eigene Änderung: gilt vor einer gespeicherten Auswahl, die erst danach ankommt. */
   const local = shallowRef<FilterState | null>(null);
   const storedState = computed(() => local.value ?? parseStoredFilters(stored.data.value));
   const ready = computed(
-    () => (stored.isFetched.value || local.value !== null) && options.data.value !== undefined,
+    () =>
+      (stored.isFetched.value || local.value !== null) &&
+      options.data.value !== undefined &&
+      // Mit Tag-Filter erst laden, wenn die Tags da sind (oder ihr Abruf gescheitert ist): sonst zwei Anfragen.
+      (rawState.value.tagIds.length === 0 || !canViewTags.value || tags.isFetched.value),
   );
 
   // Zurück/Vor zwischen Einträgen mit gleicher URL (nur andere Profile) ändert `route` nicht: eigener Zähler.
@@ -94,9 +106,17 @@ export function useAnalyticsFilters() {
     return parseStoredFilters(historyState?.[HISTORY_STATE_KEY]);
   });
 
+  const rawState = computed(() =>
+    filterStateFromQuery(route.query, entryState.value ?? storedState.value),
+  );
   const state = computed<FilterState>(() => {
-    const raw = filterStateFromQuery(route.query, entryState.value ?? storedState.value);
-    return options.data.value ? sanitizeFilterState(raw, options.data.value) : raw;
+    const raw = rawState.value;
+    return options.data.value
+      ? sanitizeFilterState(raw, {
+          ...options.data.value,
+          ...(knownTags.value && { tags: knownTags.value }),
+        })
+      : raw;
   });
 
   // Ausgangszustand in URL und Verlaufseintrag festhalten (teilbarer Link; Zurück kehrt genau hierher zurück).

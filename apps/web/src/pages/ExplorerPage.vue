@@ -5,6 +5,7 @@ import {
   type AdChangeField,
   type AdProduct,
   type ExplorerLevel,
+  type TagEntityType,
 } from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
@@ -55,6 +56,8 @@ import {
 import ExplorerChart from '../explorer/ExplorerChart.vue';
 import ExplorerGrid from '../explorer/ExplorerGrid.vue';
 import ExplorerTabs from '../explorer/ExplorerTabs.vue';
+import AssignTagsDialog from '../tags/AssignTagsDialog.vue';
+import { tagsById, useTagRights, useTags } from '../tags/queries';
 import { useExplorerRows, useExplorerSeries } from '../explorer/queries';
 import {
   childLevel,
@@ -243,6 +246,20 @@ function linkFor(row: GridRow) {
 // --- Bearbeiten (`phase-3.md` 3.5) ---------------------------------------------------------
 
 const { canView: canViewChanges, canWrite: canWriteChanges } = useChangeRights();
+
+// --- Tags (`phase-3.md` 3.7) ----------------------------------------------------------------
+
+const { canView: canViewTags, canWrite: canWriteTags } = useTagRights();
+const tagsQuery = useTags();
+const tagMap = computed(() => tagsById(tagsQuery.data.value));
+const TAG_ENTITY_BY_LEVEL: Partial<Record<ExplorerLevel, TagEntityType>> = {
+  campaign: 'campaign',
+  adGroup: 'ad_group',
+  target: 'target',
+  productAd: 'product_ad',
+};
+const tagEntityType = computed(() => TAG_ENTITY_BY_LEVEL[level.value] ?? null);
+const tagRows = shallowRef<GridRow[] | null>(null);
 const pendingCount = usePendingCount();
 /** Ebenen, deren Zeilen sich ändern lassen (Kampagnen, Ad Groups, Targets, Product Ads, Negatives). */
 const editableLevel = computed(() => entityTypeOf(level.value) !== null);
@@ -439,6 +456,7 @@ const columnDefs = computed(() =>
     displayCurrency: data.value?.meta.currency ?? 'EUR',
     converted: data.value?.meta.converted ?? false,
     editable: canViewChanges.value,
+    ...(canViewTags.value && { tags: tagMap.value }),
   }),
 );
 const gridRows = computed<GridRow[]>(() => data.value?.rows ?? []);
@@ -470,8 +488,10 @@ const BULK_MONEY_FIELD: Partial<Record<ExplorerLevel, MoneyField>> = {
   target: 'bid',
 };
 const bulkMoneyField = computed(() => BULK_MONEY_FIELD[level.value] ?? null);
+const canBulkEdit = computed(() => canWriteChanges.value && editableLevel.value);
+const canBulkTag = computed(() => canWriteTags.value && tagEntityType.value !== null);
 const showBulkBar = computed(
-  () => canWriteChanges.value && editableLevel.value && selectedRows.value.length > 0,
+  () => (canBulkEdit.value || canBulkTag.value) && selectedRows.value.length > 0,
 );
 /** Strategie und Platzierungen gelten für genau eine SP-Kampagne. */
 const biddingRow = computed(() => {
@@ -492,6 +512,7 @@ function openBulk(field: 'state' | MoneyField) {
 }
 watch(level, () => {
   bulkField.value = null;
+  tagRows.value = null;
   biddingOpen.value = null;
   editNotice.value = null;
 });
@@ -756,6 +777,16 @@ const truncatedText = computed(() => {
           </span>
           <span class="flex-1" />
           <Button
+            v-if="canBulkTag"
+            data-bulk="tags"
+            icon="pi pi-tags"
+            :label="t('explorer.bulk.action.tags')"
+            severity="secondary"
+            size="small"
+            @click="tagRows = selectedRows"
+          />
+          <Button
+            v-if="canBulkEdit"
             data-bulk="state"
             :label="t('explorer.bulk.action.state')"
             severity="secondary"
@@ -763,7 +794,7 @@ const truncatedText = computed(() => {
             @click="openBulk('state')"
           />
           <Button
-            v-if="bulkMoneyField"
+            v-if="canBulkEdit && bulkMoneyField"
             :data-bulk="bulkMoneyField"
             :label="t(`explorer.bulk.action.${bulkMoneyField}`)"
             severity="secondary"
@@ -771,7 +802,7 @@ const truncatedText = computed(() => {
             @click="openBulk(bulkMoneyField)"
           />
           <Button
-            v-if="level === 'campaign'"
+            v-if="canBulkEdit && level === 'campaign'"
             v-tooltip.top="biddingRow ? undefined : t('explorer.bulk.biddingHint')"
             data-bulk="bidding"
             :label="t('explorer.bulk.action.bidding')"
@@ -812,6 +843,15 @@ const truncatedText = computed(() => {
       </section>
     </template>
 
+    <AssignTagsDialog
+      v-if="tagEntityType && canWriteTags"
+      :visible="tagRows !== null"
+      :entity-type="tagEntityType"
+      :rows="tagRows ?? []"
+      :tags="tagsQuery.data.value ?? []"
+      @assigned="clearSelection"
+      @close="tagRows = null"
+    />
     <BulkEditDialog
       v-if="bulkField"
       visible

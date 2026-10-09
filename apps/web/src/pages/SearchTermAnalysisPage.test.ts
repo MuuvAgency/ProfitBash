@@ -1511,6 +1511,8 @@ describe('Suchbegriff-Aktionen (phase-3.md 3.8)', () => {
     });
     box.click();
     await flushPromises();
+    // Erst weiter, wenn die Markierung in der Leiste angekommen ist (die Knöpfe sind sonst noch gesperrt).
+    await vi.waitFor(() => expect(document.body.textContent).toMatch(/[1-9]\d* markiert/));
   }
   const radio = (value: string) =>
     document.querySelector<HTMLInputElement>(`input[type="radio"][value="${value}"]`)!;

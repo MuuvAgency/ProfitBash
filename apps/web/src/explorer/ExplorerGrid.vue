@@ -18,6 +18,7 @@ import { gridLocaleText, gridStyleOptions, gridTheme } from '../grid/grid';
 import { activateCellControlOnEnter } from '../grid/keyboard';
 import type { GridRow } from './columns';
 import EditCell, { type EditCellContext } from './EditCell.vue';
+import TagsCell from '../tags/TagsCell.vue';
 import NameCell, { type NameCellContext } from './NameCell.vue';
 
 /**
@@ -108,7 +109,11 @@ function clearSelection() {
 
 defineExpose({ csv, clearSelection });
 
-const components = { nameCell: markRaw(NameCell), editCell: markRaw(EditCell) };
+const components = {
+  nameCell: markRaw(NameCell),
+  editCell: markRaw(EditCell),
+  tagsCell: markRaw(TagsCell),
+};
 </script>
 
 <template>

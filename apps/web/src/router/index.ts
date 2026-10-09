@@ -35,6 +35,7 @@ const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteCompone
   dashboard: () => import('../pages/DashboardPage.vue'),
   explorer: () => import('../pages/ExplorerPage.vue'),
   changes: () => import('../pages/ChangesPage.vue'),
+  tags: () => import('../pages/TagsPage.vue'),
   connections: () => import('../pages/ConnectionsPage.vue'),
   members: () => import('../pages/MembersPage.vue'),
   sync: () => import('../pages/SyncStatusPage.vue'),

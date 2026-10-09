@@ -4,6 +4,7 @@ import {
   filterStateFromQuery,
   filterStateToQuery,
   fromTreeSelection,
+  MAX_FILTER_TAGS,
   parseStoredFilters,
   sanitizeFilterState,
   toAnalyticsQuery,
@@ -245,5 +246,43 @@ describe('Baumauswahl (Clients › Profile)', () => {
     const selection = fromTreeSelection(keys, options);
     expect(selection).toEqual({ clientIds: [C1, C2], withoutClient: false, profileIds: [P2, P3] });
     expect(toTreeSelection(state(selection), options)).toEqual(keys);
+  });
+});
+
+describe('Tags in der Filterleiste (phase-3.md 3.7)', () => {
+  const T1 = '00000000-0000-4000-8000-0000000000d1';
+  const T2 = '00000000-0000-4000-8000-0000000000d2';
+
+  it('stehen als kurze Liste in der URL und kommen von dort zurück', () => {
+    const query = filterStateToQuery(state({ tagIds: [T2, T1] }));
+    expect(query).toEqual({ tags: `${T1},${T2}` });
+    expect(filterStateFromQuery(query, null).tagIds).toEqual([T1, T2]);
+    expect(filterStateToQuery(state({}))).toEqual({});
+  });
+
+  it('kaputte oder zu viele Tags in der URL gelten als kein Filter', () => {
+    expect(filterStateFromQuery({ tags: 'x' }, null).tagIds).toEqual([]);
+    const many = Array.from({ length: MAX_FILTER_TAGS + 1 }, (_, i) =>
+      T1.replace(/d1$/, String(10 + i)),
+    );
+    expect(filterStateFromQuery({ tags: many.join(',') }, null).tagIds).toEqual([]);
+  });
+
+  it('gespeicherte Auswahl: mit Tags, und ohne das Feld (ältere Einträge) ohne Filter', () => {
+    const stored = JSON.parse(JSON.stringify(state({ tagIds: [T1] }))) as Record<string, unknown>;
+    expect(parseStoredFilters(stored)?.tagIds).toEqual([T1]);
+    delete stored.tagIds;
+    expect(parseStoredFilters(stored)?.tagIds).toEqual([]);
+  });
+
+  it('gehen nur eingeschränkt in die Anfrage', () => {
+    expect(toAnalyticsQuery(state({ tagIds: [T1] }), '2026-10-09').tagIds).toEqual([T1]);
+    expect('tagIds' in toAnalyticsQuery(state({}), '2026-10-09')).toBe(false);
+  });
+
+  it('Tags, die es nicht mehr gibt, fallen weg (nur wenn die Tags bekannt sind)', () => {
+    const chosen = state({ tagIds: [T1, T2] });
+    expect(sanitizeFilterState(chosen, { ...options, tags: [{ id: T2 }] }).tagIds).toEqual([T2]);
+    expect(sanitizeFilterState(chosen, options).tagIds).toEqual([T1, T2]);
   });
 });
