@@ -180,7 +180,53 @@ describe('buildSetupBulkFile', () => {
     expect(read(file.content!).rows.map((row) => row['Campaign ID'])).toEqual(['Zweite']);
   });
 
-  it('nimmt nur offene und angelegte Zeilen; Kinder gescheiterter Kampagnen fallen weg', () => {
+  it('schreibt nach einer teilweisen Bestätigung nur Offenes, mit den echten IDs der Eltern', () => {
+    const items = [
+      campaign(),
+      item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+      item({ entity: 'keyword', text: 'flasche', matchType: 'exact', bid: '0.90' }),
+      item({ entity: 'keyword', text: 'becher', matchType: 'exact', bid: '0.90' }),
+    ];
+    items[0]!.status = 'applied';
+    items[0]!.amazonEntityId = '4401';
+    items[1]!.status = 'applied';
+    items[1]!.amazonEntityId = '5501';
+    items[2]!.status = 'applied';
+    items[2]!.amazonEntityId = '7701';
+    const file = buildSetupBulkFile(items, {
+      countryCode: 'DE',
+      accountType: 'seller',
+      startDate: '2026-10-09',
+    });
+    expect(file.skipped).toEqual([]);
+    expect(read(file.content!).rows).toEqual([
+      expect.objectContaining({
+        Entity: 'Keyword',
+        'Campaign ID': '4401',
+        'Ad Group ID': '5501',
+        'Keyword Text': 'becher',
+      }),
+    ]);
+  });
+
+  it('wartet mit Kindern, deren Eltern angelegt, aber noch nicht zugeordnet sind', () => {
+    const items = [
+      campaign(),
+      item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+      item({ entity: 'keyword', text: 'becher', matchType: 'exact', bid: '0.90' }),
+    ];
+    items[0]!.status = 'applied';
+    items[1]!.status = 'applied';
+    const file = buildSetupBulkFile(items, {
+      countryCode: 'DE',
+      accountType: 'seller',
+      startDate: '2026-10-09',
+    });
+    // Nicht scheitern lassen: Der nächste Import trägt die IDs nach, dann geht es weiter.
+    expect(file).toMatchObject({ content: null, rows: 0, skipped: [], waiting: [items[2]!.id] });
+  });
+
+  it('nimmt nur offene Zeilen; Kinder gescheiterter Kampagnen fallen weg', () => {
     const failed = campaign({ adProduct: 'SD' });
     failed.status = 'failed';
     const file = buildSetupBulkFile(
