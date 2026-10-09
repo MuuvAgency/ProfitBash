@@ -222,10 +222,10 @@ function loadDefaults() {
       >
         <button
           v-for="name in TABS"
+          :id="tabId(name)"
           :key="name"
           type="button"
           role="tab"
-          :id="tabId(name)"
           :data-catalog-tab="name"
           aria-controls="catalog-tabpanel"
           :aria-selected="tab === name"
