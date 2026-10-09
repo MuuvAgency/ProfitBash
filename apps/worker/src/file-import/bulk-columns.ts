@@ -172,6 +172,15 @@ export function classifySheet(name: string): BulkSheetKind | null {
   return null;
 }
 
+/**
+ * Das SB-Blatt für Kampagnen mit mehreren Ad Groups („SB Multi Ad Group Campaigns“, „SB Anzeigengruppe
+ * Kampagnen“), im Unterschied zum älteren Blatt („Sponsored Brands Campaigns“). Eine SB-Kampagne steht in genau
+ * einem der beiden; die Bulk-Datei für Änderungen (3.9) muss ihre Zeilen in dasselbe Blatt schreiben.
+ */
+export function isSbMultiAdGroupSheet(name: string): boolean {
+  return classifySheet(name) === 'sb' && !normalizeHeader(name).includes('sponsored brands');
+}
+
 // ---------------------------------------------------------------------------
 // Werte
 // ---------------------------------------------------------------------------

@@ -3,8 +3,8 @@ import type { AmazonAdsBiddingStrategy, AmazonAdsWriteState } from './writes';
 
 /**
  * Bulk-Datei für die Amazon-Werbekonsole (`docs/tasks/phase-3.md` 3.2b, F2): der zweite Weg einer Übermittlung,
- * solange es keinen API-Zugang gibt. Hier entstehen nur die **Zeilen** des Blatts für Sponsored Products; die Datei
- * schreibt `writeXlsx` aus `@profitbash/sheets`.
+ * solange es keinen API-Zugang gibt. Hier entstehen nur die **Zeilen** der Blätter (Sponsored Products, Sponsored
+ * Brands, Sponsored Display); die Datei schreibt `writeXlsx` aus `@profitbash/sheets`.
  *
  * Grundlage: Amazons Bulksheets-Guides (gelesen am 2026-10-08, Zusammenfassung in `phase-3.md` 3.2b):
  * - Die Datei ist **englisch**: Beim Hochladen nimmt Amazon jede unterstützte Sprache an, unabhängig vom Konto.
@@ -51,6 +51,174 @@ export const SP_BULK_COLUMNS = [
 ] as const;
 export type SpBulkColumn = (typeof SP_BULK_COLUMNS)[number];
 
+/**
+ * Blätter für Sponsored Brands und Sponsored Display (`phase-3.md` 3.9). Kopfzeilen aus einer echten englischen
+ * Datei der Werbekonsole (2026-10-09, ohne die Spalten „Informational only“ und ohne Kennzahlen), Entities und
+ * Werte aus den Bulksheets-Guides für SB (älteres Blatt und „multi-ad group“) und SD.
+ *
+ * Sponsored Brands hat **zwei Blätter**: das ältere für Kampagnen ohne eigene Ad-Group-Zeilen und das für
+ * Kampagnen mit mehreren Ad Groups. Eine Kampagne steht in genau einem; der Aufrufer nennt es je Änderung.
+ */
+export const SB_BULK_SHEET_NAME = 'Sponsored Brands Campaigns';
+export const SB_MULTI_AD_GROUP_BULK_SHEET_NAME = 'SB Multi Ad Group Campaigns';
+export const SD_BULK_SHEET_NAME = 'Sponsored Display Campaigns';
+
+export const SB_BULK_COLUMNS = [
+  'Product',
+  'Entity',
+  'Operation',
+  'Campaign ID',
+  'Draft Campaign ID',
+  'Portfolio ID',
+  'Ad Group ID',
+  'Keyword ID',
+  'Product Targeting ID',
+  'Campaign Name',
+  'Start Date',
+  'End Date',
+  'State',
+  'Budget Type',
+  'Budget',
+  'Bid Optimization',
+  'Bid Multiplier',
+  'Bid',
+  'Keyword Text',
+  'Match Type',
+  'Product Targeting Expression',
+  'Ad Format',
+  'Landing Page URL',
+  'Landing Page ASINs',
+  'Brand Entity ID',
+  'Brand Name',
+  'Brand Logo Asset ID',
+  'Custom Image Asset ID',
+  'Creative Headline',
+  'Creative ASINs',
+  'Video Media IDs',
+  'Creative Type',
+] as const;
+
+export const SB_MULTI_AD_GROUP_BULK_COLUMNS = [
+  'Product',
+  'Entity',
+  'Operation',
+  'Campaign ID',
+  'Portfolio ID',
+  'Ad Group ID',
+  'Ad ID',
+  'Keyword ID',
+  'Product Targeting ID',
+  'Campaign Name',
+  'Ad Group Name',
+  'Ad Name',
+  'Start Date',
+  'End Date',
+  'State',
+  'Brand Entity ID',
+  'Budget Type',
+  'Budget',
+  'Bid Optimization',
+  'Product Location',
+  'Bid',
+  'Placement',
+  'Percentage',
+  'Audience ID',
+  'Shopper Cohort Percentage',
+  'Shopper Cohort Type',
+  'Keyword Text',
+  'Match Type',
+  'Native Language Keyword',
+  'Native Language Locale',
+  'Product Targeting Expression',
+  'Landing Page URL',
+  'Landing Page ASINs',
+  'Landing Page Type',
+  'Brand Name',
+  'Consent To Translate',
+  'Brand Logo Asset ID',
+  'Brand Logo Crop',
+  'Custom Images',
+  'Creative Headline',
+  'Creative ASINs',
+  'Video Asset IDs',
+  'Subpages',
+  'Product Exclusions',
+  'Ad Title',
+  'Sites',
+] as const;
+
+export const SD_BULK_COLUMNS = [
+  'Product',
+  'Entity',
+  'Operation',
+  'Campaign ID',
+  'Portfolio ID',
+  'Ad Group ID',
+  'Ad ID',
+  'Targeting ID',
+  'Campaign Name',
+  'Ad Group Name',
+  'Start Date',
+  'End Date',
+  'State',
+  'Tactic',
+  'Budget Type',
+  'Budget',
+  'SKU',
+  'Ad Group Default Bid',
+  'Bid',
+  'Bid Optimization',
+  'Cost Type',
+  'Targeting Expression',
+] as const;
+
+/** Blatt der Bulk-Datei: SP, SB (älteres Blatt), SB mit mehreren Ad Groups, SD. */
+export type BulkFileSheetKind = 'sp' | 'sb' | 'sbMultiAdGroup' | 'sd';
+
+interface SheetSpec {
+  sheetName: string;
+  product: string;
+  columns: readonly string[];
+  budgetColumn: string;
+  targetIdColumn: string;
+  expressionColumn: string;
+}
+
+const SHEETS: Record<BulkFileSheetKind, SheetSpec> = {
+  sp: {
+    sheetName: SP_BULK_SHEET_NAME,
+    product: 'Sponsored Products',
+    columns: SP_BULK_COLUMNS,
+    budgetColumn: 'Daily Budget',
+    targetIdColumn: 'Product Targeting ID',
+    expressionColumn: 'Product Targeting Expression',
+  },
+  sb: {
+    sheetName: SB_BULK_SHEET_NAME,
+    product: 'Sponsored Brands',
+    columns: SB_BULK_COLUMNS,
+    budgetColumn: 'Budget',
+    targetIdColumn: 'Product Targeting ID',
+    expressionColumn: 'Product Targeting Expression',
+  },
+  sbMultiAdGroup: {
+    sheetName: SB_MULTI_AD_GROUP_BULK_SHEET_NAME,
+    product: 'Sponsored Brands',
+    columns: SB_MULTI_AD_GROUP_BULK_COLUMNS,
+    budgetColumn: 'Budget',
+    targetIdColumn: 'Product Targeting ID',
+    expressionColumn: 'Product Targeting Expression',
+  },
+  sd: {
+    sheetName: SD_BULK_SHEET_NAME,
+    product: 'Sponsored Display',
+    columns: SD_BULK_COLUMNS,
+    budgetColumn: 'Budget',
+    targetIdColumn: 'Targeting ID',
+    expressionColumn: 'Targeting Expression',
+  },
+};
+
 /** Zelle wie `XlsxWriteCell` in `@profitbash/sheets`: Text, leer oder Zahl als Decimal-String. */
 export type BulkFileCell = string | null | { number: string };
 
@@ -67,6 +235,15 @@ interface AdGroupIds {
   amazonCampaignId: string;
   amazonAdGroupId: string;
 }
+
+/** Targets und Negatives: Im älteren SB-Blatt gibt es keine Ad-Group-Zeilen, die Ad Group darf dort fehlen. */
+interface TargetParentIds {
+  amazonCampaignId: string;
+  amazonAdGroupId: string | null;
+}
+
+/** Sponsored Display trennt Targets in zwei Entities; bei SP und SB ohne Bedeutung. */
+export type BulkFileSdTargeting = 'contextual' | 'audience';
 
 export type BulkFileChange = { ref: string } & (
   | {
@@ -95,16 +272,18 @@ export type BulkFileChange = { ref: string } & (
       amazonTargetId: string;
       state?: AmazonAdsWriteState;
       bid?: string;
-    } & AdGroupIds)
+      sdTargeting?: BulkFileSdTargeting;
+    } & TargetParentIds)
   | ({ type: 'productAd'; amazonAdId: string; state?: AmazonAdsWriteState } & AdGroupIds)
   | { type: 'archive'; entity: 'campaign'; amazonCampaignId: string }
   | ({ type: 'archive'; entity: 'adGroup' } & AdGroupIds)
   | ({
       type: 'archive';
-      entity:
-        'keyword' | 'productTarget' | 'productAd' | 'negativeKeyword' | 'negativeProductTarget';
+      entity: 'keyword' | 'productTarget' | 'negativeKeyword' | 'negativeProductTarget';
       amazonId: string;
-    } & AdGroupIds)
+      sdTargeting?: BulkFileSdTargeting;
+    } & TargetParentIds)
+  | ({ type: 'archive'; entity: 'productAd'; amazonId: string } & AdGroupIds)
   | {
       type: 'archive';
       entity: 'campaignNegativeKeyword' | 'campaignNegativeProductTarget';
@@ -125,7 +304,10 @@ export type BulkFileChange = { ref: string } & (
 export type BulkFileSkipReason =
   /** Die Kampagne ist archiviert (endgültig). */
   | 'entityArchived'
-  /** Die Bulk-Datei kennt diese Änderung laut Doku nicht (negative ASIN auf Kampagnenebene). */
+  /**
+   * Das Blatt kennt diese Änderung laut Doku nicht (SP: negative ASIN auf Kampagnenebene; SB: Anzeigen,
+   * Standardgebot, Negatives der Kampagne im Blatt mit mehreren Ad Groups; SD: Keywords, Negatives der Kampagne).
+   */
   | 'notSupportedInBulkFile'
   /** Für dieselbe Entity steht schon eine Zeile in der Datei. */
   | 'duplicate'
@@ -134,15 +316,15 @@ export type BulkFileSkipReason =
   | 'invalidValue'
   | 'nothingToChange';
 
-export interface SpBulkSheet {
+export interface BulkSheet {
   sheetName: string;
   /** Kopfzeile und je Änderung eine Zeile. */
   rows: BulkFileCell[][];
   /** Änderungen, die nicht in der Datei stehen. */
   skipped: { ref: string; reason: BulkFileSkipReason }[];
 }
+export type SpBulkSheet = BulkSheet;
 
-const PRODUCT = 'Sponsored Products';
 const STATES = new Map([
   ['ENABLED', 'enabled'],
   ['PAUSED', 'paused'],
@@ -159,15 +341,9 @@ const PLACEMENTS = new Map([
   ['PLACEMENT_PRODUCT_PAGE', 'Placement Product Page'],
   ['SITE_AMAZON_BUSINESS', 'Placement Amazon Business'],
 ]);
-const ARCHIVE_ENTITIES = {
-  campaign: 'Campaign',
-  adGroup: 'Ad Group',
-  keyword: 'Keyword',
-  productTarget: 'Product Targeting',
-  productAd: 'Product Ad',
-  negativeKeyword: 'Negative Keyword',
-  campaignNegativeKeyword: 'Campaign Negative Keyword',
-  negativeProductTarget: 'Negative Product Targeting',
+const SD_TARGETING_ENTITIES = {
+  contextual: 'Contextual Targeting',
+  audience: 'Audience Targeting',
 } as const;
 
 class Skip extends Error {
@@ -211,16 +387,39 @@ function date(value: string): string {
   return value.replaceAll('-', '');
 }
 
-type Row = Partial<Record<SpBulkColumn, BulkFileCell>>;
+type Row = Record<string, BulkFileCell>;
 
 interface Context {
+  kind: BulkFileSheetKind;
+  sheet: SheetSpec;
   /** Neue Strategie je Kampagne, wenn dieselbe Datei sie ändert. */
   strategyByCampaign: ReadonlyMap<string, string>;
 }
 
-function campaignRow(change: Extract<BulkFileChange, { type: 'campaign' }>): Row {
+const notSupported = () => new Skip('notSupportedInBulkFile');
+
+/** Ad Group der Zeile; fehlen darf sie nur im älteren SB-Blatt. */
+function adGroupCell(kind: BulkFileSheetKind, amazonAdGroupId: string | null): Row {
+  if (amazonAdGroupId !== null) return { 'Ad Group ID': id(amazonAdGroupId) };
+  if (kind !== 'sb') throw invalid();
+  return {};
+}
+
+/** Entity-Name eines Produkt-Targets: bei SD je nach Art des Targetings. */
+function productTargetEntity(kind: BulkFileSheetKind, sdTargeting?: BulkFileSdTargeting): string {
+  if (kind !== 'sd') return 'Product Targeting';
+  if (sdTargeting === undefined) throw invalid();
+  return SD_TARGETING_ENTITIES[sdTargeting];
+}
+
+function campaignRow(
+  change: Extract<BulkFileChange, { type: 'campaign' }>,
+  { kind, sheet }: Context,
+): Row {
   const { campaign, set } = change;
   if (campaign.state?.toUpperCase() === 'ARCHIVED') throw new Skip('entityArchived');
+  // Gebotsstrategien gibt es nur bei Sponsored Products.
+  if (kind !== 'sp' && set.biddingStrategy !== undefined) throw notSupported();
   return withFields(
     {
       Entity: 'Campaign',
@@ -233,7 +432,7 @@ function campaignRow(change: Extract<BulkFileChange, { type: 'campaign' }>): Row
     },
     {
       ...stateField(set.state),
-      ...(set.dailyBudget !== undefined && { 'Daily Budget': amount(set.dailyBudget) }),
+      ...(set.dailyBudget !== undefined && { [sheet.budgetColumn]: amount(set.dailyBudget) }),
       ...(set.biddingStrategy !== undefined && {
         'Bidding Strategy': mapped(STRATEGIES, set.biddingStrategy),
       }),
@@ -250,10 +449,12 @@ const stateField = (state: AmazonAdsWriteState | undefined): Row =>
   state === undefined ? {} : { State: mapped(STATES, state) };
 
 function rowFor(change: BulkFileChange, context: Context): Row {
+  const { kind, sheet } = context;
   switch (change.type) {
     case 'campaign':
-      return campaignRow(change);
+      return campaignRow(change, context);
     case 'placement': {
+      if (kind !== 'sp') throw notSupported();
       if (!/^(0|[1-9]\d{0,2})$/.test(change.percentage) || Number(change.percentage) > 900) {
         throw invalid();
       }
@@ -270,6 +471,10 @@ function rowFor(change: BulkFileChange, context: Context): Row {
       };
     }
     case 'adGroup':
+      // Das ältere SB-Blatt kennt keine Ad-Group-Zeilen, SB-Ad-Groups haben kein Standardgebot.
+      if (kind === 'sb' || (kind === 'sbMultiAdGroup' && change.defaultBid !== undefined)) {
+        throw notSupported();
+      }
       return withFields(
         {
           Entity: 'Ad Group',
@@ -286,13 +491,16 @@ function rowFor(change: BulkFileChange, context: Context): Row {
       );
     case 'keyword':
     case 'productTarget':
+      // Sponsored Display hat keine Keywords.
+      if (kind === 'sd' && change.type === 'keyword') throw notSupported();
       return withFields(
         {
-          Entity: change.type === 'keyword' ? 'Keyword' : 'Product Targeting',
+          Entity:
+            change.type === 'keyword' ? 'Keyword' : productTargetEntity(kind, change.sdTargeting),
           Operation: 'Update',
           'Campaign ID': id(change.amazonCampaignId),
-          'Ad Group ID': id(change.amazonAdGroupId),
-          [change.type === 'keyword' ? 'Keyword ID' : 'Product Targeting ID']: id(
+          ...adGroupCell(kind, change.amazonAdGroupId),
+          [change.type === 'keyword' ? 'Keyword ID' : sheet.targetIdColumn]: id(
             change.amazonTargetId,
           ),
         },
@@ -302,6 +510,8 @@ function rowFor(change: BulkFileChange, context: Context): Row {
         },
       );
     case 'productAd':
+      // SB-Anzeigen heißen im Blatt je Format anders („Store spotlight ad“ …); das Format kennt ProfitBash nicht.
+      if (kind === 'sb' || kind === 'sbMultiAdGroup') throw notSupported();
       return withFields(
         {
           Entity: 'Product Ad',
@@ -312,29 +522,13 @@ function rowFor(change: BulkFileChange, context: Context): Row {
         },
         stateField(change.state),
       );
-    case 'archive': {
-      if (change.entity === 'campaignNegativeProductTarget')
-        throw new Skip('notSupportedInBulkFile');
-      const row: Row = {
-        Entity: ARCHIVE_ENTITIES[change.entity],
-        Operation: 'Archive',
-        'Campaign ID': id(change.amazonCampaignId),
-      };
-      if ('amazonAdGroupId' in change) row['Ad Group ID'] = id(change.amazonAdGroupId);
-      if (change.entity === 'productAd') row['Ad ID'] = id(change.amazonId);
-      else if (
-        change.entity === 'keyword' ||
-        change.entity === 'negativeKeyword' ||
-        change.entity === 'campaignNegativeKeyword'
-      ) {
-        row['Keyword ID'] = id(change.amazonId);
-      } else if (change.entity === 'productTarget' || change.entity === 'negativeProductTarget') {
-        row['Product Targeting ID'] = id(change.amazonId);
-      }
-      return row;
-    }
+    case 'archive':
+      return archiveRow(change, context);
     case 'createNegative': {
       const onCampaign = change.amazonAdGroupId === null;
+      // Negatives der Kampagne: bei SP eine eigene Entity (nur Keywords), im älteren SB-Blatt der Normalfall
+      // (dort gibt es keine Ad-Group-Zeilen), sonst nicht vorhanden.
+      if (onCampaign && (kind === 'sbMultiAdGroup' || kind === 'sd')) throw notSupported();
       const parent: Row = {
         Operation: 'Create',
         'Campaign ID': id(change.amazonCampaignId),
@@ -342,24 +536,81 @@ function rowFor(change: BulkFileChange, context: Context): Row {
         State: 'enabled',
       };
       if (change.negative.type === 'keyword') {
+        if (kind === 'sd') throw notSupported();
         const keywordText = change.negative.keywordText.trim();
         // eslint-disable-next-line no-control-regex
         if (keywordText === '' || /[\u0000-\u001f\u007f]/.test(keywordText)) throw invalid();
         return {
-          Entity: onCampaign ? 'Campaign Negative Keyword' : 'Negative Keyword',
+          Entity: onCampaign && kind === 'sp' ? 'Campaign Negative Keyword' : 'Negative Keyword',
           ...parent,
           'Keyword Text': keywordText,
           'Match Type': change.negative.matchType === 'EXACT' ? 'negativeExact' : 'negativePhrase',
         };
       }
-      if (onCampaign) throw new Skip('notSupportedInBulkFile');
+      if (onCampaign && kind === 'sp') throw notSupported();
       if (!/^[A-Z0-9]{10}$/.test(change.negative.asin)) throw invalid();
       return {
         Entity: 'Negative Product Targeting',
         ...parent,
-        'Product Targeting Expression': `asin="${change.negative.asin}"`,
+        [sheet.expressionColumn]: `asin="${change.negative.asin}"`,
       };
     }
+  }
+}
+
+function archiveRow(
+  change: Extract<BulkFileChange, { type: 'archive' }>,
+  { kind, sheet }: Context,
+): Row {
+  const row: Row = { Operation: 'Archive', 'Campaign ID': id(change.amazonCampaignId) };
+  switch (change.entity) {
+    case 'campaign':
+      return { ...row, Entity: 'Campaign' };
+    case 'adGroup':
+      if (kind === 'sb') throw notSupported();
+      return { ...row, Entity: 'Ad Group', 'Ad Group ID': id(change.amazonAdGroupId) };
+    case 'productAd':
+      if (kind === 'sb' || kind === 'sbMultiAdGroup') throw notSupported();
+      return {
+        ...row,
+        Entity: 'Product Ad',
+        'Ad Group ID': id(change.amazonAdGroupId),
+        'Ad ID': id(change.amazonId),
+      };
+    case 'keyword':
+    case 'negativeKeyword':
+      if (kind === 'sd') throw notSupported();
+      return {
+        ...row,
+        Entity: change.entity === 'keyword' ? 'Keyword' : 'Negative Keyword',
+        ...adGroupCell(kind, change.amazonAdGroupId),
+        'Keyword ID': id(change.amazonId),
+      };
+    case 'productTarget':
+    case 'negativeProductTarget':
+      return {
+        ...row,
+        Entity:
+          change.entity === 'productTarget'
+            ? productTargetEntity(kind, change.sdTargeting)
+            : 'Negative Product Targeting',
+        ...adGroupCell(kind, change.amazonAdGroupId),
+        [sheet.targetIdColumn]: id(change.amazonId),
+      };
+    case 'campaignNegativeKeyword':
+      if (kind === 'sbMultiAdGroup' || kind === 'sd') throw notSupported();
+      return {
+        ...row,
+        Entity: kind === 'sp' ? 'Campaign Negative Keyword' : 'Negative Keyword',
+        'Keyword ID': id(change.amazonId),
+      };
+    case 'campaignNegativeProductTarget':
+      if (kind !== 'sb') throw notSupported();
+      return {
+        ...row,
+        Entity: 'Negative Product Targeting',
+        [sheet.targetIdColumn]: id(change.amazonId),
+      };
   }
 }
 
@@ -390,12 +641,16 @@ const campaignIdOf = (change: BulkFileChange) =>
   change.type === 'campaign' ? change.campaign.amazonCampaignId : change.amazonCampaignId;
 
 /**
- * Zeilen des Blatts „Sponsored Products Campaigns“ für die Änderungen eines Profils, in der Reihenfolge der Eingabe.
- * Was sich nicht abbilden lässt, steht mit Grund in `skipped` und nicht in der Datei.
+ * Zeilen eines Blatts der Bulk-Datei für die Änderungen eines Profils, in der Reihenfolge der Eingabe. Was sich
+ * nicht abbilden lässt, steht mit Grund in `skipped` und nicht in der Datei.
  */
-export function buildSpBulkSheet(changes: readonly BulkFileChange[]): SpBulkSheet {
-  const rows: BulkFileCell[][] = [[...SP_BULK_COLUMNS]];
-  const skipped: SpBulkSheet['skipped'] = [];
+export function buildBulkSheet(
+  kind: BulkFileSheetKind,
+  changes: readonly BulkFileChange[],
+): BulkSheet {
+  const sheet = SHEETS[kind];
+  const rows: BulkFileCell[][] = [[...sheet.columns]];
+  const skipped: BulkSheet['skipped'] = [];
 
   const strategyByCampaign = new Map<string, string>();
   const archivedCampaigns = new Set<string>();
@@ -430,16 +685,25 @@ export function buildSpBulkSheet(changes: readonly BulkFileChange[]): SpBulkShee
       }
       const key = entityKey(change);
       if (key !== null && seen.has(key)) throw new Skip('duplicate');
-      row = rowFor(change, { strategyByCampaign });
+      row = rowFor(change, { kind, sheet, strategyByCampaign });
       if (key !== null) seen.add(key);
     } catch (error) {
       if (!(error instanceof Skip)) throw error;
       skipped.push({ ref: change.ref, reason: error.reason });
       continue;
     }
+    for (const column of Object.keys(row)) {
+      if (!sheet.columns.includes(column)) {
+        throw new Error(`Bulk-Datei: Das Blatt „${sheet.sheetName}“ hat keine Spalte „${column}“.`);
+      }
+    }
     rows.push(
-      SP_BULK_COLUMNS.map((column) => (column === 'Product' ? PRODUCT : (row[column] ?? null))),
+      sheet.columns.map((column) => (column === 'Product' ? sheet.product : (row[column] ?? null))),
     );
   }
-  return { sheetName: SP_BULK_SHEET_NAME, rows, skipped };
+  return { sheetName: sheet.sheetName, rows, skipped };
 }
+
+/** Zeilen des Blatts „Sponsored Products Campaigns“. */
+export const buildSpBulkSheet = (changes: readonly BulkFileChange[]): BulkSheet =>
+  buildBulkSheet('sp', changes);

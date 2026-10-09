@@ -138,13 +138,23 @@ export {
   type ApplyChangesResult,
 } from './writes';
 export {
+  buildBulkSheet,
   buildSpBulkSheet,
+  SB_BULK_COLUMNS,
+  SB_BULK_SHEET_NAME,
+  SB_MULTI_AD_GROUP_BULK_COLUMNS,
+  SB_MULTI_AD_GROUP_BULK_SHEET_NAME,
+  SD_BULK_COLUMNS,
+  SD_BULK_SHEET_NAME,
   SP_BULK_COLUMNS,
   SP_BULK_SHEET_NAME,
   type BulkFileCampaign,
   type BulkFileCell,
   type BulkFileChange,
+  type BulkFileSdTargeting,
+  type BulkFileSheetKind,
   type BulkFileSkipReason,
+  type BulkSheet,
   type SpBulkColumn,
   type SpBulkSheet,
 } from './bulk-file';

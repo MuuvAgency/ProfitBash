@@ -1,8 +1,10 @@
 import {
-  buildSpBulkSheet,
+  buildBulkSheet,
   type AmazonAdsBiddingStrategy,
   type AmazonAdsWriteState,
   type BulkFileChange,
+  type BulkFileSdTargeting,
+  type BulkFileSheetKind,
   type BulkFileSkipReason,
 } from '@profitbash/amazon-ads';
 import {
@@ -17,11 +19,19 @@ import type { RejectedChange, SubmissionChange } from './operations';
  * Änderungen einer Übermittlung → Bulk-Datei für die Werbekonsole (`docs/tasks/phase-3.md` 3.4, Vorgaben aus 3.2b,
  * ohne I/O). Wie beim Weg über die API gehören mehrere Felder einer Entity in **eine** Zeile, `state = ARCHIVED`
  * wird zu `Archive`; anders als dort ist jede Platzierung eine eigene Zeile (`Bidding Adjustment`), und jede Zeile
- * trägt die IDs ihrer Eltern. Bisher nur Sponsored Products (SB und SD mit 3.2c).
+ * trägt die IDs ihrer Eltern.
+ *
+ * Je Anzeigentyp entsteht ein eigenes Blatt (3.9): Sponsored Products, Sponsored Display und für Sponsored Brands
+ * zwei (das ältere und das für Kampagnen mit mehreren Ad Groups). In welchem der beiden eine SB-Kampagne steht,
+ * weiß ProfitBash aus dem Bulk-Import (`campaignMultiAdGroups`); ohne diese Angabe entfällt die Änderung.
  */
 
 const REJECTIONS = {
-  AD_PRODUCT_NOT_SUPPORTED: 'Die Bulk-Datei gibt es bisher nur für Sponsored Products.',
+  AD_PRODUCT_NOT_SUPPORTED:
+    'Die Bulk-Datei gibt es nur für Sponsored Products, Sponsored Brands und Sponsored Display.',
+  BULK_FILE_SHEET_UNKNOWN:
+    'Für diese Sponsored-Brands-Kampagne ist das Blatt der Bulk-Datei unbekannt; bitte zuerst eine aktuelle Bulk-Datei importieren.',
+  TARGET_TYPE_NOT_SUPPORTED: 'Diese Art von Target kennt die Bulk-Datei nicht.',
   ENTITY_NOT_FOUND: 'Die Entity gibt es bei Amazon nicht mehr oder sie ist unbekannt.',
   ENTITY_ARCHIVED: 'Dieselbe Übermittlung archiviert die Entity; weitere Änderungen entfallen.',
   SUPERSEDED: 'Dieselbe Übermittlung ändert dieses Feld noch einmal; es gilt die spätere Angabe.',
@@ -30,7 +40,38 @@ const REJECTIONS = {
     'Platzierungen lassen sich nur ändern, wenn die Kampagne eine feste oder dynamische Gebotsstrategie trägt.',
 } as const;
 
-/** Gründe, aus denen `buildSpBulkSheet` eine Zeile auslässt, als Code und Text der Änderung. */
+/** Blätter in der Reihenfolge der Datei der Werbekonsole. */
+const SHEET_ORDER: readonly BulkFileSheetKind[] = ['sp', 'sb', 'sbMultiAdGroup', 'sd'];
+
+/** Blatt einer Änderung; ein Ablehnungsgrund, wenn es keines gibt. */
+function sheetOf(row: SubmissionChange): BulkFileSheetKind | keyof typeof REJECTIONS {
+  switch (row.adProduct) {
+    case 'SPONSORED_PRODUCTS':
+      return 'sp';
+    case 'SPONSORED_DISPLAY':
+      return 'sd';
+    case 'SPONSORED_BRANDS':
+      if (row.campaignMultiAdGroups === null) return 'BULK_FILE_SHEET_UNKNOWN';
+      return row.campaignMultiAdGroups ? 'sbMultiAdGroup' : 'sb';
+    default:
+      return 'AD_PRODUCT_NOT_SUPPORTED';
+  }
+}
+
+const isSheet = (value: string): value is BulkFileSheetKind =>
+  (SHEET_ORDER as readonly string[]).includes(value);
+
+/**
+ * Art des Targetings eines SD-Targets (eigene Entity je Art im Blatt): Zielgruppen (`audience`,
+ * `product_audience` …) bzw. Produkte und Kategorien. `null`: unbekannte Art.
+ */
+function sdTargeting(targetType: string | null): BulkFileSdTargeting | null {
+  if (targetType === null) return null;
+  if (targetType.includes('audience')) return 'audience';
+  return targetType === 'product' || targetType === 'category' ? 'contextual' : null;
+}
+
+/** Gründe, aus denen `buildBulkSheet` eine Zeile auslässt, als Code und Text der Änderung. */
 const SKIPS: Record<BulkFileSkipReason, { code: string; message: string }> = {
   entityArchived: {
     code: 'BULK_FILE_ENTITY_ARCHIVED',
@@ -39,7 +80,7 @@ const SKIPS: Record<BulkFileSkipReason, { code: string; message: string }> = {
   notSupportedInBulkFile: {
     code: 'BULK_FILE_NOT_SUPPORTED',
     message:
-      'Diese Änderung kennt die Bulk-Datei nicht (negative ASIN auf Kampagnenebene); bitte in der Werbekonsole ändern.',
+      'Diese Änderung kennt die Bulk-Datei für diesen Anzeigentyp nicht; bitte in der Werbekonsole ändern.',
   },
   duplicate: {
     code: 'BULK_FILE_DUPLICATE',
@@ -64,17 +105,22 @@ export interface BulkFileChangePlan {
   changes: BulkFileChange[];
   /** `ref` einer Zeile → ihre Änderungen. */
   changeIdsByRef: Map<string, string[]>;
+  /** `ref` einer Zeile → ihr Blatt. */
+  sheetByRef: Map<string, BulkFileSheetKind>;
   rejected: RejectedChange[];
 }
 
 export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFileChangePlan {
   const changes: BulkFileChange[] = [];
   const changeIdsByRef = new Map<string, string[]>();
+  const sheetByRef = new Map<string, BulkFileSheetKind>();
   const rejected: RejectedChange[] = [];
   const reject = (row: SubmissionChange, code: keyof typeof REJECTIONS) =>
     rejected.push({ changeId: row.id, code, message: REJECTIONS[code] });
   const add = (change: BulkFileChange, sources: readonly SubmissionChange[]) => {
     changes.push(change);
+    // `sheetOf` hat für jede Änderung, die hier ankommt, ein Blatt geliefert.
+    sheetByRef.set(change.ref, sheetOf(sources[0]!) as BulkFileSheetKind);
     changeIdsByRef.set(
       change.ref,
       sources.map((source) => source.id),
@@ -83,8 +129,9 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
 
   const groups = new Map<string, SubmissionChange[]>();
   for (const row of rows) {
-    if (row.adProduct !== 'SPONSORED_PRODUCTS') {
-      reject(row, 'AD_PRODUCT_NOT_SUPPORTED');
+    const sheet = sheetOf(row);
+    if (!isSheet(sheet)) {
+      reject(row, sheet);
       continue;
     }
     if (row.operation === 'create') {
@@ -121,18 +168,32 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
     const first = group[0]!;
     const amazonId = first.amazonEntityId!;
     const { amazonCampaignId, amazonAdGroupId } = first;
+    const sheet = sheetOf(first) as BulkFileSheetKind;
     const onCampaign = first.entityType === 'campaign' || first.negativeLevel === 'campaign';
-    // Alle Zeilen unterhalb der Kampagne nennen ihre Ad Group.
-    if (!onCampaign && amazonAdGroupId === null) {
+    const isTarget = first.entityType === 'target' || first.entityType === 'negative_target';
+    // Alle Zeilen unterhalb der Kampagne nennen ihre Ad Group; nur das ältere SB-Blatt kennt Targets ohne.
+    if (!onCampaign && amazonAdGroupId === null && !(sheet === 'sb' && isTarget)) {
       for (const row of group) reject(row, 'ENTITY_NOT_FOUND');
       continue;
     }
     const ids = { amazonCampaignId, amazonAdGroupId: amazonAdGroupId! };
+    const targeting = sheet === 'sd' ? sdTargeting(first.targetType) : null;
+    if (
+      first.entityType === 'target' &&
+      first.targetType !== 'keyword' &&
+      ((sheet === 'sd' && targeting === null) || (sheet !== 'sd' && first.targetType === 'theme'))
+    ) {
+      for (const row of group) reject(row, 'TARGET_TYPE_NOT_SUPPORTED');
+      continue;
+    }
+    const sd = targeting === null ? {} : { sdTargeting: targeting };
 
     const archive = group.find((row) => row.field === 'state' && row.after === 'ARCHIVED');
     if (archive) {
       for (const row of group) if (row !== archive) reject(row, 'ENTITY_ARCHIVED');
-      add(archiveChange(ref, first, amazonId, ids), [archive]);
+      add(archiveChange(ref, first, amazonId, { amazonCampaignId, amazonAdGroupId }, sd), [
+        archive,
+      ]);
       continue;
     }
     if (first.entityType === 'negative_target') {
@@ -209,10 +270,12 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
         {
           ref,
           type: first.targetType === 'keyword' ? 'keyword' : 'productTarget',
-          ...ids,
+          amazonCampaignId,
+          amazonAdGroupId,
           amazonTargetId: amazonId,
           ...(bid !== undefined && { bid }),
           ...(state !== undefined && { state }),
+          ...(first.targetType !== 'keyword' && sd),
         },
         group,
       );
@@ -229,16 +292,19 @@ export function buildBulkFileChanges(rows: readonly SubmissionChange[]): BulkFil
       );
     }
   }
-  return { changes, changeIdsByRef, rejected };
+  return { changes, changeIdsByRef, sheetByRef, rejected };
 }
 
 function archiveChange(
   ref: string,
   row: SubmissionChange,
   amazonId: string,
-  ids: { amazonCampaignId: string; amazonAdGroupId: string },
+  parents: { amazonCampaignId: string; amazonAdGroupId: string | null },
+  sd: { sdTargeting?: BulkFileSdTargeting },
 ): BulkFileChange {
-  const { amazonCampaignId } = ids;
+  const { amazonCampaignId } = parents;
+  // Ad Groups und Product Ads haben immer eine Ad Group (oben geprüft).
+  const ids = { amazonCampaignId, amazonAdGroupId: parents.amazonAdGroupId! };
   switch (row.entityType) {
     case 'campaign':
       return { ref, type: 'archive', entity: 'campaign', amazonCampaignId };
@@ -247,13 +313,9 @@ function archiveChange(
     case 'product_ad':
       return { ref, type: 'archive', entity: 'productAd', amazonId, ...ids };
     case 'target':
-      return {
-        ref,
-        type: 'archive',
-        entity: row.targetType === 'keyword' ? 'keyword' : 'productTarget',
-        amazonId,
-        ...ids,
-      };
+      return row.targetType === 'keyword'
+        ? { ref, type: 'archive', entity: 'keyword', amazonId, ...parents }
+        : { ref, type: 'archive', entity: 'productTarget', amazonId, ...parents, ...sd };
     case 'negative_target': {
       const keyword = row.targetType === 'keyword';
       if (row.negativeLevel === 'campaign') {
@@ -270,7 +332,7 @@ function archiveChange(
         type: 'archive',
         entity: keyword ? 'negativeKeyword' : 'negativeProductTarget',
         amazonId,
-        ...ids,
+        ...parents,
       };
     }
   }
@@ -285,20 +347,26 @@ export interface SubmissionBulkFile {
   skipped: RejectedChange[];
 }
 
-/** Die Bulk-Datei einer Übermittlung samt der Änderungen, die sie nicht enthält. */
+/** Die Bulk-Datei einer Übermittlung samt der Änderungen, die sie nicht enthält; je Anzeigentyp ein Blatt. */
 export function buildSubmissionBulkFile(rows: readonly SubmissionChange[]): SubmissionBulkFile {
   const plan = buildBulkFileChanges(rows);
-  const sheet = buildSpBulkSheet(plan.changes);
   const skipped = [...plan.rejected];
-  for (const { ref, reason } of sheet.skipped) {
-    for (const changeId of plan.changeIdsByRef.get(ref) ?? []) {
-      skipped.push({ changeId, ...SKIPS[reason] });
+  const sheets: { name: string; rows: ReturnType<typeof buildBulkSheet>['rows'] }[] = [];
+  let count = 0;
+  for (const kind of SHEET_ORDER) {
+    const changes = plan.changes.filter((change) => plan.sheetByRef.get(change.ref) === kind);
+    if (changes.length === 0) continue;
+    const sheet = buildBulkSheet(kind, changes);
+    for (const { ref, reason } of sheet.skipped) {
+      for (const changeId of plan.changeIdsByRef.get(ref) ?? []) {
+        skipped.push({ changeId, ...SKIPS[reason] });
+      }
+    }
+    // Ein Blatt nur mit Kopfzeile bleibt weg.
+    if (sheet.rows.length > 1) {
+      sheets.push({ name: sheet.sheetName, rows: sheet.rows });
+      count += sheet.rows.length - 1;
     }
   }
-  const count = sheet.rows.length - 1;
-  return {
-    content: count > 0 ? writeXlsx([{ name: sheet.sheetName, rows: sheet.rows }]) : null,
-    rows: count,
-    skipped,
-  };
+  return { content: count > 0 ? writeXlsx(sheets) : null, rows: count, skipped };
 }

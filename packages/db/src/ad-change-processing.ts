@@ -221,6 +221,11 @@ export interface AdChangeJobRow {
   campaignState: string | null;
   campaignEndDate: string | null;
   campaignAmazonPortfolioId: string | null;
+  /**
+   * Sponsored Brands: ob die Kampagne im Blatt „SB Multi Ad Group Campaigns“ der Bulk-Datei steht
+   * (`extra.multiAdGroups` aus dem Bulk-Import); `null`, wenn unbekannt und bei anderen Ad-Typen.
+   */
+  campaignMultiAdGroups: boolean | null;
 }
 
 interface EntityIdentity {
@@ -443,6 +448,8 @@ export async function loadAdChangeJobRows(
         campaignState: campaign.state,
         campaignEndDate: campaign.endDate,
         campaignAmazonPortfolioId: campaign.amazonPortfolioId,
+        campaignMultiAdGroups:
+          typeof campaign.extra.multiAdGroups === 'boolean' ? campaign.extra.multiAdGroups : null,
       });
     }
     return rows;

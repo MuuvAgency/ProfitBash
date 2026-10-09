@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   classifySheet,
+  isSbMultiAdGroupSheet,
   entityKind,
   mapHeader,
   mapValue,
@@ -149,6 +150,14 @@ describe('Blätter', () => {
     expect(classifySheet('SB multi-ad group campaigns')).toBe('sb');
     expect(classifySheet('Sponsored Display-Kampagnen')).toBe('sd');
     expect(classifySheet('Sponsored Display Campaigns')).toBe('sd');
+  });
+
+  it('unterscheidet das SB-Blatt mit mehreren Ad Groups vom älteren SB-Blatt', () => {
+    expect(isSbMultiAdGroupSheet('SB Multi Ad Group Campaigns')).toBe(true);
+    expect(isSbMultiAdGroupSheet('SB multi-ad group campaigns')).toBe(true);
+    expect(isSbMultiAdGroupSheet('SB Anzeigengruppe Kampagnen')).toBe(true);
+    expect(isSbMultiAdGroupSheet('Sponsored Brands Campaigns')).toBe(false);
+    expect(isSbMultiAdGroupSheet('Sponsored Brands-Kampagnen')).toBe(false);
   });
 
   it('übergeht Suchbegriff-Berichte und Hilfsblätter', () => {

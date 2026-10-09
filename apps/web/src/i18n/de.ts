@@ -1088,6 +1088,9 @@ export const de = {
       BIDDING_STRATEGY_NOT_SUPPORTED:
         'Mit der Gebotsstrategie der Kampagne lassen sich keine Platzierungen setzen.',
       BULK_FILE_NOT_SUPPORTED: 'Lässt sich nicht per Bulk-Datei ändern.',
+      BULK_FILE_SHEET_UNKNOWN:
+        'Das Blatt dieser Sponsored-Brands-Kampagne ist unbekannt: zuerst eine aktuelle Bulk-Datei importieren.',
+      TARGET_TYPE_NOT_SUPPORTED: 'Diese Art von Target lässt sich so nicht ändern.',
       BULK_FILE_PARENT_ARCHIVED: 'Die Kampagne bzw. Ad Group wird in derselben Datei archiviert.',
     },
     followUp: {
