@@ -5,7 +5,7 @@
   am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt, am 2026-09-29 um gespeicherte Ansichten (`saved_views`),
   am 2026-10-07 um die Suchbegriff-Regeln (`search_term_rules`) und geschützte Begriffe, am 2026-10-08 um die
   abweichenden Regeln je Profil (`search_term_rule_overrides`) und die Änderungen an Amazon-Werbung (`ad_changes`),
-  am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`)
+  am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -90,6 +90,11 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   Lesen und Entfernen nur über `visibleProfilesScope()` (`search-term-harvest.ts`), mit Audit-Event; Quelle und
   Kennzahlen liest der Server aus den Suchbegriffen des Profils, nie aus der Anfrage. Das Recht (`write` bzw. `view`
   im Feature `sp-explorer`) prüft die API.
+- **Eigene Tags** (ab Phase 3, 3.7): `tags` gehören der Organisation (für alle Mitglieder lesbar, `tags.ts`),
+  `tag_assignments` der Organisation des Profils der Entity. Zuweisen und Lösen nur für Entities sichtbarer Profile
+  (`visibleProfilesScope()`), Zähler nur über sichtbare Profile, mit Audit-Event; das Recht (`write` bzw. `view` im
+  Feature `tags`) prüft die API. Der Tag-Filter der Auswertungen (`ads-analytics.ts`) wirkt nur innerhalb der
+  sichtbaren Profile der Auswahl: Ein Tag einer fremden Organisation trifft dort nichts.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.
