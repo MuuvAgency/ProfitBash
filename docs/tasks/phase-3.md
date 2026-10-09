@@ -6,8 +6,8 @@
 >
 > **Status: abgeschlossen (2026-10-09) bis auf drei Punkte, die nicht am Code hängen bzw. eigene Aufgaben sind:**
 > (1) der **echte Upload** der Bulk-Datei in der Werbekonsole durch Dominik (offene Punkte in 3.2b, dazu der Befund aus dem
-> „Config“-Blatt unten), (2) die **Bulk-Datei für Sponsored Brands und Sponsored Display** (3.9, ohne sie lassen sich SB und SD
-> ohne API-Zugang nicht ändern), (3) der **erste echte Lauf über die API** (`phase-1.md` 1.10, offene Punkte in ADR 005).
+> „Config“-Blatt unten), (2) dasselbe für die **Blätter für Sponsored Brands und Sponsored Display** (3.9 ist gebaut, aber ohne echte
+> SB- oder SD-Daten ungeprüft), (3) der **erste echte Lauf über die API** (`phase-1.md` 1.10, offene Punkte in ADR 005).
 > Entschieden: F1, F2 (2026-09-29), **F3–F10** (2026-10-08, die Nummern gelten nur in dieser Datei). `phase-1.md` 1.11 und
 > `phase-2b.md` sind bis auf die Themen ohne Berichte abgeschlossen. Zusätzlich in Phase 3: Suchbegriff-Aktionen aus 2b
 > (Negativ anlegen, Harvest vormerken, F9), siehe `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` Abschnitt B.
@@ -460,10 +460,7 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Updates raus; einzelne Keyword-Antwort als Objekt und `negativeTargetRequestIndex` werden gelesen; fehlende
     Eltern-IDs mit eigenem Code (`PARENT_IDS_MISSING`), das Archivieren negativer SB-Targets braucht nur die
     Ad Group; Tests für Codes, Reihenfolge, Stücke zu 100.
-  - **Offen bzw. bewusst so:** **Die Bulk-Datei kennt weiter nur SP** (eigene Blätter und Spalten für SB und SD;
-    `AD_PRODUCT_NOT_SUPPORTED` beim Weg `bulk_file`). Die Aufgabenzeile nannte die Bulk-Datei als Abdeckung für SB
-    und SD; das stimmt nicht (Notiz 3.2b). Ohne API-Zugang lassen sich SB und SD damit noch nicht ändern: eigene
-    Aufgabe mit den Bulksheets-Guides für SB und SD, am besten mit einer echten Datei von Dominik. Die ±50-%-Warnung
+  - **Offen bzw. bewusst so:** Die Bulk-Datei kannte hier nur SP; **SB und SD kamen mit 3.9 dazu.** Die ±50-%-Warnung
     und die Anzeige im Explorer unterscheiden vCPM nicht von CPC (nur die Grenzen). SB-Platzierungen und
     `bidOptimization` lassen sich nicht ändern. Die offenen Punkte zum echten Verhalten der v3-Endpunkte stehen in
     ADR 005 (IDs über 2^53 als Zahl, Reihenfolge der Antworten, Codes, Höchstzahl bei SD).
@@ -962,6 +959,87 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     vorgemerkt (Spalte „Merkliste“, Ansicht „Merkliste“ mit Quelle), entfernt; 1440 px dunkel und Handy ohne
     waagerechtes Scrollen, Konsole ohne Fehler. Testdaten danach verworfen.
 
+### 3.9 Bulk-Datei für Sponsored Brands und Sponsored Display
+- [x] Blätter und Spalten für SB und SD nach den Bulksheets-Guides, Abbildung in `packages/amazon-ads/src/bulk-file.ts`,
+      Zusammenführung in `apps/worker/src/ad-changes/bulk-file.ts` (bisher `AD_PRODUCT_NOT_SUPPORTED`), Rundlauf-Test mit
+      dem Import-Leser. Offener Punkt aus 3.2b und 3.2c: Ohne das ließen sich SB und SD ohne API-Zugang nicht ändern.
+- **Entschieden (Dominik, 2026-10-09):** jetzt bauen, vor Phase 4. Drei echte Bulk-Dateien bereitgestellt (deutsch und
+  englisch; die Blätter für SB und SD enthalten nur die Kopfzeile, der Kunde nutzt nur SP).
+- **Quellen** (2026-10-09): Kopfzeilen der Blätter „Sponsored Brands Campaigns“, „SB Multi Ad Group Campaigns“ und
+  „Sponsored Display Campaigns“ aus der echten englischen Datei; Entities, Pflichtangaben und Werte aus den Guides
+  `sb-legacy/sb-examples/update-sb-campaigns` und `…/create-sb-campaign`, `sb/sb-examples/update-sb-campaigns` und
+  `…/create-sb-campaign` (mehrere Ad Groups), `sd/sd-examples/update-sd-campaigns` und `…/create-sd-campaign`. Das
+  versteckte Blatt „Config“ der echten Datei nennt Pflichtspalten nur für SP (Befund in 3.2b).
+- [x] Umsetzung (Stand für Phase 4 und später):
+  - **Blätter** (`buildBulkSheet(kind, changes)`, `kind` = `sp` | `sb` | `sbMultiAdGroup` | `sd`; `buildSpBulkSheet`
+    bleibt): je Blatt Name, Wert der Spalte `Product` und die Spalten der echten Datei ohne „Informational only“ und
+    ohne Kennzahlen (`SB_BULK_COLUMNS`, `SB_MULTI_AD_GROUP_BULK_COLUMNS`, `SD_BULK_COLUMNS`). Abweichungen je Blatt:
+    Budget in `Budget` (SP: `Daily Budget`), bei SD `Targeting ID` und `Targeting Expression` (sonst `Product Targeting
+    ID` bzw. `… Expression`). Die Regeln aus 3.2b gelten für alle Blätter: englisch, IDs als Text, Beträge als
+    Zahlzelle, je Entity eine Zeile, Kinder archivierter Eltern entfallen, die Kampagnenzeile trägt immer Portfolio-ID
+    und Enddatum und sonst nur Geändertes (der SD-Guide sagt ausdrücklich, dass ein leeres `End Date` das Enddatum
+    entfernt; für SB steht es nicht da, die Zeile trägt es trotzdem). Schreibt eine Zeile in eine Spalte, die ihr Blatt
+    nicht hat, wirft der Schreiber (Programmierfehler, kein stilles Weglassen).
+  - **Sponsored Brands, älteres Blatt** (`sb`, Kampagnen ohne eigene Ad-Group-Zeilen): `Campaign` (Zustand, Budget,
+    Archivieren), `Keyword` und `Product Targeting` (Zustand, Gebot, Archivieren; die Ad Group darf fehlen),
+    `Negative Keyword` und `Negative Product Targeting` anlegen und archivieren, auch auf Ebene der Kampagne (dort
+    der Normalfall: Der Import liest Negatives ohne Ad Group als „Kampagne“).
+  - **Sponsored Brands mit mehreren Ad Groups** (`sbMultiAdGroup`): zusätzlich `Ad Group` (Zustand, Archivieren);
+    Targets und Negatives brauchen die Ad Group.
+  - **Sponsored Display** (`sd`): `Campaign` (Zustand, Budget), `Ad Group` (Zustand, Standardgebot), `Product Ad`
+    (Zustand), Targets als `Contextual Targeting` bzw. `Audience Targeting` (Zustand, Gebot), `Negative Product
+    Targeting` (ASIN) in der Ad Group anlegen, alles archivieren.
+  - **Nicht im Blatt** (`notSupportedInBulkFile` → `BULK_FILE_NOT_SUPPORTED`, in der Werbekonsole ändern): bei SB
+    Anzeigen (im Blatt heißen sie je Format anders, „Store spotlight ad“ …; das Format kennt ProfitBash nicht), das
+    Standardgebot der Ad Group, Ad Groups im älteren Blatt, Negatives der Kampagne im Blatt mit mehreren Ad Groups;
+    bei SD Keywords und negative Keywords, Negatives der Kampagne; bei beiden Gebotsstrategie und Platzierungen
+    (lehnt schon das Vormerken ab).
+  - **Welches SB-Blatt?** Eine SB-Kampagne steht in genau einem der beiden Blätter. Der Bulk-Import merkt es sich an
+    der Kampagne (`extra.multiAdGroups`, `isSbMultiAdGroupSheet`), der Job reicht es durch
+    (`AdChangeJobRow.campaignMultiAdGroups`). Fehlt die Angabe (Kampagne aus dem API-Export oder vor diesem Stand
+    importiert), scheitert die Änderung mit `BULK_FILE_SHEET_UNKNOWN` („zuerst eine aktuelle Bulk-Datei importieren“).
+  - **Zusammenführung** (`buildBulkFileChanges`, `buildSubmissionBulkFile`): Blatt je Änderung (`sheetByRef`) aus dem
+    Ad-Typ der Kampagne; andere Ad-Typen weiter `AD_PRODUCT_NOT_SUPPORTED`. Die Art eines SD-Targets kommt aus
+    `targetType` (`audience`, `product_audience` … → Zielgruppe; `product`, `category` → kontextbezogen), unbekannte
+    Arten und Themen-Targets von SB scheitern mit `TARGET_TYPE_NOT_SUPPORTED`. Die Datei enthält nur Blätter mit
+    Zeilen, in der Reihenfolge der Werbekonsole (SP, SB, SB mit mehreren Ad Groups, SD).
+  - **Rundlauf** (`bulk-export-roundtrip.test.ts`): eine Arbeitsmappe mit den drei Blättern, gelesen mit `openXlsx` und
+    den Abbildungen des Bulk-Imports (Blätter erkannt, das Blatt mit mehreren Ad Groups unterschieden, alle
+    gebrauchten Kopfzeilen bekannt, Entity-Namen, IDs als Text, Beträge, Datum, Zustand, Match-Typ, Ausdruck
+    `asin="…"`). Wie bei SP belegt das den Gleichlauf von Schreiben und Lesen, nicht die Annahme durch die Konsole.
+  - **Tests:** `bulk-file-sb-sd.test.ts` (je Blatt: Zeilen, was übersprungen wird, gemeinsame Regeln),
+    `ad-changes/bulk-file.test.ts` (Blatt je Änderung, unbekanntes SB-Blatt, Targets ohne Ad Group, Art des
+    SD-Targetings, mehrere Blätter in einer Datei), Import (`multiAdGroups`), `ad-change-queries.test.ts`.
+  - Review (unabhängig): keine kritischen Befunde; alle Pfade je Entity und Operation gegen die vier Spaltenlisten
+    geprüft (keine Zelle in einer Spalte, die das Blatt nicht hat), SP unverändert, keine Änderung geht still
+    verloren, `settleBulkFile`, Download, Abschließen, Retry, Revert und die Bestätigung durch den Import nehmen SB und
+    SD an. Übernommen: Ein SD-Target der Entity „Audience Targeting“ gilt beim Import als Zielgruppe, auch wenn der
+    Leser den Ausdruck nicht kennt (sonst wäre es als „Contextual Targeting“ in die Datei gekommen);
+    `extra.multiAdGroups` bleibt erhalten, wenn eine spätere Quelle (Export über die API) es nicht nennt
+    (`upsertCampaigns`, vorher wäre das Blatt nach jedem Sync wieder unbekannt gewesen); Themen-Targets werden nur für
+    SB abgelehnt (SP wie bisher); ändert eine Übermittlung Zustand und Standardgebot einer SB-Ad-Group, entfällt nur
+    das Standardgebot; die Reihenfolge der Blätter ist über den Typ vollständig; Tests für das ältere SB-Blatt im
+    Import, `product_audience` und `category_audience`, unbekannte SD-Arten.
+  - **Bewusst so (aus dem Review):** `isSbMultiAdGroupSheet` schließt über den Namen aus (alles, was als SB gilt und
+    nicht „Sponsored Brands“ heißt); ein künftig anders benanntes Blatt gälte als das ältere (robuster wäre die
+    Kopfzeile: `Draft Campaign ID` gibt es nur im älteren). Im älteren SB-Blatt trägt ein neues Negative die Ad
+    Group, wenn die Änderung eine nennt; liest der nächste Import die Zeile ohne Ad Group, findet die Bestätigung sie
+    nicht und die Änderung bleibt offen, bis jemand von Hand abschließt. Nicht getestet: der Wächter gegen Spalten,
+    die ein Blatt nicht hat (kein erreichbarer Pfad), `campaignMultiAdGroups` `true`/`false` über die Datenbank
+    (nur `null`; die Abbildung selbst testet der Worker).
+  - **Offen (braucht echte Daten bzw. einen echten Upload):** Die Blätter für SB und SD in Dominiks Dateien sind leer:
+    Schreibweise der Entity-Namen („Ad Group“, „Product Targeting“, „Contextual Targeting“ in der Großschreibung des
+    SP-Blatts; die Guides schreiben „Ad group“, „Product targeting“) und die Werte von `State` sind dort unbelegt. Ob
+    die Konsole Zeilen mit nur den geänderten Feldern annimmt (Pflichtspalten wie bei SP, Befund in 3.2b), ob im
+    älteren SB-Blatt Negatives mit Ad Group angenommen werden, ob ein leeres `Portfolio ID` bei SB und SD die
+    Kampagne aus dem Portfolio nimmt. SB-Kampagnen, die nur der API-Export kennt, tragen `multiAdGroups` nicht
+    (mit 1.10 aus dem Export ableiten); der Mock liefert es deshalb auch nicht, die Demo zeigt für SB
+    `BULK_FILE_SHEET_UNKNOWN`.
+  - Browser-Pane geprüft (Demo-Daten, 2026-10-09): Standardgebot einer SD-Ad-Group geändert, als Bulk-Datei
+    übermittelt („Wartet auf den Upload“ statt wie bisher abgelehnt), Datei geladen und gelesen: ein Blatt „Sponsored
+    Display Campaigns“ mit den 22 Spalten und der Zeile `Ad Group`/`Update` mit Kampagnen- und Ad-Group-ID und dem
+    Gebot als Zahl. Danach „Nicht hochladen“.
+
 ## Bewusst nicht in Phase 3
 
 - Keine neuen Kampagnen, Ad Groups oder Keywords (Phase 4, Kampagnen-Setup)
@@ -970,6 +1048,6 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
 
 ## Reihenfolge für Claude Code
 
-3.1 → 3.2a → 3.2b → 3.3 → 3.4 → 3.5 → 3.6 → 3.8 → 3.7 → 3.2c (die Suchbegriff-Aktionen vor den Tags: Sie schließen die tägliche
+3.1 → 3.2a → 3.2b → 3.3 → 3.4 → 3.5 → 3.6 → 3.8 → 3.7 → 3.2c → 3.9 (die Suchbegriff-Aktionen vor den Tags: Sie schließen die tägliche
 Arbeit aus 2b ab, Tags sind unabhängig). Bis zu drei Aufgaben je Session (`CLAUDE.md`), nach jedem Schritt Tests grün, Commit,
 Häkchen und „Umsetzung“-Notiz.

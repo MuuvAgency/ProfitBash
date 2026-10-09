@@ -631,7 +631,12 @@ class BulkCollector {
         }
         return this.addTarget(kind, adProduct, cells, position, {
           amazonTargetId,
-          targetType: parsed.targetType,
+          // Die Entity der Zeile entscheidet, wenn der Ausdruck nichts Zielgruppenartiges ergibt (unbekannte
+          // Form): Die Bulk-Datei der Änderungen schreibt Zielgruppen und Produkte als verschiedene Entities (3.9).
+          targetType:
+            kind === 'audienceTargeting' && !parsed.targetType.includes('audience')
+              ? 'audience'
+              : parsed.targetType,
           keywordText: null,
           matchType: parsed.matchType,
           expression: parsed.expression,

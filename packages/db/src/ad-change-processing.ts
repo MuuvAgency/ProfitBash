@@ -223,7 +223,7 @@ export interface AdChangeJobRow {
   campaignAmazonPortfolioId: string | null;
   /**
    * Sponsored Brands: ob die Kampagne im Blatt „SB Multi Ad Group Campaigns“ der Bulk-Datei steht
-   * (`extra.multiAdGroups` aus dem Bulk-Import); `null`, wenn unbekannt und bei anderen Ad-Typen.
+   * (`extra.multiAdGroups`, das nur der Bulk-Import an SB-Kampagnen setzt); `null`, wenn die Angabe fehlt.
    */
   campaignMultiAdGroups: boolean | null;
 }
