@@ -29,3 +29,4 @@ export * from './ad-change-queries';
 export * from './product-groups';
 export * from './structure-catalog';
 export * from './campaign-setup';
+export * from './campaign-setup-processing';

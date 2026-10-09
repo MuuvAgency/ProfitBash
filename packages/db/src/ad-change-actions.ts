@@ -41,6 +41,7 @@ import {
   amazonAdsCampaigns,
   amazonAdsNegativeTargets,
   amazonAdsProfiles,
+  campaignSetupItems,
 } from './schema';
 
 /**
@@ -684,6 +685,17 @@ export async function closeBulkFileSubmission(
         .set({ status: input.outcome === 'applied' ? 'applied' : 'dismissed', resolvedAt: now })
         .where(inArray(adChanges.id, part));
     }
+    // Anlagen eines Setups: „hochgeladen“ = angelegt (die echten IDs bringt der nächste Import), sonst verworfen.
+    const setupItems = await tx
+      .update(campaignSetupItems)
+      .set({ status: input.outcome === 'applied' ? 'applied' : 'dismissed', resolvedAt: now })
+      .where(
+        and(
+          eq(campaignSetupItems.submissionId, submission.id),
+          eq(campaignSetupItems.status, 'submitted'),
+        ),
+      )
+      .returning({ id: campaignSetupItems.id });
     if (input.outcome === 'applied') {
       // „Vorher“ endgültig: der Stand unmittelbar vor dem Nachziehen (eine frühere Bulk-Übermittlung an derselben
       // Stelle kann inzwischen abgeschlossen sein).
@@ -713,9 +725,9 @@ export async function closeBulkFileSubmission(
         id: submission.id,
         profileId: submission.profileId,
         outcome: input.outcome,
-        changes: open.length,
+        changes: open.length + setupItems.length,
       },
     });
-    return { changes: open.length };
+    return { changes: open.length + setupItems.length };
   });
 }
