@@ -32,7 +32,9 @@ import {
   amazonAdsProfiles,
   amazonAdsTargets,
   connections,
+  campaignSetupItems,
 } from './schema';
+import { confirmCampaignSetupItems } from './campaign-setup-processing';
 
 /**
  * Verarbeitung der Übermittlungen (`docs/tasks/phase-3.md` 3.3). Systemzugriff des Jobs `ad-changes-submit` und
@@ -66,6 +68,9 @@ export async function lockProfileAdChanges(tx: DbOrTx, profileId: string): Promi
 
 const INTERRUPTED_CREATE_MESSAGE =
   'Der Lauf wurde unterbrochen. Ob Amazon das Negative angelegt hat, ist unklar; nach dem nächsten Sync prüfen.';
+
+const INTERRUPTED_SETUP_MESSAGE =
+  'Der Lauf wurde unterbrochen. Ob Amazon die Entity angelegt hat, ist unklar; nach dem nächsten Sync prüfen.';
 
 // ---------------------------------------------------------------------------
 // Abholen
@@ -138,6 +143,21 @@ export async function claimNextAdChangeSubmission(
             eq(adChanges.submissionId, row.id),
             eq(adChanges.status, 'submitted'),
             eq(adChanges.operation, 'create'),
+          ),
+        );
+      // Anlagen eines Setups ebenso (ohne Ergebnis ist unklar, ob Amazon sie angelegt hat).
+      await tx
+        .update(campaignSetupItems)
+        .set({
+          status: 'failed',
+          errorCode: AD_CHANGE_UNKNOWN_OUTCOME,
+          errorMessage: INTERRUPTED_SETUP_MESSAGE,
+          resolvedAt: input.now,
+        })
+        .where(
+          and(
+            eq(campaignSetupItems.submissionId, row.id),
+            eq(campaignSetupItems.status, 'submitted'),
           ),
         );
     }
@@ -693,24 +713,40 @@ export async function closeAdChangeSubmission(
     eq(adChanges.submissionId, input.submissionId),
     eq(adChanges.status, 'submitted'),
   );
+  // Anlagen eines Setups (`phase-4.md` 4.4) zählen wie Änderungen.
+  const setupStillSubmitted = and(
+    eq(campaignSetupItems.submissionId, input.submissionId),
+    eq(campaignSetupItems.status, 'submitted'),
+  );
   let failed = 0;
   if (input.failRemaining) {
+    const failure = {
+      status: 'failed',
+      errorCode: input.failRemaining.code,
+      errorMessage: input.failRemaining.message,
+      resolvedAt: input.now,
+    };
     const rows = await tx
       .update(adChanges)
-      .set({
-        status: 'failed',
-        errorCode: input.failRemaining.code,
-        errorMessage: input.failRemaining.message,
-        resolvedAt: input.now,
-      })
+      .set(failure)
       .where(stillSubmitted)
       .returning({ id: adChanges.id });
-    failed = rows.length;
+    const items = await tx
+      .update(campaignSetupItems)
+      .set(failure)
+      .where(setupStillSubmitted)
+      .returning({ id: campaignSetupItems.id });
+    failed = rows.length + items.length;
   }
-  const [{ open } = { open: 0 }] = await tx
-    .select({ open: sql<number>`count(*)::int` })
+  const [{ changes } = { changes: 0 }] = await tx
+    .select({ changes: sql<number>`count(*)::int` })
     .from(adChanges)
     .where(stillSubmitted);
+  const [{ items } = { items: 0 }] = await tx
+    .select({ items: sql<number>`count(*)::int` })
+    .from(campaignSetupItems)
+    .where(setupStillSubmitted);
+  const open = changes + items;
   const status: AdChangeSubmissionStatus =
     open > 0 ? 'pending' : input.failRemaining ? 'failed' : 'finished';
   await tx
@@ -834,6 +870,10 @@ export async function confirmBulkFileAdChanges(
       .for('update');
     const result = { confirmed: 0, finished: 0 };
     if (submissions.length === 0) return result;
+    result.confirmed += await confirmCampaignSetupItems(tx, {
+      ...input,
+      submissionIds: submissions.map((submission) => submission.id),
+    });
 
     const changes = await tx
       .select()

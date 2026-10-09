@@ -106,14 +106,12 @@ beforeAll(async () => {
     .values({ name: 'Otto', email: 'otto@andere.test' })
     .returning({ id: users.id });
   other.otto = otto!.id;
-  await db
-    .insert(members)
-    .values({
-      organizationId: other.org,
-      userId: other.otto,
-      role: 'admin',
-      createdAt: new Date(),
-    });
+  await db.insert(members).values({
+    organizationId: other.org,
+    userId: other.otto,
+    role: 'admin',
+    createdAt: new Date(),
+  });
   const base = { countryCode: 'DE', currencyCode: 'EUR', timezone: 'Europe/Berlin' };
   const [foreign] = await db
     .insert(amazonAdsProfiles)
