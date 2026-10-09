@@ -273,6 +273,36 @@ describe('buildCampaignPlan: Gebote und Budgets', () => {
     ]);
   });
 
+  it('nimmt Gebote aus den Daten des Profils vor Preset und Baustein, aber nach der Eingabe (F13)', () => {
+    const plan = buildCampaignPlan(
+      base({
+        preset: preset('funnel-hub'),
+        keywords: [{ text: 'trinkflasche edelstahl', bid: '1.23' }, { text: 'flasche' }],
+        profileBids: { keyword: { exact: '0.71', broad: '0.44' }, product: '0.52' },
+      }),
+    );
+    const exact = one(plan.campaigns, 'SP-KW-EXACT');
+    expect(exact.adGroup.defaultBid).toBe('0.71');
+    expect(exact.targets.map((target) => target.bid)).toEqual(['1.23', '0.71']);
+    expect(one(plan.campaigns, 'SP-KW-BROAD-CLUSTER').adGroup.defaultBid).toBe('0.44');
+    expect(one(plan.campaigns, 'SP-PAT').targets[0]!.bid).toBe('0.52');
+    // Ohne Wert im Profil: Katalog (Kategorie), und nie für SB/SD (die Daten stammen aus SP).
+    const without = buildCampaignPlan(base({ preset: preset('funnel-hub') }));
+    expect(one(plan.campaigns, 'SP-CAT').targets[0]!.bid).toBe(
+      one(without.campaigns, 'SP-CAT').targets[0]!.bid,
+    );
+    expect(plan.hints).toContainEqual({
+      severity: 'info',
+      code: 'bidFromProfile',
+      block: 'SP-KW-EXACT',
+    });
+    expect(plan.hints).not.toContainEqual({
+      severity: 'info',
+      code: 'bidFromProfile',
+      block: 'SP-CAT',
+    });
+  });
+
   it('meldet Gebote und Budgets außerhalb der Grenzen von Amazon als Fehler', () => {
     const limits: AdChangeLimitLookup = ({ field }) =>
       field === 'budget' ? { min: '20', max: '1000000' } : { min: '0.10', max: '0.60' };
