@@ -7,15 +7,27 @@ import {
   AmazonAdsNetworkError,
   AmazonAdsResponseError,
 } from './errors';
-import { sanitize } from './http';
 import { isPlainDecimal, jsonDecimal, stringifyJsonLossless } from './json';
-import { amazonIdSchema } from './profiles';
+import {
+  cleanMessage,
+  errorCode,
+  indexedReader,
+  requireId,
+  WriteNotSupportedError,
+  type Endpoint,
+  type ItemOutcome,
+  type MappedOperation,
+  type Pending,
+  type WriteDialect,
+} from './write-endpoints';
+import { SB_DIALECT, SD_DIALECT } from './writes-sb-sd';
 
 /**
  * Schreibaufträge an Amazon (`docs/tasks/phase-3.md` 3.2a, ADR 005): ein eigenes, schmales Modell
  * (`AmazonAdsWriteOperation`), das hier auf die Endpunkte je Anzeigentyp abgebildet wird. Jobs und Datenbank kennen
- * die Endpunkte nicht. Umgesetzt für **Sponsored Products v3**, geprüft am 2026-10-08 gegen die OpenAPI-Spec
- * (`SponsoredProducts_prod_3p.json`); SB und SD folgen mit 3.2c.
+ * die Endpunkte nicht. Umgesetzt für **Sponsored Products v3** (geprüft am 2026-10-08 gegen die OpenAPI-Spec
+ * `SponsoredProducts_prod_3p.json`), **Sponsored Brands** (v4, Keywords und Targets v3) und **Sponsored Display**
+ * (3.2c, geprüft am 2026-10-09 gegen die Specs von Amazon; Abbildung und Antwortformen in `writes-sb-sd.ts`).
  *
  * SP v3 in Kürze:
  * - `PUT /sp/<entity>` ändert bis zu 1000 Entities je Aufruf, Content-Type und Accept je Entity
@@ -31,7 +43,7 @@ import { amazonIdSchema } from './profiles';
  * Archivieren (sie setzen denselben Zielwert); Anlagen werden nicht wiederholt (sonst doppelte Negatives).
  */
 
-/** Höchstzahl der Einträge je Aufruf (SP v3: `maxItems: 1000` in allen Schreib-Endpunkten). */
+/** Höchstzahl der Einträge je Aufruf bei SP v3 (`maxItems: 1000` in allen Schreib-Endpunkten); SB und SD: weniger. */
 export const MAX_WRITE_BATCH_SIZE = 1000;
 
 export type AmazonAdsWriteState = 'ENABLED' | 'PAUSED';
@@ -51,6 +63,15 @@ interface OperationBase {
   ref: string;
 }
 
+/**
+ * Kampagne und Ad Group der Entity. Sponsored Brands v3 verlangt sie bei Keywords, Targets und Negatives in jeder
+ * Änderung (auch beim Archivieren); SP und SD brauchen sie nicht.
+ */
+interface ParentIds {
+  amazonCampaignId?: string;
+  amazonAdGroupId?: string;
+}
+
 export type AmazonAdsUpdateOperation = OperationBase & { type: 'update'; amazonId: string } & (
     | {
         entity: 'campaign';
@@ -68,7 +89,7 @@ export type AmazonAdsUpdateOperation = OperationBase & { type: 'update'; amazonI
       }
     | { entity: 'adGroup'; state?: AmazonAdsWriteState; defaultBid?: string }
     /** `keyword`: Keyword-Targets; `target`: Produkt-, Kategorie- und Auto-Targets. */
-    | { entity: 'keyword' | 'target'; state?: AmazonAdsWriteState; bid?: string }
+    | ({ entity: 'keyword' | 'target'; state?: AmazonAdsWriteState; bid?: string } & ParentIds)
     | { entity: 'productAd'; state?: AmazonAdsWriteState }
   );
 
@@ -83,11 +104,12 @@ export type AmazonAdsArchiveEntity =
   | 'negativeTarget'
   | 'campaignNegativeTarget';
 
-export type AmazonAdsArchiveOperation = OperationBase & {
-  type: 'archive';
-  entity: AmazonAdsArchiveEntity;
-  amazonId: string;
-};
+export type AmazonAdsArchiveOperation = OperationBase &
+  ParentIds & {
+    type: 'archive';
+    entity: AmazonAdsArchiveEntity;
+    amazonId: string;
+  };
 
 export type AmazonAdsCreateNegativeOperation = OperationBase & {
   type: 'createNegative';
@@ -153,79 +175,61 @@ export class AmazonAdsWriteAbortedError extends AmazonAdsError {
 }
 
 // ---------------------------------------------------------------------------
-// Endpunkte (SP v3)
+// Sponsored Products v3
 // ---------------------------------------------------------------------------
-
-interface Endpoint {
-  operation: string;
-  method: 'PUT' | 'POST';
-  path: string;
-  contentType: string;
-  /** Schlüssel der ID im Erfolgs-Eintrag der Antwort. */
-  idKey: string;
-  /** Schlüssel des Ergebnisses in der Antwort (`campaigns`, `keywords` …). */
-  responseKey: string;
-  /** 5xx und Netzwerkfehler wiederholen (nur, wenn eine Wiederholung nichts doppelt anlegt). */
-  idempotent: boolean;
-  body: (items: unknown[]) => unknown;
-}
 
 const vnd = (entity: string) => `application/vnd.sp${entity}.v3+json`;
 
 const list = (key: string) => (items: unknown[]) => ({ [key]: items });
 const filter = (key: string) => (ids: unknown[]) => ({ [key]: { include: ids } });
 
+const spEndpoint = (
+  operation: string,
+  method: Endpoint['method'],
+  path: string,
+  entity: string,
+  idKey: string,
+  responseKey: string,
+  idempotent: boolean,
+  body: Endpoint['body'],
+): Endpoint => ({
+  operation,
+  method,
+  path,
+  contentType: vnd(entity),
+  accept: vnd(entity),
+  batchSize: MAX_WRITE_BATCH_SIZE,
+  idempotent,
+  body,
+  read: indexedReader(responseKey, idKey),
+});
+
+const update = (path: string, entity: string, idKey: string, listKey: string = path): Endpoint =>
+  spEndpoint(
+    `sp.${path}.update`,
+    'PUT',
+    `/sp/${path}`,
+    entity,
+    idKey,
+    listKey,
+    true,
+    list(listKey),
+  );
+
 const UPDATE_ENDPOINTS: Record<AmazonAdsUpdateOperation['entity'], Endpoint> = {
-  campaign: {
-    operation: 'sp.campaigns.update',
-    method: 'PUT',
-    path: '/sp/campaigns',
-    contentType: vnd('Campaign'),
-    idKey: 'campaignId',
-    idempotent: true,
-    responseKey: 'campaigns',
-    body: list('campaigns'),
-  },
-  adGroup: {
-    operation: 'sp.adGroups.update',
-    method: 'PUT',
-    path: '/sp/adGroups',
-    contentType: vnd('AdGroup'),
-    idKey: 'adGroupId',
-    idempotent: true,
-    responseKey: 'adGroups',
-    body: list('adGroups'),
-  },
-  keyword: {
-    operation: 'sp.keywords.update',
-    method: 'PUT',
-    path: '/sp/keywords',
-    contentType: vnd('Keyword'),
-    idKey: 'keywordId',
-    idempotent: true,
-    responseKey: 'keywords',
-    body: list('keywords'),
-  },
-  target: {
-    operation: 'sp.targets.update',
-    method: 'PUT',
-    path: '/sp/targets',
-    contentType: vnd('TargetingClause'),
-    idKey: 'targetId',
-    idempotent: true,
-    responseKey: 'targetingClauses',
-    body: list('targetingClauses'),
-  },
-  productAd: {
-    operation: 'sp.productAds.update',
-    method: 'PUT',
-    path: '/sp/productAds',
-    contentType: vnd('ProductAd'),
-    idKey: 'adId',
-    idempotent: true,
-    responseKey: 'productAds',
-    body: list('productAds'),
-  },
+  campaign: update('campaigns', 'Campaign', 'campaignId'),
+  adGroup: update('adGroups', 'AdGroup', 'adGroupId'),
+  keyword: update('keywords', 'Keyword', 'keywordId'),
+  target: update('targets', 'TargetingClause', 'targetId', 'targetingClauses'),
+  productAd: update('productAds', 'ProductAd', 'adId'),
+};
+/** Schlüssel der ID im Eintrag je Entity. */
+const UPDATE_ID_KEYS: Record<AmazonAdsUpdateOperation['entity'], string> = {
+  campaign: 'campaignId',
+  adGroup: 'adGroupId',
+  keyword: 'keywordId',
+  target: 'targetId',
+  productAd: 'adId',
 };
 
 const archive = (
@@ -234,16 +238,17 @@ const archive = (
   idKey: string,
   filterKey: string,
   responseKey: string = path,
-): Endpoint => ({
-  operation: `sp.${path}.archive`,
-  method: 'POST',
-  path: `/sp/${path}/delete`,
-  contentType: vnd(entity),
-  idKey,
-  idempotent: true,
-  responseKey,
-  body: filter(filterKey),
-});
+): Endpoint =>
+  spEndpoint(
+    `sp.${path}.archive`,
+    'POST',
+    `/sp/${path}/delete`,
+    entity,
+    idKey,
+    responseKey,
+    true,
+    filter(filterKey),
+  );
 
 const ARCHIVE_ENDPOINTS: Record<AmazonAdsArchiveEntity, Endpoint> = {
   campaign: archive('campaigns', 'Campaign', 'campaignId', 'campaignIdFilter'),
@@ -282,16 +287,17 @@ const ARCHIVE_ENDPOINTS: Record<AmazonAdsArchiveEntity, Endpoint> = {
 type CreateKind =
   'negativeKeyword' | 'campaignNegativeKeyword' | 'negativeTarget' | 'campaignNegativeTarget';
 
-const create = (path: string, entity: string, idKey: string, listKey: string): Endpoint => ({
-  operation: `sp.${path}.create`,
-  method: 'POST',
-  path: `/sp/${path}`,
-  contentType: vnd(entity),
-  idKey,
-  idempotent: false,
-  responseKey: listKey,
-  body: list(listKey),
-});
+const create = (path: string, entity: string, idKey: string, listKey: string): Endpoint =>
+  spEndpoint(
+    `sp.${path}.create`,
+    'POST',
+    `/sp/${path}`,
+    entity,
+    idKey,
+    listKey,
+    false,
+    list(listKey),
+  );
 
 const CREATE_ENDPOINTS: Record<CreateKind, Endpoint> = {
   negativeKeyword: create(
@@ -320,27 +326,15 @@ const CREATE_ENDPOINTS: Record<CreateKind, Endpoint> = {
   ),
 };
 
-/** Reihenfolge der Aufrufe: erst Updates (Kampagne vor ihren Kindern), dann Archivieren, zuletzt Anlagen. */
-const ENDPOINT_ORDER: readonly Endpoint[] = [
-  ...Object.values(UPDATE_ENDPOINTS),
-  ...Object.values(ARCHIVE_ENDPOINTS),
-  ...Object.values(CREATE_ENDPOINTS),
-];
-
 const STRATEGIES: Record<AmazonAdsBiddingStrategy, string> = {
   SALES_DOWN_ONLY: 'LEGACY_FOR_SALES',
   SALES_UP_AND_DOWN: 'AUTO_FOR_SALES',
   NONE: 'MANUAL',
 };
 
-// ---------------------------------------------------------------------------
-// Abbildung der Änderungen
-// ---------------------------------------------------------------------------
-
 /** Eintrag im Body des Endpunkts, oder `null`, wenn die Änderung nichts ändert. */
 function updateItem(op: AmazonAdsUpdateOperation): Record<string, unknown> | null {
-  const endpoint = UPDATE_ENDPOINTS[op.entity];
-  const item: Record<string, unknown> = { [endpoint.idKey]: requireId(op.amazonId) };
+  const item: Record<string, unknown> = { [UPDATE_ID_KEYS[op.entity]]: requireId(op.amazonId) };
   if (op.state !== undefined) item.state = op.state;
   if (op.entity === 'campaign') {
     if (op.dailyBudget !== undefined) {
@@ -371,12 +365,7 @@ function wholeNumber(value: string): string {
   return value;
 }
 
-function requireId(value: string): string {
-  if (!/^\d+$/.test(value)) throw new TypeError('Amazon-ID besteht nicht nur aus Ziffern.');
-  return value;
-}
-
-function createTarget(op: AmazonAdsCreateNegativeOperation): { endpoint: Endpoint; item: unknown } {
+function createTarget(op: AmazonAdsCreateNegativeOperation): MappedOperation {
   const parent = {
     campaignId: requireId(op.amazonCampaignId),
     ...(op.amazonAdGroupId !== null && { adGroupId: requireId(op.amazonAdGroupId) }),
@@ -385,6 +374,7 @@ function createTarget(op: AmazonAdsCreateNegativeOperation): { endpoint: Endpoin
   if (op.negative.type === 'keyword') {
     return {
       endpoint: CREATE_ENDPOINTS[onCampaign ? 'campaignNegativeKeyword' : 'negativeKeyword'],
+      amazonId: null,
       item: {
         ...parent,
         keywordText: op.negative.keywordText,
@@ -395,6 +385,7 @@ function createTarget(op: AmazonAdsCreateNegativeOperation): { endpoint: Endpoin
   }
   return {
     endpoint: CREATE_ENDPOINTS[onCampaign ? 'campaignNegativeTarget' : 'negativeTarget'],
+    amazonId: null,
     item: {
       ...parent,
       expression: [{ type: 'ASIN_SAME_AS', value: op.negative.asin }],
@@ -403,81 +394,36 @@ function createTarget(op: AmazonAdsCreateNegativeOperation): { endpoint: Endpoin
   };
 }
 
-// ---------------------------------------------------------------------------
-// Antworten
-// ---------------------------------------------------------------------------
+const SP_DIALECT: WriteDialect = {
+  map(op) {
+    if (op.type === 'update') {
+      const item = updateItem(op);
+      return item && { endpoint: UPDATE_ENDPOINTS[op.entity], item, amazonId: op.amazonId };
+    }
+    if (op.type === 'archive') {
+      const amazonId = requireId(op.amazonId);
+      return { endpoint: ARCHIVE_ENDPOINTS[op.entity], item: amazonId, amazonId };
+    }
+    return createTarget(op);
+  },
+  order: [
+    ...Object.values(UPDATE_ENDPOINTS),
+    ...Object.values(ARCHIVE_ENDPOINTS),
+    ...Object.values(CREATE_ENDPOINTS),
+  ],
+};
 
-const mutationErrorSchema = z.looseObject({
-  errorType: z.string().nullish(),
-  errorValue: z.record(z.string(), z.unknown()).nullish(),
-});
-
-const mutationResultSchema = z.object({
-  success: z
-    .array(z.looseObject({ index: z.int().min(0) }))
-    .nullish()
-    .transform((value) => value ?? []),
-  error: z
-    .array(z.looseObject({ index: z.int().min(0), errors: z.array(mutationErrorSchema).nullish() }))
-    .nullish()
-    .transform((value) => value ?? []),
-});
-
-/** Gelesen wird nur der Schlüssel des Endpunkts (`responseKey`); weitere Felder der Antwort stören nicht. */
-const mutationResponseSchema = z.record(z.string(), z.unknown());
-
-const MAX_MESSAGE_LENGTH = 300;
-const ERROR_CODE = /^[A-Za-z0-9_]{1,64}$/;
-
-/** Text von Amazon für die Anzeige: ohne Steuerzeichen und Tokens, Leerraum zusammengefasst, gekürzt. */
-function cleanMessage(text: string): string {
-  return sanitize(text.replace(/\s+/gu, ' ').trim(), MAX_MESSAGE_LENGTH - 1);
-}
-
-type ItemOutcome = AmazonAdsWriteResult extends infer R
-  ? R extends { ref: string }
-    ? Omit<R, 'ref'>
-    : never
-  : never;
-
-/** Ergebnis eines Fehler-Eintrags der 207-Antwort. */
-function failureOf(errors: z.output<typeof mutationErrorSchema>[] | null | undefined): ItemOutcome {
-  const first = errors?.[0];
-  const errorType = first?.errorType ?? null;
-  const detail = errorType ? first?.errorValue?.[errorType] : undefined;
-  const fields =
-    typeof detail === 'object' && detail !== null ? (detail as Record<string, unknown>) : {};
-  const message = typeof fields.message === 'string' ? cleanMessage(fields.message) : '';
-  // Kein Urteil über die Änderung: Amazon hat sie gedrosselt bzw. ist selbst gescheitert.
-  if (errorType === 'throttledError') return { status: 'unsent' };
-  if (errorType === 'internalServerError') {
-    return { status: 'unknown', message: message || 'Interner Fehler bei Amazon.' };
-  }
-  const code = [fields.reason, errorType].find(
-    (value): value is string => typeof value === 'string' && ERROR_CODE.test(value),
-  );
-  return {
-    status: 'failed',
-    code: code ?? 'UNKNOWN',
-    message: message || 'Amazon hat die Änderung ohne Begründung abgelehnt.',
-  };
-}
+const DIALECTS: Record<string, WriteDialect> = {
+  SPONSORED_PRODUCTS: SP_DIALECT,
+  SPONSORED_BRANDS: SB_DIALECT,
+  SPONSORED_DISPLAY: SD_DIALECT,
+};
 
 // ---------------------------------------------------------------------------
 // Senden
 // ---------------------------------------------------------------------------
 
-interface Pending {
-  /** Position in `operations` (und im Ergebnis). */
-  position: number;
-  ref: string;
-  /** Eintrag im Body bzw. ID im Filter. */
-  item: unknown;
-  /** ID der geänderten Entity (Updates, Archivieren); `null` bei Anlagen. */
-  amazonId: string | null;
-}
-
-const OPERATION = 'sp.applyChanges';
+const OPERATION = 'ads.applyChanges';
 
 export async function applyChanges(
   deps: AdsEndpointDeps,
@@ -492,26 +438,49 @@ export async function applyChanges(
   const fail = (position: number, code: string, message: string) => {
     results[position] = { ref: input.operations[position]!.ref, status: 'failed', code, message };
   };
-  if (input.adProduct !== 'SPONSORED_PRODUCTS') {
+  const dialect = DIALECTS[input.adProduct];
+  if (!dialect) {
     input.operations.forEach((_, position) =>
       fail(
         position,
         'AD_PRODUCT_NOT_SUPPORTED',
-        'Änderungen über die API gibt es bisher nur für Sponsored Products.',
+        'Änderungen über die API gibt es nur für Sponsored Products, Sponsored Brands und Sponsored Display.',
       ),
     );
     return { results, throttled: false, retryAfterMs: null };
   }
 
   const byEndpoint = new Map<Endpoint, Pending[]>();
-  /** Je Endpunkt jede Entity nur einmal: Die Antwort wird über den Index zugeordnet. */
+  /** Je Endpunkt jede Entity nur einmal: Die Antwort wird über den Index bzw. die Reihenfolge zugeordnet. */
   const seen = new Set<string>();
-  const add = (endpoint: Endpoint, pending: Pending) => {
-    if (pending.amazonId !== null) {
-      const key = `${endpoint.path}:${pending.amazonId}`;
+  input.operations.forEach((op, position) => {
+    let mapped: MappedOperation | null;
+    try {
+      mapped = dialect.map(op);
+    } catch (error) {
+      if (error instanceof WriteNotSupportedError) {
+        fail(position, 'NOT_SUPPORTED', error.message);
+        return;
+      }
+      // Ein ungültiger Wert betrifft nur diese Änderung (`jsonDecimal` und `requireId` werfen `TypeError`).
+      if (!(error instanceof TypeError) && !(error instanceof SyntaxError)) throw error;
+      fail(
+        position,
+        'INVALID_VALUE',
+        'Die Änderung enthält einen ungültigen Wert oder eine ungültige ID.',
+      );
+      return;
+    }
+    if (mapped === null) {
+      fail(position, 'NOTHING_TO_CHANGE', 'Die Änderung nennt kein Feld.');
+      return;
+    }
+    const { endpoint, item, amazonId } = mapped;
+    if (amazonId !== null) {
+      const key = `${endpoint.method} ${endpoint.path}:${amazonId}`;
       if (seen.has(key)) {
         fail(
-          pending.position,
+          position,
           'DUPLICATE_OPERATION',
           'Dieselbe Entity steht in diesem Aufruf schon einmal; Felder einer Entity gehören in eine Änderung.',
         );
@@ -520,43 +489,17 @@ export async function applyChanges(
       seen.add(key);
     }
     const group = byEndpoint.get(endpoint) ?? [];
-    group.push(pending);
+    group.push({ position, ref: op.ref, item, amazonId });
     byEndpoint.set(endpoint, group);
-  };
-  input.operations.forEach((op, position) => {
-    try {
-      if (op.type === 'update') {
-        const item = updateItem(op);
-        if (item === null) {
-          fail(position, 'NOTHING_TO_CHANGE', 'Die Änderung nennt kein Feld.');
-          return;
-        }
-        add(UPDATE_ENDPOINTS[op.entity], { position, ref: op.ref, item, amazonId: op.amazonId });
-      } else if (op.type === 'archive') {
-        const amazonId = requireId(op.amazonId);
-        add(ARCHIVE_ENDPOINTS[op.entity], { position, ref: op.ref, item: amazonId, amazonId });
-      } else {
-        const { endpoint, item } = createTarget(op);
-        add(endpoint, { position, ref: op.ref, item, amazonId: null });
-      }
-    } catch (error) {
-      // Ein ungültiger Wert betrifft nur diese Änderung (`jsonDecimal` und `requireId` werfen `TypeError`).
-      if (!(error instanceof TypeError) && !(error instanceof SyntaxError)) throw error;
-      fail(
-        position,
-        'INVALID_VALUE',
-        'Die Änderung enthält einen ungültigen Wert oder eine ungültige ID.',
-      );
-    }
   });
 
   let throttled = false;
   let retryAfterMs: number | null = null;
-  sending: for (const endpoint of ENDPOINT_ORDER) {
+  sending: for (const endpoint of dialect.order) {
     const group = byEndpoint.get(endpoint);
     if (!group) continue;
-    for (let start = 0; start < group.length; start += MAX_WRITE_BATCH_SIZE) {
-      const batch = group.slice(start, start + MAX_WRITE_BATCH_SIZE);
+    for (let start = 0; start < group.length; start += endpoint.batchSize) {
+      const batch = group.slice(start, start + endpoint.batchSize);
       let outcome: BatchOutcome;
       try {
         outcome = await sendBatch(
@@ -591,6 +534,9 @@ export async function applyChanges(
 type BatchOutcome =
   { type: 'throttled'; retryAfterMs: number | null } | { type: 'done'; results: ItemOutcome[] };
 
+/** Die Form der Antwort kennt erst der Endpunkt (`read`). */
+const anyResponseSchema = z.unknown();
+
 /**
  * Sendet ein Stück an einen Endpunkt. Wirft, wenn der Lauf nicht weitergehen kann: kein Zugriff (401, 403), Fehler
  * beim Holen des Access-Tokens (dann wurde nichts gesendet) oder Unerwartetes.
@@ -607,16 +553,16 @@ async function sendBatch(
     type: 'done',
     results: batch.map(() => outcome),
   });
-  let response: z.output<typeof mutationResponseSchema>;
+  let response: unknown;
   try {
     response = await deps.request(connection, {
       operation: endpoint.operation,
       method: endpoint.method,
       path: endpoint.path,
       amazonProfileId,
-      headers: { 'Content-Type': endpoint.contentType, Accept: endpoint.contentType },
+      headers: { 'Content-Type': endpoint.contentType, Accept: endpoint.accept },
       body: stringifyJsonLossless(endpoint.body(batch.map((pending) => pending.item))),
-      schema: mutationResponseSchema,
+      schema: anyResponseSchema,
       retryServerErrors: endpoint.idempotent,
       ...(options.meter && { meter: options.meter }),
     });
@@ -635,7 +581,9 @@ async function sendBatch(
       return all({
         status: 'failed',
         code:
-          error.code !== null && ERROR_CODE.test(error.code) ? error.code : `HTTP_${error.status}`,
+          error.code !== null
+            ? errorCode(error.code, `HTTP_${error.status}`)
+            : `HTTP_${error.status}`,
         message: error.details
           ? cleanMessage(error.details)
           : `Amazon hat den Aufruf abgelehnt (${error.status}).`,
@@ -653,46 +601,8 @@ async function sendBatch(
     throw error;
   }
 
-  const parsed = mutationResultSchema.safeParse(response[endpoint.responseKey]);
-  if (!parsed.success) {
-    return all({ status: 'unknown', message: 'Die Antwort von Amazon war nicht lesbar.' });
-  }
-  const outcomes: ItemOutcome[] = batch.map(() => ({
-    status: 'unknown',
-    message: 'Amazon hat für diese Änderung kein Ergebnis genannt.',
-  }));
-  /** Wie oft die Antwort einen Index nennt: mehr als einmal ist widersprüchlich. */
-  const mentions = new Map<number, number>();
-  const mention = (index: number) => mentions.set(index, (mentions.get(index) ?? 0) + 1);
-  for (const success of parsed.data.success) {
-    const pending = batch[success.index];
-    if (!pending) continue;
-    mention(success.index);
-    const id = amazonIdSchema.safeParse(success[endpoint.idKey]);
-    if (pending.amazonId !== null && id.success && id.data !== pending.amazonId) {
-      outcomes[success.index] = {
-        status: 'unknown',
-        message: 'Amazon hat für diese Änderung eine andere ID genannt.',
-      };
-      continue;
-    }
-    outcomes[success.index] = {
-      status: 'applied',
-      amazonId: id.success ? id.data : pending.amazonId,
-    };
-  }
-  for (const failure of parsed.data.error) {
-    if (!batch[failure.index]) continue;
-    mention(failure.index);
-    outcomes[failure.index] = failureOf(failure.errors);
-  }
-  for (const [index, count] of mentions) {
-    if (count > 1) {
-      outcomes[index] = {
-        status: 'unknown',
-        message: 'Amazon hat für diese Änderung widersprüchliche Ergebnisse genannt.',
-      };
-    }
-  }
-  return { type: 'done', results: outcomes };
+  const outcomes = endpoint.read(response, batch);
+  return outcomes === null
+    ? all({ status: 'unknown', message: 'Die Antwort von Amazon war nicht lesbar.' })
+    : { type: 'done', results: outcomes };
 }
