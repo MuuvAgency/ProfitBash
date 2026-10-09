@@ -669,9 +669,65 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     richtigem Typ ausgeliefert), „Nicht hochladen“; 1440 px dunkel, Handy hell, kein waagerechtes Scrollen.
 
 ### 3.7 Tags (`/ads/tags/*`, F7)
-- [ ] Eigene Tags je Organisation (Name, Farbe) für Kampagnen, Ad Groups, Targets und Product Ads: verwalten, zuweisen (auch per
+- [x] Eigene Tags je Organisation (Name, Farbe) für Kampagnen, Ad Groups, Targets und Product Ads: verwalten, zuweisen (auch per
       Bulk), Filter im Explorer und in der Filterleiste des Dashboards; Amazon-Tags nur anzeigen.
 - **Entschieden (Dominik, 2026-10-09):** Farben aus einer **festen Palette** der Design-Tokens (kein freier Farbwähler).
+- [x] Umsetzung (Stand für 3.2c, Phase 4 und später):
+  - **Shared** (`packages/shared/src/tags.ts`, browserfähig): `TAG_COLORS` (`violet`, `lime`, `amber`, `red`, `ink`,
+    `grey`: die sechs Farbtöne der Design-Tokens), `TAG_ENTITY_TYPES` (`campaign`, `ad_group`, `target`,
+    `product_ad`), `normalizeTagName` (Ränder weg, Leerraum zusammengefasst, NFC), Grenzen (Name 40 Zeichen, 200 Tags
+    je Organisation, 1000 Entities und 50 Tags je Zuweisung, 50 Tags im Filter) und die Schemas der API.
+  - **Schema** (Migration `0028_tags`, `packages/db/src/schema/tags.ts`): `tags` (Organisation, Name, Farbe als Text
+    ohne CHECK, damit eine neue Farbe keine Migration braucht; Unique je Organisation auf `lower(name)`) und
+    `tag_assignments` (Primärschlüssel Tag, Art und ID der Entity; Profil der Entity; Fremdschlüssel auf Tag und
+    Profil jeweils zusammen mit der Organisation, `ON DELETE CASCADE`; `entity_id` ohne Fremdschlüssel wie bei
+    `ad_changes`; Index über Entity und über Profil).
+  - **Access-Layer** (`packages/db/src/tags.ts`): `listTags` (nach Name, Zähler je Art nur über sichtbare Profile),
+    `createTag`, `updateTag`, `deleteTag` (löscht alle Zuweisungen, auch in ausgeblendeten Profilen; das Tag gehört
+    der Organisation), `assignTags({ entityType, entityIds, addTagIds, removeTagIds })`: nur Entities sichtbarer
+    Profile (`loadEntities` über `visibleProfilesScope()`), unbekannte und unsichtbare zählt `skippedEntities`; ein
+    Tag, das nicht der Organisation gehört, bricht mit `NOT_FOUND` ab, ohne etwas zu ändern; schon Vorhandenes zählt
+    nicht. Fehler `TagError` (`NOT_FOUND`, `NAME_TAKEN`, `LIMIT_REACHED`). Audit `tag.create`, `tag.update` (vorher
+    und nachher), `tag.delete` (Name, Zahl der Zuweisungen), `tags.assign` (nur bei Änderung). ADR 002 ergänzt.
+  - **Filter in den Auswertungen** (`packages/db/src/ads-analytics.ts`, `tagIds` in `analyticsSelectionSchema`):
+    mehrere Tags als ODER, leer = kein Filter. **Ein Tag gilt für seine Entity und alles darunter, nicht nach oben:**
+    Ad Groups, Targets, Suchbegriffe, Product Ads und Negatives erben von Ad Group und Kampagne; Dashboard, Kampagnen
+    und Portfolios zählen nur Kampagnen, die das Tag selbst tragen (ein Tag nur an Targets lässt das Dashboard leer;
+    die Filterleiste sagt das). Gilt für Explorer-Zeilen, Summenzeile, Tagesreihe, Dashboard und Negatives. Die
+    Zeilen der vier Ebenen tragen `attributes.tagIds`, Kampagnen dazu `attributes.amazonTags` (`extra.tags` aus dem
+    Export, nur Anzeige).
+  - **Nebenbei behoben:** Die Tagesreihe der Ebene Portfolios und der Drill-Down auf ein Portfolio in dieser Ebene
+    scheiterten mit einem SQL-Fehler (eine einzelne Tabelle in Klammern ist kein gültiger Join; `entityJoinSql`).
+    Mit Test.
+  - **API** (`apps/api/src/routes/tags.ts`, Feature `tags`): `GET /api/ads/tags` (`view`), `POST /api/ads/tags`
+    (`201`), `PATCH`/`DELETE /api/ads/tags/{id}` (`204`), `POST /api/ads/tags/assign` (alle `write`). Fehler:
+    `404 TAG_NOT_FOUND` (auch fremde Organisation), `409 TAG_NAME_TAKEN`, `409 TAG_LIMIT_REACHED`.
+  - **Seite „Tags“** (`pages/TagsPage.vue`, Route `tags`): Liste mit Farbpunkt, Name und Zuweisungen je Art,
+    „Neues Tag“ und Ändern im Dialog (Name mit Label, Farbe als Auswahl aus der Palette), Löschen mit Rückfrage und
+    Zahl der Zuweisungen; Skeleton, Leerzustand, Fehler mit „Erneut versuchen“; Viewer nur lesend.
+  - **Explorer:** Spalte „Tags“ auf den Ebenen Kampagnen, Ad Groups, Targets und Product Ads (`tags/TagsCell.vue`:
+    eigene Tags als Marke mit Farbpunkt, Amazon-Tags gedämpft mit Umriss; der Wert der Spalte ist der Text der Namen,
+    also filter- und sortierbar und im CSV), nur mit Recht `view` im Feature `tags`. Leiste der markierten Zeilen:
+    „Tags zuweisen“ (`tags/AssignTagsDialog.vue`, nur mit `write`): je Tag ein Häkchen, vorbelegt mit dem, was alle
+    markierten Zeilen tragen, „bei manchen“ als Strich; geändert wird nur Angefasstes (Häkchen setzen hängt an alle,
+    entfernen löst von allen), in Stücken zu 1000 Zeilen. Die Leiste erscheint jetzt auch nur mit dem Recht auf Tags
+    (die Knöpfe für Status, Budget und Gebote hängen weiter an `changes`).
+  - **Filterleiste** (`analytics/FilterBar.vue`, Dashboard und Explorer): Feld „Tags“ (Mehrfachauswahl, höchstens 10,
+    nur mit Recht `view` und wenn es Tags gibt) mit dem Hinweis zur Vererbung. Zustand `tagIds` in `FilterState`: in
+    der URL als `tags=<id>,<id>` und in der gespeicherten Auswahl (ältere Einträge ohne das Feld gelten als „kein
+    Filter“). Tags, die der Nutzer nicht auflösen kann (gelöscht, fremder Link, kein Recht), gelten nicht
+    (`useAnalyticsFilters`, sonst blieben die Auswertungen ohne sichtbaren Grund leer); mit Tag-Filter warten die
+    Auswertungen auf die Tags.
+  - **Farben** (`tags/colors.ts`): Palette → Klassen der Tokens (`bg-violet`, `bg-lime-deep`, `bg-warn`, `bg-loss`,
+    `bg-ink`, `bg-ink-tertiary`) als Punkt; der Text bleibt in Tintenfarbe (lesbar in Hell und Dunkel).
+  - **Tests:** `tags.test.ts` in `packages/db` und `apps/api` (Rechte, fremde Organisation, ausgeblendetes Profil,
+    Entitlement), `ads-analytics.test.ts` (Tags je Zeile, Filter je Ebene samt Vererbung, ODER, Dashboard gleich
+    Explorer, Portfolios, Tagesreihe, Negatives, fremdes Tag), `analytics/filters.test.ts`, `tags/row-tags.test.ts`,
+    `pages/TagsPage.test.ts`, `pages/ExplorerEditing.test.ts` (Spalte, Zuweisen mit „manche“, Lösen, Filter aus der
+    URL, Viewer, ohne Feature).
+  - Browser-Pane geprüft (Demo-Daten, 2026-10-09): zwei Tags angelegt, zwei Kampagnen im Explorer zugewiesen
+    („2 Zuweisungen hinzugefügt“), Filter über die URL: 2 Kampagnen, 101 Targets darunter, Dashboard mit Feld
+    „Tags“ und Hinweis; Konsole ohne Fehler, kein waagerechtes Scrollen. Test-Tags danach gelöscht.
 
 ### 3.8 Suchbegriff-Aktionen (F9)
 - [x] „Negativ anlegen“ in der Suchbegriff-Analyse: Dialog mit Standard „negativ exakt“ in der Ad Group der Zeile, umstellbar
