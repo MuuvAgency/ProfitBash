@@ -193,23 +193,49 @@ const PLACEMENTS: Record<string, string> = {
  */
 export async function confirmCampaignSetupItems(
   tx: DbOrTx,
-  input: { organizationId: string; profileId: string; submissionIds: readonly string[]; now: Date },
+  input: { organizationId: string; profileId: string; now: Date },
 ): Promise<number> {
-  if (input.submissionIds.length === 0) return 0;
+  // Offene Setups per Bulk-Datei und solche mit angelegten Zeilen ohne ID (von Hand als hochgeladen abgeschlossen).
+  const s = adChangeSubmissions;
+  const unresolved = and(
+    eq(i.status, 'applied'),
+    isNull(i.amazonEntityId),
+    sql`${i.entityType} <> 'placement'`,
+  );
+  const submissions = await tx
+    .select({ id: s.id })
+    .from(s)
+    .where(
+      and(
+        eq(s.organizationId, input.organizationId),
+        eq(s.profileId, input.profileId),
+        eq(s.kind, 'setup'),
+        eq(s.channel, 'bulk_file'),
+        sql`(${s.status} in ('pending', 'running') or exists (select 1 from ${i} where ${i.submissionId} = ${s.id} and ${i.profileId} = ${input.profileId} and ${unresolved}))`,
+      ),
+    );
+  if (submissions.length === 0) return 0;
   const rows = asRows(
     await tx
       .select(itemColumns)
       .from(i)
       .where(
         and(
-          inArray(i.submissionId, [...input.submissionIds]),
+          inArray(
+            i.submissionId,
+            submissions.map((submission) => submission.id),
+          ),
           inArray(i.status, ['submitted', 'applied']),
         ),
       )
       .orderBy(i.submissionId, i.position)
       .for('update'),
   );
-  if (!rows.some((row) => row.status === 'submitted')) return 0;
+  /** Zeile ohne Ergebnis bzw. angelegt, aber noch ohne echte ID. */
+  const pending = (row: CampaignSetupItemRow) =>
+    row.status === 'submitted' ||
+    (row.status === 'applied' && row.amazonEntityId === null && row.entityType !== 'placement');
+  if (!rows.some(pending)) return 0;
 
   const profile = eq(amazonAdsCampaigns.profileId, input.profileId);
   const campaigns = await tx
@@ -250,12 +276,12 @@ export async function confirmCampaignSetupItems(
           : campaignByName.get(lower(payload.name));
       if (!campaign) continue;
       campaignOf.set(campaignKey, campaign);
-      if (row.status === 'submitted') await apply(row, campaign.amazonId);
+      if (pending(row)) await apply(row, campaign.amazonId);
       continue;
     }
     const campaign = campaignOf.get(campaignKey);
-    // Angelegte Ad Groups braucht die Zuordnung ihrer Kinder; andere angelegte Zeilen sind erledigt.
-    if (!campaign || (row.status !== 'submitted' && payload.entity !== 'ad_group')) continue;
+    // Angelegte Ad Groups braucht die Zuordnung ihrer Kinder; andere erledigte Zeilen bleiben, wie sie sind.
+    if (!campaign || (!pending(row) && payload.entity !== 'ad_group')) continue;
 
     if (payload.entity === 'placement') {
       const adjustments = (campaign.extra as { placementBidAdjustments?: unknown })
@@ -286,7 +312,7 @@ export async function confirmCampaignSetupItems(
         .limit(1);
       if (!adGroup) continue;
       adGroupOf.set(key(row, row.adGroupRef), adGroup);
-      if (row.status === 'submitted') await apply(row, adGroup.amazonId);
+      if (pending(row)) await apply(row, adGroup.amazonId);
       continue;
     }
 

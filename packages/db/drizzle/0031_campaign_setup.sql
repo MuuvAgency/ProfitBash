@@ -58,5 +58,5 @@ ALTER TABLE "campaign_setup_items" ADD CONSTRAINT "campaign_setup_items_submissi
 CREATE INDEX "campaign_setup_drafts_profile_idx" ON "campaign_setup_drafts" USING btree ("profile_id","updated_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "campaign_setup_drafts_submission_idx" ON "campaign_setup_drafts" USING btree ("submission_id");--> statement-breakpoint
 CREATE INDEX "campaign_setup_items_submission_idx" ON "campaign_setup_items" USING btree ("submission_id","position");--> statement-breakpoint
-CREATE INDEX "campaign_setup_items_open_profile_idx" ON "campaign_setup_items" USING btree ("profile_id") WHERE "campaign_setup_items"."status" = 'submitted';--> statement-breakpoint
+CREATE INDEX "campaign_setup_items_unresolved_profile_idx" ON "campaign_setup_items" USING btree ("profile_id") WHERE "campaign_setup_items"."status" = 'submitted' or ("campaign_setup_items"."status" = 'applied' and "campaign_setup_items"."amazon_entity_id" is null and "campaign_setup_items"."entity_type" <> 'placement');--> statement-breakpoint
 ALTER TABLE "ad_change_submissions" ADD CONSTRAINT "ad_change_submissions_kind_ck" CHECK ("ad_change_submissions"."kind" in ('changes', 'setup'));

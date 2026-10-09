@@ -1,5 +1,5 @@
 {
-  "id": "e03142de-79b2-4b2f-b66d-c5eb728c92f2",
+  "id": "65fc51d5-bd7f-403f-a9d4-435485dfc6fd",
   "prevId": "af1baafb-4ee7-42ee-ba5b-5a4335961411",
   "version": "7",
   "dialect": "postgresql",
@@ -7875,8 +7875,8 @@
           "method": "btree",
           "with": {}
         },
-        "campaign_setup_items_open_profile_idx": {
-          "name": "campaign_setup_items_open_profile_idx",
+        "campaign_setup_items_unresolved_profile_idx": {
+          "name": "campaign_setup_items_unresolved_profile_idx",
           "columns": [
             {
               "expression": "profile_id",
@@ -7886,7 +7886,7 @@
             }
           ],
           "isUnique": false,
-          "where": "\"campaign_setup_items\".\"status\" = 'submitted'",
+          "where": "\"campaign_setup_items\".\"status\" = 'submitted' or (\"campaign_setup_items\".\"status\" = 'applied' and \"campaign_setup_items\".\"amazon_entity_id\" is null and \"campaign_setup_items\".\"entity_type\" <> 'placement')",
           "concurrently": false,
           "method": "btree",
           "with": {}
