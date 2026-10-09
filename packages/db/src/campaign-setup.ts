@@ -6,7 +6,7 @@ import type {
   SaveCampaignSetupDraft,
   SetupInputs,
 } from '@profitbash/shared';
-import type { AdChangeLimitLookup } from '@profitbash/engine';
+import { Dec, type AdChangeLimitLookup } from '@profitbash/engine';
 import { planSetupItems, reviewCampaignPlan, type PlanReviewIssue } from '@profitbash/engine/plan';
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
@@ -18,6 +18,7 @@ import {
   adChangeSubmissions,
   amazonAdsCampaigns,
   amazonAdsProfiles,
+  amazonAdsTargetDailyMetrics,
   amazonAdsTargets,
   campaignSetupDrafts,
   campaignSetupItems,
@@ -591,4 +592,68 @@ export async function submitCampaignSetupDraft(
     if (error instanceof ReviewRejected) return { status: 'rejected', issues: error.issues };
     throw error;
   }
+}
+
+/** Rückblick und Mindestdaten für Gebote aus dem Profil (F13). */
+export const PROFILE_BID_LOOKBACK_DAYS = 60;
+export const PROFILE_BID_MIN_CLICKS = 30;
+
+export interface ProfileBidSuggestions {
+  keyword?: Partial<Record<'broad' | 'phrase' | 'exact', string>>;
+  product?: string;
+  category?: string;
+}
+
+/**
+ * Gebote aus den eigenen Daten des Profils (F13): mittlerer CPC (Kosten / Klicks) der Sponsored-Products-Targets in
+ * den letzten 60 Tagen vor `today` (Tag in der Zeitzone des Profils), je Match-Typ der Keywords, Produkt-Targets und
+ * Kategorien; nur ab 30 Klicks, auf zwei Nachkommastellen (half-even, ADR 003). Systemzugriff ohne Sichtbarkeit:
+ * Der Aufrufer prüft das Profil.
+ */
+export async function loadProfileBidSuggestions(
+  db: DbOrTx,
+  input: { profileId: string; today: string },
+): Promise<ProfileBidSuggestions> {
+  const m = amazonAdsTargetDailyMetrics;
+  const t = amazonAdsTargets;
+  // Keywords je Match-Typ, Produkt-Targets (exakt und „ähnlich“) und Kategorien je Art zusammen.
+  const matchType = sql<
+    string | null
+  >`case when ${t.targetType} = 'keyword' then upper(${t.matchType}) end`;
+  const rows = await db
+    .select({
+      targetType: t.targetType,
+      matchType,
+      clicks: sql<number>`sum(${m.clicks})::int`,
+      cost: sql<string>`sum(${m.cost})::text`,
+    })
+    .from(m)
+    .innerJoin(t, eq(t.id, m.targetId))
+    .where(
+      and(
+        eq(m.profileId, input.profileId),
+        eq(m.adProduct, 'SPONSORED_PRODUCTS'),
+        sql`${m.date} >= ${input.today}::date - ${PROFILE_BID_LOOKBACK_DAYS}::int`,
+        sql`${m.date} < ${input.today}::date`,
+        inArray(t.targetType, ['keyword', 'product', 'category']),
+      ),
+    )
+    .groupBy(t.targetType, matchType);
+  const result: ProfileBidSuggestions = {};
+  for (const row of rows) {
+    if (row.clicks < PROFILE_BID_MIN_CLICKS) continue;
+    const cpc = new Dec(row.cost)
+      .div(row.clicks)
+      .toDecimalPlaces(2, Dec.ROUND_HALF_EVEN)
+      .toFixed(2);
+    if (row.targetType === 'keyword') {
+      const match = row.matchType?.toLowerCase();
+      if (match === 'broad' || match === 'phrase' || match === 'exact') {
+        result.keyword = { ...result.keyword, [match]: cpc };
+      }
+    } else if (row.targetType === 'product' || row.targetType === 'category') {
+      result[row.targetType] = cpc;
+    }
+  }
+  return result;
 }

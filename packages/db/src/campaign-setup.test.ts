@@ -8,6 +8,7 @@ import {
   discardCampaignSetupDraft,
   getCampaignSetupContext,
   getCampaignSetupDraft,
+  loadProfileBidSuggestions,
   listCampaignSetupDrafts,
   saveCampaignSetupDraft,
   submitCampaignSetupDraft,
@@ -15,6 +16,7 @@ import {
 import {
   adChangeSubmissions,
   amazonAdsProfiles,
+  amazonAdsTargetDailyMetrics,
   auditEvents,
   campaignSetupDrafts,
   campaignSetupItems,
@@ -308,6 +310,40 @@ describe('getCampaignSetupContext', () => {
     expect(
       await code(getCampaignSetupContext(testDb.db, { ...as(f.ada), profileId: hiddenProfile })),
     ).toBe('NOT_FOUND');
+  });
+});
+
+describe('loadProfileBidSuggestions (F13)', () => {
+  it('schlägt den mittleren CPC der letzten 60 Tage je Match-Typ bzw. Art vor, ab 30 Klicks', async () => {
+    const { db } = testDb;
+    const row = (targetId: string, date: string, clicks: number, cost: string) => ({
+      organizationId: f.org,
+      profileId: f.profile,
+      targetId,
+      date,
+      adProduct: 'SPONSORED_PRODUCTS',
+      currencyCode: 'EUR',
+      importedAt: new Date(),
+      impressions: clicks * 10,
+      clicks,
+      cost,
+    });
+    await db.insert(amazonAdsTargetDailyMetrics).values([
+      // Keyword (BROAD): 40 Klicks, 22.40 → 0.56
+      row(f.keyword, '2026-10-01', 25, '14.00'),
+      row(f.keyword, '2026-09-01', 15, '8.40'),
+      // Älter als 60 Tage: zählt nicht.
+      row(f.keyword, '2026-07-01', 100, '500.00'),
+      // Produkt-Target: nur 10 Klicks → zu wenig Daten.
+      row(f.productTarget, '2026-10-01', 10, '9.00'),
+    ]);
+    try {
+      expect(await loadProfileBidSuggestions(db, { profileId: f.profile, today: '2026-10-09' })).toEqual(
+        { keyword: { broad: '0.56' } },
+      );
+    } finally {
+      await db.delete(amazonAdsTargetDailyMetrics);
+    }
   });
 });
 
