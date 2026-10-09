@@ -16,6 +16,7 @@ import {
   listSubmissionConnections,
   recordAdChangeResults,
   getCampaignSetupSubmissionItems,
+  loadCampaignSetupItems,
   recordCampaignSetupResults,
   retryAdChanges,
   revertAdChanges,
@@ -57,6 +58,7 @@ import {
   type AdChangeCheck,
   type AdChangeSubmission,
   todayInTimezone,
+  type CampaignSetupItem,
 } from '@profitbash/shared';
 import { buildSetupBulkFile, buildSubmissionBulkFile } from '@profitbash/worker';
 import type { Context } from 'hono';
@@ -603,6 +605,15 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
           ...serializeChange(change),
           followUp,
         })),
+        setupItems:
+          found.submission.kind === 'setup'
+            ? (await loadCampaignSetupItems(db, found.submission.id)).map(
+                ({ submissionId: _submission, ...item }) => ({
+                  ...item,
+                  status: item.status as CampaignSetupItem['status'],
+                }),
+              )
+            : [],
         entitiesSyncedAt: toIso(await getSubmissionEntitiesSyncedAt(db, found.submission.id)),
       },
       200,

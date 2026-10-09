@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { campaignSetupItemSchema, setupIssueSchema } from './campaign-setup';
 import {
   AD_CHANGE_CHANNELS,
   AD_CHANGE_ENTITY_TYPES,
@@ -261,6 +262,8 @@ export const adChangeSubmissionDetailSchema = z
      * Ältester Sync bzw. Import der Kampagnen dieser Übermittlung: Portfolio und Enddatum in der Bulk-Datei
      * stammen von diesem Stand (`null`: noch nie).
      */
+    /** Anlagen eines Setups (Art `setup`, 4.4); leer bei Änderungen. */
+    setupItems: z.array(campaignSetupItemSchema),
     entitiesSyncedAt: timestamp.nullable(),
   })
   .meta({ id: 'AdChangeSubmissionDetail' });
@@ -421,3 +424,20 @@ export const adChangeHistoryResponseSchema = z
     ),
   })
   .meta({ id: 'AdChangeHistoryResponse' });
+
+/** Antwort auf das Übermitteln eines Setup-Entwurfs (4.5). */
+export const submitCampaignSetupResponseSchema = z
+  .discriminatedUnion('status', [
+    z.object({
+      status: z.literal('submitted'),
+      submission: adChangeSubmissionSchema,
+      items: z.number().int(),
+      unsupported: z.number().int(),
+      /** Warnungen und Hinweise der Prüfung (sperren nicht). */
+      issues: z.array(setupIssueSchema),
+    }),
+    /** Die Prüfung hat Fehler gemeldet; nichts wurde übermittelt. */
+    z.object({ status: z.literal('rejected'), issues: z.array(setupIssueSchema) }),
+  ])
+  .meta({ id: 'SubmitCampaignSetupResponse' });
+export type SubmitCampaignSetupResponse = z.infer<typeof submitCampaignSetupResponseSchema>;
