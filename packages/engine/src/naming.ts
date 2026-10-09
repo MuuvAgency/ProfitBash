@@ -24,6 +24,8 @@ export const campaignNameMaxLength = (accountType: string): number =>
  * Devanagari, Tamil und Arabisch. Nicht dabei sind z. B. `·`, `%`, `!`, `#` und Emoji.
  */
 const NAME_CHARACTERS = new RegExp(
+  // Devanagari, Tamil und Arabisch enthalten kombinierende Zeichen; Amazon nennt die Bereiche als Ganzes.
+  // eslint-disable-next-line no-misleading-character-class
   '^[ a-zA-Z0-9\\-$"\'&()*+,./:;=?@\\\\[\\]_`~{}|' +
     '\\u00AE\\u00C0-\\u00CF\\u00D1-\\u00D6\\u00D9-\\u00DC\\u00DF\\u00E0-\\u00EF\\u00F1-\\u00F6\\u00F9-\\u00FC\\u00FF' +
     '\\u0104-\\u0107\\u0118\\u0119\\u0130\\u0131\\u0141-\\u0144\\u0152\\u0153\\u015A-\\u015F\\u0178\\u0179-\\u017E' +
