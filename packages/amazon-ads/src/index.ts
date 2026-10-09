@@ -8,6 +8,7 @@ export {
 export {
   createAmazonAdsClient,
   type AdsApiRequest,
+  type AdsEndpointDeps,
   type AmazonAdsClient,
   type AmazonAdsClientOptions,
   type RequestOptions,
@@ -29,6 +30,12 @@ export {
   type GetExportInput,
   type RequestExportInput,
 } from './exports';
+export {
+  applySpCreates,
+  type AmazonAdsCreateEntity,
+  type AmazonAdsCreateOperation,
+  type ApplySpCreatesInput,
+} from './creates';
 export { createAmazonAdsClientFromConfig, type AmazonAdsClientConfig } from './configure';
 export {
   AMAZON_ADS_DOWNLOAD_HOST_PATTERNS,
