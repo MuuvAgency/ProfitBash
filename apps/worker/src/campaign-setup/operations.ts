@@ -1,6 +1,7 @@
 import type { AmazonAdsCreateOperation } from '@profitbash/amazon-ads';
 import type { CampaignSetupItemRow } from '@profitbash/db';
 import { PARENT_NOT_CREATED } from './bulk-file';
+import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
 
 /**
  * Anlagen einer Setup-Übermittlung → Aufträge für `applySpCreates` (`docs/tasks/phase-4.md` 4.4, API-Weg), ohne I/O.
@@ -12,7 +13,8 @@ import { PARENT_NOT_CREATED } from './bulk-file';
  * - Kinder einer Kampagne bzw. Ad Group, die nicht angelegt wird (gescheitert, verworfen, ohne ID), scheitern mit
  *   `PARENT_NOT_CREATED`.
  * - Negatives in der Quelle (4.6) hängen an bestehenden Kampagnen: deren echte IDs stehen unter eigenen refs in
- *   `created`.
+ *   `created`. Sie gehen erst raus, wenn ein Ziel mit demselben Begriff angelegt ist (`deferred`, solange es offen
+ *   ist; ohne Ziel `HARVEST_TARGET_NOT_CREATED`).
  * - Off-Amazon wie in der Bulk-Datei: nur in den USA einstellbar, dort ohne Freischaltung „Ausgaben begrenzen“.
  */
 
@@ -22,6 +24,8 @@ export interface SetupOperations {
   /** Kampagnen-Zeile → Zeilen, die ihr Ergebnis teilen (Gebotsanpassungen). */
   followers: Map<string, string[]>;
   rejected: { itemId: string; code: string; message: string }[];
+  /** Negatives in der Quelle, deren neues Ziel noch offen ist: gehen nach dessen Anlage raus (zweiter Aufruf). */
+  deferred: string[];
 }
 
 const MATCH_TYPES = { exact: 'EXACT', phrase: 'PHRASE', broad: 'BROAD' } as const;
@@ -40,7 +44,18 @@ export function buildSetupOperations(
     created: new Map(),
     followers: new Map(),
     rejected: [],
+    deferred: [],
   };
+  // Stand der Ziele je Begriff: angelegt bzw. noch offen (Negativ in der Quelle, 4.6).
+  const appliedTerms = new Set<string>();
+  const openTerms = new Set<string>();
+  for (const row of items) {
+    if (row.payload.entity !== 'keyword' && row.payload.entity !== 'product_target') continue;
+    const term = setupTermKey(row);
+    if (term === null) continue;
+    if (row.status === 'applied') appliedTerms.add(term);
+    if (row.status === 'submitted') openTerms.add(term);
+  }
   const lower = (value: string | null) => (value ?? '').toLowerCase();
   const campaignKey = (row: CampaignSetupItemRow) => lower(row.campaignRef);
   const adGroupKey = (row: CampaignSetupItemRow) =>
@@ -69,6 +84,13 @@ export function buildSetupOperations(
     if (row.status !== 'submitted') continue;
 
     if (payload.entity === 'source_negative') {
+      // Erst wenn das neue Ziel des Begriffs angelegt ist; ohne Ziel bliebe die Quelle ohne Ersatz.
+      const term = setupTermKey(row)!;
+      if (!appliedTerms.has(term)) {
+        if (openTerms.has(term)) result.deferred.push(row.id);
+        else result.rejected.push({ itemId: row.id, ...HARVEST_TARGET_NOT_CREATED });
+        continue;
+      }
       // Bestehende Kampagne und Ad Group (4.6): ihre echten IDs gelten als schon angelegte Eltern.
       const campaignRef = `amazon-campaign:${payload.amazonCampaignId}`;
       const adGroupRef = `amazon-ad-group:${payload.amazonAdGroupId}`;

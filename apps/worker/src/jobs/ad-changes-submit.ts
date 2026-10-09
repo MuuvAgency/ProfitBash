@@ -281,11 +281,11 @@ async function sendSetup(
   const submissionRef = { organizationId, submissionId: submission.id };
   const job = await loadCampaignSetupJob(deps.db, submissionRef);
   if (!job) return { open: 0, retryAfterMs: null, aborted: null };
-  const plan = buildSetupOperations(job.items, {
+  const context = {
     accountType: job.profile.accountType,
     countryCode: job.profile.countryCode,
     startDate: todayInTimezone(job.profile.timezone, now()),
-  });
+  };
   const record = async (results: CampaignSetupResult[]) => {
     if (results.length === 0) return;
     await recordCampaignSetupResults(deps.db, { ...submissionRef, now: now(), results });
@@ -294,62 +294,70 @@ async function sendSetup(
       else counters.changesFailed! += 1;
     }
   };
-  await record(
-    plan.rejected.map(({ itemId, code, message }) => ({
-      itemId,
-      outcome: 'failed',
-      code,
-      message,
-    })),
-  );
 
-  let results: readonly AmazonAdsWriteResult[] = [];
   let retryAfterMs: number | null = null;
   let aborted: { cause: unknown } | null = null;
-  if (plan.operations.length > 0) {
-    await run.extendLease();
-    try {
-      const response = await deps.amazonAds.applySpCreates(
-        connection,
-        {
-          amazonProfileId: submission.amazonProfileId,
-          operations: plan.operations,
-          created: plan.created,
-        },
-        { meter: run.meter },
-      );
-      results = response.results;
-      if (response.throttled) retryAfterMs = response.retryAfterMs ?? MIN_RETRY_SECONDS * 1000;
-    } catch (err) {
-      if (!(err instanceof AmazonAdsWriteAbortedError)) throw err;
-      results = err.results;
-      aborted = { cause: err.cause };
-    }
-  }
-  const outcomes: CampaignSetupResult[] = [];
-  const created = new Set(plan.created.keys());
-  for (const result of results) {
-    // Schon in einem früheren Lauf angelegt: Ergebnis steht.
-    if (created.has(result.ref) || result.status === 'unsent') continue;
-    const itemIds = [result.ref, ...(plan.followers.get(result.ref) ?? [])];
-    for (const itemId of itemIds) {
-      const amazonEntityId =
-        itemId === result.ref && result.status === 'applied' ? result.amazonId : null;
-      if (result.status === 'applied')
-        outcomes.push({ itemId, outcome: 'applied', amazonEntityId });
-      else if (result.status === 'failed') {
-        outcomes.push({ itemId, outcome: 'failed', code: result.code, message: result.message });
-      } else {
-        outcomes.push({
-          itemId,
-          outcome: 'failed',
-          code: AD_CHANGE_UNKNOWN_OUTCOME,
-          message: `${result.message} ${UNKNOWN_SETUP_HINT}`,
-        });
+  // Zweiter Aufruf nur für Negatives in der Quelle (4.6), deren neues Ziel im ersten angelegt wurde.
+  let items = job.items;
+  for (let pass = 0; pass < 2; pass++) {
+    const plan = buildSetupOperations(items, context);
+    await record(
+      plan.rejected.map(({ itemId, code, message }) => ({
+        itemId,
+        outcome: 'failed',
+        code,
+        message,
+      })),
+    );
+
+    let results: readonly AmazonAdsWriteResult[] = [];
+    if (plan.operations.length > 0) {
+      await run.extendLease();
+      try {
+        const response = await deps.amazonAds.applySpCreates(
+          connection,
+          {
+            amazonProfileId: submission.amazonProfileId,
+            operations: plan.operations,
+            created: plan.created,
+          },
+          { meter: run.meter },
+        );
+        results = response.results;
+        if (response.throttled) retryAfterMs = response.retryAfterMs ?? MIN_RETRY_SECONDS * 1000;
+      } catch (err) {
+        if (!(err instanceof AmazonAdsWriteAbortedError)) throw err;
+        results = err.results;
+        aborted = { cause: err.cause };
       }
     }
+    const outcomes: CampaignSetupResult[] = [];
+    const created = new Set(plan.created.keys());
+    for (const result of results) {
+      // Schon in einem früheren Lauf angelegt: Ergebnis steht.
+      if (created.has(result.ref) || result.status === 'unsent') continue;
+      const itemIds = [result.ref, ...(plan.followers.get(result.ref) ?? [])];
+      for (const itemId of itemIds) {
+        const amazonEntityId =
+          itemId === result.ref && result.status === 'applied' ? result.amazonId : null;
+        if (result.status === 'applied')
+          outcomes.push({ itemId, outcome: 'applied', amazonEntityId });
+        else if (result.status === 'failed') {
+          outcomes.push({ itemId, outcome: 'failed', code: result.code, message: result.message });
+        } else {
+          outcomes.push({
+            itemId,
+            outcome: 'failed',
+            code: AD_CHANGE_UNKNOWN_OUTCOME,
+            message: `${result.message} ${UNKNOWN_SETUP_HINT}`,
+          });
+        }
+      }
+    }
+    await record(outcomes);
+    if (aborted || retryAfterMs !== null || plan.deferred.length === 0) break;
+    items = await loadCampaignSetupItems(deps.db, submission.id);
   }
-  await record(outcomes);
   const open = (await loadCampaignSetupItems(deps.db, submission.id)).filter(
     (item) => item.status === 'submitted',
   ).length;

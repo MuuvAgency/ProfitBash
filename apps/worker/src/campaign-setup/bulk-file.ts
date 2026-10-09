@@ -2,6 +2,7 @@ import { buildSpBulkSheet, type BulkFileChange, type BulkFileCreate } from '@pro
 import type { CampaignSetupItemRow } from '@profitbash/db';
 import { writeXlsx } from '@profitbash/sheets';
 import { BULK_FILE_SKIPS } from '../ad-changes/bulk-file';
+import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
 
 /**
  * Bulk-Datei einer Setup-Übermittlung (`docs/tasks/phase-4.md` 4.4): je offener Anlage eine `Create`-Zeile im
@@ -208,6 +209,24 @@ export function buildSetupBulkFile(
     if (ownKey !== null)
       parents.set(ownKey, entity === 'campaign' ? row.campaignRef : row.adGroupRef!);
   }
+
+  // Negatives in der Quelle (4.6) nur, wenn das neue Ziel des Begriffs in der Datei steht oder schon angelegt ist.
+  const inFile = new Set(changes.map((change) => change.ref));
+  const covered = new Set<string>();
+  for (const row of items) {
+    if (row.payload.entity !== 'keyword' && row.payload.entity !== 'product_target') continue;
+    const term = setupTermKey(row);
+    if (term !== null && (row.status === 'applied' || inFile.has(row.id))) covered.add(term);
+  }
+  const rowsById = new Map(items.map((row) => [row.id, row]));
+  const kept = changes.filter((change) => {
+    const row = rowsById.get(change.ref);
+    if (row?.payload.entity !== 'source_negative' || covered.has(setupTermKey(row)!)) return true;
+    skipped.push({ itemId: row.id, ...HARVEST_TARGET_NOT_CREATED });
+    return false;
+  });
+  changes.length = 0;
+  changes.push(...kept);
 
   const sheet = buildSpBulkSheet(changes);
   for (const { ref, reason } of sheet.skipped)
