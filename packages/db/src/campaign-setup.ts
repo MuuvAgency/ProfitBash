@@ -11,7 +11,7 @@ import type {
 import { Dec, type AdChangeLimitLookup } from '@profitbash/engine';
 import { planSetupItems, reviewCampaignPlan, type PlanReviewIssue } from '@profitbash/engine/plan';
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
-import { visibleProfilesScope } from './access';
+import { canSeeProfile, visibleProfilesScope } from './access';
 import { loadAdChangeSubmissionSummaries, type AdChangeSubmissionSummary } from './ad-changes';
 import { closeAdChangeSubmission } from './ad-change-processing';
 import { recordAuditEvent, type DbOrTx } from './audit';
@@ -460,6 +460,15 @@ export async function getCampaignSetupContext(
     );
   if (!profile) throw notFound();
   return { profile, existing: await loadContext(db, input.profileId) };
+}
+
+/** Prüft, ob der Nutzer das Profil sieht; `NOT_FOUND` sonst. */
+export async function assertCampaignSetupProfile(
+  db: Db,
+  input: CampaignSetupActor & { profileId: string },
+): Promise<true> {
+  if (!(await canSeeProfile(db, input))) throw notFound();
+  return true;
 }
 
 export type SubmitCampaignSetupResult =

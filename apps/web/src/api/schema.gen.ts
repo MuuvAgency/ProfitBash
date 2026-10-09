@@ -4629,6 +4629,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/tools/setup/harvest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Harvest-Merkliste eines Profils als Eingang des Setups (4.6), mit CPC als Gebotsvorschlag */
+        get: {
+            parameters: {
+                query: {
+                    profileId: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Merkliste. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SetupHarvestList"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/tools/setup/drafts": {
         parameters: {
             query?: never;
@@ -6663,7 +6737,7 @@ export interface components {
             id: string;
             position: number;
             /** @enum {string} */
-            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "negative_keyword" | "negative_product_target";
+            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "negative_keyword" | "negative_product_target" | "source_negative";
             campaignRef: string;
             adGroupRef: string | null;
             payload: {
@@ -6937,6 +7011,7 @@ export interface components {
                     matchType: "negativeExact";
                 })[];
             }[];
+            sourceNegatives: components["schemas"]["SourceNegative"][];
             hints: components["schemas"]["SetupIssue"][];
             eurRate: {
                 rate: string;
@@ -6951,6 +7026,29 @@ export interface components {
                 product?: string;
                 category?: string;
             };
+        };
+        SourceNegative: {
+            /** Format: uuid */
+            markId: string;
+            searchTerm: string;
+            amazonCampaignId: string;
+            amazonAdGroupId: string;
+            campaignName: string;
+            adGroupName: string;
+            negative: {
+                /** @enum {string} */
+                type: "keyword";
+                text: string;
+                /** @enum {string} */
+                matchType: "negativeExact" | "negativePhrase";
+            } | {
+                /** @enum {string} */
+                type: "product";
+                asin: string;
+                /** @enum {string} */
+                matchType: "negativeExact";
+            };
+            selected: boolean;
         };
         SetupIssue: {
             /** @enum {string} */
@@ -6986,6 +7084,13 @@ export interface components {
                     name: string;
                     bid?: string;
                 }[];
+                /** @default [] */
+                harvest: {
+                    /** Format: uuid */
+                    markId: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
                 /** @default {} */
                 unlocks: {
                     [key: string]: {
@@ -6996,6 +7101,29 @@ export interface components {
             };
             /** @default true */
             useProfileBids: boolean;
+            /** @default [] */
+            deselectedSources: string[];
+        };
+        SetupHarvestList: {
+            marks: {
+                /** Format: uuid */
+                id: string;
+                searchTerm: string;
+                adProduct: string;
+                campaignName: string | null;
+                adGroupName: string | null;
+                periodStart: string;
+                periodEnd: string;
+                clicks: number;
+                cost: string;
+                sales: string;
+                purchases: number;
+                currencyCode: string;
+                cpc: string | null;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+            truncated: boolean;
         };
         CampaignSetupDraftList: {
             drafts: {
@@ -7075,6 +7203,13 @@ export interface components {
                     name: string;
                     bid?: string;
                 }[];
+                /** @default [] */
+                harvest: {
+                    /** Format: uuid */
+                    markId: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
                 /** @default {} */
                 unlocks: {
                     [key: string]: {
@@ -7156,6 +7291,7 @@ export interface components {
                     matchType: "negativeExact";
                 })[];
             }[];
+            sourceNegatives: components["schemas"]["SourceNegative"][];
         };
         SaveCampaignSetupDraftRequest: {
             /** Format: uuid */
@@ -7187,6 +7323,13 @@ export interface components {
                     name: string;
                     bid?: string;
                 }[];
+                /** @default [] */
+                harvest: {
+                    /** Format: uuid */
+                    markId: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
                 /** @default {} */
                 unlocks: {
                     [key: string]: {
@@ -7268,6 +7411,8 @@ export interface components {
                     matchType: "negativeExact";
                 })[];
             }[];
+            /** @default [] */
+            sourceNegatives: components["schemas"]["SourceNegative"][];
         };
         SubmitCampaignSetupResponse: {
             /** @enum {string} */

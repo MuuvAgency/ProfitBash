@@ -6316,7 +6316,8 @@
               "keyword",
               "product_target",
               "negative_keyword",
-              "negative_product_target"
+              "negative_product_target",
+              "source_negative"
             ]
           },
           "campaignRef": {
@@ -7598,6 +7599,12 @@
               "additionalProperties": false
             }
           },
+          "sourceNegatives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceNegative"
+            }
+          },
           "hints": {
             "type": "array",
             "items": {
@@ -7647,10 +7654,117 @@
         },
         "required": [
           "campaigns",
+          "sourceNegatives",
           "hints",
           "eurRate",
           "profileBids"
         ]
+      },
+      "SourceNegative": {
+        "type": "object",
+        "properties": {
+          "markId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "searchTerm": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "amazonCampaignId": {
+            "type": "string",
+            "pattern": "^\\d{1,20}$"
+          },
+          "amazonAdGroupId": {
+            "type": "string",
+            "pattern": "^\\d{1,20}$"
+          },
+          "campaignName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "adGroupName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "negative": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "keyword"
+                    ]
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "matchType": {
+                    "type": "string",
+                    "enum": [
+                      "negativeExact",
+                      "negativePhrase"
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "text",
+                  "matchType"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "product"
+                    ]
+                  },
+                  "asin": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9]{10}$"
+                  },
+                  "matchType": {
+                    "type": "string",
+                    "enum": [
+                      "negativeExact"
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "asin",
+                  "matchType"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "selected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "markId",
+          "searchTerm",
+          "amazonCampaignId",
+          "amazonAdGroupId",
+          "campaignName",
+          "adGroupName",
+          "negative",
+          "selected"
+        ],
+        "additionalProperties": false
       },
       "SetupIssue": {
         "type": "object",
@@ -7792,6 +7906,31 @@
                 "maxItems": 1000,
                 "default": []
               },
+              "harvest": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "markId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "single": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "markId"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
               "unlocks": {
                 "type": "object",
                 "additionalProperties": {
@@ -7814,6 +7953,15 @@
           "useProfileBids": {
             "type": "boolean",
             "default": true
+          },
+          "deselectedSources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000,
+            "default": []
           }
         },
         "required": [
@@ -7823,6 +7971,95 @@
           "inputs"
         ],
         "additionalProperties": false
+      },
+      "SetupHarvestList": {
+        "type": "object",
+        "properties": {
+          "marks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "searchTerm": {
+                  "type": "string"
+                },
+                "adProduct": {
+                  "type": "string"
+                },
+                "campaignName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "adGroupName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "periodStart": {
+                  "type": "string"
+                },
+                "periodEnd": {
+                  "type": "string"
+                },
+                "clicks": {
+                  "type": "integer"
+                },
+                "cost": {
+                  "type": "string"
+                },
+                "sales": {
+                  "type": "string"
+                },
+                "purchases": {
+                  "type": "integer"
+                },
+                "currencyCode": {
+                  "type": "string"
+                },
+                "cpc": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "searchTerm",
+                "adProduct",
+                "campaignName",
+                "adGroupName",
+                "periodStart",
+                "periodEnd",
+                "clicks",
+                "cost",
+                "sales",
+                "purchases",
+                "currencyCode",
+                "cpc",
+                "createdAt"
+              ]
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "marks",
+          "truncated"
+        ]
       },
       "CampaignSetupDraftList": {
         "type": "object",
@@ -8105,6 +8342,31 @@
                   "required": [
                     "id",
                     "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "harvest": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "markId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "single": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "markId"
                   ],
                   "additionalProperties": false
                 },
@@ -8508,6 +8770,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "sourceNegatives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceNegative"
+            }
           }
         },
         "required": [
@@ -8526,7 +8794,8 @@
           "createdAt",
           "updatedAt",
           "inputs",
-          "campaigns"
+          "campaigns",
+          "sourceNegatives"
         ]
       },
       "SaveCampaignSetupDraftRequest": {
@@ -8643,6 +8912,31 @@
                   "required": [
                     "id",
                     "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "harvest": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "markId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "single": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "markId"
                   ],
                   "additionalProperties": false
                 },
@@ -9048,6 +9342,14 @@
             },
             "minItems": 1,
             "maxItems": 300
+          },
+          "sourceNegatives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceNegative"
+            },
+            "maxItems": 1000,
+            "default": []
           }
         },
         "required": [
@@ -14006,6 +14308,77 @@
           },
           "409": {
             "description": "Entwurf inzwischen geändert, schon übermittelt bzw. kein Kurs vorhanden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/tools/setup/harvest": {
+      "get": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Harvest-Merkliste eines Profils als Eingang des Setups (4.6), mit CPC als Gebotsvorschlag",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Merkliste.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupHarvestList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entwurf, Profil oder Produktgruppe nicht gefunden.",
             "content": {
               "application/json": {
                 "schema": {

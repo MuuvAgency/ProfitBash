@@ -277,7 +277,15 @@ describe('Setup über die API gegen den Mock-Anbieter (4.4)', () => {
         presetKey: 'muuv-standard',
         name: 'Neue Flaschen',
         campaignState: 'PAUSED',
-        inputs: { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} },
+        inputs: {
+          keywords: [],
+          brandTerms: [],
+          productTargets: [],
+          categories: [],
+          harvest: [],
+          unlocks: {},
+        },
+        sourceNegatives: [],
         campaigns: [
           {
             block: 'SP-KW-EXACT',

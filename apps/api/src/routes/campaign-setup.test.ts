@@ -6,6 +6,7 @@ import type {
   CampaignSetupDraftListResponse,
   ErrorResponse,
   PlanCampaignSetupResponse,
+  SetupHarvestListResponse,
   SubmitCampaignSetupResponse,
 } from '@profitbash/shared';
 import { todayInTimezone } from '@profitbash/shared';
@@ -30,6 +31,7 @@ const {
   orgEntitlements,
   productGroupItems,
   productGroups,
+  searchTermHarvestMarks,
 } = schema;
 
 /**
@@ -412,5 +414,141 @@ describe('Planen: Kurs und Gebote aus dem Profil (F13)', () => {
     } finally {
       await db.delete(amazonAdsTargetDailyMetrics);
     }
+  });
+});
+
+describe('Harvest von der Merkliste (4.6)', () => {
+  async function harvestMark(
+    profileId: string,
+    searchTerm: string,
+    orgId = ctx.seeded.organizationId,
+  ) {
+    const [row] = await ctx.testDb.db
+      .insert(searchTermHarvestMarks)
+      .values({
+        organizationId: orgId,
+        profileId,
+        searchTerm,
+        termKey: searchTerm.toLowerCase(),
+        adProduct: 'SPONSORED_PRODUCTS',
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '2001',
+        amazonTargetId: '3001',
+        periodStart: '2026-09-01',
+        periodEnd: '2026-09-30',
+        sourceRows: 1,
+        currencyCode: 'EUR',
+        impressions: 100,
+        clicks: 10,
+        cost: '7.80',
+        sales: '30.00',
+        purchases: 2,
+        units: 2,
+      })
+      .returning({ id: searchTermHarvestMarks.id });
+    return row!.id;
+  }
+  beforeEach(async () => {
+    await ctx.testDb.db.delete(searchTermHarvestMarks);
+  });
+
+  it('liest die Merkliste eines Profils mit CPC, auch für Viewer', async () => {
+    await harvestMark(f.profile, 'trinkflasche glas');
+    const res = await call<SetupHarvestListResponse>(
+      'GET',
+      `/harvest?profileId=${f.profile}`,
+      viewer,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.marks).toEqual([
+      expect.objectContaining({
+        searchTerm: 'trinkflasche glas',
+        campaignName: 'Kampagne 1001',
+        adGroupName: 'AG 2001',
+        clicks: 10,
+        cost: '7.80',
+        cpc: '0.78',
+        currencyCode: 'EUR',
+      }),
+    ]);
+  });
+
+  it('zeigt fremde und ausgeblendete Profile nicht', async () => {
+    expect((await call('GET', `/harvest?profileId=${f.profile}`, foreign)).status).toBe(404);
+    await ctx.testDb.db.update(amazonAdsProfiles).set({ isHidden: true });
+    expect((await call('GET', `/harvest?profileId=${f.profile}`, admin)).status).toBe(404);
+  });
+
+  it('plant Begriffe der Merkliste mit CPC und schlägt das Negativ in der Quelle vor', async () => {
+    const markId = await harvestMark(f.profile, 'trinkflasche glas');
+    const foreignMark = await harvestMark(other.profile, 'fremd', other.org);
+    const body = {
+      profileId: f.profile,
+      productGroupId: groupId,
+      presetKey: 'control',
+      inputs: { ...inputs, keywords: [], harvest: [{ markId }, { markId: foreignMark }] },
+    };
+    const res = await call<PlanCampaignSetupResponse>('POST', '/plan', editor, body);
+    expect(res.status).toBe(200);
+    const keywords = res.body.campaigns.flatMap((campaign) =>
+      campaign.targets.flatMap((target) => (target.type === 'keyword' ? [target] : [])),
+    );
+    expect(keywords).toContainEqual(
+      expect.objectContaining({ text: 'trinkflasche glas', matchType: 'exact', bid: '0.78' }),
+    );
+    expect(res.body.sourceNegatives).toEqual([
+      expect.objectContaining({
+        markId,
+        amazonCampaignId: '1001',
+        amazonAdGroupId: '2001',
+        negative: { type: 'keyword', text: 'trinkflasche glas', matchType: 'negativeExact' },
+        selected: true,
+      }),
+    ]);
+    expect(res.body.hints).toContainEqual({
+      severity: 'warning',
+      code: 'harvestMarkMissing',
+      markId: foreignMark,
+    });
+
+    const deselected = await call<PlanCampaignSetupResponse>('POST', '/plan', editor, {
+      ...body,
+      deselectedSources: [markId],
+    });
+    expect(deselected.body.sourceNegatives[0]?.selected).toBe(false);
+  });
+
+  it('übermittelt das Negativ in der Quelle mit dem Entwurf', async () => {
+    const markId = await harvestMark(f.profile, 'trinkflasche glas');
+    const harvestInputs = { ...inputs, keywords: [], harvest: [{ markId }] };
+    const planned = await call<PlanCampaignSetupResponse>('POST', '/plan', editor, {
+      profileId: f.profile,
+      productGroupId: groupId,
+      presetKey: 'control',
+      inputs: harvestInputs,
+    });
+    const saved = await call<CampaignSetupDraft>('POST', '/drafts', editor, {
+      profileId: f.profile,
+      productGroupId: groupId,
+      presetKey: 'control',
+      name: 'Harvest',
+      campaignState: 'ENABLED',
+      inputs: harvestInputs,
+      campaigns: planned.body.campaigns,
+      sourceNegatives: planned.body.sourceNegatives,
+    });
+    expect(saved.status).toBe(201);
+    expect(saved.body.sourceNegatives).toHaveLength(1);
+    const submitted = await call<SubmitCampaignSetupResponse>(
+      'POST',
+      `/drafts/${saved.body.id}/submit`,
+      editor,
+      { version: 1, channel: 'bulk_file' },
+    );
+    expect(submitted.body.status).toBe('submitted');
+    const items = await ctx.testDb.db
+      .select({ entityType: campaignSetupItems.entityType })
+      .from(campaignSetupItems);
+    expect(items.map((item) => item.entityType)).toContain('source_negative');
   });
 });
