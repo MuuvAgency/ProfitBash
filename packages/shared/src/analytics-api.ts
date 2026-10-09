@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { adProductSchema, attributionSettingSchema } from './analytics';
+import { MAX_TAG_FILTER_IDS } from './tags';
 
 /**
  * zod-Schemas der Auswertungs-Endpunkte (`/api/ads/*`, `docs/tasks/phase-2.md` 2.5). Alle Endpunkte sind POST, IDs
@@ -51,6 +52,11 @@ export const analyticsSelectionSchema = z.object({
   withoutClient: z.boolean().optional(),
   profileIds: ids(1000).optional(),
   adProducts: z.array(adProductSchema).min(1).max(3).optional(),
+  /**
+   * Eigene Tags (`phase-3.md` 3.7), mehrere als ODER. Ein Tag gilt für seine Entity und alles darunter; Dashboard,
+   * Kampagnen und Portfolios zählen nur Kampagnen, die das Tag selbst tragen.
+   */
+  tagIds: ids(MAX_TAG_FILTER_IDS).optional(),
 });
 
 export const analyticsQuerySchema = analyticsSelectionSchema

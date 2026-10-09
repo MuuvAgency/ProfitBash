@@ -16,6 +16,7 @@ import { registerHealthRoutes } from './routes/health';
 import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMemberRoutes } from './routes/members';
 import { registerMeRoutes } from './routes/me';
+import { registerTagRoutes } from './routes/tags';
 import { registerSavedViewRoutes } from './routes/saved-views';
 import { registerSearchTermRoutes } from './routes/search-terms';
 import { registerSettingsRoutes } from './routes/settings';
@@ -98,6 +99,7 @@ export function createApp(options: CreateAppOptions) {
   registerFileImportRoutes(app, deps);
   registerAnalyticsRoutes(app, deps);
   registerSavedViewRoutes(app, deps);
+  registerTagRoutes(app, deps);
   registerSearchTermRoutes(app, deps);
   registerAdChangeRoutes(app, deps);
   registerMemberRoutes(app, deps);

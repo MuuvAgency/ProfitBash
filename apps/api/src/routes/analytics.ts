@@ -319,6 +319,7 @@ function selection(
     ...(body.withoutClient !== undefined && { withoutClient: body.withoutClient }),
     ...(body.profileIds && { profileIds: body.profileIds }),
     ...(body.adProducts && { adProducts: body.adProducts }),
+    ...(body.tagIds && { tagIds: body.tagIds }),
   };
 }
 
