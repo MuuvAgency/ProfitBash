@@ -1,3 +1,4 @@
+import { plannedCampaignSchema } from '@profitbash/shared/campaign-setup';
 import {
   DEFAULT_STRUCTURE_CATALOG,
   type CatalogPreset,
@@ -54,6 +55,14 @@ const one = (campaigns: PlannedCampaign[], block: string) => {
 };
 
 describe('buildCampaignPlan: Struktur und Namen', () => {
+  it('liefert Kampagnen in der Form, die ein Entwurf speichert', () => {
+    for (const key of ['muuv-standard', 'funnel-hub', 'launch']) {
+      for (const campaign of buildCampaignPlan(base({ preset: preset(key) })).campaigns) {
+        expect(plannedCampaignSchema.parse(campaign)).toEqual(campaign);
+      }
+    }
+  });
+
   it('legt je Baustein des Presets Kampagnen mit Namen nach dem Schema an', () => {
     const plan = buildCampaignPlan(base());
     expect(plan.campaigns.map((campaign) => campaign.name)).toEqual([
