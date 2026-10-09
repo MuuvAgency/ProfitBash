@@ -54,6 +54,8 @@ const REJECTIONS = {
     'Platzierungen lassen sich nur ändern, wenn die Kampagne eine feste oder dynamische Gebotsstrategie trägt.',
   SUPERSEDED: 'Dieselbe Übermittlung ändert dieses Feld noch einmal; es gilt die spätere Angabe.',
   NOT_SUPPORTED: 'Negatives lassen sich nur archivieren.',
+  TARGET_TYPE_NOT_SUPPORTED:
+    'Themen-Targets von Sponsored Brands lassen sich nicht über die API ändern (eigener Endpunkt bei Amazon).',
 } as const;
 
 /** Kampagne und Ad Group der Entity: Sponsored Brands verlangt sie bei Keywords, Targets und Negatives (3.2c). */
@@ -165,6 +167,15 @@ export function buildWriteOperations(changes: readonly SubmissionChange[]): Writ
     const group = all.filter((change) => lastByField.get(change.field) === change);
     for (const change of all) if (!group.includes(change)) reject(change, 'SUPERSEDED');
     const first = group[0]!;
+    // SB-Themen haben bei Amazon einen eigenen Endpunkt (`/sb/themes`); als Target gesendet träfen sie den falschen.
+    if (
+      first.entityType === 'target' &&
+      first.targetType === 'theme' &&
+      first.adProduct === 'SPONSORED_BRANDS'
+    ) {
+      for (const change of group) reject(change, 'TARGET_TYPE_NOT_SUPPORTED');
+      continue;
+    }
     const amazonId = first.amazonEntityId!;
     const archive = group.find((change) => change.field === 'state' && change.after === 'ARCHIVED');
     if (archive) {

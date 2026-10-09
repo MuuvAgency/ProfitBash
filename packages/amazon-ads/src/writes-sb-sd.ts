@@ -40,8 +40,8 @@ import type {
 const SB_V4_BATCH_SIZE = 10;
 const SB_V3_BATCH_SIZE = 100;
 /**
- * Die SD-Spec nennt keine Höchstzahl; Amazons Leitfäden nennen 100 Einträge je Aufruf. Beim ersten echten Lauf
- * prüfen (ADR 005, offene Punkte).
+ * Die SD-Spec nennt 100 je Aufruf für Targets und negative Targets; für Kampagnen, Ad Groups und Product Ads nennt
+ * sie keine Höchstzahl. Der Client nimmt überall 100 (beim ersten echten Lauf prüfen, ADR 005).
  */
 const SD_BATCH_SIZE = 100;
 
@@ -55,11 +55,22 @@ const notSupported = (message: string): never => {
   throw new WriteNotSupportedError(message);
 };
 
+const missingParent = (): never => {
+  throw new WriteNotSupportedError(
+    'Für diese Änderung bei Sponsored Brands fehlen Kampagne oder Ad Group der Entity.',
+    'PARENT_IDS_MISSING',
+  );
+};
+
+function parentAdGroup(op: { amazonAdGroupId?: string }) {
+  return { adGroupId: numericId(op.amazonAdGroupId ?? missingParent()) };
+}
+
 function parents(op: { amazonCampaignId?: string; amazonAdGroupId?: string }) {
-  if (op.amazonCampaignId === undefined || op.amazonAdGroupId === undefined) {
-    throw new TypeError('Kampagne und Ad Group der Entity fehlen.');
-  }
-  return { adGroupId: numericId(op.amazonAdGroupId), campaignId: numericId(op.amazonCampaignId) };
+  return {
+    ...parentAdGroup(op),
+    campaignId: numericId(op.amazonCampaignId ?? missingParent()),
+  };
 }
 
 // --- Antwortformen ---------------------------------------------------------------------------
@@ -73,14 +84,23 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  */
 function orderedReader(idKey: string): Endpoint['read'] {
   return (response, batch) => {
-    if (!Array.isArray(response)) return null;
-    const entries = (response as unknown[])
+    // Ein einzelner Eintrag kommt laut SB-Spec auch als Objekt statt als Liste.
+    const list = isRecord(response) && batch.length === 1 ? [response] : response;
+    if (!Array.isArray(list)) return null;
+    const entries = (list as unknown[])
       .slice(0, batch.length)
       .flatMap((entry, index): ResponseEntry[] => {
         if (!isRecord(entry)) return [];
-        return typeof entry.code === 'string' && entry.code.toUpperCase() === 'SUCCESS'
-          ? [{ index, ok: true, id: entry[idKey] }]
-          : [{ index, ok: false, outcome: flatFailure(entry.code, entry.description) }];
+        const code = typeof entry.code === 'string' ? entry.code.trim() : '';
+        // Die SD-Spec beschreibt `code` auch als HTTP-Status: 2xx heißt angenommen.
+        if (code.toUpperCase() === 'SUCCESS' || /^2\d\d$/.test(code)) {
+          return [{ index, ok: true, id: entry[idKey] }];
+        }
+        // Ohne Code kein Urteil (der Eintrag gilt als unklar): Eine Anlage würde sonst als gescheitert gemeldet
+        // und doppelt angelegt.
+        if (code === '') return [];
+        const failure = /^\d+$/.test(code) ? `HTTP_${code}` : code;
+        return [{ index, ok: false, outcome: flatFailure(failure, entry.description) }];
       });
     return collectOutcomes(batch, entries);
   };
@@ -94,10 +114,11 @@ function targetResultsReader(prefix: 'updateTarget' | 'createTarget'): Endpoint[
       const value = response[key];
       return Array.isArray(value) ? (value as unknown[]).filter(isRecord) : [];
     };
-    const indexOf = (row: Record<string, unknown>) =>
-      typeof row.targetRequestIndex === 'number' && Number.isInteger(row.targetRequestIndex)
-        ? row.targetRequestIndex
-        : -1;
+    // Die Spec nennt für negative Targets an einer Stelle `negativeTargetRequestIndex`.
+    const indexOf = (row: Record<string, unknown>) => {
+      const value = row.targetRequestIndex ?? row.negativeTargetRequestIndex;
+      return typeof value === 'number' && Number.isInteger(value) ? value : -1;
+    };
     return collectOutcomes(batch, [
       ...rows(`${prefix}SuccessResults`).map((row): ResponseEntry => ({
         index: indexOf(row),
@@ -226,6 +247,19 @@ const SB_NEGATIVE_TARGETS_CREATE = sbV3(
   targetResultsReader('createTarget'),
 );
 
+/**
+ * Archivieren über den Zustand `archived` nutzt den Update-Endpunkt, wird aber als eigener Aufruf **nach** den
+ * Updates gesendet (eine archivierte Kampagne nähme Änderungen an ihren Kindern nicht mehr an). Dieselbe Entity
+ * in Update und Archivieren fängt die Dublettenprüfung über Methode und Pfad ab.
+ */
+const archiveCall = (endpoint: Endpoint): Endpoint => ({
+  ...endpoint,
+  operation: endpoint.operation.replace(/\.update$/, '.archive'),
+});
+
+const SB_KEYWORDS_ARCHIVE = archiveCall(SB_KEYWORDS);
+const SB_TARGETS_ARCHIVE = archiveCall(SB_TARGETS);
+
 /** `null`, wenn der Eintrag außer den IDs nichts nennt. */
 const changed = (item: Record<string, unknown>, idKeys: number) =>
   Object.keys(item).length > idKeys ? item : null;
@@ -296,13 +330,13 @@ function sbArchive(op: AmazonAdsArchiveOperation): MappedOperation {
       return viaFilter(SB_ADS.archive);
     case 'keyword':
       return {
-        endpoint: SB_KEYWORDS,
+        endpoint: SB_KEYWORDS_ARCHIVE,
         item: { keywordId: numericId(amazonId), ...parents(op), ...archived },
         amazonId,
       };
     case 'target':
       return {
-        endpoint: SB_TARGETS,
+        endpoint: SB_TARGETS_ARCHIVE,
         item: { targetId: numericId(amazonId), ...parents(op), ...archived },
         amazonId,
       };
@@ -315,7 +349,7 @@ function sbArchive(op: AmazonAdsArchiveOperation): MappedOperation {
     case 'negativeTarget':
       return {
         endpoint: SB_NEGATIVE_TARGETS_UPDATE,
-        item: { targetId: numericId(amazonId), adGroupId: parents(op).adGroupId, ...archived },
+        item: { targetId: numericId(amazonId), ...parentAdGroup(op), ...archived },
         amazonId,
       };
     case 'campaignNegativeKeyword':
@@ -358,6 +392,8 @@ export const SB_DIALECT: WriteDialect = {
     SB_KEYWORDS,
     SB_TARGETS,
     SB_ADS.update,
+    SB_KEYWORDS_ARCHIVE,
+    SB_TARGETS_ARCHIVE,
     SB_NEGATIVE_KEYWORDS_UPDATE,
     SB_NEGATIVE_TARGETS_UPDATE,
     SB_CAMPAIGNS.archive,
@@ -392,12 +428,18 @@ const SD_PRODUCT_ADS = sd('productAds', 'adId');
 const SD_NEGATIVE_TARGETS = sd('negativeTargets', 'targetId');
 const SD_NEGATIVE_TARGETS_CREATE = sd('negativeTargets', 'targetId', 'POST');
 
+const sdEntity = (endpoint: Endpoint, idKey: string) => ({
+  endpoint,
+  archive: archiveCall(endpoint),
+  idKey,
+});
+
 const SD_ENTITIES = {
-  campaign: { endpoint: SD_CAMPAIGNS, idKey: 'campaignId' },
-  adGroup: { endpoint: SD_AD_GROUPS, idKey: 'adGroupId' },
-  target: { endpoint: SD_TARGETS, idKey: 'targetId' },
-  productAd: { endpoint: SD_PRODUCT_ADS, idKey: 'adId' },
-  negativeTarget: { endpoint: SD_NEGATIVE_TARGETS, idKey: 'targetId' },
+  campaign: sdEntity(SD_CAMPAIGNS, 'campaignId'),
+  adGroup: sdEntity(SD_AD_GROUPS, 'adGroupId'),
+  target: sdEntity(SD_TARGETS, 'targetId'),
+  productAd: sdEntity(SD_PRODUCT_ADS, 'adId'),
+  negativeTarget: sdEntity(SD_NEGATIVE_TARGETS, 'targetId'),
 } as const;
 
 const SD_NO_KEYWORDS = 'Sponsored Display kennt keine Keywords.';
@@ -431,9 +473,9 @@ function sdArchive(op: AmazonAdsArchiveOperation): MappedOperation {
         : 'Sponsored Display kennt keine Negatives auf Kampagnenebene.',
     );
   }
-  const { endpoint, idKey } = SD_ENTITIES[op.entity as keyof typeof SD_ENTITIES];
+  const { archive, idKey } = SD_ENTITIES[op.entity as keyof typeof SD_ENTITIES];
   const amazonId = requireId(op.amazonId);
-  return { endpoint, item: { [idKey]: numericId(amazonId), state: 'archived' }, amazonId };
+  return { endpoint: archive, item: { [idKey]: numericId(amazonId), state: 'archived' }, amazonId };
 }
 
 function sdCreate(op: AmazonAdsCreateNegativeOperation): MappedOperation {
@@ -461,7 +503,12 @@ export const SD_DIALECT: WriteDialect = {
     SD_AD_GROUPS,
     SD_TARGETS,
     SD_PRODUCT_ADS,
-    SD_NEGATIVE_TARGETS,
+    // Archivieren von unten nach oben, zuletzt Anlagen.
+    SD_ENTITIES.negativeTarget.archive,
+    SD_ENTITIES.target.archive,
+    SD_ENTITIES.productAd.archive,
+    SD_ENTITIES.adGroup.archive,
+    SD_ENTITIES.campaign.archive,
     SD_NEGATIVE_TARGETS_CREATE,
   ],
 };
