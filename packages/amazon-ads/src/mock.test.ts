@@ -3,7 +3,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { RefreshTokenStore } from './access-token';
 import type { AmazonAdsClient } from './client';
+import { applySpCreates, type AmazonAdsCreateOperation } from './creates';
 import { decodeGzipJson } from './download';
+import { noopLogger } from './logger';
 import {
   AmazonAdsDuplicateReportError,
   AmazonAdsHttpError,
@@ -807,5 +809,216 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
       (t) => t.target.amazonTargetId === keyword.amazonTargetId,
     )!;
     expect(after.target).toMatchObject({ bid: keyword.bid });
+  });
+
+  /** Eine vollständige SP-Struktur wie aus einem Preset (4.4). */
+  const STRUCTURE: AmazonAdsCreateOperation[] = [
+    {
+      ref: 'c',
+      entity: 'campaign',
+      name: 'SP | Mock | Neu',
+      targetingType: 'MANUAL',
+      state: 'ENABLED',
+      dailyBudget: '12.34',
+      startDate: '2026-11-01',
+      biddingStrategy: 'SALES_UP_AND_DOWN',
+      placements: [{ placement: 'PLACEMENT_TOP', percentage: '50' }],
+      amazonPortfolioId: null,
+      offAmazon: 'limitSpend',
+    },
+    {
+      ref: 'g',
+      entity: 'adGroup',
+      campaignRef: 'c',
+      name: 'Neue Gruppe',
+      defaultBid: '0.55',
+      state: 'ENABLED',
+    },
+    {
+      ref: 'ad',
+      entity: 'productAd',
+      campaignRef: 'c',
+      adGroupRef: 'g',
+      sku: 'NEU-SKU-1',
+      asin: null,
+      state: 'ENABLED',
+    },
+    {
+      ref: 'kw',
+      entity: 'keyword',
+      campaignRef: 'c',
+      adGroupRef: 'g',
+      keywordText: 'neue laufschuhe',
+      matchType: 'PHRASE',
+      bid: '0.90',
+      state: 'ENABLED',
+    },
+    {
+      ref: 'pt',
+      entity: 'target',
+      campaignRef: 'c',
+      adGroupRef: 'g',
+      expression: { type: 'ASIN_SAME_AS', value: 'B0ZIEL0001' },
+      bid: null,
+      state: 'PAUSED',
+    },
+    {
+      ref: 'cat',
+      entity: 'target',
+      campaignRef: 'c',
+      adGroupRef: 'g',
+      expression: { type: 'ASIN_CATEGORY_SAME_AS', value: '12345678901' },
+      bid: '0.40',
+      state: 'ENABLED',
+    },
+    {
+      ref: 'nk',
+      entity: 'negativeKeyword',
+      campaignRef: 'c',
+      adGroupRef: 'g',
+      keywordText: 'gebraucht',
+      matchType: 'NEGATIVE_EXACT',
+    },
+    { ref: 'nt', entity: 'negativeTarget', campaignRef: 'c', adGroupRef: 'g', asin: 'B0FREMD002' },
+  ];
+
+  it('legt neue Strukturen an und liefert sie im nächsten Export mit (4.4)', async () => {
+    const { client, exportRows } = setup();
+
+    const outcome = await applySpCreates(
+      { request: client.request, logger: noopLogger },
+      connection,
+      { amazonProfileId: DE, operations: STRUCTURE },
+    );
+
+    expect(outcome.results.map((r) => r.status)).toEqual(Array(STRUCTURE.length).fill('applied'));
+    const id = Object.fromEntries(
+      outcome.results.map((r) => [r.ref, r.status === 'applied' ? r.amazonId! : '']),
+    );
+    expect(new Set(Object.values(id)).size).toBe(STRUCTURE.length);
+
+    expect((await exportRows('campaigns')).find((c) => c.amazonCampaignId === id.c)).toMatchObject({
+      name: 'SP | Mock | Neu',
+      state: 'ENABLED',
+      targetingType: 'MANUAL',
+      budgetAmount: '12.34',
+      biddingStrategy: 'SALES_UP_AND_DOWN',
+      startDate: '2026-11-01',
+      amazonPortfolioId: null,
+    });
+    expect((await exportRows('adGroups')).find((g) => g.amazonAdGroupId === id.g)).toMatchObject({
+      amazonCampaignId: id.c,
+      name: 'Neue Gruppe',
+      defaultBid: '0.55',
+      state: 'ENABLED',
+    });
+    expect((await exportRows('ads')).find((a) => a.amazonAdId === id.ad)).toMatchObject({
+      amazonAdGroupId: id.g,
+      sku: 'NEU-SKU-1',
+      state: 'ENABLED',
+    });
+    const targets = new Map(
+      (await exportRows('targets')).map((t) => [t.target.amazonTargetId, t] as const),
+    );
+    expect(targets.get(id.kw!)).toMatchObject({
+      kind: 'target',
+      target: {
+        amazonCampaignId: id.c,
+        amazonAdGroupId: id.g,
+        targetType: 'keyword',
+        keywordText: 'neue laufschuhe',
+        matchType: 'PHRASE',
+        bid: '0.9',
+        state: 'ENABLED',
+      },
+    });
+    expect(targets.get(id.pt!)).toMatchObject({
+      kind: 'target',
+      target: {
+        targetType: 'product',
+        expression: { matchType: 'PRODUCT_EXACT', asin: 'B0ZIEL0001' },
+        bid: null,
+        state: 'PAUSED',
+      },
+    });
+    expect(targets.get(id.cat!)).toMatchObject({
+      kind: 'target',
+      target: { targetType: 'category', expression: { productCategoryId: '12345678901' } },
+    });
+    expect(targets.get(id.nk!)).toMatchObject({
+      kind: 'negative',
+      target: { level: 'ad_group', keywordText: 'gebraucht', matchType: 'EXACT' },
+    });
+    expect(targets.get(id.nt!)).toMatchObject({
+      kind: 'negative',
+      target: { level: 'ad_group', targetType: 'product', expression: { asin: 'B0FREMD002' } },
+    });
+
+    // Neue Entities lassen sich danach ändern wie bestehende.
+    await client.applyChanges(connection, {
+      amazonProfileId: DE,
+      adProduct: SP,
+      operations: [
+        { ref: 'p', type: 'update', entity: 'campaign', amazonId: id.c!, state: 'PAUSED' },
+      ],
+    });
+    expect((await exportRows('campaigns')).find((c) => c.amazonCampaignId === id.c)).toMatchObject({
+      state: 'PAUSED',
+    });
+  });
+
+  it('prüft Grenzen und Produkt-IDs je Anlage und merkt sich Abgelehntes nicht (4.4)', async () => {
+    const { client, exportRows } = setup();
+    const before = (await exportRows('campaigns')).length;
+
+    const outcome = await applySpCreates(
+      { request: client.request, logger: noopLogger },
+      connection,
+      {
+        amazonProfileId: DE,
+        operations: [
+          { ...STRUCTURE[0]!, dailyBudget: '99999999' } as AmazonAdsCreateOperation,
+          ...STRUCTURE.slice(1),
+          {
+            ...STRUCTURE[3]!,
+            ref: 'kw-gebot',
+            keywordText: 'zu teuer',
+            bid: '99999',
+          } as AmazonAdsCreateOperation,
+        ],
+        created: new Map(),
+      },
+    );
+    expect(outcome.results[0]).toMatchObject({
+      status: 'failed',
+      code: 'BUDGET_OUT_OF_MARKET_PLACE_RANGE',
+    });
+    expect(outcome.results.slice(1).map((r) => r.status)).toEqual(
+      Array(STRUCTURE.length).fill('failed'),
+    );
+
+    const ok = await applySpCreates({ request: client.request, logger: noopLogger }, connection, {
+      amazonProfileId: DE,
+      operations: [
+        STRUCTURE[0]!,
+        STRUCTURE[1]!,
+        { ...STRUCTURE[2]!, sku: null, asin: 'B0VENDOR01' } as AmazonAdsCreateOperation,
+        { ...STRUCTURE[3]!, bid: '99999' } as AmazonAdsCreateOperation,
+        {
+          ...STRUCTURE[6]!,
+          keywordText: 'eins zwei drei vier fünf',
+          matchType: 'NEGATIVE_PHRASE',
+        } as AmazonAdsCreateOperation,
+      ],
+    });
+    expect(ok.results.map((r) => (r.status === 'failed' ? r.code : r.status))).toEqual([
+      'applied',
+      'applied',
+      // Seller-Profil: Product Ads brauchen die SKU.
+      'INVALID_ASIN',
+      'BID_OUT_OF_MARKET_PLACE_RANGE',
+      'TOO_HIGH',
+    ]);
+    expect((await exportRows('campaigns')).length).toBe(before + 1);
   });
 });

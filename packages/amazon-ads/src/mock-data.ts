@@ -71,6 +71,8 @@ export interface MockCampaign {
   /** SP: Gebotsanpassungen je Platzierung (ganze Prozent); ohne Angabe 25 % für `PLACEMENT_TOP`. */
   placements?: Array<{ placement: string; percentage: string }>;
   portfolioId: string | null;
+  /** `YYYY-MM-DD`; ohne Angabe `2026-01-15`. */
+  startDate?: string;
   /** SB ohne Multi-Ad-Group (v3-Preview-Lücke): Entities im Export, aber keine Report-Zeilen. */
   withoutReports?: boolean;
 }
@@ -541,7 +543,7 @@ export function mockExportRows(
           campaignId: raw(c.id),
           ...(c.portfolioId && { portfolioId: c.portfolioId }),
           name: c.name,
-          startDate: '2026-01-15',
+          startDate: c.startDate ?? '2026-01-15',
           ...(c.adProduct === SP && {
             targetingSettings: c.targeting,
             optimization: {

@@ -1,5 +1,10 @@
 import { parseJsonLossless } from './json';
-import { amazonAdsValueLimitIssue, type AmazonAdsValueLimitIssue } from './limits';
+import {
+  amazonAdsValueLimitIssue,
+  MAX_KEYWORD_LENGTH,
+  negativeKeywordLimitIssue,
+  type AmazonAdsValueLimitIssue,
+} from './limits';
 import type {
   MockAccount,
   MockAd,
@@ -11,9 +16,10 @@ import type {
 
 /**
  * Schreib-Endpunkte des Mock-Anbieters (Sponsored Products v3, `docs/tasks/phase-3.md` 3.2a): nimmt Updates,
- * Archivieren und neue Negatives an und antwortet wie Amazon mit `207` und einem Ergebnis je Eintrag. Gebote und
- * Budgets außerhalb der Grenzen des Marktplatzes (`limits.ts`) lehnt er je Eintrag ab, damit Teilfehler ohne
- * API-Zugang vorführbar sind.
+ * Archivieren und neue Negatives an, seit 4.4 auch neue Kampagnen, Ad Groups, Product Ads, Keywords und Targets,
+ * und antwortet wie Amazon mit `207` und einem Ergebnis je Eintrag. Gebote, Budgets und Platzierungen außerhalb der
+ * Grenzen des Marktplatzes, zu lange Keywords (`limits.ts`) und Product Ads mit der falschen Produkt-ID für den
+ * Kontotyp lehnt er je Eintrag ab, damit Teilfehler ohne API-Zugang vorführbar sind.
  *
  * Angenommene Änderungen merkt sich der Mock **im laufenden Prozess** (`overlay`, Dominik 2026-10-08): Der nächste
  * Export liefert sie mit, damit die Demo stimmig bleibt und der Revert nicht fälschlich „bei Amazon geändert“ meldet.
@@ -58,18 +64,18 @@ function routesFor(
 }
 
 const WRITE_ROUTES: readonly WriteRoute[] = [
-  ...routesFor('campaigns', 'Campaign', 'campaigns', 'campaignId', 'campaignIdFilter', false),
-  ...routesFor('adGroups', 'AdGroup', 'adGroups', 'adGroupId', 'adGroupIdFilter', false),
-  ...routesFor('keywords', 'Keyword', 'keywords', 'keywordId', 'keywordIdFilter', false),
+  ...routesFor('campaigns', 'Campaign', 'campaigns', 'campaignId', 'campaignIdFilter', true),
+  ...routesFor('adGroups', 'AdGroup', 'adGroups', 'adGroupId', 'adGroupIdFilter', true),
+  ...routesFor('keywords', 'Keyword', 'keywords', 'keywordId', 'keywordIdFilter', true),
   ...routesFor(
     'targets',
     'TargetingClause',
     'targetingClauses',
     'targetId',
     'targetIdFilter',
-    false,
+    true,
   ),
-  ...routesFor('productAds', 'ProductAd', 'productAds', 'adId', 'adIdFilter', false),
+  ...routesFor('productAds', 'ProductAd', 'productAds', 'adId', 'adIdFilter', true),
   ...routesFor(
     'negativeKeywords',
     'NegativeKeyword',
@@ -125,7 +131,13 @@ interface ProfileOverlay {
   /** Keywords, Targets und Negatives (im Export eine gemeinsame Liste). */
   targets: Map<string, { state?: string; bid?: string }>;
   ads: Map<string, { state?: string }>;
-  createdNegatives: MockTarget[];
+  /** Neu angelegte Entities (4.4; Keywords, Targets und Negatives in `targets`). */
+  created: {
+    campaigns: MockCampaign[];
+    adGroups: MockAdGroup[];
+    targets: MockTarget[];
+    ads: MockAd[];
+  };
 }
 
 type OverlayCollection = 'campaigns' | 'adGroups' | 'targets' | 'ads';
@@ -145,6 +157,38 @@ const EXPORT_STRATEGIES: Readonly<Record<string, string>> = {
 
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : undefined;
+
+/** Platzierungen aus `dynamicBidding` (Prozent als Quelltext). */
+function placementsOf(
+  bidding: { placementBidding?: unknown } | undefined,
+): Array<{ placement: string; percentage: string }> | undefined {
+  return Array.isArray(bidding?.placementBidding)
+    ? (bidding.placementBidding as Array<Record<string, unknown>>).flatMap((entry) => {
+        const percentage = text(entry.percentage);
+        return typeof entry.placement === 'string' && percentage !== undefined
+          ? [{ placement: entry.placement, percentage }]
+          : [];
+      })
+    : undefined;
+}
+
+/** Feste Mock-ASIN zu einer SKU (FNV-1a, 8 Hex-Ziffern). */
+function mockAsinOf(sku: string): string {
+  let value = 0x811c9dc5;
+  for (let i = 0; i < sku.length; i += 1) {
+    value ^= sku.charCodeAt(i);
+    value = Math.imul(value, 0x01000193) >>> 0;
+  }
+  return `B0${value.toString(16).toUpperCase().padStart(8, '0')}`;
+}
+
+/** Fehler eines Eintrags wie in der 207-Antwort von SP v3. */
+function entryError(type: string, reason: string, location: string, message: string) {
+  return {
+    errorType: type,
+    errorValue: { [type]: { reason, cause: { location }, message: `Mock: ${message}` } },
+  };
+}
 
 /**
  * Schreib-Endpunkte für SB (v4 und v3) und SD (3.2c): Der Mock bildet ihre Antwortformen nicht nach. Getestet sind
@@ -168,7 +212,7 @@ export function createMockWrites(simulation: MockWriteSimulation) {
         adGroups: new Map(),
         targets: new Map(),
         ads: new Map(),
-        createdNegatives: [],
+        created: { campaigns: [], adGroups: [], targets: [], ads: [] },
       };
       overlays.set(profile.amazonProfileId, overlay);
     }
@@ -192,14 +236,7 @@ export function createMockWrites(simulation: MockWriteSimulation) {
     if (id === undefined) return;
     const bidding = item.dynamicBidding as
       { strategy?: unknown; placementBidding?: unknown } | undefined;
-    const placements = Array.isArray(bidding?.placementBidding)
-      ? (bidding.placementBidding as Array<Record<string, unknown>>).flatMap((entry) => {
-          const percentage = text(entry.percentage);
-          return typeof entry.placement === 'string' && percentage !== undefined
-            ? [{ placement: entry.placement, percentage }]
-            : [];
-        })
-      : undefined;
+    const placements = placementsOf(bidding);
     remember(profile, route, id, {
       state: text(item.state),
       bid: text(item.bid),
@@ -218,7 +255,7 @@ export function createMockWrites(simulation: MockWriteSimulation) {
       ? (item.expression as Array<Record<string, unknown>>)[0]
       : undefined;
     const keyword = typeof item.keywordText === 'string';
-    overlayOf(profile).createdNegatives.push({
+    overlayOf(profile).created.targets.push({
       id,
       campaignId,
       adGroupId: text(item.adGroupId) ?? null,
@@ -235,6 +272,101 @@ export function createMockWrites(simulation: MockWriteSimulation) {
     });
   }
 
+  /** Neue Kampagne, Ad Group, Product Ad, Keyword oder Target (4.4); Negatives über `rememberNegative`. */
+  function rememberCreate(
+    profile: MockProfile,
+    route: WriteRoute,
+    id: string,
+    item: Record<string, unknown>,
+  ) {
+    const created = overlayOf(profile).created;
+    const state = text(item.state) ?? 'ENABLED';
+    const campaignId = text(item.campaignId) ?? '';
+    const adGroupId = text(item.adGroupId) ?? '';
+    switch (route.listKey) {
+      case 'campaigns': {
+        const bidding = item.dynamicBidding as
+          { strategy?: unknown; placementBidding?: unknown } | undefined;
+        created.campaigns.push({
+          id,
+          adProduct: 'SPONSORED_PRODUCTS',
+          name: String(item.name),
+          state,
+          targeting: String(item.targetingType),
+          budget: text((item.budget as { budget?: unknown } | undefined)?.budget) ?? '0',
+          bidStrategy:
+            (typeof bidding?.strategy === 'string' && EXPORT_STRATEGIES[bidding.strategy]) ||
+            'SALES_DOWN_ONLY',
+          placements: placementsOf(bidding) ?? [],
+          portfolioId: text(item.portfolioId) ?? null,
+          ...(typeof item.startDate === 'string' && { startDate: item.startDate }),
+        });
+        return;
+      }
+      case 'adGroups':
+        created.adGroups.push({
+          id,
+          campaignId,
+          name: String(item.name),
+          state,
+          defaultBid: text(item.defaultBid) ?? null,
+        });
+        return;
+      case 'productAds': {
+        const sku = text(item.sku);
+        created.ads.push({
+          id,
+          campaignId,
+          adGroupId,
+          state,
+          adType: 'PRODUCT_AD',
+          // Amazon löst die SKU zur ASIN auf; der Mock leitet eine feste ASIN aus der SKU ab.
+          asins: [text(item.asin) ?? mockAsinOf(sku ?? id)],
+          ...(sku !== undefined && { sku }),
+        });
+        return;
+      }
+      case 'keywords':
+        created.targets.push({
+          id,
+          campaignId,
+          adGroupId,
+          state,
+          negative: false,
+          targetType: 'KEYWORD',
+          details: { matchType: String(item.matchType), keyword: item.keywordText },
+          bid: text(item.bid) ?? null,
+        });
+        return;
+      case 'targetingClauses': {
+        const expression = Array.isArray(item.expression)
+          ? (item.expression as Array<Record<string, unknown>>)[0]
+          : undefined;
+        const value = text(expression?.value);
+        const category = expression?.type === 'ASIN_CATEGORY_SAME_AS';
+        created.targets.push({
+          id,
+          campaignId,
+          adGroupId,
+          state,
+          negative: false,
+          targetType: category ? 'PRODUCT_CATEGORY' : 'PRODUCT',
+          details: category
+            ? { productCategoryId: value }
+            : {
+                matchType:
+                  expression?.type === 'ASIN_EXPANDED_FROM' ? 'PRODUCT_SIMILAR' : 'PRODUCT_EXACT',
+                asin: value,
+              },
+          bid: text(item.bid) ?? null,
+        });
+        return;
+      }
+      default:
+        rememberNegative(profile, id, item);
+    }
+  }
+
   /** Das Konto mit den gemerkten Änderungen des Profils (für die Exports). */
   function overlay(account: MockAccount): MockAccount {
     const changes = overlays.get(account.profile.amazonProfileId);
@@ -243,15 +375,16 @@ export function createMockWrites(simulation: MockWriteSimulation) {
       patches.size === 0
         ? items
         : items.map((item) => (patches.has(item.id) ? { ...item, ...patches.get(item.id) } : item));
+    const { created } = changes;
     return {
       ...account,
-      campaigns: patched<MockCampaign>(account.campaigns, changes.campaigns),
-      adGroups: patched<MockAdGroup>(account.adGroups, changes.adGroups),
-      targets: patched<MockTarget>(
-        [...account.targets, ...changes.createdNegatives],
-        changes.targets,
+      campaigns: patched<MockCampaign>(
+        [...account.campaigns, ...created.campaigns],
+        changes.campaigns,
       ),
-      ads: patched<MockAd>(account.ads, changes.ads),
+      adGroups: patched<MockAdGroup>([...account.adGroups, ...created.adGroups], changes.adGroups),
+      targets: patched<MockTarget>([...account.targets, ...created.targets], changes.targets),
+      ads: patched<MockAd>([...account.ads, ...created.ads], changes.ads),
     };
   }
 
@@ -306,6 +439,72 @@ export function createMockWrites(simulation: MockWriteSimulation) {
         `${at}.budget.budget`,
         budgetIssue,
       );
+    }
+    return null;
+  }
+
+  /** Weitere Prüfungen einer Anlage (Gebote und Budgets prüft `updateError`) oder `null`. */
+  function createError(
+    route: WriteRoute,
+    item: Record<string, unknown>,
+    index: number,
+    country: string,
+    accountType: string,
+  ) {
+    const at = `$.${route.listKey}[${index}]`;
+    const placements = placementsOf(item.dynamicBidding as { placementBidding?: unknown });
+    for (const [position, { percentage }] of (placements ?? []).entries()) {
+      const issue = amazonAdsValueLimitIssue({
+        adProduct: 'SPONSORED_PRODUCTS',
+        countryCode: country,
+        field: 'placement',
+        value: percentage,
+      });
+      if (issue) {
+        return entryError(
+          'rangeError',
+          issue.code === 'aboveMaximum' ? 'TOO_HIGH' : 'TOO_LOW',
+          `${at}.dynamicBidding.placementBidding[${position}].percentage`,
+          `Prozentsatz außerhalb von ${issue.min} bis ${issue.max}.`,
+        );
+      }
+    }
+    const keywordText = item.keywordText;
+    if (typeof keywordText === 'string') {
+      const negative = /^NEGATIVE_(EXACT|PHRASE)$/.exec(String(item.matchType))?.[1] as
+        'EXACT' | 'PHRASE' | undefined;
+      const issue = negative
+        ? negativeKeywordLimitIssue(keywordText, negative)
+        : keywordText.length > MAX_KEYWORD_LENGTH
+          ? { code: 'tooLong', max: MAX_KEYWORD_LENGTH }
+          : null;
+      if (issue) {
+        return entryError(
+          'rangeError',
+          'TOO_HIGH',
+          `${at}.keywordText`,
+          issue.code === 'tooLong'
+            ? `Keyword länger als ${issue.max} Zeichen.`
+            : `Keyword mit mehr als ${issue.max} Wörtern.`,
+        );
+      }
+    }
+    if (route.listKey === 'productAds') {
+      // Laut Spec: SKU nur bei Sellern, ASIN nur bei Vendoren.
+      const vendor = accountType === 'vendor';
+      const wrong = vendor
+        ? item.sku !== undefined || item.asin === undefined
+        : item.asin !== undefined || item.sku === undefined;
+      if (wrong) {
+        return entryError(
+          'productIdentifierError',
+          vendor ? 'INVALID_SKU' : 'INVALID_ASIN',
+          `${at}.${vendor ? 'sku' : 'asin'}`,
+          vendor
+            ? 'Vendoren bewerben Produkte über die ASIN.'
+            : 'Seller bewerben Produkte über die SKU.',
+        );
+      }
     }
     return null;
   }
@@ -369,10 +568,17 @@ export function createMockWrites(simulation: MockWriteSimulation) {
       }
       const entry = item as Record<string, unknown>;
       if (route.kind === 'create') {
+        const failure =
+          updateError(route, entry, index, country) ??
+          createError(route, entry, index, country, profile.accountType);
+        if (failure) {
+          error.push({ index, errors: [failure] });
+          return;
+        }
         created += 1;
         const id = `${idPrefix}${String(created).padStart(4, '0')}`;
         success.push({ index, [route.idKey]: id });
-        rememberNegative(profile, id, entry);
+        rememberCreate(profile, route, id, entry);
         return;
       }
       const failure = updateError(route, entry, index, country);
