@@ -227,9 +227,21 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
   - **Leitplanken:** immer CPC und ohne Off-Amazon; `unlocks` je Baustein (gilt für alle Kampagnen des Bausteins im
     Entwurf) schaltet vCPM (nur SB und SD) bzw. Off-Amazon (nur SP) mit Warnung frei. Neue Kampagnen sind aktiv (F6);
     „pausiert“ setzt der Entwurf (4.5).
+  - **Review-Befunde (eingearbeitet):** Mit Marken-Baustein im Preset fallen allgemeine Keywords, die einen
+    Marken-Begriff als Wortfolge enthalten, aus den allgemeinen Kampagnen (Hinweis `keywordIsBrand`; sonst wären sie
+    dort negativ und liefen nie). Doppelte Eingaben werden zusammengeführt (`single`, wenn einer es ist; erstes Gebot).
+    Produkt-Targets sind isoliert: geplante fremde ASINs negativ exakt in Auto und Kategorie, einzelne auch in der
+    Sammlung; eigene ASINs unter den fremden fallen mit Warnung weg. Jede Kampagne trägt ihre `targeting`-Art (die
+    Bulk-Datei braucht sie, auch wenn sich der Katalog nach dem Entwurf ändert). Negatives gelten für die Ad Group.
+    Keine SKU-Pflicht für SB; leere Gruppe ist ein Fehler; Marken-Begriffe gegen die Grenze negativer Phrasen
+    (4 Wörter); bei freigeschaltetem vCPM zusätzlich die Warnung „Gebot je 1000 sichtbare Impressionen“.
   - **Offen für 4.4/4.5:** Auto-Kampagnen ohne eigene Gebote je Zielgruppe (es gilt das Standardgebot der Ad Group);
     die Harvest-Merkliste (4.6) liefert Keywords mit CPC als `bid`; Grenzen für Keyword-Länge sind Annahmen wie in
-    Phase 3.
+    Phase 3. Startdatum setzt 4.4 (heute in der Zeitzone des Profils). `offAmazon` ist eine Einstellung von SP; SD-
+    Zielgruppen laufen ihrer Art nach auch außerhalb von Amazon, und Off-Amazon lässt sich laut Ideen-Dokument E nicht
+    per Bulk-Datei setzen (in 4.4 prüfen). Ein vor 4.3 gespeicherter Katalog ohne `audience` an den SD-Zielgruppen
+    fällt auf die Startwerte zurück (betrifft nur Entwicklungsdaten; die Dev-DB hat keinen gespeicherten Katalog).
+    Freischalten gilt je Baustein, nicht je einzelner Kampagne (mit Dominik in 4.5 klären).
 
 ### 4.4 Schreibschicht für Anlagen (`packages/db`, `packages/amazon-ads`, `apps/worker`)
 - [ ] Entwürfe speichern, prüfen, übermitteln (eigene Tabellen; Übermittlungen wie in Phase 3, damit Seite und Verlauf

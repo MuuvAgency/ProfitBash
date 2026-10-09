@@ -6357,6 +6357,11 @@ export interface components {
                 } | null;
                 /** @default null */
                 lookbackDays: number | null;
+                /**
+                 * @default null
+                 * @enum {string|null}
+                 */
+                audience: "views" | "purchases" | null;
             }[];
             edges: {
                 from: string;
