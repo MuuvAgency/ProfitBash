@@ -414,6 +414,7 @@ const PLACEMENTS = new Map([
   ['PLACEMENT_PRODUCT_PAGE', 'Placement Product Page'],
   ['SITE_AMAZON_BUSINESS', 'Placement Amazon Business'],
 ]);
+const OPTIONAL_COLUMNS: ReadonlySet<string> = new Set(['Off-Amazon ad serving']);
 const OFF_AMAZON = {
   increaseReach: 'Increase reach',
   limitSpend: 'Limit off-Amazon spend',
@@ -880,7 +881,7 @@ export function buildBulkSheet(
   changes: readonly BulkFileChange[],
 ): BulkSheet {
   const sheet = SHEETS[kind];
-  const rows: BulkFileCell[][] = [[...sheet.columns]];
+  const records: Row[] = [];
   const skipped: BulkSheet['skipped'] = [];
 
   const strategyByCampaign = new Map<string, string>();
@@ -928,10 +929,18 @@ export function buildBulkSheet(
         throw new Error(`Bulk-Datei: Das Blatt „${sheet.sheetName}“ hat keine Spalte „${column}“.`);
       }
     }
-    rows.push(
-      sheet.columns.map((column) => (column === 'Product' ? sheet.product : (row[column] ?? null))),
-    );
+    records.push(row);
   }
+  // Spalten nur für Anlagen erscheinen nur, wenn eine Zeile sie belegt (Off-Amazon gibt es nur in den USA).
+  const columns = sheet.columns.filter(
+    (column) => !OPTIONAL_COLUMNS.has(column) || records.some((row) => column in row),
+  );
+  const rows: BulkFileCell[][] = [
+    [...columns],
+    ...records.map((row) =>
+      columns.map((column) => (column === 'Product' ? sheet.product : (row[column] ?? null))),
+    ),
+  ];
   return { sheetName: sheet.sheetName, rows, skipped };
 }
 

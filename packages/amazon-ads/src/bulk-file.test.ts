@@ -63,7 +63,6 @@ describe('buildSpBulkSheet', () => {
       'Placement',
       'Percentage',
       'Product Targeting Expression',
-      'Off-Amazon ad serving',
     ]);
   });
 
