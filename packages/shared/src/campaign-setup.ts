@@ -165,15 +165,17 @@ const draftName = z
   .pipe(z.string().min(1).max(MAX_SETUP_DRAFT_NAME_LENGTH));
 
 /** Entwurf speichern (anlegen bzw. mit `version` ändern). */
-export const saveCampaignSetupDraftSchema = z.strictObject({
-  profileId: z.uuid(),
-  productGroupId: z.uuid().nullable(),
-  presetKey: z.string().min(1).max(64),
-  name: draftName,
-  campaignState: z.enum(CAMPAIGN_SETUP_STATES),
-  inputs: setupInputsSchema,
-  campaigns: z.array(plannedCampaignSchema).min(1).max(MAX_SETUP_CAMPAIGNS),
-});
+export const saveCampaignSetupDraftSchema = z
+  .strictObject({
+    profileId: z.uuid(),
+    productGroupId: z.uuid().nullable(),
+    presetKey: z.string().min(1).max(64),
+    name: draftName,
+    campaignState: z.enum(CAMPAIGN_SETUP_STATES),
+    inputs: setupInputsSchema,
+    campaigns: z.array(plannedCampaignSchema).min(1).max(MAX_SETUP_CAMPAIGNS),
+  })
+  .meta({ id: 'SaveCampaignSetupDraftRequest' });
 export type SaveCampaignSetupDraft = z.output<typeof saveCampaignSetupDraftSchema>;
 
 /** Platzierungen der Gebotsanpassung (wie `AD_CHANGE_PLACEMENTS`). */
@@ -229,14 +231,16 @@ export const setupIssueSchema = z
   .meta({ id: 'SetupIssue' });
 export type SetupIssue = z.infer<typeof setupIssueSchema>;
 
-export const planCampaignSetupRequestSchema = z.strictObject({
-  profileId: z.uuid(),
-  productGroupId: z.uuid(),
-  presetKey: z.string().min(1).max(64),
-  inputs: setupInputsSchema,
-  /** Gebote aus den Daten des Profils vorschlagen (F13). */
-  useProfileBids: z.boolean().default(true),
-});
+export const planCampaignSetupRequestSchema = z
+  .strictObject({
+    profileId: z.uuid(),
+    productGroupId: z.uuid(),
+    presetKey: z.string().min(1).max(64),
+    inputs: setupInputsSchema,
+    /** Gebote aus den Daten des Profils vorschlagen (F13). */
+    useProfileBids: z.boolean().default(true),
+  })
+  .meta({ id: 'PlanCampaignSetupRequest' });
 export type PlanCampaignSetupRequest = z.input<typeof planCampaignSetupRequestSchema>;
 
 export const planCampaignSetupResponseSchema = z
@@ -283,7 +287,11 @@ export type CampaignSetupDraft = z.infer<typeof campaignSetupDraftSchema>;
 export const campaignSetupDraftListResponseSchema = z
   .object({
     drafts: z.array(
-      z.object({ ...draftFields, campaigns: z.number().int(), createdByName: z.string().nullable() }),
+      z.object({
+        ...draftFields,
+        campaigns: z.number().int(),
+        createdByName: z.string().nullable(),
+      }),
     ),
   })
   .meta({ id: 'CampaignSetupDraftList' });

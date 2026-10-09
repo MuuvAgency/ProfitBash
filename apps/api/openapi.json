@@ -7685,6 +7685,145 @@
           ]
         }
       },
+      "PlanCampaignSetupRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productGroupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "presetKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "keywords": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    },
+                    "single": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "brandTerms": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "productTargets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "asin": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9]{10}$"
+                    },
+                    "single": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "asin"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^\\d{1,20}$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 255
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "unlocks": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "vcpm": {
+                      "type": "boolean"
+                    },
+                    "offAmazon": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "default": {}
+              }
+            },
+            "additionalProperties": false
+          },
+          "useProfileBids": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "profileId",
+          "productGroupId",
+          "presetKey",
+          "inputs"
+        ],
+        "additionalProperties": false
+      },
       "CampaignSetupDraftList": {
         "type": "object",
         "properties": {
@@ -8389,6 +8528,538 @@
           "inputs",
           "campaigns"
         ]
+      },
+      "SaveCampaignSetupDraftRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productGroupId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "presetKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string"
+          },
+          "campaignState": {
+            "type": "string",
+            "enum": [
+              "ENABLED",
+              "PAUSED"
+            ]
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "keywords": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    },
+                    "single": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "brandTerms": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "productTargets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "asin": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9]{10}$"
+                    },
+                    "single": {
+                      "type": "boolean"
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "asin"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^\\d{1,20}$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 255
+                    },
+                    "bid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 1000,
+                "default": []
+              },
+              "unlocks": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "vcpm": {
+                      "type": "boolean"
+                    },
+                    "offAmazon": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "default": {}
+              }
+            },
+            "additionalProperties": false
+          },
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "block": {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                "adProduct": {
+                  "type": "string",
+                  "enum": [
+                    "SP",
+                    "SB",
+                    "SD"
+                  ]
+                },
+                "targeting": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "keyword",
+                    "product",
+                    "category",
+                    "audience"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "ENABLED"
+                  ]
+                },
+                "currencyCode": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "dailyBudget": {
+                  "type": "string",
+                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                },
+                "biddingStrategy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "SALES_DOWN_ONLY",
+                    "SALES_UP_AND_DOWN",
+                    "NONE",
+                    null
+                  ]
+                },
+                "sdOptimization": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "clicks",
+                    "conversions",
+                    null
+                  ]
+                },
+                "costType": {
+                  "type": "string",
+                  "enum": [
+                    "cpc",
+                    "vcpm"
+                  ]
+                },
+                "offAmazon": {
+                  "type": "boolean"
+                },
+                "placements": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "topOfSearch": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 900
+                    },
+                    "productPages": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 900
+                    },
+                    "restOfSearch": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 900
+                    }
+                  },
+                  "required": [
+                    "topOfSearch",
+                    "productPages",
+                    "restOfSearch"
+                  ],
+                  "additionalProperties": false
+                },
+                "adGroup": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 255
+                    },
+                    "defaultBid": {
+                      "type": "string",
+                      "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "defaultBid"
+                  ],
+                  "additionalProperties": false
+                },
+                "ads": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "asin": {
+                        "type": "string",
+                        "pattern": "^[A-Z0-9]{10}$"
+                      },
+                      "sku": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "minLength": 1,
+                        "maxLength": 40
+                      }
+                    },
+                    "required": [
+                      "asin",
+                      "sku"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 100
+                },
+                "targets": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "keyword"
+                            ]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          },
+                          "matchType": {
+                            "type": "string",
+                            "enum": [
+                              "broad",
+                              "phrase",
+                              "exact"
+                            ]
+                          },
+                          "bid": {
+                            "type": "string",
+                            "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "text",
+                          "matchType",
+                          "bid"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "product"
+                            ]
+                          },
+                          "asin": {
+                            "type": "string",
+                            "pattern": "^[A-Z0-9]{10}$"
+                          },
+                          "match": {
+                            "type": "string",
+                            "enum": [
+                              "exact",
+                              "expanded"
+                            ]
+                          },
+                          "bid": {
+                            "type": "string",
+                            "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "asin",
+                          "match",
+                          "bid"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "category"
+                            ]
+                          },
+                          "categoryId": {
+                            "type": "string",
+                            "pattern": "^\\d{1,20}$"
+                          },
+                          "name": {
+                            "type": "string",
+                            "maxLength": 255
+                          },
+                          "bid": {
+                            "type": "string",
+                            "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "categoryId",
+                          "name",
+                          "bid"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "audience"
+                            ]
+                          },
+                          "audience": {
+                            "type": "string",
+                            "enum": [
+                              "views",
+                              "purchases"
+                            ]
+                          },
+                          "lookbackDays": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 365
+                          },
+                          "bid": {
+                            "type": "string",
+                            "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "audience",
+                          "lookbackDays",
+                          "bid"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "maxItems": 1000
+                },
+                "negatives": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "keyword"
+                            ]
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          },
+                          "matchType": {
+                            "type": "string",
+                            "enum": [
+                              "negativeExact",
+                              "negativePhrase"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "text",
+                          "matchType"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "product"
+                            ]
+                          },
+                          "asin": {
+                            "type": "string",
+                            "pattern": "^[A-Z0-9]{10}$"
+                          },
+                          "matchType": {
+                            "type": "string",
+                            "enum": [
+                              "negativeExact"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "asin",
+                          "matchType"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "maxItems": 1000
+                }
+              },
+              "required": [
+                "block",
+                "adProduct",
+                "targeting",
+                "name",
+                "state",
+                "currencyCode",
+                "dailyBudget",
+                "biddingStrategy",
+                "sdOptimization",
+                "costType",
+                "offAmazon",
+                "placements",
+                "adGroup",
+                "ads",
+                "targets",
+                "negatives"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 300
+          }
+        },
+        "required": [
+          "profileId",
+          "productGroupId",
+          "presetKey",
+          "name",
+          "campaignState",
+          "inputs",
+          "campaigns"
+        ],
+        "additionalProperties": false
       },
       "SubmitCampaignSetupResponse": {
         "oneOf": [
@@ -13277,143 +13948,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "profileId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "productGroupId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "presetKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
-                  },
-                  "inputs": {
-                    "type": "object",
-                    "properties": {
-                      "keywords": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "text": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 255
-                            },
-                            "single": {
-                              "type": "boolean"
-                            },
-                            "bid": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            }
-                          },
-                          "required": [
-                            "text"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "brandTerms": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "productTargets": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "asin": {
-                              "type": "string",
-                              "pattern": "^[A-Z0-9]{10}$"
-                            },
-                            "single": {
-                              "type": "boolean"
-                            },
-                            "bid": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            }
-                          },
-                          "required": [
-                            "asin"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "categories": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "pattern": "^\\d{1,20}$"
-                            },
-                            "name": {
-                              "type": "string",
-                              "maxLength": 255
-                            },
-                            "bid": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "name"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "unlocks": {
-                        "type": "object",
-                        "additionalProperties": {
-                          "type": "object",
-                          "properties": {
-                            "vcpm": {
-                              "type": "boolean"
-                            },
-                            "offAmazon": {
-                              "type": "boolean"
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "default": {}
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  "useProfileBids": {
-                    "type": "boolean",
-                    "default": true
-                  }
-                },
-                "required": [
-                  "profileId",
-                  "productGroupId",
-                  "presetKey",
-                  "inputs"
-                ],
-                "additionalProperties": false
+                "$ref": "#/components/schemas/PlanCampaignSetupRequest"
               }
             }
           }
@@ -13562,536 +14097,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "profileId": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "productGroupId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "format": "uuid"
-                  },
-                  "presetKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "campaignState": {
-                    "type": "string",
-                    "enum": [
-                      "ENABLED",
-                      "PAUSED"
-                    ]
-                  },
-                  "inputs": {
-                    "type": "object",
-                    "properties": {
-                      "keywords": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "text": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 255
-                            },
-                            "single": {
-                              "type": "boolean"
-                            },
-                            "bid": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            }
-                          },
-                          "required": [
-                            "text"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "brandTerms": {
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "productTargets": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "asin": {
-                              "type": "string",
-                              "pattern": "^[A-Z0-9]{10}$"
-                            },
-                            "single": {
-                              "type": "boolean"
-                            },
-                            "bid": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            }
-                          },
-                          "required": [
-                            "asin"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "categories": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "pattern": "^\\d{1,20}$"
-                            },
-                            "name": {
-                              "type": "string",
-                              "maxLength": 255
-                            },
-                            "bid": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "name"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "maxItems": 1000,
-                        "default": []
-                      },
-                      "unlocks": {
-                        "type": "object",
-                        "additionalProperties": {
-                          "type": "object",
-                          "properties": {
-                            "vcpm": {
-                              "type": "boolean"
-                            },
-                            "offAmazon": {
-                              "type": "boolean"
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "default": {}
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  "campaigns": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "block": {
-                          "type": "string",
-                          "maxLength": 32
-                        },
-                        "adProduct": {
-                          "type": "string",
-                          "enum": [
-                            "SP",
-                            "SB",
-                            "SD"
-                          ]
-                        },
-                        "targeting": {
-                          "type": "string",
-                          "enum": [
-                            "auto",
-                            "keyword",
-                            "product",
-                            "category",
-                            "audience"
-                          ]
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 255
-                        },
-                        "state": {
-                          "type": "string",
-                          "enum": [
-                            "ENABLED"
-                          ]
-                        },
-                        "currencyCode": {
-                          "type": "string",
-                          "pattern": "^[A-Z]{3}$"
-                        },
-                        "dailyBudget": {
-                          "type": "string",
-                          "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                        },
-                        "biddingStrategy": {
-                          "type": [
-                            "string",
-                            "null"
-                          ],
-                          "enum": [
-                            "SALES_DOWN_ONLY",
-                            "SALES_UP_AND_DOWN",
-                            "NONE",
-                            null
-                          ]
-                        },
-                        "sdOptimization": {
-                          "type": [
-                            "string",
-                            "null"
-                          ],
-                          "enum": [
-                            "clicks",
-                            "conversions",
-                            null
-                          ]
-                        },
-                        "costType": {
-                          "type": "string",
-                          "enum": [
-                            "cpc",
-                            "vcpm"
-                          ]
-                        },
-                        "offAmazon": {
-                          "type": "boolean"
-                        },
-                        "placements": {
-                          "type": [
-                            "object",
-                            "null"
-                          ],
-                          "properties": {
-                            "topOfSearch": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 900
-                            },
-                            "productPages": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 900
-                            },
-                            "restOfSearch": {
-                              "type": "integer",
-                              "minimum": 0,
-                              "maximum": 900
-                            }
-                          },
-                          "required": [
-                            "topOfSearch",
-                            "productPages",
-                            "restOfSearch"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "adGroup": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 255
-                            },
-                            "defaultBid": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            }
-                          },
-                          "required": [
-                            "name",
-                            "defaultBid"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "ads": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "asin": {
-                                "type": "string",
-                                "pattern": "^[A-Z0-9]{10}$"
-                              },
-                              "sku": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ],
-                                "minLength": 1,
-                                "maxLength": 40
-                              }
-                            },
-                            "required": [
-                              "asin",
-                              "sku"
-                            ],
-                            "additionalProperties": false
-                          },
-                          "maxItems": 100
-                        },
-                        "targets": {
-                          "type": "array",
-                          "items": {
-                            "oneOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "keyword"
-                                    ]
-                                  },
-                                  "text": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 255
-                                  },
-                                  "matchType": {
-                                    "type": "string",
-                                    "enum": [
-                                      "broad",
-                                      "phrase",
-                                      "exact"
-                                    ]
-                                  },
-                                  "bid": {
-                                    "type": "string",
-                                    "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                  }
-                                },
-                                "required": [
-                                  "type",
-                                  "text",
-                                  "matchType",
-                                  "bid"
-                                ],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "product"
-                                    ]
-                                  },
-                                  "asin": {
-                                    "type": "string",
-                                    "pattern": "^[A-Z0-9]{10}$"
-                                  },
-                                  "match": {
-                                    "type": "string",
-                                    "enum": [
-                                      "exact",
-                                      "expanded"
-                                    ]
-                                  },
-                                  "bid": {
-                                    "type": "string",
-                                    "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                  }
-                                },
-                                "required": [
-                                  "type",
-                                  "asin",
-                                  "match",
-                                  "bid"
-                                ],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "category"
-                                    ]
-                                  },
-                                  "categoryId": {
-                                    "type": "string",
-                                    "pattern": "^\\d{1,20}$"
-                                  },
-                                  "name": {
-                                    "type": "string",
-                                    "maxLength": 255
-                                  },
-                                  "bid": {
-                                    "type": "string",
-                                    "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                  }
-                                },
-                                "required": [
-                                  "type",
-                                  "categoryId",
-                                  "name",
-                                  "bid"
-                                ],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "audience"
-                                    ]
-                                  },
-                                  "audience": {
-                                    "type": "string",
-                                    "enum": [
-                                      "views",
-                                      "purchases"
-                                    ]
-                                  },
-                                  "lookbackDays": {
-                                    "type": "integer",
-                                    "minimum": 1,
-                                    "maximum": 365
-                                  },
-                                  "bid": {
-                                    "type": "string",
-                                    "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                  }
-                                },
-                                "required": [
-                                  "type",
-                                  "audience",
-                                  "lookbackDays",
-                                  "bid"
-                                ],
-                                "additionalProperties": false
-                              }
-                            ]
-                          },
-                          "maxItems": 1000
-                        },
-                        "negatives": {
-                          "type": "array",
-                          "items": {
-                            "oneOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "keyword"
-                                    ]
-                                  },
-                                  "text": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 255
-                                  },
-                                  "matchType": {
-                                    "type": "string",
-                                    "enum": [
-                                      "negativeExact",
-                                      "negativePhrase"
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "type",
-                                  "text",
-                                  "matchType"
-                                ],
-                                "additionalProperties": false
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "product"
-                                    ]
-                                  },
-                                  "asin": {
-                                    "type": "string",
-                                    "pattern": "^[A-Z0-9]{10}$"
-                                  },
-                                  "matchType": {
-                                    "type": "string",
-                                    "enum": [
-                                      "negativeExact"
-                                    ]
-                                  }
-                                },
-                                "required": [
-                                  "type",
-                                  "asin",
-                                  "matchType"
-                                ],
-                                "additionalProperties": false
-                              }
-                            ]
-                          },
-                          "maxItems": 1000
-                        }
-                      },
-                      "required": [
-                        "block",
-                        "adProduct",
-                        "targeting",
-                        "name",
-                        "state",
-                        "currencyCode",
-                        "dailyBudget",
-                        "biddingStrategy",
-                        "sdOptimization",
-                        "costType",
-                        "offAmazon",
-                        "placements",
-                        "adGroup",
-                        "ads",
-                        "targets",
-                        "negatives"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "minItems": 1,
-                    "maxItems": 300
-                  }
-                },
-                "required": [
-                  "profileId",
-                  "productGroupId",
-                  "presetKey",
-                  "name",
-                  "campaignState",
-                  "inputs",
-                  "campaigns"
-                ],
-                "additionalProperties": false
+                "$ref": "#/components/schemas/SaveCampaignSetupDraftRequest"
               }
             }
           }
@@ -14248,536 +14254,7 @@
                     "minimum": 1
                   },
                   "draft": {
-                    "type": "object",
-                    "properties": {
-                      "profileId": {
-                        "type": "string",
-                        "format": "uuid"
-                      },
-                      "productGroupId": {
-                        "type": [
-                          "string",
-                          "null"
-                        ],
-                        "format": "uuid"
-                      },
-                      "presetKey": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "campaignState": {
-                        "type": "string",
-                        "enum": [
-                          "ENABLED",
-                          "PAUSED"
-                        ]
-                      },
-                      "inputs": {
-                        "type": "object",
-                        "properties": {
-                          "keywords": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "text": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 255
-                                },
-                                "single": {
-                                  "type": "boolean"
-                                },
-                                "bid": {
-                                  "type": "string",
-                                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                }
-                              },
-                              "required": [
-                                "text"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "maxItems": 1000,
-                            "default": []
-                          },
-                          "brandTerms": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 255
-                            },
-                            "maxItems": 1000,
-                            "default": []
-                          },
-                          "productTargets": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "asin": {
-                                  "type": "string",
-                                  "pattern": "^[A-Z0-9]{10}$"
-                                },
-                                "single": {
-                                  "type": "boolean"
-                                },
-                                "bid": {
-                                  "type": "string",
-                                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                }
-                              },
-                              "required": [
-                                "asin"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "maxItems": 1000,
-                            "default": []
-                          },
-                          "categories": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "pattern": "^\\d{1,20}$"
-                                },
-                                "name": {
-                                  "type": "string",
-                                  "maxLength": 255
-                                },
-                                "bid": {
-                                  "type": "string",
-                                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "name"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "maxItems": 1000,
-                            "default": []
-                          },
-                          "unlocks": {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "object",
-                              "properties": {
-                                "vcpm": {
-                                  "type": "boolean"
-                                },
-                                "offAmazon": {
-                                  "type": "boolean"
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            "default": {}
-                          }
-                        },
-                        "additionalProperties": false
-                      },
-                      "campaigns": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "block": {
-                              "type": "string",
-                              "maxLength": 32
-                            },
-                            "adProduct": {
-                              "type": "string",
-                              "enum": [
-                                "SP",
-                                "SB",
-                                "SD"
-                              ]
-                            },
-                            "targeting": {
-                              "type": "string",
-                              "enum": [
-                                "auto",
-                                "keyword",
-                                "product",
-                                "category",
-                                "audience"
-                              ]
-                            },
-                            "name": {
-                              "type": "string",
-                              "minLength": 1,
-                              "maxLength": 255
-                            },
-                            "state": {
-                              "type": "string",
-                              "enum": [
-                                "ENABLED"
-                              ]
-                            },
-                            "currencyCode": {
-                              "type": "string",
-                              "pattern": "^[A-Z]{3}$"
-                            },
-                            "dailyBudget": {
-                              "type": "string",
-                              "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                            },
-                            "biddingStrategy": {
-                              "type": [
-                                "string",
-                                "null"
-                              ],
-                              "enum": [
-                                "SALES_DOWN_ONLY",
-                                "SALES_UP_AND_DOWN",
-                                "NONE",
-                                null
-                              ]
-                            },
-                            "sdOptimization": {
-                              "type": [
-                                "string",
-                                "null"
-                              ],
-                              "enum": [
-                                "clicks",
-                                "conversions",
-                                null
-                              ]
-                            },
-                            "costType": {
-                              "type": "string",
-                              "enum": [
-                                "cpc",
-                                "vcpm"
-                              ]
-                            },
-                            "offAmazon": {
-                              "type": "boolean"
-                            },
-                            "placements": {
-                              "type": [
-                                "object",
-                                "null"
-                              ],
-                              "properties": {
-                                "topOfSearch": {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 900
-                                },
-                                "productPages": {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 900
-                                },
-                                "restOfSearch": {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 900
-                                }
-                              },
-                              "required": [
-                                "topOfSearch",
-                                "productPages",
-                                "restOfSearch"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "adGroup": {
-                              "type": "object",
-                              "properties": {
-                                "name": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 255
-                                },
-                                "defaultBid": {
-                                  "type": "string",
-                                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                }
-                              },
-                              "required": [
-                                "name",
-                                "defaultBid"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "ads": {
-                              "type": "array",
-                              "items": {
-                                "type": "object",
-                                "properties": {
-                                  "asin": {
-                                    "type": "string",
-                                    "pattern": "^[A-Z0-9]{10}$"
-                                  },
-                                  "sku": {
-                                    "type": [
-                                      "string",
-                                      "null"
-                                    ],
-                                    "minLength": 1,
-                                    "maxLength": 40
-                                  }
-                                },
-                                "required": [
-                                  "asin",
-                                  "sku"
-                                ],
-                                "additionalProperties": false
-                              },
-                              "maxItems": 100
-                            },
-                            "targets": {
-                              "type": "array",
-                              "items": {
-                                "oneOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "keyword"
-                                        ]
-                                      },
-                                      "text": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 255
-                                      },
-                                      "matchType": {
-                                        "type": "string",
-                                        "enum": [
-                                          "broad",
-                                          "phrase",
-                                          "exact"
-                                        ]
-                                      },
-                                      "bid": {
-                                        "type": "string",
-                                        "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                      }
-                                    },
-                                    "required": [
-                                      "type",
-                                      "text",
-                                      "matchType",
-                                      "bid"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "product"
-                                        ]
-                                      },
-                                      "asin": {
-                                        "type": "string",
-                                        "pattern": "^[A-Z0-9]{10}$"
-                                      },
-                                      "match": {
-                                        "type": "string",
-                                        "enum": [
-                                          "exact",
-                                          "expanded"
-                                        ]
-                                      },
-                                      "bid": {
-                                        "type": "string",
-                                        "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                      }
-                                    },
-                                    "required": [
-                                      "type",
-                                      "asin",
-                                      "match",
-                                      "bid"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "category"
-                                        ]
-                                      },
-                                      "categoryId": {
-                                        "type": "string",
-                                        "pattern": "^\\d{1,20}$"
-                                      },
-                                      "name": {
-                                        "type": "string",
-                                        "maxLength": 255
-                                      },
-                                      "bid": {
-                                        "type": "string",
-                                        "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                      }
-                                    },
-                                    "required": [
-                                      "type",
-                                      "categoryId",
-                                      "name",
-                                      "bid"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "audience"
-                                        ]
-                                      },
-                                      "audience": {
-                                        "type": "string",
-                                        "enum": [
-                                          "views",
-                                          "purchases"
-                                        ]
-                                      },
-                                      "lookbackDays": {
-                                        "type": "integer",
-                                        "minimum": 1,
-                                        "maximum": 365
-                                      },
-                                      "bid": {
-                                        "type": "string",
-                                        "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
-                                      }
-                                    },
-                                    "required": [
-                                      "type",
-                                      "audience",
-                                      "lookbackDays",
-                                      "bid"
-                                    ],
-                                    "additionalProperties": false
-                                  }
-                                ]
-                              },
-                              "maxItems": 1000
-                            },
-                            "negatives": {
-                              "type": "array",
-                              "items": {
-                                "oneOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "keyword"
-                                        ]
-                                      },
-                                      "text": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 255
-                                      },
-                                      "matchType": {
-                                        "type": "string",
-                                        "enum": [
-                                          "negativeExact",
-                                          "negativePhrase"
-                                        ]
-                                      }
-                                    },
-                                    "required": [
-                                      "type",
-                                      "text",
-                                      "matchType"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": [
-                                          "product"
-                                        ]
-                                      },
-                                      "asin": {
-                                        "type": "string",
-                                        "pattern": "^[A-Z0-9]{10}$"
-                                      },
-                                      "matchType": {
-                                        "type": "string",
-                                        "enum": [
-                                          "negativeExact"
-                                        ]
-                                      }
-                                    },
-                                    "required": [
-                                      "type",
-                                      "asin",
-                                      "matchType"
-                                    ],
-                                    "additionalProperties": false
-                                  }
-                                ]
-                              },
-                              "maxItems": 1000
-                            }
-                          },
-                          "required": [
-                            "block",
-                            "adProduct",
-                            "targeting",
-                            "name",
-                            "state",
-                            "currencyCode",
-                            "dailyBudget",
-                            "biddingStrategy",
-                            "sdOptimization",
-                            "costType",
-                            "offAmazon",
-                            "placements",
-                            "adGroup",
-                            "ads",
-                            "targets",
-                            "negatives"
-                          ],
-                          "additionalProperties": false
-                        },
-                        "minItems": 1,
-                        "maxItems": 300
-                      }
-                    },
-                    "required": [
-                      "profileId",
-                      "productGroupId",
-                      "presetKey",
-                      "name",
-                      "campaignState",
-                      "inputs",
-                      "campaigns"
-                    ],
-                    "additionalProperties": false
+                    "$ref": "#/components/schemas/SaveCampaignSetupDraftRequest"
                   }
                 },
                 "required": [

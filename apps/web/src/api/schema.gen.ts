@@ -4563,44 +4563,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        profileId: string;
-                        /** Format: uuid */
-                        productGroupId: string;
-                        presetKey: string;
-                        inputs: {
-                            /** @default [] */
-                            keywords?: {
-                                text: string;
-                                single?: boolean;
-                                bid?: string;
-                            }[];
-                            /** @default [] */
-                            brandTerms?: string[];
-                            /** @default [] */
-                            productTargets?: {
-                                asin: string;
-                                single?: boolean;
-                                bid?: string;
-                            }[];
-                            /** @default [] */
-                            categories?: {
-                                id: string;
-                                name: string;
-                                bid?: string;
-                            }[];
-                            /** @default {} */
-                            unlocks?: {
-                                [key: string]: {
-                                    vcpm?: boolean;
-                                    offAmazon?: boolean;
-                                };
-                            };
-                        };
-                        /** @default true */
-                        useProfileBids?: boolean;
-                    };
+                    "application/json": components["schemas"]["PlanCampaignSetupRequest"];
                 };
             };
             responses: {
@@ -4743,118 +4706,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        profileId: string;
-                        /** Format: uuid */
-                        productGroupId: string | null;
-                        presetKey: string;
-                        name: string;
-                        /** @enum {string} */
-                        campaignState: "ENABLED" | "PAUSED";
-                        inputs: {
-                            /** @default [] */
-                            keywords?: {
-                                text: string;
-                                single?: boolean;
-                                bid?: string;
-                            }[];
-                            /** @default [] */
-                            brandTerms?: string[];
-                            /** @default [] */
-                            productTargets?: {
-                                asin: string;
-                                single?: boolean;
-                                bid?: string;
-                            }[];
-                            /** @default [] */
-                            categories?: {
-                                id: string;
-                                name: string;
-                                bid?: string;
-                            }[];
-                            /** @default {} */
-                            unlocks?: {
-                                [key: string]: {
-                                    vcpm?: boolean;
-                                    offAmazon?: boolean;
-                                };
-                            };
-                        };
-                        campaigns: {
-                            block: string;
-                            /** @enum {string} */
-                            adProduct: "SP" | "SB" | "SD";
-                            /** @enum {string} */
-                            targeting: "auto" | "keyword" | "product" | "category" | "audience";
-                            name: string;
-                            /** @enum {string} */
-                            state: "ENABLED";
-                            currencyCode: string;
-                            dailyBudget: string;
-                            /** @enum {string|null} */
-                            biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
-                            /** @enum {string|null} */
-                            sdOptimization: "clicks" | "conversions" | null;
-                            /** @enum {string} */
-                            costType: "cpc" | "vcpm";
-                            offAmazon: boolean;
-                            placements: {
-                                topOfSearch: number;
-                                productPages: number;
-                                restOfSearch: number;
-                            } | null;
-                            adGroup: {
-                                name: string;
-                                defaultBid: string;
-                            };
-                            ads: {
-                                asin: string;
-                                sku: string | null;
-                            }[];
-                            targets: ({
-                                /** @enum {string} */
-                                type: "keyword";
-                                text: string;
-                                /** @enum {string} */
-                                matchType: "broad" | "phrase" | "exact";
-                                bid: string;
-                            } | {
-                                /** @enum {string} */
-                                type: "product";
-                                asin: string;
-                                /** @enum {string} */
-                                match: "exact" | "expanded";
-                                bid: string;
-                            } | {
-                                /** @enum {string} */
-                                type: "category";
-                                categoryId: string;
-                                name: string;
-                                bid: string;
-                            } | {
-                                /** @enum {string} */
-                                type: "audience";
-                                /** @enum {string} */
-                                audience: "views" | "purchases";
-                                lookbackDays: number;
-                                bid: string;
-                            })[];
-                            negatives: ({
-                                /** @enum {string} */
-                                type: "keyword";
-                                text: string;
-                                /** @enum {string} */
-                                matchType: "negativeExact" | "negativePhrase";
-                            } | {
-                                /** @enum {string} */
-                                type: "product";
-                                asin: string;
-                                /** @enum {string} */
-                                matchType: "negativeExact";
-                            })[];
-                        }[];
-                    };
+                    "application/json": components["schemas"]["SaveCampaignSetupDraftRequest"];
                 };
             };
             responses: {
@@ -4991,118 +4843,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         version: number;
-                        draft: {
-                            /** Format: uuid */
-                            profileId: string;
-                            /** Format: uuid */
-                            productGroupId: string | null;
-                            presetKey: string;
-                            name: string;
-                            /** @enum {string} */
-                            campaignState: "ENABLED" | "PAUSED";
-                            inputs: {
-                                /** @default [] */
-                                keywords?: {
-                                    text: string;
-                                    single?: boolean;
-                                    bid?: string;
-                                }[];
-                                /** @default [] */
-                                brandTerms?: string[];
-                                /** @default [] */
-                                productTargets?: {
-                                    asin: string;
-                                    single?: boolean;
-                                    bid?: string;
-                                }[];
-                                /** @default [] */
-                                categories?: {
-                                    id: string;
-                                    name: string;
-                                    bid?: string;
-                                }[];
-                                /** @default {} */
-                                unlocks?: {
-                                    [key: string]: {
-                                        vcpm?: boolean;
-                                        offAmazon?: boolean;
-                                    };
-                                };
-                            };
-                            campaigns: {
-                                block: string;
-                                /** @enum {string} */
-                                adProduct: "SP" | "SB" | "SD";
-                                /** @enum {string} */
-                                targeting: "auto" | "keyword" | "product" | "category" | "audience";
-                                name: string;
-                                /** @enum {string} */
-                                state: "ENABLED";
-                                currencyCode: string;
-                                dailyBudget: string;
-                                /** @enum {string|null} */
-                                biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
-                                /** @enum {string|null} */
-                                sdOptimization: "clicks" | "conversions" | null;
-                                /** @enum {string} */
-                                costType: "cpc" | "vcpm";
-                                offAmazon: boolean;
-                                placements: {
-                                    topOfSearch: number;
-                                    productPages: number;
-                                    restOfSearch: number;
-                                } | null;
-                                adGroup: {
-                                    name: string;
-                                    defaultBid: string;
-                                };
-                                ads: {
-                                    asin: string;
-                                    sku: string | null;
-                                }[];
-                                targets: ({
-                                    /** @enum {string} */
-                                    type: "keyword";
-                                    text: string;
-                                    /** @enum {string} */
-                                    matchType: "broad" | "phrase" | "exact";
-                                    bid: string;
-                                } | {
-                                    /** @enum {string} */
-                                    type: "product";
-                                    asin: string;
-                                    /** @enum {string} */
-                                    match: "exact" | "expanded";
-                                    bid: string;
-                                } | {
-                                    /** @enum {string} */
-                                    type: "category";
-                                    categoryId: string;
-                                    name: string;
-                                    bid: string;
-                                } | {
-                                    /** @enum {string} */
-                                    type: "audience";
-                                    /** @enum {string} */
-                                    audience: "views" | "purchases";
-                                    lookbackDays: number;
-                                    bid: string;
-                                })[];
-                                negatives: ({
-                                    /** @enum {string} */
-                                    type: "keyword";
-                                    text: string;
-                                    /** @enum {string} */
-                                    matchType: "negativeExact" | "negativePhrase";
-                                } | {
-                                    /** @enum {string} */
-                                    type: "product";
-                                    asin: string;
-                                    /** @enum {string} */
-                                    matchType: "negativeExact";
-                                })[];
-                            }[];
-                        };
+                        draft: components["schemas"]["SaveCampaignSetupDraftRequest"];
                     };
                 };
             };
@@ -7218,6 +6959,44 @@ export interface components {
         } & {
             [key: string]: string | number | null;
         };
+        PlanCampaignSetupRequest: {
+            /** Format: uuid */
+            profileId: string;
+            /** Format: uuid */
+            productGroupId: string;
+            presetKey: string;
+            inputs: {
+                /** @default [] */
+                keywords: {
+                    text: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
+                /** @default [] */
+                brandTerms: string[];
+                /** @default [] */
+                productTargets: {
+                    asin: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
+                /** @default [] */
+                categories: {
+                    id: string;
+                    name: string;
+                    bid?: string;
+                }[];
+                /** @default {} */
+                unlocks: {
+                    [key: string]: {
+                        vcpm?: boolean;
+                        offAmazon?: boolean;
+                    };
+                };
+            };
+            /** @default true */
+            useProfileBids: boolean;
+        };
         CampaignSetupDraftList: {
             drafts: {
                 /** Format: uuid */
@@ -7275,6 +7054,118 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            inputs: {
+                /** @default [] */
+                keywords: {
+                    text: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
+                /** @default [] */
+                brandTerms: string[];
+                /** @default [] */
+                productTargets: {
+                    asin: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
+                /** @default [] */
+                categories: {
+                    id: string;
+                    name: string;
+                    bid?: string;
+                }[];
+                /** @default {} */
+                unlocks: {
+                    [key: string]: {
+                        vcpm?: boolean;
+                        offAmazon?: boolean;
+                    };
+                };
+            };
+            campaigns: {
+                block: string;
+                /** @enum {string} */
+                adProduct: "SP" | "SB" | "SD";
+                /** @enum {string} */
+                targeting: "auto" | "keyword" | "product" | "category" | "audience";
+                name: string;
+                /** @enum {string} */
+                state: "ENABLED";
+                currencyCode: string;
+                dailyBudget: string;
+                /** @enum {string|null} */
+                biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
+                /** @enum {string|null} */
+                sdOptimization: "clicks" | "conversions" | null;
+                /** @enum {string} */
+                costType: "cpc" | "vcpm";
+                offAmazon: boolean;
+                placements: {
+                    topOfSearch: number;
+                    productPages: number;
+                    restOfSearch: number;
+                } | null;
+                adGroup: {
+                    name: string;
+                    defaultBid: string;
+                };
+                ads: {
+                    asin: string;
+                    sku: string | null;
+                }[];
+                targets: ({
+                    /** @enum {string} */
+                    type: "keyword";
+                    text: string;
+                    /** @enum {string} */
+                    matchType: "broad" | "phrase" | "exact";
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                    /** @enum {string} */
+                    match: "exact" | "expanded";
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "category";
+                    categoryId: string;
+                    name: string;
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "audience";
+                    /** @enum {string} */
+                    audience: "views" | "purchases";
+                    lookbackDays: number;
+                    bid: string;
+                })[];
+                negatives: ({
+                    /** @enum {string} */
+                    type: "keyword";
+                    text: string;
+                    /** @enum {string} */
+                    matchType: "negativeExact" | "negativePhrase";
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                    /** @enum {string} */
+                    matchType: "negativeExact";
+                })[];
+            }[];
+        };
+        SaveCampaignSetupDraftRequest: {
+            /** Format: uuid */
+            profileId: string;
+            /** Format: uuid */
+            productGroupId: string | null;
+            presetKey: string;
+            name: string;
+            /** @enum {string} */
+            campaignState: "ENABLED" | "PAUSED";
             inputs: {
                 /** @default [] */
                 keywords: {

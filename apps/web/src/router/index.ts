@@ -98,6 +98,12 @@ const routes: RouteRecordRaw[] = [
         meta: { feature: 'tools', navItemId: 'tools', titleKey: 'productGroups.title' },
       },
       {
+        path: 'ads/tools/setup',
+        name: 'campaign-setup',
+        component: () => import('../pages/SetupPage.vue'),
+        meta: { feature: 'tools', navItemId: 'tools', titleKey: 'setup.title' },
+      },
+      {
         path: 'ads/tools/catalog',
         name: 'structure-catalog',
         component: () => import('../pages/CatalogPage.vue'),

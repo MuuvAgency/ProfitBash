@@ -40,6 +40,14 @@ export type ProductGroupData = Schemas['ProductGroup'];
 export type ProductGroupListData = Schemas['ProductGroupListResponse'];
 export type AdvertisedProductsData = Schemas['AdvertisedProductsResponse'];
 export type StructureCatalogData = Schemas['StructureCatalogResponse'];
+export type PlanSetupInput = Schemas['PlanCampaignSetupRequest'];
+export type PlanSetupData = Schemas['PlanCampaignSetupResponse'];
+export type SetupDraftData = Schemas['CampaignSetupDraft'];
+export type SetupDraftListData = Schemas['CampaignSetupDraftList'];
+export type SaveSetupDraftInput = Schemas['SaveCampaignSetupDraftRequest'];
+export type SubmitSetupData = Schemas['SubmitCampaignSetupResponse'];
+export type SetupIssueData = Schemas['SetupIssue'];
+export type PlannedCampaignData = SetupDraftData['campaigns'][number];
 export type AssignTagsInput = Schemas['AssignTagsRequest'];
 export type AssignTagsData = Schemas['AssignTagsResponse'];
 export type HarvestListData = Schemas['HarvestListResponse'];
@@ -319,6 +327,45 @@ export function createApi(options: ApiOptions = {}) {
             client.PUT('/api/ads/tools/client-presets/{clientId}', {
               params: { path: { clientId } },
               body: { presetKey },
+            }),
+          ),
+      },
+      /** Kampagnen-Setup (`phase-4.md` 4.5): planen, Entwürfe, übermitteln. */
+      setup: {
+        plan: (input: PlanSetupInput): Promise<PlanSetupData> =>
+          unwrap(client.POST('/api/ads/tools/setup/plan', { body: input })),
+        list: (): Promise<SetupDraftListData> => unwrap(client.GET('/api/ads/tools/setup/drafts')),
+        get: (id: string): Promise<SetupDraftData> =>
+          unwrap(client.GET('/api/ads/tools/setup/drafts/{id}', { params: { path: { id } } })),
+        create: (draft: SaveSetupDraftInput): Promise<SetupDraftData> =>
+          unwrap(client.POST('/api/ads/tools/setup/drafts', { body: draft })),
+        update: (
+          id: string,
+          version: number,
+          draft: SaveSetupDraftInput,
+        ): Promise<SetupDraftData> =>
+          unwrap(
+            client.PUT('/api/ads/tools/setup/drafts/{id}', {
+              params: { path: { id } },
+              body: { version, draft },
+            }),
+          ),
+        discard: (id: string, version: number): Promise<SetupDraftData> =>
+          unwrap(
+            client.POST('/api/ads/tools/setup/drafts/{id}/discard', {
+              params: { path: { id } },
+              body: { version },
+            }),
+          ),
+        submit: (
+          id: string,
+          version: number,
+          channel: AdChangeChannelData,
+        ): Promise<SubmitSetupData> =>
+          unwrap(
+            client.POST('/api/ads/tools/setup/drafts/{id}/submit', {
+              params: { path: { id } },
+              body: { version, channel },
             }),
           ),
       },
