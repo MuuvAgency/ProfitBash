@@ -77,6 +77,11 @@ Umgesetzt in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsored Bra
   (`parseJsonLossless`); intern bleiben IDs Strings. Kampagne und Ad Group stehen in jedem Eintrag, deshalb tragen
   die Schreibaufträge für Keywords, Targets und das Archivieren optional `amazonCampaignId` und `amazonAdGroupId`
   (der Job liefert sie immer mit).
+- **Reihenfolge:** Archivieren über den Zustand `archived` nutzt den Update-Endpunkt, geht aber als eigener
+  Aufruf nach den Updates raus (gilt auch für SD); dieselbe Entity in Update und Archivieren eines Aufrufs wird
+  abgelehnt (`DUPLICATE_OPERATION`).
+- **Themen-Targets** (`targetType: theme`) haben einen eigenen Endpunkt (`/sb/themes`); der Job lehnt Änderungen
+  daran ab (`TARGET_TYPE_NOT_SUPPORTED`).
 - **Antwortformen v3:** Keywords und negative Keywords als Liste `{ keywordId, code, description }` in der
   **Reihenfolge der Anfrage** (`code: SUCCESS` = angenommen); Targets und negative Targets als
   `{ updateTarget|createTarget SuccessResults: [{ targetId, targetRequestIndex }], …ErrorResults: [{ code, details,
@@ -100,8 +105,10 @@ Umgesetzt in zwei Schritten: **Sponsored Products v3** mit 3.2a, **Sponsored Bra
 - Alles `application/json`, Listen von Einträgen, **IDs als `integer`**, Zustände klein (`enabled`, `paused`,
   `archived`). Antwort `207` als Liste `{ code, description, <id> }` in der Reihenfolge der Anfrage.
 - **Nicht vorhanden:** Keywords, negative Keywords, Negatives auf Kampagnenebene, Gebotsstrategie und Platzierungen.
-- Die Spec nennt keine Höchstzahl je Aufruf; der Client schickt höchstens 100 (Annahme, beim ersten echten Lauf
-  prüfen).
+- Die Spec nennt 100 je Aufruf für Targets und negative Targets, für Kampagnen, Ad Groups und Product Ads keine
+  Höchstzahl; der Client schickt überall höchstens 100 (beim ersten echten Lauf prüfen).
+- Die Spec beschreibt `code` auch als HTTP-Status: `SUCCESS` oder ein 2xx-Wert gilt als angenommen, ein Eintrag
+  ohne Code als unklar (nicht als gescheitert, sonst würde eine Anlage doppelt angelegt).
 
 ### Grenzen für SB und SD
 
@@ -139,7 +146,9 @@ nicht kennt (Amazon entscheidet).
   Abbruch sind für alle gleich.
 - **Offen für 1.10 bei SB und SD:** ob v3 IDs oberhalb von 2^53 als Zahl annimmt und so zurückgibt, ob die
   v3-Antworten wirklich in der Reihenfolge der Anfrage kommen (bei abweichender ID gilt der Ausgang als unklar),
-  welche `code`-Werte außer `SUCCESS` vorkommen (der Client wertet Codes mit „throttl“ als gedrosselt, mit
+  ob `PUT /sb/keywords` eine Liste oder (wie das Schema der Spec sagt) ein
+  einzelnes Objekt liefert (der Client liest beides), ob Fehler negativer Targets `targetRequestIndex` oder
+  `negativeTargetRequestIndex` tragen (beides wird gelesen), welche `code`-Werte außer `SUCCESS` vorkommen (der Client wertet Codes mit „throttl“ als gedrosselt, mit
   „internal“/„server“ als unklar), die Höchstzahl je Aufruf bei SD, ob `PUT /sb/v4/campaigns` ein Tagesbudget ohne
   `budgetType` annimmt, ob Vendor-Profile dieselben Endpunkte nutzen.
 - **Offen für 1.10 (erster echter Lauf):** ob `dynamicBidding` als Ganzes ersetzt wird (der Client schickt Strategie und

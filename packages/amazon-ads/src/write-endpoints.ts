@@ -59,7 +59,11 @@ export interface WriteDialect {
 
 /** Die Änderung gibt es für diesen Anzeigentyp nicht (z. B. Gebotsstrategie bei SB, Keywords bei SD). */
 export class WriteNotSupportedError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** Code im Ergebnis der Änderung. */
+    public readonly code: string = 'NOT_SUPPORTED',
+  ) {
     super(message);
     this.name = 'WriteNotSupportedError';
   }

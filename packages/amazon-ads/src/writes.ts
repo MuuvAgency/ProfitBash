@@ -459,7 +459,7 @@ export async function applyChanges(
       mapped = dialect.map(op);
     } catch (error) {
       if (error instanceof WriteNotSupportedError) {
-        fail(position, 'NOT_SUPPORTED', error.message);
+        fail(position, error.code, error.message);
         return;
       }
       // Ein ungültiger Wert betrifft nur diese Änderung (`jsonDecimal` und `requireId` werfen `TypeError`).

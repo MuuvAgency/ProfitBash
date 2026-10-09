@@ -382,6 +382,15 @@ dazu das Anlegen von Negatives (Keyword exakt/Wortgruppe oder ASIN, auf Kampagne
     Tabelle aus 3.4 entfällt).
   - **Mock:** bildet Schreiben weiter nur für SP nach; SB und SD beantwortet er mit `400 MOCK_NOT_SUPPORTED` und
     klarem Text (je Änderung fehlgeschlagen). Getestet sind SB und SD mit msw (`writes-sb-sd.test.ts`).
+  - Review (unabhängig): keine kritischen Befunde; SP nach dem Umbau unverändert (Endpunkte, Reihenfolge,
+    Wiederholen, Abbruch), Abbildung gegen die drei Specs, IDs nie über `number` und alle Grenzwerte für die 13
+    Marktplätze gegen die Doku-Seite bestätigt. Übernommen: Themen-Targets von SB lehnt der Job ab
+    (`TARGET_TYPE_NOT_SUPPORTED`; sie wären am falschen Endpunkt gelandet); ein Eintrag der Antwort ohne Code gilt
+    als unklar statt gescheitert, 2xx als angenommen (die SD-Spec beschreibt `code` auch als HTTP-Status; eine
+    Anlage wäre sonst doppelt angelegt worden); Archivieren geht bei SB v3 und SD als eigener Aufruf nach den
+    Updates raus; einzelne Keyword-Antwort als Objekt und `negativeTargetRequestIndex` werden gelesen; fehlende
+    Eltern-IDs mit eigenem Code (`PARENT_IDS_MISSING`), das Archivieren negativer SB-Targets braucht nur die
+    Ad Group; Tests für Codes, Reihenfolge, Stücke zu 100.
   - **Offen bzw. bewusst so:** **Die Bulk-Datei kennt weiter nur SP** (eigene Blätter und Spalten für SB und SD;
     `AD_PRODUCT_NOT_SUPPORTED` beim Weg `bulk_file`). Die Aufgabenzeile nannte die Bulk-Datei als Abdeckung für SB
     und SD; das stimmt nicht (Notiz 3.2b). Ohne API-Zugang lassen sich SB und SD damit noch nicht ändern: eigene

@@ -255,7 +255,7 @@ describe('Sponsored Brands', () => {
     ]);
 
     expect(outcome.results).toEqual([
-      { ref: 'k', status: 'failed', code: 'INVALID_VALUE', message: expect.any(String) },
+      { ref: 'k', status: 'failed', code: 'PARENT_IDS_MISSING', message: expect.any(String) },
     ]);
   });
 
@@ -373,6 +373,34 @@ describe('Sponsored Brands', () => {
     expect(outcome.results).toEqual([
       { ref: 'nk', status: 'applied', amazonId: BIG },
       { ref: 'nt', status: 'applied', amazonId: '7002' },
+    ]);
+  });
+
+  it('liest eine einzelne Keyword-Antwort auch als Objekt und Fehler negativer Targets mit eigenem Index-Schlüssel', async () => {
+    const client = setup();
+    capture('put', '/sb/keywords', () => `{"keywordId":3001,"code":"SUCCESS"}`);
+    capture(
+      'put',
+      '/sb/negativeTargets',
+      () =>
+        `{"updateTargetErrorResults":[{"code":"NOT_FOUND","details":"gibt es nicht","negativeTargetRequestIndex":0}]}`,
+      200,
+    );
+
+    const outcome = await apply(client, SB, [
+      { ref: 'k', type: 'update', entity: 'keyword', amazonId: '3001', ...parents, bid: '0.75' },
+      {
+        ref: 'nt',
+        type: 'archive',
+        entity: 'negativeTarget',
+        amazonId: '7001',
+        amazonAdGroupId: '2001',
+      },
+    ]);
+
+    expect(outcome.results).toEqual([
+      { ref: 'k', status: 'applied', amazonId: '3001' },
+      { ref: 'nt', status: 'failed', code: 'NOT_FOUND', message: 'gibt es nicht' },
     ]);
   });
 
@@ -559,6 +587,92 @@ describe('Sponsored Display', () => {
     expect(outcome.results).toEqual(
       ['keyword', 'bidding', 'negativeKeyword', 'campaignNegative'].map(notSupported),
     );
+  });
+
+  it('liest Codes vorsichtig: 2xx gilt als angenommen, ohne Code bleibt der Ausgang unklar', async () => {
+    const client = setup();
+    capture(
+      'put',
+      '/sd/targets',
+      () =>
+        `[{"code":"200","targetId":5001},{"targetId":5002},{"code":"404","description":"not found"},{"code":"THROTTLED"}]`,
+    );
+
+    const outcome = await apply(
+      client,
+      SD,
+      ['5001', '5002', '5003', '5004'].map((amazonId): AmazonAdsWriteOperation => ({
+        ref: amazonId,
+        type: 'update',
+        entity: 'target',
+        amazonId,
+        bid: '0.50',
+      })),
+    );
+
+    expect(outcome.results).toEqual([
+      { ref: '5001', status: 'applied', amazonId: '5001' },
+      { ref: '5002', status: 'unknown', message: expect.any(String) },
+      { ref: '5003', status: 'failed', code: 'HTTP_404', message: 'not found' },
+      { ref: '5004', status: 'unsent' },
+    ]);
+    expect(outcome.throttled).toBe(true);
+  });
+
+  it('archiviert erst nach den Updates und lehnt dieselbe Entity in Update und Archivieren ab', async () => {
+    const client = setup();
+    const order: string[] = [];
+    capture('put', '/sd/campaigns', (body) => {
+      order.push(`campaigns ${body}`);
+      return `[{"code":"SUCCESS","campaignId":1001}]`;
+    });
+    capture('put', '/sd/targets', (body) => {
+      order.push(`targets ${body}`);
+      return `[{"code":"SUCCESS","targetId":5001}]`;
+    });
+
+    const outcome = await apply(client, SD, [
+      { ref: 'c', type: 'archive', entity: 'campaign', amazonId: '1001' },
+      { ref: 't', type: 'update', entity: 'target', amazonId: '5001', bid: '0.50' },
+      { ref: 'dup', type: 'update', entity: 'campaign', amazonId: '1001', state: 'PAUSED' },
+    ]);
+
+    expect(order).toEqual([
+      'targets [{"targetId":5001,"bid":0.50}]',
+      'campaigns [{"campaignId":1001,"state":"archived"}]',
+    ]);
+    expect(outcome.results.map((r) => (r.status === 'failed' ? r.code : r.status))).toEqual([
+      'applied',
+      'applied',
+      'DUPLICATE_OPERATION',
+    ]);
+  });
+
+  it('schickt höchstens 100 Einträge je Aufruf', async () => {
+    const client = setup();
+    const seen = capture('put', '/sd/targets', (body) =>
+      JSON.stringify(
+        (JSON.parse(body) as { targetId: number }[]).map(({ targetId }) => ({
+          code: 'SUCCESS',
+          targetId,
+        })),
+      ),
+    );
+
+    const outcome = await apply(
+      client,
+      SD,
+      Array.from({ length: 101 }, (_, index): AmazonAdsWriteOperation => ({
+        ref: `t${index}`,
+        type: 'update',
+        entity: 'target',
+        amazonId: String(5000 + index),
+        bid: '0.50',
+      })),
+    );
+
+    expect(seen.map((call) => (JSON.parse(call.body) as unknown[]).length)).toEqual([100, 1]);
+    expect(outcome.results.every((r) => r.status === 'applied')).toBe(true);
   });
 
   it('wiederholt Anlagen nach einem Serverfehler nicht (unklar), Updates schon', async () => {

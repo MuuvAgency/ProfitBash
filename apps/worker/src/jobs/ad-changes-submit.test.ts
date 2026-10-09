@@ -375,7 +375,7 @@ describe('submitConnectionAdChanges', () => {
     ]);
     answer = (input) => {
       throw new AmazonAdsWriteAbortedError(
-        'sp.applyChanges',
+        'ads.applyChanges',
         input.operations.map((op) =>
           op.ref.startsWith('campaign:')
             ? { ref: op.ref, status: 'applied', amazonId: '1001' }
@@ -408,7 +408,7 @@ describe('submitConnectionAdChanges', () => {
     const second = await submit([update('campaign', f.campaign, 'budget', '25')]);
     answer = (input) => {
       throw new AmazonAdsWriteAbortedError(
-        'sp.applyChanges',
+        'ads.applyChanges',
         input.operations.map((op) => ({ ref: op.ref, status: 'unsent' })),
         new AmazonAdsReauthRequiredError('lwa.refresh', 400, null),
       );

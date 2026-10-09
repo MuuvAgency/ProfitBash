@@ -405,4 +405,24 @@ describe('buildWriteOperations', () => {
       ['SPONSORED_BRANDS', 1],
     ]);
   });
+
+  it('lehnt Themen-Targets von Sponsored Brands ab (eigener Endpunkt bei Amazon, 3.2c)', () => {
+    const theme = change({ adProduct: 'SPONSORED_BRANDS', targetType: 'theme', after: '0.90' });
+    const product = change({
+      adProduct: 'SPONSORED_BRANDS',
+      entityId: 'target-2',
+      amazonEntityId: '301',
+      targetType: 'product',
+      after: '0.90',
+    });
+
+    const { operations, rejected } = build([theme, product]);
+
+    expect(rejected).toEqual([
+      { changeId: theme.id, code: 'TARGET_TYPE_NOT_SUPPORTED', message: expect.any(String) },
+    ]);
+    expect(operations).toEqual([
+      expect.objectContaining({ entity: 'target', amazonId: '301', ...PARENTS }),
+    ]);
+  });
 });
