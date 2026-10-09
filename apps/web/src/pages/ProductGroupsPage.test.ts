@@ -248,6 +248,70 @@ describe('Seite „Produktgruppen“', () => {
     ]);
   });
 
+  it('nimmt den Hero wieder weg („Kein Hero“)', async () => {
+    const { requests } = await mountPage({
+      [`PATCH /api/ads/tools/product-groups/${G1}`]: json(flaschen),
+    });
+    await vi.waitFor(() => expect(button('Produktgruppe „Flaschen“ ändern')).toBeDefined());
+    button('Produktgruppe „Flaschen“ ändern')!.click();
+    (await found<HTMLInputElement>('input[name="group-hero"][value=""]')).click();
+    await flushPromises();
+    (await found<HTMLButtonElement>('[data-group-save]')).click();
+    await flushPromises();
+    expect(sent(requests, 'PATCH').map((r) => r.body)).toEqual([
+      {
+        name: 'Flaschen',
+        items: [
+          { asin: 'B0FLASCHE1', sku: 'FL-750', isHero: false },
+          { asin: 'B0FLASCHE2', sku: 'FL-500', isHero: false },
+        ],
+      },
+    ]);
+  });
+
+  it('leert die Handeingabe beim Wechsel des Profils (Vendor ohne SKU-Feld)', async () => {
+    await mountPage();
+    (await found<HTMLButtonElement>('[data-group-new]')).click();
+    await choose('[data-group-profile]', P1);
+    await type('[data-manual-sku]', 'BE-2');
+    await choose('[data-group-profile]', P2);
+    expect(document.querySelector('[data-manual-sku]')).toBeNull();
+    await type('[data-manual-asin]', 'B0DOSE0002');
+    (await found<HTMLButtonElement>('[data-manual-add]')).click();
+    await flushPromises();
+    expect(document.body.textContent).not.toContain('Vendor-Profile haben keine SKU.');
+    expect(document.querySelectorAll('[data-item]')).toHaveLength(1);
+  });
+
+  it('verweist bei abgeschnittener Auswahl auf die Handeingabe', async () => {
+    await mountPage({
+      'GET /api/ads/tools/advertised-products': json({
+        truncated: true,
+        products: [
+          {
+            asin: 'B0BECHER01',
+            sku: 'BE-1',
+            adProducts: ['SPONSORED_PRODUCTS'],
+            enabled: true,
+            groupIds: [],
+          },
+        ],
+      }),
+    });
+    (await found<HTMLButtonElement>('[data-group-new]')).click();
+    await choose('[data-group-profile]', P1);
+    await vi.waitFor(() => expect(document.body.textContent).toContain('von Hand ein'));
+  });
+
+  it('sagt ohne sichtbares Profil, dass erst ein Profil nötig ist', async () => {
+    await mountPage({
+      'GET /api/ads/tools/product-groups': json({ ...listResponse([]), profiles: [], clients: [] }),
+    });
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Es gibt noch kein sichtbares Profil'),
+    );
+  });
+
   it('meldet einen vergebenen Namen im Dialog', async () => {
     await mountPage({
       [`PATCH /api/ads/tools/product-groups/${G1}`]: json(

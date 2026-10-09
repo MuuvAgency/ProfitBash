@@ -117,9 +117,9 @@ async function visibleProfile(
   const [profile] = await db
     .select({ accountType: amazonAdsProfiles.accountType })
     .from(amazonAdsProfiles)
-    .where(
-      and(eq(amazonAdsProfiles.id, input.profileId), inArray(amazonAdsProfiles.id, scope.ids)),
-    );
+    .where(and(eq(amazonAdsProfiles.id, input.profileId), inArray(amazonAdsProfiles.id, scope.ids)))
+    // Kontoart und Bestand bis zum Ende der Transaktion festhalten (beim Lesen außerhalb ohne Wirkung).
+    .for('share');
   if (!profile) throw notFound();
   return profile;
 }
@@ -199,15 +199,16 @@ export async function createProductGroup(
     items: readonly ProductGroupItem[];
   },
 ): Promise<ProductGroupRecord | null> {
-  const profile = await visibleProfile(db, input);
-  if (profile === null) return null;
-  checkSkus(profile.accountType, input.items);
   try {
     return await db.transaction(async (tx) => {
       // Anlegen je Organisation nacheinander: Sonst kämen zwei gleichzeitige Anfragen beide unter der Höchstzahl durch.
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`product-groups:${input.orgId}`}, 0))`,
       );
+      // In der Transaktion: Profil und Kontoart können sich sonst zwischen Prüfung und Anlegen ändern.
+      const profile = await visibleProfile(tx, input);
+      if (profile === null) return null;
+      checkSkus(profile.accountType, input.items);
       const [{ existing } = { existing: 0 }] = await tx
         .select({ existing: count() })
         .from(productGroups)
@@ -364,13 +365,14 @@ export interface AdvertisedProductRecord {
 /**
  * Schon beworbene Produkte eines sichtbaren Profils (Product Ads aus Sync oder Import) je ASIN und SKU, ohne
  * entfernte Anzeigen und Platzhalter ohne ASIN; dazu die Gruppen des Profils, die das Produkt enthalten. Höchstens
- * `MAX_ADVERTISED_PRODUCTS` (`truncated`). `NOT_FOUND` für unsichtbare Profile, `null` für Nicht-Mitglieder.
+ * `MAX_ADVERTISED_PRODUCTS` (`truncated`). Bei Seller-Profilen nur Anzeigen mit SKU (SKU-Regel). `NOT_FOUND` für unsichtbare Profile, `null` für Nicht-Mitglieder.
  */
 export async function listAdvertisedProducts(
   db: Db,
   input: ProductGroupAccessInput & { profileId: string },
 ): Promise<{ products: AdvertisedProductRecord[]; truncated: boolean } | null> {
-  if ((await visibleProfile(db, input)) === null) return null;
+  const profile = await visibleProfile(db, input);
+  if (profile === null) return null;
   const ads = amazonAdsProductAds;
   const rows = await db
     .select({
@@ -380,7 +382,15 @@ export async function listAdvertisedProducts(
       enabled: sql<boolean>`bool_or(${ads.state} = 'ENABLED')`,
     })
     .from(ads)
-    .where(and(eq(ads.profileId, input.profileId), isNotNull(ads.asin), isNull(ads.removedAt)))
+    .where(
+      and(
+        eq(ads.profileId, input.profileId),
+        isNotNull(ads.asin),
+        isNull(ads.removedAt),
+        // Seller bewerben über die SKU: Zeilen ohne SKU (SB/SD aus Reports) wären in einer Gruppe nicht speicherbar.
+        profile.accountType === 'seller' ? isNotNull(ads.sku) : undefined,
+      ),
+    )
     .groupBy(ads.asin, ads.sku)
     .orderBy(asc(ads.asin), sql`${ads.sku} asc nulls first`)
     .limit(MAX_ADVERTISED_PRODUCTS + 1);
