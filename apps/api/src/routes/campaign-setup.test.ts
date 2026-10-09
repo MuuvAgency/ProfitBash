@@ -105,15 +105,13 @@ beforeAll(async () => {
     .values({ organizationId: orgId, profileId: f.profile, name: 'Flaschen' })
     .returning({ id: productGroups.id });
   groupId = group!.id;
-  await db
-    .insert(productGroupItems)
-    .values({
-      productGroupId: groupId,
-      position: 0,
-      asin: 'B0TEST0001',
-      sku: 'SKU-1',
-      isHero: true,
-    });
+  await db.insert(productGroupItems).values({
+    productGroupId: groupId,
+    position: 0,
+    asin: 'B0TEST0001',
+    sku: 'SKU-1',
+    isHero: true,
+  });
 });
 
 afterAll(async () => {

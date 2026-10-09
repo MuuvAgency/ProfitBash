@@ -338,9 +338,9 @@ describe('loadProfileBidSuggestions (F13)', () => {
       row(f.productTarget, '2026-10-01', 10, '9.00'),
     ]);
     try {
-      expect(await loadProfileBidSuggestions(db, { profileId: f.profile, today: '2026-10-09' })).toEqual(
-        { keyword: { broad: '0.56' } },
-      );
+      expect(
+        await loadProfileBidSuggestions(db, { profileId: f.profile, today: '2026-10-09' }),
+      ).toEqual({ keyword: { broad: '0.56' } });
     } finally {
       await db.delete(amazonAdsTargetDailyMetrics);
     }
