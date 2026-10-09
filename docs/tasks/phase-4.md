@@ -315,11 +315,22 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     Drosselung lässt Zeilen offen, der nächste Lauf setzt mit den angelegten Eltern fort (`created`); Abbruch wie bei
     Änderungen. Der Mock nimmt Anlagen an und liefert sie im nächsten Export (Ende-zu-Ende in
     `ad-changes-flow.test.ts`).
-  - **Offen bzw. bewusst so:** Erster echter Upload einer Anlage-Datei steht aus (Pflichtspalten laut Config sind
+  - **Review-Befunde (eingearbeitet):** `submitCampaignSetupDraft` prüft selbst mit `reviewCampaignPlan` (Aufrufer
+    gibt nur `limitFor`); nur Fehler sperren (`rejected` mit `issues`), Warnungen und Hinweise kommen mit der
+    Übermittlung zurück (vorher hätte die Liste `[]` jede Übermittlung gesperrt); Dubletten im Profil und in
+    offenen Setups sind getestet. Nach dem Abschließen von Hand trägt der nächste Bulk-Import die echten IDs nach,
+    auch in abgeschlossenen Übermittlungen (Index `campaign_setup_items_unresolved_profile_idx`). Ein erneuter
+    Download schreibt nur noch offene Zeilen; Kinder angelegter Eltern nennen deren echte ID bzw. warten
+    (`waiting`), bis der Import sie zugeordnet hat. Die Spalte „Off-Amazon ad serving“ steht nur in der Datei, wenn
+    eine Zeile sie belegt (Dateien aus Phase 3 unverändert). Eine Übermittlung ohne anlegbare Kampagne ist sofort
+    abgeschlossen. Die Prüfung meldet Namen nur aus Ziffern (`onlyDigits`, wäre in der Datei eine echte ID),
+    Auto-Kampagnen mit Zielen, doppelte Ziele bzw. Negatives einer Ad Group und ungültige Ad-Group-Namen (255
+    Zeichen). Exakte Keywords offener Setups zählen als gebucht (Warnung). Ergebnisse je Zeile in einer Transaktion.
+  - **Offen bzw. bewusst so:** Startdatum ist der Tag des Downloads: Wer kurz vor Mitternacht (Zeitzone des Profils)
+    herunterlädt und erst danach hochlädt, bekommt ein vergangenes Datum (Hinweis in der Oberfläche, 4.5). Erster
+    echter Upload einer Anlage-Datei steht aus (Pflichtspalten laut Config sind
     erfüllt; ob `Bidding Adjustment` mit `Create` ohne Strategie und die Spalte „Off-Amazon ad serving“ außerhalb
-    der USA leer angenommen werden, zeigt der Upload). Ein Portfolio setzt das Setup noch nicht (4.7). Die Datei
-    entsteht bei jedem Download neu aus offenen **und** angelegten Zeilen: Wer sie nach einer Bestätigung erneut
-    hochlädt, bekommt Fehlerzeilen bzw. doppelte Kinder (wie bei Änderungen). Auto-Kampagnen ohne eigene Gebote je
+    der USA leer angenommen werden, zeigt der Upload). Ein Portfolio setzt das Setup noch nicht (4.7). Auto-Kampagnen ohne eigene Gebote je
     Zielgruppe (Amazon legt die vier an). Der Detail-Endpunkt einer Übermittlung liefert für Setups noch keine Zeilen
     (kommt mit 4.5, ebenso die API für Entwürfe). Kampagnennamen im Profil zählen ohne Rücksicht auf den Anzeigentyp.
 
