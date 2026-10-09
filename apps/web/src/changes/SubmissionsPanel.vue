@@ -421,7 +421,7 @@ const conflictRows = computed(() =>
             </p>
           </div>
           <div v-if="canWrite" class="flex flex-wrap items-end gap-space-sm">
-            <div class="flex flex-col gap-space-xs">
+            <div v-if="selected.submission.kind !== 'setup'" class="flex flex-col gap-space-xs">
               <label :for="`${id}-channel`" class="text-label-eyebrow uppercase text-ink-tertiary">
                 {{ t('changes.action.channel') }}
               </label>
@@ -492,14 +492,20 @@ const conflictRows = computed(() =>
           v-if="isBulkFile"
           class="rounded-control bg-well px-space-md py-space-sm text-body-sm text-ink"
         >
-          <i class="pi pi-info-circle mr-space-xs text-warn" aria-hidden="true" />{{
-            selected.entitiesSyncedAt
-              ? t('changes.submission.entitiesSyncedAt', {
-                  date: formatDateTime(selected.entitiesSyncedAt, locale),
-                })
-              : t('changes.submission.entitiesNeverSynced')
-          }}
-          <template v-if="openBulkFile"> {{ t('changes.submission.bulkFileHint') }}</template>
+          <i class="pi pi-info-circle mr-space-xs text-warn" aria-hidden="true" />
+          <template v-if="selected.submission.kind === 'setup'">{{
+            t('changes.submission.setupBulkHint')
+          }}</template>
+          <template v-else
+            >{{
+              selected.entitiesSyncedAt
+                ? t('changes.submission.entitiesSyncedAt', {
+                    date: formatDateTime(selected.entitiesSyncedAt, locale),
+                  })
+                : t('changes.submission.entitiesNeverSynced')
+            }}
+            <template v-if="openBulkFile"> {{ t('changes.submission.bulkFileHint') }}</template>
+          </template>
         </p>
         <InlineError v-if="errorText" :message="errorText" />
         <div

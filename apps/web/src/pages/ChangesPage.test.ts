@@ -421,6 +421,9 @@ describe('Änderungen: Übermittlungen', () => {
     expect(campaignRow!.text()).toContain('4401');
     expect(keywordRow!.text()).toContain('trinkflasche');
     expect(keywordRow!.text()).toContain('Die Kampagne wird nicht angelegt. (PARENT_NOT_CREATED)');
+    // Folgeschritte (erneut versuchen, Revert) gibt es für Setups nicht; der Hinweis erklärt die Zuordnung.
+    expect(panel.find('[data-followup-channel]').exists()).toBe(false);
+    expect(panel.text()).toContain('über ihren Namen');
   });
 
   it('listet die Übermittlungen der Organisation und öffnet eine mit dem Ergebnis je Änderung', async () => {
