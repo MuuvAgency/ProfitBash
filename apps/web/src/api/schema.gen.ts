@@ -4544,6 +4544,815 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/tools/setup/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Setup planen: Kampagnen mit Namen, Geboten, Budgets und Hinweisen (ohne zu speichern) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        profileId: string;
+                        /** Format: uuid */
+                        productGroupId: string;
+                        presetKey: string;
+                        inputs: {
+                            /** @default [] */
+                            keywords?: {
+                                text: string;
+                                single?: boolean;
+                                bid?: string;
+                            }[];
+                            /** @default [] */
+                            brandTerms?: string[];
+                            /** @default [] */
+                            productTargets?: {
+                                asin: string;
+                                single?: boolean;
+                                bid?: string;
+                            }[];
+                            /** @default [] */
+                            categories?: {
+                                id: string;
+                                name: string;
+                                bid?: string;
+                            }[];
+                            /** @default {} */
+                            unlocks?: {
+                                [key: string]: {
+                                    vcpm?: boolean;
+                                    offAmazon?: boolean;
+                                };
+                            };
+                        };
+                        /** @default true */
+                        useProfileBids?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Plan. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PlanCampaignSetupResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf inzwischen geändert, schon übermittelt bzw. kein Kurs vorhanden. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/tools/setup/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Offene und übermittelte Entwürfe der sichtbaren Profile, zuletzt geänderte zuerst */
+        get: {
+            parameters: {
+                query?: {
+                    profileId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Entwürfe. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CampaignSetupDraftList"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Entwurf anlegen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        profileId: string;
+                        /** Format: uuid */
+                        productGroupId: string | null;
+                        presetKey: string;
+                        name: string;
+                        /** @enum {string} */
+                        campaignState: "ENABLED" | "PAUSED";
+                        inputs: {
+                            /** @default [] */
+                            keywords?: {
+                                text: string;
+                                single?: boolean;
+                                bid?: string;
+                            }[];
+                            /** @default [] */
+                            brandTerms?: string[];
+                            /** @default [] */
+                            productTargets?: {
+                                asin: string;
+                                single?: boolean;
+                                bid?: string;
+                            }[];
+                            /** @default [] */
+                            categories?: {
+                                id: string;
+                                name: string;
+                                bid?: string;
+                            }[];
+                            /** @default {} */
+                            unlocks?: {
+                                [key: string]: {
+                                    vcpm?: boolean;
+                                    offAmazon?: boolean;
+                                };
+                            };
+                        };
+                        campaigns: {
+                            block: string;
+                            /** @enum {string} */
+                            adProduct: "SP" | "SB" | "SD";
+                            /** @enum {string} */
+                            targeting: "auto" | "keyword" | "product" | "category" | "audience";
+                            name: string;
+                            /** @enum {string} */
+                            state: "ENABLED";
+                            currencyCode: string;
+                            dailyBudget: string;
+                            /** @enum {string|null} */
+                            biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
+                            /** @enum {string|null} */
+                            sdOptimization: "clicks" | "conversions" | null;
+                            /** @enum {string} */
+                            costType: "cpc" | "vcpm";
+                            offAmazon: boolean;
+                            placements: {
+                                topOfSearch: number;
+                                productPages: number;
+                                restOfSearch: number;
+                            } | null;
+                            adGroup: {
+                                name: string;
+                                defaultBid: string;
+                            };
+                            ads: {
+                                asin: string;
+                                sku: string | null;
+                            }[];
+                            targets: ({
+                                /** @enum {string} */
+                                type: "keyword";
+                                text: string;
+                                /** @enum {string} */
+                                matchType: "broad" | "phrase" | "exact";
+                                bid: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "product";
+                                asin: string;
+                                /** @enum {string} */
+                                match: "exact" | "expanded";
+                                bid: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "category";
+                                categoryId: string;
+                                name: string;
+                                bid: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "audience";
+                                /** @enum {string} */
+                                audience: "views" | "purchases";
+                                lookbackDays: number;
+                                bid: string;
+                            })[];
+                            negatives: ({
+                                /** @enum {string} */
+                                type: "keyword";
+                                text: string;
+                                /** @enum {string} */
+                                matchType: "negativeExact" | "negativePhrase";
+                            } | {
+                                /** @enum {string} */
+                                type: "product";
+                                asin: string;
+                                /** @enum {string} */
+                                matchType: "negativeExact";
+                            })[];
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Angelegt. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CampaignSetupDraft"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/tools/setup/drafts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ein Entwurf mit Plan und Eingaben */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Entwurf. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CampaignSetupDraft"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /** Entwurf ändern, mit der Version, auf der die Änderung beruht (Recht „write“) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                        draft: {
+                            /** Format: uuid */
+                            profileId: string;
+                            /** Format: uuid */
+                            productGroupId: string | null;
+                            presetKey: string;
+                            name: string;
+                            /** @enum {string} */
+                            campaignState: "ENABLED" | "PAUSED";
+                            inputs: {
+                                /** @default [] */
+                                keywords?: {
+                                    text: string;
+                                    single?: boolean;
+                                    bid?: string;
+                                }[];
+                                /** @default [] */
+                                brandTerms?: string[];
+                                /** @default [] */
+                                productTargets?: {
+                                    asin: string;
+                                    single?: boolean;
+                                    bid?: string;
+                                }[];
+                                /** @default [] */
+                                categories?: {
+                                    id: string;
+                                    name: string;
+                                    bid?: string;
+                                }[];
+                                /** @default {} */
+                                unlocks?: {
+                                    [key: string]: {
+                                        vcpm?: boolean;
+                                        offAmazon?: boolean;
+                                    };
+                                };
+                            };
+                            campaigns: {
+                                block: string;
+                                /** @enum {string} */
+                                adProduct: "SP" | "SB" | "SD";
+                                /** @enum {string} */
+                                targeting: "auto" | "keyword" | "product" | "category" | "audience";
+                                name: string;
+                                /** @enum {string} */
+                                state: "ENABLED";
+                                currencyCode: string;
+                                dailyBudget: string;
+                                /** @enum {string|null} */
+                                biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
+                                /** @enum {string|null} */
+                                sdOptimization: "clicks" | "conversions" | null;
+                                /** @enum {string} */
+                                costType: "cpc" | "vcpm";
+                                offAmazon: boolean;
+                                placements: {
+                                    topOfSearch: number;
+                                    productPages: number;
+                                    restOfSearch: number;
+                                } | null;
+                                adGroup: {
+                                    name: string;
+                                    defaultBid: string;
+                                };
+                                ads: {
+                                    asin: string;
+                                    sku: string | null;
+                                }[];
+                                targets: ({
+                                    /** @enum {string} */
+                                    type: "keyword";
+                                    text: string;
+                                    /** @enum {string} */
+                                    matchType: "broad" | "phrase" | "exact";
+                                    bid: string;
+                                } | {
+                                    /** @enum {string} */
+                                    type: "product";
+                                    asin: string;
+                                    /** @enum {string} */
+                                    match: "exact" | "expanded";
+                                    bid: string;
+                                } | {
+                                    /** @enum {string} */
+                                    type: "category";
+                                    categoryId: string;
+                                    name: string;
+                                    bid: string;
+                                } | {
+                                    /** @enum {string} */
+                                    type: "audience";
+                                    /** @enum {string} */
+                                    audience: "views" | "purchases";
+                                    lookbackDays: number;
+                                    bid: string;
+                                })[];
+                                negatives: ({
+                                    /** @enum {string} */
+                                    type: "keyword";
+                                    text: string;
+                                    /** @enum {string} */
+                                    matchType: "negativeExact" | "negativePhrase";
+                                } | {
+                                    /** @enum {string} */
+                                    type: "product";
+                                    asin: string;
+                                    /** @enum {string} */
+                                    matchType: "negativeExact";
+                                })[];
+                            }[];
+                        };
+                    };
+                };
+            };
+            responses: {
+                /** @description Geändert. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CampaignSetupDraft"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf inzwischen geändert, schon übermittelt bzw. kein Kurs vorhanden. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/tools/setup/drafts/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entwurf verwerfen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Verworfen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CampaignSetupDraft"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf inzwischen geändert, schon übermittelt bzw. kein Kurs vorhanden. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/tools/setup/drafts/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Entwurf übermitteln (Bulk-Datei oder API; Recht „write“)
+         * @description Prüft den gespeicherten Plan gegen den aktuellen Stand des Profils (Namen, Grenzen von Amazon). Bei Fehlern antwortet der Endpunkt mit `status: rejected` und übermittelt nichts.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                        /** @enum {string} */
+                        channel: "api" | "bulk_file";
+                    };
+                };
+            };
+            responses: {
+                /** @description Übermittelt bzw. abgelehnt. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SubmitCampaignSetupResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf inzwischen geändert, schon übermittelt bzw. kein Kurs vorhanden. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/tools/catalog": {
         parameters: {
             query?: never;
@@ -6104,8 +6913,26 @@ export interface components {
                     submissionId: string | null;
                 } | null;
             }[];
+            setupItems: components["schemas"]["CampaignSetupItem"][];
             /** Format: date-time */
             entitiesSyncedAt: string | null;
+        };
+        CampaignSetupItem: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            /** @enum {string} */
+            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "negative_keyword" | "negative_product_target";
+            campaignRef: string;
+            adGroupRef: string | null;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status: "submitted" | "applied" | "failed" | "dismissed";
+            amazonEntityId: string | null;
+            errorCode: string | null;
+            errorMessage: string | null;
         };
         CloseAdChangeSubmissionResponse: {
             changes: number;
@@ -6294,6 +7121,274 @@ export interface components {
             adProducts: string[];
             enabled: boolean;
             groupIds: string[];
+        };
+        PlanCampaignSetupResponse: {
+            campaigns: {
+                block: string;
+                /** @enum {string} */
+                adProduct: "SP" | "SB" | "SD";
+                /** @enum {string} */
+                targeting: "auto" | "keyword" | "product" | "category" | "audience";
+                name: string;
+                /** @enum {string} */
+                state: "ENABLED";
+                currencyCode: string;
+                dailyBudget: string;
+                /** @enum {string|null} */
+                biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
+                /** @enum {string|null} */
+                sdOptimization: "clicks" | "conversions" | null;
+                /** @enum {string} */
+                costType: "cpc" | "vcpm";
+                offAmazon: boolean;
+                placements: {
+                    topOfSearch: number;
+                    productPages: number;
+                    restOfSearch: number;
+                } | null;
+                adGroup: {
+                    name: string;
+                    defaultBid: string;
+                };
+                ads: {
+                    asin: string;
+                    sku: string | null;
+                }[];
+                targets: ({
+                    /** @enum {string} */
+                    type: "keyword";
+                    text: string;
+                    /** @enum {string} */
+                    matchType: "broad" | "phrase" | "exact";
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                    /** @enum {string} */
+                    match: "exact" | "expanded";
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "category";
+                    categoryId: string;
+                    name: string;
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "audience";
+                    /** @enum {string} */
+                    audience: "views" | "purchases";
+                    lookbackDays: number;
+                    bid: string;
+                })[];
+                negatives: ({
+                    /** @enum {string} */
+                    type: "keyword";
+                    text: string;
+                    /** @enum {string} */
+                    matchType: "negativeExact" | "negativePhrase";
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                    /** @enum {string} */
+                    matchType: "negativeExact";
+                })[];
+            }[];
+            hints: components["schemas"]["SetupIssue"][];
+            eurRate: {
+                rate: string;
+                date: string;
+            };
+            profileBids: {
+                keyword?: {
+                    broad?: string;
+                    phrase?: string;
+                    exact?: string;
+                };
+                product?: string;
+                category?: string;
+            };
+        };
+        SetupIssue: {
+            /** @enum {string} */
+            severity: "error" | "warning" | "info";
+            code: string;
+        } & {
+            [key: string]: string | number | null;
+        };
+        CampaignSetupDraftList: {
+            drafts: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                profileId: string;
+                /** Format: uuid */
+                productGroupId: string | null;
+                presetKey: string;
+                name: string;
+                /** @enum {string} */
+                status: "draft" | "submitted" | "discarded";
+                /** @enum {string} */
+                campaignState: "ENABLED" | "PAUSED";
+                version: number;
+                /** Format: uuid */
+                submissionId: string | null;
+                /** Format: uuid */
+                createdBy: string | null;
+                /** Format: uuid */
+                updatedBy: string | null;
+                /** Format: date-time */
+                submittedAt: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+                campaigns: number;
+                createdByName: string | null;
+            }[];
+        };
+        CampaignSetupDraft: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            profileId: string;
+            /** Format: uuid */
+            productGroupId: string | null;
+            presetKey: string;
+            name: string;
+            /** @enum {string} */
+            status: "draft" | "submitted" | "discarded";
+            /** @enum {string} */
+            campaignState: "ENABLED" | "PAUSED";
+            version: number;
+            /** Format: uuid */
+            submissionId: string | null;
+            /** Format: uuid */
+            createdBy: string | null;
+            /** Format: uuid */
+            updatedBy: string | null;
+            /** Format: date-time */
+            submittedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            inputs: {
+                /** @default [] */
+                keywords: {
+                    text: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
+                /** @default [] */
+                brandTerms: string[];
+                /** @default [] */
+                productTargets: {
+                    asin: string;
+                    single?: boolean;
+                    bid?: string;
+                }[];
+                /** @default [] */
+                categories: {
+                    id: string;
+                    name: string;
+                    bid?: string;
+                }[];
+                /** @default {} */
+                unlocks: {
+                    [key: string]: {
+                        vcpm?: boolean;
+                        offAmazon?: boolean;
+                    };
+                };
+            };
+            campaigns: {
+                block: string;
+                /** @enum {string} */
+                adProduct: "SP" | "SB" | "SD";
+                /** @enum {string} */
+                targeting: "auto" | "keyword" | "product" | "category" | "audience";
+                name: string;
+                /** @enum {string} */
+                state: "ENABLED";
+                currencyCode: string;
+                dailyBudget: string;
+                /** @enum {string|null} */
+                biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
+                /** @enum {string|null} */
+                sdOptimization: "clicks" | "conversions" | null;
+                /** @enum {string} */
+                costType: "cpc" | "vcpm";
+                offAmazon: boolean;
+                placements: {
+                    topOfSearch: number;
+                    productPages: number;
+                    restOfSearch: number;
+                } | null;
+                adGroup: {
+                    name: string;
+                    defaultBid: string;
+                };
+                ads: {
+                    asin: string;
+                    sku: string | null;
+                }[];
+                targets: ({
+                    /** @enum {string} */
+                    type: "keyword";
+                    text: string;
+                    /** @enum {string} */
+                    matchType: "broad" | "phrase" | "exact";
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                    /** @enum {string} */
+                    match: "exact" | "expanded";
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "category";
+                    categoryId: string;
+                    name: string;
+                    bid: string;
+                } | {
+                    /** @enum {string} */
+                    type: "audience";
+                    /** @enum {string} */
+                    audience: "views" | "purchases";
+                    lookbackDays: number;
+                    bid: string;
+                })[];
+                negatives: ({
+                    /** @enum {string} */
+                    type: "keyword";
+                    text: string;
+                    /** @enum {string} */
+                    matchType: "negativeExact" | "negativePhrase";
+                } | {
+                    /** @enum {string} */
+                    type: "product";
+                    asin: string;
+                    /** @enum {string} */
+                    matchType: "negativeExact";
+                })[];
+            }[];
+        };
+        SubmitCampaignSetupResponse: {
+            /** @enum {string} */
+            status: "submitted";
+            submission: components["schemas"]["AdChangeSubmission"];
+            items: number;
+            unsupported: number;
+            issues: components["schemas"]["SetupIssue"][];
+        } | {
+            /** @enum {string} */
+            status: "rejected";
+            issues: components["schemas"]["SetupIssue"][];
         };
         StructureCatalogResponse: {
             catalog: components["schemas"]["StructureCatalog"];

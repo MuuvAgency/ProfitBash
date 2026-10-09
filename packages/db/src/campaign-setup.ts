@@ -5,6 +5,7 @@ import type {
   PlannedCampaign,
   SaveCampaignSetupDraft,
   SetupInputs,
+  StructureCatalog,
 } from '@profitbash/shared';
 import { Dec, type AdChangeLimitLookup } from '@profitbash/engine';
 import { planSetupItems, reviewCampaignPlan, type PlanReviewIssue } from '@profitbash/engine/plan';
@@ -22,10 +23,16 @@ import {
   amazonAdsTargets,
   campaignSetupDrafts,
   campaignSetupItems,
+  clients,
+  productGroupItems,
   productGroups,
   users,
 } from './schema';
-import { assertPresetKnown, StructureCatalogError } from './structure-catalog';
+import {
+  assertPresetKnown,
+  loadStructureCatalog,
+  StructureCatalogError,
+} from './structure-catalog';
 
 /**
  * Setup-Entwürfe (`docs/tasks/phase-4.md` 4.4, F5, F13): speichern, lesen, verwerfen und übermitteln. Entwürfe
@@ -656,4 +663,61 @@ export async function loadProfileBidSuggestions(
     }
   }
   return result;
+}
+
+export interface CampaignSetupPlanSource {
+  profile: CampaignSetupContext['profile'] & { clientName: string | null };
+  productGroup: { name: string; items: { asin: string; sku: string | null; isHero: boolean }[] };
+  catalog: StructureCatalog;
+  existing: CampaignSetupContext['existing'];
+}
+
+/**
+ * Was die Plan-Engine für ein Setup braucht (4.5): Profil mit Client, Produktgruppe dieses Profils mit Produkten,
+ * Katalog der Organisation und Vorhandenes. `NOT_FOUND` für unsichtbare Profile und Gruppen anderer Profile, `null`
+ * für Nicht-Mitglieder.
+ */
+export async function loadCampaignSetupPlanSource(
+  db: Db,
+  input: CampaignSetupActor & { profileId: string; productGroupId: string },
+): Promise<CampaignSetupPlanSource | null> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return null;
+  const [profile] = await db
+    .select({
+      countryCode: amazonAdsProfiles.countryCode,
+      currencyCode: amazonAdsProfiles.currencyCode,
+      accountType: amazonAdsProfiles.accountType,
+      timezone: amazonAdsProfiles.timezone,
+      clientName: clients.name,
+    })
+    .from(amazonAdsProfiles)
+    .leftJoin(clients, eq(clients.id, amazonAdsProfiles.clientId))
+    .where(
+      and(eq(amazonAdsProfiles.id, input.profileId), inArray(amazonAdsProfiles.id, scope.ids)),
+    );
+  if (!profile) throw notFound();
+  const [group] = await db
+    .select({ id: productGroups.id, name: productGroups.name })
+    .from(productGroups)
+    .where(
+      and(eq(productGroups.id, input.productGroupId), eq(productGroups.profileId, input.profileId)),
+    );
+  if (!group) throw notFound();
+  const items = await db
+    .select({
+      asin: productGroupItems.asin,
+      sku: productGroupItems.sku,
+      isHero: productGroupItems.isHero,
+    })
+    .from(productGroupItems)
+    .where(eq(productGroupItems.productGroupId, group.id))
+    .orderBy(productGroupItems.position);
+  const { catalog } = await loadStructureCatalog(db, input.orgId);
+  return {
+    profile,
+    productGroup: { name: group.name, items },
+    catalog,
+    existing: await loadContext(db, input.profileId),
+  };
 }

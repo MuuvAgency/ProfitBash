@@ -212,3 +212,109 @@ export type CampaignSetupItemPayload =
     }
   | { entity: 'negative_keyword'; text: string; matchType: 'negativeExact' | 'negativePhrase' }
   | { entity: 'negative_product_target'; asin: string };
+
+// ---------------------------------------------------------------------------
+// API (4.5)
+// ---------------------------------------------------------------------------
+
+const timestamp = z.iso.datetime();
+
+/** Hinweise der Plan-Engine (`PlanHint`) und der Prüfung beim Übermitteln (`PlanReviewIssue`), offen typisiert. */
+export const setupIssueSchema = z
+  .object({
+    severity: z.enum(['error', 'warning', 'info']),
+    code: z.string(),
+  })
+  .catchall(z.union([z.string(), z.number(), z.null()]))
+  .meta({ id: 'SetupIssue' });
+export type SetupIssue = z.infer<typeof setupIssueSchema>;
+
+export const planCampaignSetupRequestSchema = z.strictObject({
+  profileId: z.uuid(),
+  productGroupId: z.uuid(),
+  presetKey: z.string().min(1).max(64),
+  inputs: setupInputsSchema,
+  /** Gebote aus den Daten des Profils vorschlagen (F13). */
+  useProfileBids: z.boolean().default(true),
+});
+export type PlanCampaignSetupRequest = z.input<typeof planCampaignSetupRequestSchema>;
+
+export const planCampaignSetupResponseSchema = z
+  .object({
+    campaigns: z.array(plannedCampaignSchema),
+    hints: z.array(setupIssueSchema),
+    /** 1 EUR in der Währung des Profils und der Tag des Kurses. */
+    eurRate: z.object({ rate: z.string(), date: z.string() }),
+    /** Gebote aus dem Profil (F13), soweit genug Daten da sind. */
+    profileBids: z.object({
+      keyword: z
+        .object({ broad: z.string(), phrase: z.string(), exact: z.string() })
+        .partial()
+        .optional(),
+      product: z.string().optional(),
+      category: z.string().optional(),
+    }),
+  })
+  .meta({ id: 'PlanCampaignSetupResponse' });
+export type PlanCampaignSetupResponse = z.infer<typeof planCampaignSetupResponseSchema>;
+
+const draftFields = {
+  id: z.uuid(),
+  profileId: z.uuid(),
+  productGroupId: z.uuid().nullable(),
+  presetKey: z.string(),
+  name: z.string(),
+  status: z.enum(CAMPAIGN_SETUP_DRAFT_STATUSES),
+  campaignState: z.enum(CAMPAIGN_SETUP_STATES),
+  version: z.number().int(),
+  submissionId: z.uuid().nullable(),
+  createdBy: z.uuid().nullable(),
+  updatedBy: z.uuid().nullable(),
+  submittedAt: timestamp.nullable(),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+};
+
+export const campaignSetupDraftSchema = z
+  .object({ ...draftFields, inputs: setupInputsSchema, campaigns: z.array(plannedCampaignSchema) })
+  .meta({ id: 'CampaignSetupDraft' });
+export type CampaignSetupDraft = z.infer<typeof campaignSetupDraftSchema>;
+
+export const campaignSetupDraftListResponseSchema = z
+  .object({
+    drafts: z.array(
+      z.object({ ...draftFields, campaigns: z.number().int(), createdByName: z.string().nullable() }),
+    ),
+  })
+  .meta({ id: 'CampaignSetupDraftList' });
+export type CampaignSetupDraftListResponse = z.infer<typeof campaignSetupDraftListResponseSchema>;
+
+export const updateCampaignSetupDraftRequestSchema = z.strictObject({
+  version: z.number().int().min(1),
+  draft: saveCampaignSetupDraftSchema,
+});
+export const discardCampaignSetupDraftRequestSchema = z.strictObject({
+  version: z.number().int().min(1),
+});
+export const submitCampaignSetupDraftRequestSchema = z.strictObject({
+  version: z.number().int().min(1),
+  channel: z.enum(['api', 'bulk_file']),
+});
+
+/** Zeile einer Setup-Übermittlung (Detail auf der Seite „Änderungen“). */
+export const campaignSetupItemSchema = z
+  .object({
+    id: z.uuid(),
+    position: z.number().int(),
+    entityType: z.enum(CAMPAIGN_SETUP_ITEM_ENTITIES),
+    campaignRef: z.string(),
+    adGroupRef: z.string().nullable(),
+    /** Was angelegt wird (`CampaignSetupItemPayload`). */
+    payload: z.record(z.string(), z.unknown()),
+    status: z.enum(['submitted', 'applied', 'failed', 'dismissed']),
+    amazonEntityId: z.string().nullable(),
+    errorCode: z.string().nullable(),
+    errorMessage: z.string().nullable(),
+  })
+  .meta({ id: 'CampaignSetupItem' });
+export type CampaignSetupItem = z.infer<typeof campaignSetupItemSchema>;
