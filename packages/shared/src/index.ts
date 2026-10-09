@@ -17,5 +17,6 @@ export * from './roles';
 export * from './saved-views';
 export * from './slug';
 export * from './search-terms';
+export * from './tags';
 export * from './ad-changes';
 export * from './ad-changes-api';
