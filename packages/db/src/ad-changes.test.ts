@@ -20,6 +20,7 @@ import {
   amazonAdsProfiles,
   amazonAdsTargets,
   auditEvents,
+  clients,
   members,
   organizations,
   users,
@@ -825,6 +826,113 @@ describe('stageAdChanges: Negatives anlegen', () => {
     ]);
 
     expect(result.results[0]).toEqual({ outcome: 'rejected', reason: 'entityArchived' });
+  });
+});
+
+describe('stageAdChanges: viele Negatives und geschützte Begriffe (3.8)', () => {
+  it('prüft viele Negatives einer Anfrage gebündelt und hält die Reihenfolge der Ergebnisse', async () => {
+    const changes: AdChangeInput[] = [];
+    for (let i = 0; i < 120; i++) {
+      changes.push(
+        negativeKeyword(`begriff ${i}`, { adGroupId: i % 2 === 0 ? ids.adGroup : null }),
+      );
+    }
+    changes.push(negativeKeyword('gebraucht lampe'));
+    changes.push(negativeKeyword('Begriff 0'));
+    changes.push(negativeKeyword('x', { campaignId: ids.foreignCampaign, adGroupId: null }));
+    changes.push(negativeKeyword('x', { campaignId: ids.archivedCampaign, adGroupId: null }));
+
+    const result = await stage(ids.ada, changes);
+
+    expect(result.counts).toEqual({
+      created: 120,
+      updated: 0,
+      removed: 0,
+      unchanged: 1,
+      rejected: 3,
+    });
+    expect(result.results.slice(120)).toEqual([
+      { outcome: 'rejected', reason: 'alreadyExists' },
+      { outcome: 'unchanged' },
+      { outcome: 'rejected', reason: 'notFound' },
+      { outcome: 'rejected', reason: 'entityArchived' },
+    ]);
+    const cart = await listPendingAdChanges(testDb.db, as(ids.ada));
+    expect(cart).toHaveLength(120);
+    expect(cart!.filter((change) => change.adGroupId === null)).toHaveLength(60);
+  });
+
+  describe('mit geschützten Begriffen des Clients', () => {
+    let clientId = '';
+    beforeAll(async () => {
+      const [client] = await testDb.db
+        .insert(clients)
+        .values({
+          organizationId: ids.org,
+          name: 'Nordwind',
+          slug: 'nordwind',
+          protectedTerms: ['nordwind'],
+        })
+        .returning({ id: clients.id });
+      clientId = client!.id;
+      await testDb.db
+        .update(amazonAdsProfiles)
+        .set({ clientId })
+        .where(eq(amazonAdsProfiles.id, ids.de));
+    });
+    afterAll(async () => {
+      await testDb.db
+        .update(amazonAdsProfiles)
+        .set({ clientId: null })
+        .where(eq(amazonAdsProfiles.id, ids.de));
+      await testDb.db.delete(clients).where(eq(clients.id, clientId));
+    });
+
+    it('lehnt ein negatives Keyword mit geschütztem Begriff ohne Bestätigung ab', async () => {
+      const result = await stage(ids.ada, [
+        negativeKeyword('Nordwind-Lampe'),
+        negativeKeyword('nordwinde lampe'),
+      ]);
+
+      expect(result.results[0]).toEqual({ outcome: 'rejected', reason: 'protectedTerm' });
+      expect(result.results[1]).toMatchObject({ outcome: 'created' });
+    });
+
+    it('legt es mit Bestätigung in den Warenkorb', async () => {
+      const result = await stage(ids.ada, [
+        { ...negativeKeyword('nordwind lampe'), confirmProtected: true } as AdChangeInput,
+      ]);
+
+      expect(result.results[0]).toMatchObject({ outcome: 'created' });
+    });
+
+    it('meldet zuerst, was ohnehin nicht ginge (schon vorhanden vor geschützt)', async () => {
+      const [existing] = await testDb.db
+        .insert(amazonAdsNegativeTargets)
+        .values({
+          organizationId: ids.org,
+          profileId: ids.de,
+          level: 'campaign',
+          campaignId: ids.campaign,
+          adGroupId: null,
+          amazonTargetId: 'N-NORDWIND',
+          adProduct: SP,
+          targetType: 'keyword',
+          keywordText: 'nordwind',
+          matchType: 'NEGATIVE_EXACT',
+          state: 'ENABLED',
+        })
+        .returning({ id: amazonAdsNegativeTargets.id });
+      try {
+        const result = await stage(ids.ada, [negativeKeyword('Nordwind', { adGroupId: null })]);
+
+        expect(result.results[0]).toEqual({ outcome: 'rejected', reason: 'alreadyExists' });
+      } finally {
+        await testDb.db
+          .delete(amazonAdsNegativeTargets)
+          .where(eq(amazonAdsNegativeTargets.id, existing!.id));
+      }
+    });
   });
 });
 

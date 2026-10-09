@@ -178,6 +178,8 @@ const adChangeCreateNegativeInputSchema = z.strictObject({
   campaignId: z.uuid(),
   adGroupId: z.uuid().nullable(),
   negative: adChangeNegativeSchema,
+  /** Der Begriff enthält einen geschützten Begriff des Clients: nur mit dieser Bestätigung (3.8, sonst `protectedTerm`). */
+  confirmProtected: z.boolean().optional(),
 });
 
 /** Beträge, die sich relativ ändern lassen (Bulk-Dialoge, 3.5). */
@@ -291,6 +293,8 @@ export const AD_CHANGE_REJECTIONS = [
   'adProductNotSupported',
   /** Das Negative gibt es dort schon (nicht archiviert). */
   'alreadyExists',
+  /** Das Negative enthält einen geschützten Begriff des Clients und die Anfrage bestätigt das nicht (3.8). */
+  'protectedTerm',
   /** Anpassen (±Prozent, ±Betrag): Die Entity hat keinen Wert, auf den sich rechnen ließe. */
   'noCurrentValue',
   /** Anpassen: Das Ergebnis ist kein Betrag über 0 (bzw. zu groß). */

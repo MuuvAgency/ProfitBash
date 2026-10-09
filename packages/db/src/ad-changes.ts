@@ -15,11 +15,14 @@ import { alias } from 'drizzle-orm/pg-core';
 import { visibleProfilesScope } from './access';
 import {
   checkNegative,
+  checkNegatives,
   chunks,
   currentValue,
   loadComparisonBids,
   loadEntities,
+  loadProtectedTermMatchers,
   negativeKey,
+  negativePlaceKey,
   resolveAdjustments,
   sameValue,
   valueColumns,
@@ -285,56 +288,104 @@ export async function stageAdChanges(
       }
     }
 
-    // --- Neue Negatives (wenige je Anfrage, deshalb einzeln) -----------------------------------
-    for (const [index, change] of changes.entries()) {
-      if (change?.operation !== 'create_negative') continue;
-      const parent = await checkNegative(tx, scope, change);
-      if (typeof parent === 'string') {
-        results[index] = { outcome: 'rejected', reason: parent };
-        continue;
-      }
-      // Prüfen und Anlegen je Nutzer und Kampagne nacheinander: Für Anlagen gibt es keinen Unique-Index, zwei
-      // gleichzeitige Anfragen legten dasselbe Negative sonst doppelt in den Warenkorb.
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`ad_changes:${input.userId}:${change.campaignId}`}, 0))`,
+    // --- Neue Negatives (gebündelt: eine Mehrfachauswahl der Suchbegriff-Analyse, 3.8) ------------
+    const negatives = changes.flatMap((change, index) =>
+      change?.operation === 'create_negative' ? [{ index, change }] : [],
+    );
+    if (negatives.length > 0) {
+      const parents = await checkNegatives(
+        tx,
+        scope,
+        negatives.map(({ change }) => change),
       );
-      const pending = await tx
-        .select({ createdBy: adChanges.createdBy, payload: adChanges.payload })
-        .from(adChanges)
-        .where(
-          and(
-            eq(adChanges.status, 'pending'),
-            eq(adChanges.operation, 'create'),
-            eq(adChanges.campaignId, change.campaignId),
-            change.adGroupId === null
-              ? isNull(adChanges.adGroupId)
-              : eq(adChanges.adGroupId, change.adGroupId),
-          ),
+      const accepted = negatives.flatMap((item, at) => {
+        const parent = parents[at]!;
+        if (typeof parent === 'string') {
+          results[item.index] = { outcome: 'rejected', reason: parent };
+          return [];
+        }
+        return [{ ...item, parent }];
+      });
+      const campaignIds = [...new Set(accepted.map(({ change }) => change.campaignId))].sort();
+      // Prüfen und Anlegen je Nutzer und Kampagne nacheinander: Für Anlagen gibt es keinen Unique-Index, zwei
+      // gleichzeitige Anfragen legten dasselbe Negative sonst doppelt in den Warenkorb. Sortiert gesperrt.
+      for (const campaignId of campaignIds) {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`ad_changes:${input.userId}:${campaignId}`}, 0))`,
         );
-      const key = negativeKey(change.negative);
-      const same = pending.filter((row) => row.payload && negativeKey(row.payload) === key);
-      if (same.some((row) => row.createdBy === input.userId)) continue;
-      const [row] = await tx
-        .insert(adChanges)
-        .values({
-          organizationId: parent.organizationId,
-          profileId: parent.profileId,
-          origin: input.origin,
-          operation: 'create',
-          entityType: 'negative_target',
-          campaignId: change.campaignId,
-          adGroupId: change.adGroupId,
-          payload: change.negative,
-          createdBy: input.userId,
-        })
-        .returning({ id: adChanges.id });
-      results[index] = {
-        outcome: 'created',
-        changeId: row!.id,
-        otherUsers: new Set(same.flatMap((other) => (other.createdBy ? [other.createdBy] : [])))
-          .size,
-      };
-      profileIds.add(parent.profileId);
+      }
+      const own = new Set<string>();
+      const others = new Map<string, Set<string>>();
+      for (const part of chunks(campaignIds)) {
+        const pending = await tx
+          .select({
+            createdBy: adChanges.createdBy,
+            campaignId: adChanges.campaignId,
+            adGroupId: adChanges.adGroupId,
+            payload: adChanges.payload,
+          })
+          .from(adChanges)
+          .where(
+            and(
+              eq(adChanges.status, 'pending'),
+              eq(adChanges.operation, 'create'),
+              inArray(adChanges.campaignId, part),
+            ),
+          );
+        for (const row of pending) {
+          if (!row.payload || row.createdBy === null) continue;
+          const key = negativePlaceKey(row.campaignId, row.adGroupId, negativeKey(row.payload));
+          if (row.createdBy === input.userId) own.add(key);
+          else others.set(key, (others.get(key) ?? new Set()).add(row.createdBy));
+        }
+      }
+      const isProtected = await loadProtectedTermMatchers(
+        tx,
+        accepted.map(({ parent }) => parent.profileId),
+      );
+      const toInsert: { index: number; key: string; values: typeof adChanges.$inferInsert }[] = [];
+      for (const { index, change, parent } of accepted) {
+        const { negative } = change;
+        const key = negativePlaceKey(change.campaignId, change.adGroupId, negativeKey(negative));
+        // Schon im eigenen Warenkorb (auch durch eine frühere Angabe derselben Anfrage): `unchanged`.
+        if (own.has(key)) continue;
+        const term = negative.type === 'keyword' ? negative.keywordText : negative.asin;
+        if (change.confirmProtected !== true && isProtected.get(parent.profileId)?.(term)) {
+          results[index] = { outcome: 'rejected', reason: 'protectedTerm' };
+          continue;
+        }
+        own.add(key);
+        toInsert.push({
+          index,
+          key,
+          values: {
+            organizationId: parent.organizationId,
+            profileId: parent.profileId,
+            origin: input.origin,
+            operation: 'create',
+            entityType: 'negative_target',
+            campaignId: change.campaignId,
+            adGroupId: change.adGroupId,
+            payload: negative,
+            createdBy: input.userId,
+          },
+        });
+      }
+      for (const part of chunks(toInsert, 500)) {
+        // `RETURNING` eines mehrzeiligen `VALUES` liefert die Zeilen in der Reihenfolge der Eingabe.
+        const rows = await tx
+          .insert(adChanges)
+          .values(part.map((item) => item.values))
+          .returning({ id: adChanges.id });
+        part.forEach((item, at) => {
+          results[item.index] = {
+            outcome: 'created',
+            changeId: rows[at]!.id,
+            otherUsers: others.get(item.key)?.size ?? 0,
+          };
+          profileIds.add(item.values.profileId);
+        });
+      }
     }
 
     const counts = { created: 0, updated: 0, removed: 0, unchanged: 0, rejected: 0 };
