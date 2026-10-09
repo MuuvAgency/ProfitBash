@@ -2,7 +2,7 @@
 import { formatNumber } from '@profitbash/shared';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
-import { computed, ref, useId } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ApiError } from '../api';
 import type { ProductGroupData } from '../api/client';
@@ -29,6 +29,15 @@ const data = computed(() => query.data.value);
 const count = (value: number) => formatNumber(String(value), locale.value);
 
 const profileFilter = ref<string | null>(null);
+// Ein Profil, das nicht mehr sichtbar ist, darf den Filter nicht festhalten (die Auswahl verschwindet sonst).
+watch(
+  () => data.value?.profiles,
+  (profiles) => {
+    if (profileFilter.value && !profiles?.some((p) => p.id === profileFilter.value)) {
+      profileFilter.value = null;
+    }
+  },
+);
 const profilesById = computed(() => new Map((data.value?.profiles ?? []).map((p) => [p.id, p])));
 const clientsById = computed(() => new Map((data.value?.clients ?? []).map((c) => [c.id, c])));
 const groups = computed(() =>
@@ -129,9 +138,11 @@ async function confirmDelete() {
           t(
             data.groups.length > 0
               ? 'productGroups.empty.filtered'
-              : canWrite
-                ? 'productGroups.empty.text'
-                : 'productGroups.empty.textViewer',
+              : data.profiles.length === 0
+                ? 'productGroups.empty.noProfiles'
+                : canWrite
+                  ? 'productGroups.empty.text'
+                  : 'productGroups.empty.textViewer',
           )
         "
       />

@@ -1263,6 +1263,8 @@ export const de = {
       text: 'Lege eine Gruppe an und wähle ihre Produkte aus den beworbenen Produkten des Profils oder trage sie von Hand ein.',
       textViewer: 'Admins und Editoren können Produktgruppen anlegen.',
       filtered: 'In diesem Profil gibt es noch keine Produktgruppe.',
+      noProfiles:
+        'Es gibt noch kein sichtbares Profil. Verbinde zuerst ein Werbekonto oder lege ein Profil für den Datei-Import an.',
     },
     edit: {
       action: 'Produktgruppe „{name}“ ändern',
@@ -1296,7 +1298,8 @@ export const de = {
       empty:
         'In diesem Profil gibt es noch keine beworbenen Produkte. Trage Produkte unten von Hand ein.',
       noMatch: 'Kein Produkt passt zur Suche.',
-      truncated: 'Es werden nur die ersten {count} Produkte gezeigt; suche nach ASIN oder SKU.',
+      truncated:
+        'Es werden nur die ersten {count} Produkte (nach ASIN) gezeigt, die Suche gilt nur für sie. Fehlt ein Produkt, trage es unten von Hand ein.',
       paused: 'pausiert',
       otherGroups: 'auch in: {names}',
       chooseProfileFirst: 'Wähle zuerst ein Profil.',

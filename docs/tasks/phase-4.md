@@ -126,11 +126,13 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
   - **API** (Feature `tools`, Lesen `view`, sonst `write`): `GET/POST /api/ads/tools/product-groups`,
     `PATCH/DELETE …/{id}` (Produkte werden als Ganzes ersetzt), `GET /api/ads/tools/advertised-products?profileId=`
     (Product Ads aller Anzeigentypen je ASIN und SKU ohne entfernte und Platzhalter, mit „aktiv“ und den Gruppen, die das
-    Produkt schon enthalten). Audit `product_group.create|update|delete` (Update mit vorher/nachher, ohne Änderung kein
+    Produkt schon enthalten). Bei Seller-Profilen nur Anzeigen mit SKU: SB- und SD-Zeilen aus Reports tragen nur die
+    ASIN und wären nach der SKU-Regel nicht speicherbar (Review-Befund); dieselbe ASIN erscheint über ihre SP-Anzeige mit
+    SKU. Die Suche im Dialog filtert nur die geladenen Produkte; bei mehr als 5000 verweist der Hinweis auf die Handeingabe. Audit `product_group.create|update|delete` (Update mit vorher/nachher, ohne Änderung kein
     Event).
   - **Seite:** `/ads/tools` leitet auf `/ads/tools/product-groups` um (weitere Unterseiten kommen mit 4.2, 4.5, 4.7). Filter
     nach Profil, Dialog mit Profil (nur beim Anlegen), Name, gewählten Produkten mit Hero-Auswahl, Liste der beworbenen
-    Produkte (Suche, Hinweis „auch in“ anderen Gruppen) und Handeingabe. Geprüft im Browser-Pane (Anlegen mit
+    Produkte (Suche, Hinweis „auch in“ anderen Gruppen) und Handeingabe; der Hero ist optional („Kein Hero“). Geprüft im Browser-Pane (Anlegen mit
     Demo-Daten, Handy, Tablet, Hell-Modus, Konsole); Testgruppe danach gelöscht.
 
 ### 4.2 Struktur-Katalog, Presets und Namensschema (`packages/shared`, `packages/db`, `packages/engine`)

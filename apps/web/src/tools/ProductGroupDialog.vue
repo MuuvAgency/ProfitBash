@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  formatNumber,
   MAX_PRODUCT_GROUP_NAME_LENGTH,
   MAX_SKU_LENGTH,
   normalizeProductGroupName,
@@ -14,6 +15,7 @@ import type { ProductGroupData, ProductGroupListData } from '../api/client';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { errorMessageKey } from '../i18n';
+import { useSessionStore } from '../stores/session';
 import { useAdvertisedProducts, useSaveProductGroup } from './queries';
 
 /**
@@ -36,18 +38,27 @@ const emit = defineEmits<{ close: [] }>();
 
 const { t } = useI18n();
 const id = useId();
+const session = useSessionStore();
 type Item = ProductGroupData['items'][number];
 
 const profileId = ref<string | null>(props.group?.profileId ?? props.initialProfileId);
 const name = ref(props.group?.name ?? '');
 const items = ref<Item[]>(props.group ? props.group.items.map((item) => ({ ...item })) : []);
+const manualAsin = ref('');
+const manualSku = ref('');
+const manualErrorKey = ref<string | null>(null);
 const profile = computed(() => props.profiles.find((p) => p.id === profileId.value) ?? null);
 const clientName = (clientId: string | null) =>
   props.clients.find((client) => client.id === clientId)?.name ?? t('productGroups.noClient');
 
 // Beim Wechsel des Profils (nur beim Anlegen) passen gewählte Produkte nicht mehr.
 watch(profileId, (next, previous) => {
-  if (previous !== undefined && next !== previous) items.value = [];
+  if (previous === undefined || next === previous) return;
+  items.value = [];
+  // Die SKU-Regel hängt am Profil; ein verstecktes SKU-Feld darf keinen alten Wert behalten.
+  manualAsin.value = '';
+  manualSku.value = '';
+  manualErrorKey.value = null;
 });
 
 const keys = computed(() => new Set(items.value.map(productGroupItemKey)));
@@ -92,10 +103,6 @@ function togglePick(product: { asin: string; sku: string | null }) {
 }
 
 // --- Handeingabe ---------------------------------------------------------------------------
-
-const manualAsin = ref('');
-const manualSku = ref('');
-const manualErrorKey = ref<string | null>(null);
 
 function addManual() {
   const asin = manualAsin.value.trim().toUpperCase();
@@ -212,7 +219,21 @@ const labelClass = 'text-label-eyebrow uppercase text-ink-tertiary';
         <p v-if="items.length === 0" class="text-body-md text-ink-secondary">
           {{ t('productGroups.field.noItems') }}
         </p>
-        <ul v-else class="flex flex-col rounded-control bg-well px-space-md">
+        <label
+          v-if="items.length > 0"
+          class="flex min-h-11 items-center gap-space-sm text-body-md text-ink-secondary"
+        >
+          <input
+            type="radio"
+            name="group-hero"
+            value=""
+            :checked="heroKey === ''"
+            class="size-4 accent-violet"
+            @change="setHero('')"
+          />
+          {{ t('productGroups.noHero') }}
+        </label>
+        <ul v-if="items.length > 0" class="flex flex-col rounded-control bg-well px-space-md">
           <li
             v-for="item in items"
             :key="productGroupItemKey(item)"
@@ -289,7 +310,10 @@ const labelClass = 'text-label-eyebrow uppercase text-ink-tertiary';
           <p v-if="advertised.data.value.truncated" class="text-body-sm text-ink-secondary">
             {{
               t('productGroups.advertised.truncated', {
-                count: advertised.data.value.products.length,
+                count: formatNumber(
+                  String(advertised.data.value.products.length),
+                  session.preferences.locale,
+                ),
               })
             }}
           </p>

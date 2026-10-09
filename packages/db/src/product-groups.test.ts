@@ -128,6 +128,14 @@ beforeAll(async () => {
     ad('4003', { asin: 'B0TEST0003', sku: 'SKU-3', state: 'PAUSED' }),
     ad('4004', { asin: 'B0TEST0004', sku: 'SKU-4', removedAt: new Date() }),
     ad('4005', { asin: null, sku: null }),
+    // SB-Anzeige aus dem Report: ASIN ohne SKU. Bei Sellern nicht speicherbar, deshalb nicht in der Auswahl.
+    ad('4006', {
+      campaignId: sb!.id,
+      adGroupId: sbAdGroup!.id,
+      adProduct: 'SPONSORED_BRANDS',
+      asin: 'B0TEST0005',
+      sku: null,
+    }),
   ]);
 });
 
@@ -292,7 +300,7 @@ describe('Produktgruppen verwalten', () => {
 });
 
 describe('Beworbene Produkte als Auswahl', () => {
-  it('fasst die Anzeigen je ASIN und SKU zusammen, ohne entfernte und Platzhalter, mit Gruppen', async () => {
+  it('fasst die Anzeigen je ASIN und SKU zusammen, ohne entfernte, Platzhalter und (bei Sellern) ohne SKU, mit Gruppen', async () => {
     const flaschen = await group('Flaschen');
     const result = await listAdvertisedProducts(testDb.db, { ...as(f.ada), profileId: f.profile });
 
