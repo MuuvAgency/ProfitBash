@@ -64,6 +64,13 @@ describe('buildSpBulkSheet: Anlagen', () => {
     ]);
   });
 
+  it('schreibt die Spalte „Off-Amazon ad serving“ nur, wenn eine Zeile sie belegt (gibt es nur in den USA)', () => {
+    expect(buildSpBulkSheet([create('c', campaign)]).rows[0]).not.toContain('Off-Amazon ad serving');
+    expect(
+      buildSpBulkSheet([create('c', { ...campaign, offAmazon: 'limitSpend' })]).rows[0],
+    ).toContain('Off-Amazon ad serving');
+  });
+
   it('setzt Portfolio, Auto-Targeting, pausiert und Off-Amazon, wenn genannt', () => {
     const { records } = build([
       create('c', {
