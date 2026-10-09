@@ -4544,6 +4544,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/tools/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Struktur-Katalog der Organisation (ohne gespeichertes Dokument die Startwerte), Presets je Client */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Katalog. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StructureCatalogResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Struktur-Katalog speichern (nur Org-Admins)
+         * @description `version` ist die gelesene Version; wurde der Katalog inzwischen gespeichert, antwortet die API mit `409 STRUCTURE_CATALOG_VERSION_CONFLICT`.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveStructureCatalogRequest"];
+                };
+            };
+            responses: {
+                /** @description Gespeichert. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StructureCatalogResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Veraltete Version. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/tools/client-presets/{clientId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Preset eines Clients setzen oder lösen (Recht „write“) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    clientId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetClientPresetRequest"];
+                };
+            };
+            responses: {
+                /** @description Gespeichert. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Client nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6062,6 +6255,7 @@ export interface components {
             /** Format: uuid */
             profileId: string;
             name: string;
+            presetKey: string | null;
             items: {
                 asin: string;
                 sku: string | null;
@@ -6075,6 +6269,7 @@ export interface components {
             profileId: string;
             name: string;
             items: components["schemas"]["ProductGroupItemInput"][];
+            presetKey?: string | null;
         };
         ProductGroupItemInput: {
             asin: string;
@@ -6085,6 +6280,7 @@ export interface components {
         UpdateProductGroupRequest: {
             name?: string;
             items?: components["schemas"]["ProductGroupItemInput"][];
+            presetKey?: string | null;
         };
         AdvertisedProductsResponse: {
             products: components["schemas"]["AdvertisedProduct"][];
@@ -6096,6 +6292,97 @@ export interface components {
             adProducts: string[];
             enabled: boolean;
             groupIds: string[];
+        };
+        StructureCatalogResponse: {
+            catalog: components["schemas"]["StructureCatalog"];
+            version: number;
+            updatedAt: string | null;
+            clientPresets: {
+                /** Format: uuid */
+                clientId: string;
+                presetKey: string;
+            }[];
+            clients: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+        };
+        StructureCatalog: {
+            blocks: {
+                key: string;
+                code: string;
+                label: string;
+                /** @default  */
+                description: string;
+                /** @enum {string} */
+                adProduct: "SP" | "SB" | "SD";
+                /** @enum {string} */
+                targeting: "auto" | "keyword" | "product" | "category" | "audience";
+                /**
+                 * @default null
+                 * @enum {string|null}
+                 */
+                matchType: "broad" | "phrase" | "exact" | null;
+                /**
+                 * @default null
+                 * @enum {string|null}
+                 */
+                productMatch: "exact" | "expanded" | null;
+                /** @enum {string} */
+                structure: "1:1:1" | "1:1:n" | "1:n:1";
+                /** @enum {string} */
+                source: "generic" | "brand" | "competitor" | "own";
+                /**
+                 * @default null
+                 * @enum {string|null}
+                 */
+                biddingStrategy: "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "NONE" | null;
+                /**
+                 * @default null
+                 * @enum {string|null}
+                 */
+                sdOptimization: "clicks" | "conversions" | null;
+                defaultBid: string;
+                dailyBudget: string;
+                /** @default null */
+                placements: {
+                    topOfSearch: number;
+                    productPages: number;
+                    restOfSearch: number;
+                } | null;
+                /** @default null */
+                lookbackDays: number | null;
+            }[];
+            edges: {
+                from: string;
+                to: string;
+            }[];
+            presets: {
+                key: string;
+                name: string;
+                /** @default  */
+                description: string;
+                blocks: {
+                    block: string;
+                    defaultBid?: string;
+                    dailyBudget?: string;
+                    topOfSearch?: number;
+                    lookbackDays?: number;
+                }[];
+                /** @default false */
+                isDefault: boolean;
+            }[];
+            naming: {
+                pattern: string;
+            };
+        };
+        SaveStructureCatalogRequest: {
+            catalog: components["schemas"]["StructureCatalog"];
+            version: number;
+        };
+        SetClientPresetRequest: {
+            presetKey: string | null;
         };
     };
     responses: never;

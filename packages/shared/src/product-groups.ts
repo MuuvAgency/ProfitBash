@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { presetKeySchema } from './structure-catalog';
 
 /**
  * Produktgruppen (`docs/tasks/phase-4.md` 4.1, F2): beworbene Einheiten eines Profils (Marktplatz) aus ASIN und SKU,
@@ -64,15 +65,26 @@ const itemsSchema = z
   });
 
 export const createProductGroupRequestSchema = z
-  .strictObject({ profileId: z.uuid(), name: nameSchema, items: itemsSchema })
+  .strictObject({
+    profileId: z.uuid(),
+    name: nameSchema,
+    items: itemsSchema,
+    /** Preset aus dem Struktur-Katalog (4.2); leer = Preset des Clients bzw. Standard. */
+    presetKey: presetKeySchema.nullable().optional(),
+  })
   .meta({ id: 'CreateProductGroupRequest' });
 export type CreateProductGroupRequest = z.output<typeof createProductGroupRequestSchema>;
 
 export const updateProductGroupRequestSchema = z
-  .strictObject({ name: nameSchema.optional(), items: itemsSchema.optional() })
-  .refine((body) => body.name !== undefined || body.items !== undefined, {
-    message: 'Name oder Produkte angeben',
+  .strictObject({
+    name: nameSchema.optional(),
+    items: itemsSchema.optional(),
+    presetKey: presetKeySchema.nullable().optional(),
   })
+  .refine(
+    (body) => body.name !== undefined || body.items !== undefined || body.presetKey !== undefined,
+    { message: 'Name, Produkte oder Preset angeben' },
+  )
   .meta({ id: 'UpdateProductGroupRequest' });
 export type UpdateProductGroupRequest = z.output<typeof updateProductGroupRequestSchema>;
 
@@ -81,6 +93,7 @@ export const productGroupSchema = z
     id: z.uuid(),
     profileId: z.uuid(),
     name: z.string(),
+    presetKey: z.string().nullable(),
     items: z.array(z.object({ asin: z.string(), sku: z.string().nullable(), isHero: z.boolean() })),
     createdAt: z.string(),
     updatedAt: z.string(),
