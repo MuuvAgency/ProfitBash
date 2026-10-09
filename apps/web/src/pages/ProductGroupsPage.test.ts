@@ -1,3 +1,4 @@
+import { DEFAULT_STRUCTURE_CATALOG } from '@profitbash/shared';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch, type RecordedRequest } from '../test/fetch-stub';
@@ -12,10 +13,17 @@ const C1 = '00000000-0000-4000-8000-0000000000c1';
 const G1 = '00000000-0000-4000-8000-0000000000b1';
 const G2 = '00000000-0000-4000-8000-0000000000b2';
 
-const group = (id: string, profileId: string, name: string, items: unknown[]) => ({
+const group = (
+  id: string,
+  profileId: string,
+  name: string,
+  items: unknown[],
+  presetKey: string | null = null,
+) => ({
   id,
   profileId,
   name,
+  presetKey,
   items,
   createdAt: '2026-10-09T08:00:00.000Z',
   updatedAt: '2026-10-09T08:00:00.000Z',
@@ -49,6 +57,13 @@ function routes(overrides: Record<string, Responder | Response> = {}) {
     'GET /api/settings/ui-state/shell/sidebar': json({ value: null }),
     'GET /api/ads/changes/pending': json({ changes: [], check: null }),
     'GET /api/ads/tools/product-groups': json(listResponse([flaschen, vendorGroup])),
+    'GET /api/ads/tools/catalog': json({
+      catalog: DEFAULT_STRUCTURE_CATALOG,
+      version: 0,
+      updatedAt: null,
+      clientPresets: [{ clientId: C1, presetKey: 'launch' }],
+      clients: [{ id: C1, name: 'Waldkauz' }],
+    }),
     'GET /api/ads/tools/advertised-products': json({
       truncated: false,
       products: [
@@ -188,6 +203,7 @@ describe('Seite „Produktgruppen“', () => {
       {
         profileId: P1,
         name: 'Becher',
+        presetKey: null,
         items: [
           { asin: 'B0BECHER01', sku: 'BE-1', isHero: false },
           { asin: 'B0BECHER02', sku: 'BE-2', isHero: true },
@@ -244,7 +260,11 @@ describe('Seite „Produktgruppen“', () => {
     await flushPromises();
 
     expect(sent(requests, 'PATCH').map((r) => r.body)).toEqual([
-      { name: 'Trinkflaschen', items: [{ asin: 'B0FLASCHE1', sku: 'FL-750', isHero: true }] },
+      {
+        name: 'Trinkflaschen',
+        presetKey: null,
+        items: [{ asin: 'B0FLASCHE1', sku: 'FL-750', isHero: true }],
+      },
     ]);
   });
 
@@ -261,6 +281,7 @@ describe('Seite „Produktgruppen“', () => {
     expect(sent(requests, 'PATCH').map((r) => r.body)).toEqual([
       {
         name: 'Flaschen',
+        presetKey: null,
         items: [
           { asin: 'B0FLASCHE1', sku: 'FL-750', isHero: false },
           { asin: 'B0FLASCHE2', sku: 'FL-500', isHero: false },
@@ -309,6 +330,22 @@ describe('Seite „Produktgruppen“', () => {
     });
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Es gibt noch kein sichtbares Profil'),
+    );
+  });
+
+  it('setzt ein eigenes Preset; ohne eigenes gilt das des Clients', async () => {
+    const { requests } = await mountPage({
+      [`PATCH /api/ads/tools/product-groups/${G1}`]: json(flaschen),
+    });
+    await vi.waitFor(() => expect(button('Produktgruppe „Flaschen“ ändern')).toBeDefined());
+    button('Produktgruppe „Flaschen“ ändern')!.click();
+    const select = await found<HTMLSelectElement>('[data-group-preset]');
+    expect(select.options[0]!.textContent).toContain('Launch');
+    await choose('[data-group-preset]', 'control');
+    (await found<HTMLButtonElement>('[data-group-save]')).click();
+    await flushPromises();
+    expect(sent(requests, 'PATCH').map((r) => (r.body as { presetKey: string }).presetKey)).toEqual(
+      ['control'],
     );
   });
 

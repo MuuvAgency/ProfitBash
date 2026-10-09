@@ -16,7 +16,7 @@ import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { errorMessageKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
-import { useAdvertisedProducts, useSaveProductGroup } from './queries';
+import { useAdvertisedProducts, useSaveProductGroup, useStructureCatalog } from './queries';
 
 /**
  * Produktgruppe anlegen oder ändern (`phase-4.md` 4.1, F2): Profil (nur beim Anlegen), Name, Produkte aus den
@@ -43,6 +43,7 @@ type Item = ProductGroupData['items'][number];
 
 const profileId = ref<string | null>(props.group?.profileId ?? props.initialProfileId);
 const name = ref(props.group?.name ?? '');
+const presetKey = ref<string | null>(props.group?.presetKey ?? null);
 const items = ref<Item[]>(props.group ? props.group.items.map((item) => ({ ...item })) : []);
 const manualAsin = ref('');
 const manualSku = ref('');
@@ -75,6 +76,24 @@ function removeItem(key: string) {
 /** Schlüssel für Attribute im DOM (Tests, Radio-Werte); intern zählt `productGroupItemKey`. */
 const domKey = (item: { asin: string; sku: string | null }) => `${item.asin}|${item.sku ?? ''}`;
 const full = computed(() => items.value.length >= props.maxItems);
+
+// --- Preset ----------------------------------------------------------------------------
+
+const catalog = useStructureCatalog();
+const presets = computed(() => catalog.data.value?.catalog.presets ?? []);
+/** Preset, das ohne eigenes gilt: das des Clients, sonst der Standard. */
+const inheritedPreset = computed(() => {
+  const data = catalog.data.value;
+  if (!data) return null;
+  const clientKey = data.clientPresets.find(
+    (e) => e.clientId === profile.value?.clientId,
+  )?.presetKey;
+  return (
+    data.catalog.presets.find((preset) => preset.key === clientKey) ??
+    data.catalog.presets.find((preset) => preset.isDefault) ??
+    null
+  );
+});
 
 // --- Beworbene Produkte --------------------------------------------------------------------
 
@@ -150,6 +169,7 @@ async function submit() {
       ...(props.group && { id: props.group.id }),
       profileId: profileId.value!,
       name: cleanName.value,
+      presetKey: presetKey.value,
       items: items.value.map(({ asin, sku, isHero }) => ({ asin, sku, isHero })),
     });
     emit('close');
@@ -209,6 +229,22 @@ const labelClass = 'text-label-eyebrow uppercase text-ink-tertiary';
         <p v-if="nameTooLong" :id="`${id}-name-hint`" class="text-body-sm text-on-loss-wash">
           {{ t('productGroups.field.nameTooLong', { max: MAX_PRODUCT_GROUP_NAME_LENGTH }) }}
         </p>
+      </div>
+
+      <div v-if="presets.length > 0" class="flex flex-col gap-space-xs">
+        <label :for="`${id}-preset`" :class="labelClass">{{
+          t('productGroups.field.preset')
+        }}</label>
+        <select :id="`${id}-preset`" v-model="presetKey" data-group-preset :class="inputClass">
+          <option :value="null">
+            {{ t('productGroups.field.presetInherit')
+            }}{{ inheritedPreset ? ` (${inheritedPreset.name})` : '' }}
+          </option>
+          <option v-for="preset in presets" :key="preset.key" :value="preset.key">
+            {{ preset.name }}
+          </option>
+        </select>
+        <p class="text-body-sm text-ink-secondary">{{ t('productGroups.field.presetHint') }}</p>
       </div>
 
       <fieldset class="flex min-w-0 flex-col gap-space-sm">

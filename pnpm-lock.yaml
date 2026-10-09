@@ -266,6 +266,9 @@ importers:
       '@primeuix/themes':
         specifier: ^2.0.3
         version: 2.0.3
+      '@profitbash/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@profitbash/shared':
         specifier: workspace:*
         version: link:../../packages/shared

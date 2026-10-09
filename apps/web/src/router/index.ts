@@ -97,6 +97,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../pages/ProductGroupsPage.vue'),
         meta: { feature: 'tools', navItemId: 'tools', titleKey: 'productGroups.title' },
       },
+      {
+        path: 'ads/tools/catalog',
+        name: 'structure-catalog',
+        component: () => import('../pages/CatalogPage.vue'),
+        meta: { feature: 'tools', navItemId: 'tools', titleKey: 'catalog.title' },
+      },
       ...NAVIGATION.flatMap((group) => group.items.map(navRoute)),
       {
         path: SETTINGS_PATH.slice(1),

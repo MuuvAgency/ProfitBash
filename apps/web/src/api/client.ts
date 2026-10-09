@@ -39,6 +39,7 @@ export type TagData = Schemas['Tag'];
 export type ProductGroupData = Schemas['ProductGroup'];
 export type ProductGroupListData = Schemas['ProductGroupListResponse'];
 export type AdvertisedProductsData = Schemas['AdvertisedProductsResponse'];
+export type StructureCatalogData = Schemas['StructureCatalogResponse'];
 export type AssignTagsInput = Schemas['AssignTagsRequest'];
 export type AssignTagsData = Schemas['AssignTagsResponse'];
 export type HarvestListData = Schemas['HarvestListResponse'];
@@ -308,6 +309,18 @@ export function createApi(options: ApiOptions = {}) {
           ),
         remove: (id: string) =>
           unwrap(client.DELETE('/api/ads/tools/product-groups/{id}', { params: { path: { id } } })),
+      },
+      catalog: {
+        get: (): Promise<StructureCatalogData> => unwrap(client.GET('/api/ads/tools/catalog')),
+        save: (input: Schemas['SaveStructureCatalogRequest']): Promise<StructureCatalogData> =>
+          unwrap(client.PUT('/api/ads/tools/catalog', { body: input })),
+        setClientPreset: (clientId: string, presetKey: string | null) =>
+          unwrap(
+            client.PUT('/api/ads/tools/client-presets/{clientId}', {
+              params: { path: { clientId } },
+              body: { presetKey },
+            }),
+          ),
       },
       advertisedProducts: (profileId: string): Promise<AdvertisedProductsData> =>
         unwrap(

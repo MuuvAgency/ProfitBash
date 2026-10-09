@@ -13,7 +13,13 @@ import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { errorMessageKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 import ProductGroupDialog from '../tools/ProductGroupDialog.vue';
-import { useDeleteProductGroup, useProductGroups, useToolRights } from '../tools/queries';
+import {
+  useDeleteProductGroup,
+  useProductGroups,
+  useStructureCatalog,
+  useToolRights,
+} from '../tools/queries';
+import ToolsTabs from '../tools/ToolsTabs.vue';
 
 /**
  * Seite „Produktgruppen“ (`phase-4.md` 4.1, F2): Gruppen der sichtbaren Profile, nach Profil filterbar; anlegen,
@@ -53,6 +59,11 @@ function clientLabel(profileId: string) {
   const clientId = profilesById.value.get(profileId)?.clientId;
   return (clientId && clientsById.value.get(clientId)?.name) || t('productGroups.noClient');
 }
+const catalog = useStructureCatalog();
+const presetName = (key: string | null) =>
+  key
+    ? (catalog.data.value?.catalog.presets.find((preset) => preset.key === key)?.name ?? key)
+    : null;
 const hero = (group: ProductGroupData) => group.items.find((item) => item.isHero) ?? null;
 
 // --- Anlegen und Ändern ------------------------------------------------------------------
@@ -93,6 +104,7 @@ async function confirmDelete() {
       :title="t('productGroups.title')"
       :description="t('productGroups.description')"
     />
+    <ToolsTabs current="product-groups" />
 
     <InlineError
       v-if="query.isError.value"
@@ -174,6 +186,9 @@ async function confirmDelete() {
                 {{
                   t('productGroups.items', { count: count(group.items.length) }, group.items.length)
                 }}
+              </span>
+              <span v-if="group.presetKey" class="text-body-sm text-ink-secondary">
+                {{ t('productGroups.preset', { name: presetName(group.presetKey) }) }}
               </span>
             </span>
             <span v-if="canWrite" class="flex gap-space-xs">
