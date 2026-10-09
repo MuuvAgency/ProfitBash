@@ -411,6 +411,29 @@ describe('submitCampaignSetupDraft', () => {
     ).toMatchObject({ status: 'rejected', issues: [{ code: 'bidOutOfRange' }] });
   });
 
+  it('schließt eine Übermittlung ohne anlegbare Kampagne sofort ab', async () => {
+    const created = await save({
+      campaigns: [
+        campaign('SD | RT | Flaschen', {
+          adProduct: 'SD',
+          targeting: 'audience',
+          biddingStrategy: null,
+          placements: null,
+          sdOptimization: 'clicks',
+          targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '0.60' }],
+          negatives: [],
+        }),
+      ],
+    });
+    const result = await submit(created.id, 1);
+    expect(result).toMatchObject({
+      status: 'submitted',
+      items: 1,
+      unsupported: 1,
+      submission: { status: 'finished', counts: { failed: 1 } },
+    });
+  });
+
   it('übermittelt über die API nur Profile mit Connection und plant den Job ein', async () => {
     const created = await save();
     const enqueued: string[] = [];
