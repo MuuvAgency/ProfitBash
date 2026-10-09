@@ -117,6 +117,10 @@ export async function createTag(
   if ((await getOrgRole(db, input.userId, input.orgId)) === null) return null;
   try {
     return await db.transaction(async (tx) => {
+      // Anlegen je Organisation nacheinander: Sonst kämen zwei gleichzeitige Anfragen beide unter der Höchstzahl durch.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`tags:${input.orgId}`}, 0))`,
+      );
       const [{ existing } = { existing: 0 }] = await tx
         .select({ existing: count() })
         .from(tags)
@@ -162,6 +166,13 @@ export async function updateTag(
         .where(own)
         .for('update');
       if (!before) throw notFound();
+      const changed =
+        (input.name !== undefined && input.name !== before.name) ||
+        (input.color !== undefined && input.color !== before.color);
+      if (!changed) {
+        const [same] = await tx.select(tagColumns).from(tags).where(own);
+        return record(same!);
+      }
       const [row] = await tx
         .update(tags)
         .set({
@@ -270,16 +281,19 @@ export async function assignTags(db: Db, input: AssignTagsInput): Promise<Assign
     let added = 0;
     let removed = 0;
     if (addTagIds.length > 0) {
-      const values = [...entities.values()].flatMap((entity) =>
-        addTagIds.map((tagId) => ({
-          tagId,
-          organizationId: entity.organizationId,
-          profileId: entity.profileId,
-          entityType: input.entityType,
-          entityId: entity.id,
-          createdBy: input.userId,
-        })),
-      );
+      // In fester Reihenfolge einfügen: Zwei überlappende Anfragen sperrten sich sonst gegenseitig (Deadlock).
+      const values = [...entities.values()]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .flatMap((entity) =>
+          [...addTagIds].sort().map((tagId) => ({
+            tagId,
+            organizationId: entity.organizationId,
+            profileId: entity.profileId,
+            entityType: input.entityType,
+            entityId: entity.id,
+            createdBy: input.userId,
+          })),
+        );
       for (const part of chunks(values)) {
         const inserted = await tx
           .insert(a)

@@ -268,13 +268,17 @@ const taggedSql = (tagIds: readonly string[], entityType: string, idSql: SQL) =>
 const anyOf = (conditions: SQL[]) => sql`(${sql.join(conditions, sql` or `)})`;
 
 /** Filter der Entity `e` einer Ebene: Tag an ihr selbst oder an Ad Group bzw. Kampagne darüber. */
-function tagEntityWhere(level: AnalyticsLevel | 'negative', tagIds: readonly string[]): SQL {
+function tagEntityWhere(
+  level: AnalyticsLevel | 'negative',
+  tagIds: readonly string[],
+  includeRemoved = false,
+): SQL {
   const campaign = (idSql: SQL) => taggedSql(tagIds, 'campaign', idSql);
   const adGroup = taggedSql(tagIds, 'ad_group', sql`e.ad_group_id`);
   switch (level) {
     case 'portfolio':
       return sql`exists (select 1 from amazon_ads_campaigns tc where tc.portfolio_id = e.id
-        and ${campaign(sql`tc.id`)})`;
+        ${includeRemoved ? sql`` : sql`and tc.removed_at is null`} and ${campaign(sql`tc.id`)})`;
     case 'campaign':
       return campaign(sql`e.id`);
     case 'adGroup':
@@ -293,10 +297,25 @@ function tagEntityWhere(level: AnalyticsLevel | 'negative', tagIds: readonly str
   }
 }
 
-/** Eigene Tags der Entity `e` für die Attribute einer Zeile (IDs, sortiert). */
-const tagIdsColumn = (entityType: string) =>
-  sql.raw(`(select coalesce(json_agg(ta.tag_id order by ta.tag_id), '[]'::json) from tag_assignments ta
-    where ta.entity_type = '${entityType}' and ta.entity_id = e.id)`);
+/** Art der Entity für eigene Tags je Ebene; andere Ebenen tragen keine. */
+const TAG_ENTITY_TYPE: Partial<Record<AnalyticsLevel, string>> = {
+  campaign: 'campaign',
+  adGroup: 'ad_group',
+  target: 'target',
+  productAd: 'product_ad',
+};
+
+/**
+ * Attribute einer Zeile `f` samt `tagIds` (eigene Tags der Entity, sortiert). Erst an den gelieferten Zeilen (nach
+ * `limit`) gelesen, nicht für jede Entity der Ebene.
+ */
+function attributesWithTags(level: AnalyticsLevel): SQL {
+  const entityType = TAG_ENTITY_TYPE[level];
+  if (!entityType) return sql`f.attributes`;
+  return sql`(f.attributes::jsonb || jsonb_build_object('tagIds', (
+    select coalesce(jsonb_agg(ta.tag_id order by ta.tag_id), '[]'::jsonb) from tag_assignments ta
+    where ta.entity_type = ${entityType} and ta.entity_id = f.row_id::uuid)))::json as attributes`;
+}
 
 /** Sichtbare Profile der Auswahl als Unterabfrage (`id`, `currency_code`, `account_type`, …). */
 async function selectionSql(db: Db, selection: AnalyticsSelection): Promise<SQL | null> {
@@ -607,6 +626,8 @@ interface LevelSpec {
   entityKey: SQL;
   /** Entity-Abfrage mit `e` (Entity) und `p` (Profil der Auswahl), liefert `row_id`, `row_ad_product` und Attribute. */
   entitySql: (filter: ExplorerFilter) => { from: SQL; where: SQL[]; columns: SQL; join: SQL };
+  /** `from` ist eine einzelne Tabelle ohne Join (in Klammern wäre sie kein gültiger Join). */
+  singleTable?: true;
 }
 
 const removedFilter = (filter: ExplorerFilter, alias = 'e') =>
@@ -633,6 +654,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
     groupKey: sql`c.portfolio_id`,
     groupSelect: sql`c.portfolio_id as group_key`,
     entityKey: sql`c.portfolio_id`,
+    singleTable: true,
     entitySql: (filter) => ({
       from: sql`amazon_ads_portfolios e`,
       join: sql`a.group_key = e.id`,
@@ -667,7 +689,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
           'budgetAmount', e.budget_amount::text, 'budgetCurrencyCode', e.budget_currency_code, 'budgetType', e.budget_type,
           'biddingStrategy', e.bidding_strategy, 'costType', e.extra->>'costType', 'startDate', e.start_date,
           'endDate', e.end_date, 'placementBidAdjustments', e.extra->'placementBidAdjustments',
-          'tagIds', ${tagIdsColumn('campaign')}, 'amazonTags', e.extra->'tags') as attributes`,
+          'amazonTags', e.extra->'tags') as attributes`,
     }),
   },
   adGroup: {
@@ -690,8 +712,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
       columns: sql`e.id::text as row_id, e.ad_product as row_ad_product, e.name, e.state, e.amazon_ad_group_id as amazon_id,
         e.removed_at is not null as removed, e.synced_at is null as placeholder,
         json_build_object('campaignId', e.campaign_id, 'campaignName', c.name, 'defaultBid', e.default_bid::text,
-          'defaultBidCurrencyCode', e.default_bid_currency_code, 'costType', c.extra->>'costType',
-          'tagIds', ${tagIdsColumn('ad_group')}) as attributes`,
+          'defaultBidCurrencyCode', e.default_bid_currency_code, 'costType', c.extra->>'costType') as attributes`,
     }),
   },
   target: {
@@ -717,7 +738,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
         json_build_object('campaignId', e.campaign_id, 'campaignName', c.name, 'adGroupId', e.ad_group_id,
           'adGroupName', g.name, 'targetType', e.target_type, 'keywordText', e.keyword_text, 'matchType', e.match_type,
           'expression', e.expression, 'bid', e.bid::text, 'bidCurrencyCode', e.bid_currency_code,
-          'costType', c.extra->>'costType', 'tagIds', ${tagIdsColumn('target')}) as attributes`,
+          'costType', c.extra->>'costType') as attributes`,
     }),
   },
   productAd: {
@@ -749,8 +770,7 @@ const LEVELS: Record<AnalyticsLevel, LevelSpec> = {
           e.state, e.amazon_ad_id as amazon_id, e.removed_at is not null as removed, e.synced_at is null as placeholder,
           json_build_object('campaignId', e.campaign_id, 'campaignName', c.name, 'adGroupId', e.ad_group_id,
             'adGroupName', g.name, 'asin', e.asin, 'sku', e.sku, 'adType', e.extra->>'adType',
-            'asins', case when jsonb_typeof(e.extra->'asins') = 'array' then e.extra->'asins' end,
-            'tagIds', ${tagIdsColumn('product_ad')}) as attributes`,
+            'asins', case when jsonb_typeof(e.extra->'asins') = 'array' then e.extra->'asins' end) as attributes`,
       };
     },
   },
@@ -821,9 +841,7 @@ function portfolioJoinSql(level: AnalyticsLevel, filter: ExplorerFilter): SQL {
 function entityJoinSql(spec: LevelSpec, entity: { from: SQL }): SQL {
   const on = sql`on e.id = ${spec.entityKey} and e.profile_id = m.profile_id`;
   // Portfolios sind eine einzelne Tabelle: In Klammern wäre das kein gültiger Join (nur Joins dürfen geklammert sein).
-  return spec === LEVELS.portfolio
-    ? sql`join ${entity.from} ${on}`
-    : sql`join (${entity.from}) ${on}`;
+  return spec.singleTable ? sql`join ${entity.from} ${on}` : sql`join (${entity.from}) ${on}`;
 }
 
 /**
@@ -834,6 +852,7 @@ function filtersOf(
   input: AnalyticsQuery & { level: AnalyticsLevel },
   entity: { where: SQL[] },
   periods: Periods,
+  includeRemoved = false,
 ): { entityWhere: SQL[]; metricsWhere: SQL[] } {
   const metricsWhere: SQL[] = [anyRange(periods)];
   const entityWhere = [...entity.where];
@@ -844,7 +863,7 @@ function filtersOf(
   }
   const tagIds = tagFilterIds(input);
   if (tagIds) {
-    entityWhere.push(tagEntityWhere(input.level, tagIds));
+    entityWhere.push(tagEntityWhere(input.level, tagIds, includeRemoved));
     // Portfolios summieren ihre Kampagnen (`c` aus `portfolioJoinSql`): nur die mit dem Tag.
     if (input.level === 'portfolio') metricsWhere.push(taggedSql(tagIds, 'campaign', sql`c.id`));
   }
@@ -896,7 +915,7 @@ export async function queryExplorerRows(
   const filter = input.filter ?? {};
   const limit = Math.min(input.limit ?? MAX_ANALYTICS_ROWS, MAX_ANALYTICS_ROWS);
   const entity = spec.entitySql(filter);
-  const { entityWhere, metricsWhere } = filtersOf(input, entity, periods);
+  const { entityWhere, metricsWhere } = filtersOf(input, entity, periods, filter.includeRemoved);
 
   const portfolio = input.level === 'portfolio';
   const sumSets = (prefix: 'cur' | 'cmp') => [
@@ -964,8 +983,8 @@ export async function queryExplorerRows(
       (select json_build_object('cur', ${sumsJson('curx', true)}${periods.comparison ? sql`, 'cmp', ${sumsJson('cmpx', true)}` : sql``},
         'missing_fx', missing_fx) from tot) as totals,
       (select coalesce(json_agg(r), '[]'::json) from (
-        select f.row_id, f.row_ad_product, f.name, f.state, f.amazon_id, f.removed, f.placeholder, f.attributes,
-          f.profile_id, f.account_name, f.country_code, f.currency_code, f.account_type,
+        select f.row_id, f.row_ad_product, f.name, f.state, f.amazon_id, f.removed, f.placeholder,
+          ${attributesWithTags(input.level)}, f.profile_id, f.account_name, f.country_code, f.currency_code, f.account_type,
           ${sumsJson('cur', portfolio)} as cur${periods.comparison ? sql`, ${sumsJson('cmp', portfolio)} as cmp` : sql``}
         from filtered f
         order by f.curx_cost desc nulls last, f.name asc nulls last, f.row_id asc
@@ -1114,7 +1133,7 @@ export async function queryTimeSeries(
   const spec = LEVELS[input.level];
   const filter = input.filter ?? {};
   const entity = spec.entitySql(filter);
-  const { entityWhere, metricsWhere } = filtersOf(input, entity, periods);
+  const { entityWhere, metricsWhere } = filtersOf(input, entity, periods, filter.includeRemoved);
   const where = [...metricsWhere, ...entityWhere];
   if (input.entityIds) {
     where.push(sql`(${spec.groupKey})::text = any(${textArray(input.entityIds)})`);

@@ -25,6 +25,8 @@ export function viewState(
       comparison: filters.comparison,
       currency: filters.currency,
       attribution: filters.attribution,
+      // Nur mit Tag-Filter: Ansichten ohne ihn bleiben gleich den vor 3.7 gespeicherten.
+      ...(filters.tagIds.length > 0 && { tagIds: [...filters.tagIds].sort() }),
     },
   };
   if (area === 'explorer' && explorer) {

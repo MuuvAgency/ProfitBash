@@ -45,6 +45,8 @@ export const savedViewFiltersSchema = z
     comparison: z.enum(COMPARISON_MODES),
     currency: displayCurrencySchema,
     attribution: attributionSettingSchema,
+    /** Eigene Tags der Filterleiste (3.7); fehlt in älteren Ansichten und ohne Tag-Filter. */
+    tagIds: z.array(uuid).min(1).max(10).optional(),
   })
   .meta({ id: 'SavedViewFilters' });
 export type SavedViewFilters = z.infer<typeof savedViewFiltersSchema>;

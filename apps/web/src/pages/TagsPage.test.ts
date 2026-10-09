@@ -151,7 +151,7 @@ describe('Seite „Tags“', () => {
     await vi.waitFor(() => expect(button('Tag „Bestseller“ löschen')).toBeDefined());
     button('Tag „Bestseller“ löschen')!.click();
     await vi.waitFor(() =>
-      expect(document.body.textContent).toContain('von 1.202 Einträgen gelöst'),
+      expect(document.body.textContent).toContain('in deinen Profilen: 1.202 Einträge'),
     );
     expect(sent(requests, 'DELETE')).toHaveLength(0);
 
