@@ -263,15 +263,15 @@ function setupSummary(item: SetupItemData): string {
     case 'ad_group':
       return text('name') ?? item.campaignRef;
     case 'placement':
-      return `${String(payload.placement)} ${String(payload.percentage)} %`;
+      return `${t(`changes.setupPlacement.${String(payload.placement)}`)} +${formatNumber(String(payload.percentage), locale.value)} %`;
     case 'product_ad':
       return [text('asin'), text('sku')].filter(Boolean).join(' · ');
     case 'keyword':
     case 'negative_keyword':
-      return `${text('text') ?? ''} (${text('matchType') ?? ''})`;
+      return `${text('text') ?? ''} (${t(`changes.setupMatch.${text('matchType') ?? 'exact'}`)})`;
     case 'product_target': {
       const expression = payload.expression as { type?: string; value?: string } | undefined;
-      return `${expression?.type ?? ''} ${expression?.value ?? ''}`;
+      return `${t(`changes.setupExpression.${expression?.type ?? 'asin'}`)} ${expression?.value ?? ''}`;
     }
     case 'negative_product_target':
       return text('asin') ?? '';
@@ -279,6 +279,10 @@ function setupSummary(item: SetupItemData): string {
 }
 function setupError(item: SetupItemData): string | null {
   if (item.status !== 'failed' && item.status !== 'dismissed') return null;
+  // Eigene Codes übersetzt (wie bei Änderungen), Meldungen von Amazon mit Code.
+  if (item.errorCode && te(`changes.failure.${item.errorCode}`)) {
+    return t(`changes.failure.${item.errorCode}`);
+  }
   if (!item.errorMessage) return item.errorCode;
   return item.errorCode ? `${item.errorMessage} (${item.errorCode})` : item.errorMessage;
 }

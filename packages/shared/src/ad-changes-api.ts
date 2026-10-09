@@ -258,12 +258,12 @@ export const adChangeSubmissionDetailSchema = z
           .nullable(),
       }),
     ),
+    /** Anlagen eines Setups (Art `setup`, 4.4); leer bei Änderungen. */
+    setupItems: z.array(campaignSetupItemSchema),
     /**
      * Ältester Sync bzw. Import der Kampagnen dieser Übermittlung: Portfolio und Enddatum in der Bulk-Datei
      * stammen von diesem Stand (`null`: noch nie).
      */
-    /** Anlagen eines Setups (Art `setup`, 4.4); leer bei Änderungen. */
-    setupItems: z.array(campaignSetupItemSchema),
     entitiesSyncedAt: timestamp.nullable(),
   })
   .meta({ id: 'AdChangeSubmissionDetail' });

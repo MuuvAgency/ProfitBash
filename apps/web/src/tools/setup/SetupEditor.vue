@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { effectivePreset, formatNumber, type StructureCatalog } from '@profitbash/shared';
+import {
+  effectivePreset,
+  formatCurrency,
+  formatDay,
+  formatNumber,
+  type StructureCatalog,
+} from '@profitbash/shared';
 import Button from 'primevue/button';
 import { computed, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -104,9 +110,13 @@ watch(productGroupId, (next) => {
 });
 // Der Plan passt nach einer Änderung der Eingaben nicht mehr: neu planen.
 const planStale = ref(false);
-watch([profileId, productGroupId, presetKey, texts, unlocks], () => (planStale.value = true), {
-  deep: true,
-});
+watch(
+  [profileId, productGroupId, presetKey, texts, unlocks, useProfileBids],
+  () => (planStale.value = true),
+  {
+    deep: true,
+  },
+);
 
 // --- Planen ------------------------------------------------------------------------------
 
@@ -128,21 +138,25 @@ async function plan() {
     });
     campaigns.value = result.campaigns;
     hints.value = result.hints;
-    const currency = result.campaigns[0]?.currencyCode ?? profile.value?.countryCode ?? '';
+    const currency = result.campaigns[0]?.currencyCode ?? 'EUR';
     rateNote.value =
       result.eurRate.rate === '1'
         ? null
         : t('setup.preview.eurRate', {
-            rate: result.eurRate.rate,
+            rate: formatNumber(result.eurRate.rate, locale.value, { maximumFractionDigits: 4 }),
             currency,
-            date: result.eurRate.date,
+            date: formatDay(result.eurRate.date, locale.value),
           });
+    const amount = (value: string) => formatCurrency(value, currency, locale.value);
+    const { keyword, product, category } = result.profileBids;
     const bids = [
-      ...Object.entries(result.profileBids.keyword ?? {}).map(
-        ([match, value]) => `${match} ${value}`,
+      ...(['broad', 'phrase', 'exact'] as const).flatMap((match) =>
+        keyword?.[match]
+          ? [`${t(`setup.preview.bidKind.${match}`)} ${amount(keyword[match])}`]
+          : [],
       ),
-      ...(result.profileBids.product ? [`ASIN ${result.profileBids.product}`] : []),
-      ...(result.profileBids.category ? [`Kategorie ${result.profileBids.category}`] : []),
+      ...(product ? [`${t('setup.preview.bidKind.product')} ${amount(product)}`] : []),
+      ...(category ? [`${t('setup.preview.bidKind.category')} ${amount(category)}`] : []),
     ];
     profileBidsNote.value = bids.length
       ? t('setup.preview.fromProfile', { values: bids.join(', ') })
@@ -165,9 +179,22 @@ const allAmountsValid = computed(() =>
     (campaign) => amountValid(campaign.dailyBudget) && amountValid(campaign.adGroup.defaultBid),
   ),
 );
-function removeCampaign(index: number) {
-  campaigns.value = campaigns.value.filter((_, position) => position !== index);
+/**
+ * Hinweise einer Kampagne, die der Nutzer korrigiert bzw. entfernt hat, gelten nicht mehr (sonst bliebe das
+ * Übermitteln gesperrt). Der Server prüft beim Übermitteln ohnehin noch einmal.
+ */
+function dropHints(campaignName: string, codes?: readonly string[]) {
+  hints.value = hints.value.filter(
+    (hint) => hint.campaign !== campaignName || (codes !== undefined && !codes.includes(hint.code)),
+  );
 }
+function removeCampaign(index: number) {
+  const removed = campaigns.value[index];
+  campaigns.value = campaigns.value.filter((_, position) => position !== index);
+  if (removed) dropHints(removed.name);
+}
+const amountEdited = (campaignName: string) =>
+  dropHints(campaignName, ['budgetOutOfRange', 'bidOutOfRange']);
 const issues = computed(() => groupedIssues(hints.value));
 const hasErrors = computed(() => hints.value.some((hint) => hint.severity === 'error'));
 
@@ -257,24 +284,39 @@ async function submitDraft() {
   }
 }
 
+/** Rückfrage vor dem Verwerfen bzw. vor dem Schließen mit ungespeicherten Änderungen. */
+const confirming = ref<'discard' | 'close' | null>(null);
 async function discardDraft() {
   if (!draftId.value || !editable.value || discard.isPending.value) return;
   try {
     await discard.mutateAsync({ id: draftId.value, version: version.value });
     emit('close');
   } catch (error) {
+    confirming.value = null;
     actionErrorKey.value =
-      error instanceof ApiError ? errorMessageKey(error.code) : 'setup.saveFailed';
+      error instanceof ApiError ? errorMessageKey(error.code) : 'setup.discardFailed';
   }
 }
 
-/** Seit dem letzten Speichern geändert (dann sichert „Übermitteln“ zuerst). */
-const savedSnapshot = ref(props.draft ? snapshot() : '');
+/** Seit dem letzten Speichern (bzw. dem Öffnen) geändert: „Übermitteln“ sichert zuerst, „Schließen“ fragt nach. */
 function snapshot() {
-  return JSON.stringify([name.value, paused.value, campaigns.value, texts.value, unlocks.value]);
+  return JSON.stringify([
+    productGroupId.value,
+    presetKey.value,
+    name.value,
+    paused.value,
+    campaigns.value,
+    texts.value,
+    unlocks.value,
+  ]);
 }
+const savedSnapshot = ref(snapshot());
 const dirty = computed(() => snapshot() !== savedSnapshot.value);
 watch(version, () => (savedSnapshot.value = snapshot()));
+function close() {
+  if (editable.value && dirty.value && !submitted.value) confirming.value = 'close';
+  else emit('close');
+}
 </script>
 
 <template>
@@ -487,6 +529,8 @@ watch(version, () => (savedSnapshot.value = snapshot()));
                 <input
                   v-if="editable"
                   v-model="campaign.dailyBudget"
+                  :data-campaign-budget="campaign.name"
+                  @input="amountEdited(campaign.name)"
                   inputmode="decimal"
                   :aria-label="t('setup.preview.budgetLabel', { name: campaign.name })"
                   :aria-invalid="!amountValid(campaign.dailyBudget)"
@@ -498,6 +542,8 @@ watch(version, () => (savedSnapshot.value = snapshot()));
                 <input
                   v-if="editable"
                   v-model="campaign.adGroup.defaultBid"
+                  :data-campaign-bid="campaign.name"
+                  @input="amountEdited(campaign.name)"
                   inputmode="decimal"
                   :aria-label="t('setup.preview.bidLabel', { name: campaign.name })"
                   :aria-invalid="!amountValid(campaign.adGroup.defaultBid)"
@@ -524,6 +570,7 @@ watch(version, () => (savedSnapshot.value = snapshot()));
                   variant="text"
                   size="small"
                   :aria-label="t('setup.preview.remove', { name: campaign.name })"
+                  :data-campaign-remove="campaign.name"
                   @click="removeCampaign(index)"
                 />
               </td>
@@ -598,7 +645,7 @@ watch(version, () => (savedSnapshot.value = snapshot()));
           variant="text"
           :label="t('setup.discard')"
           :loading="discard.isPending.value"
-          @click="discardDraft"
+          @click="confirming = 'discard'"
         />
       </div>
       <p v-if="editable" class="text-body-sm text-ink-secondary">{{ t('setup.submitHint') }}</p>
@@ -648,12 +695,40 @@ watch(version, () => (savedSnapshot.value = snapshot()));
       </RouterLink>
     </div>
 
+    <div
+      v-if="confirming"
+      :data-setup-confirm-close="confirming === 'close' ? '' : undefined"
+      :data-setup-confirm-discard="confirming === 'discard' ? '' : undefined"
+      role="alertdialog"
+      :aria-label="t(confirming === 'close' ? 'setup.confirmClose' : 'setup.confirmDiscard')"
+      class="flex flex-col gap-space-sm rounded-control bg-well p-space-md text-body-sm text-ink"
+    >
+      <p>{{ t(confirming === 'close' ? 'setup.confirmClose' : 'setup.confirmDiscard') }}</p>
+      <div class="flex flex-wrap gap-space-sm">
+        <Button
+          data-confirm
+          severity="danger"
+          size="small"
+          :label="t(confirming === 'close' ? 'setup.closeWithoutSaving' : 'setup.discard')"
+          :loading="discard.isPending.value"
+          @click="confirming === 'close' ? emit('close') : discardDraft()"
+        />
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          :label="t('setup.keepEditing')"
+          @click="confirming = null"
+        />
+      </div>
+    </div>
     <div class="flex justify-end">
       <Button
+        data-setup-close
         severity="secondary"
         variant="text"
         :label="t('setup.close')"
-        @click="emit('close')"
+        @click="close"
       />
     </div>
   </section>

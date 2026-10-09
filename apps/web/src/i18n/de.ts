@@ -969,6 +969,19 @@ export const de = {
       dismissed: 'Verworfen',
     },
     setupItemsLabel: 'Anlagen des Setups',
+    setupMatch: {
+      broad: 'weitgehend',
+      phrase: 'Wortgruppe',
+      exact: 'exakt',
+      negativeExact: 'negativ exakt',
+      negativePhrase: 'negativ Wortgruppe',
+    },
+    setupExpression: { asin: 'ASIN', asinExpanded: 'ähnlich wie', category: 'Kategorie' },
+    setupPlacement: {
+      PLACEMENT_TOP: 'Anfang der Suchergebnisse',
+      PLACEMENT_PRODUCT_PAGE: 'Produktseiten',
+      PLACEMENT_REST_OF_SEARCH: 'Rest der Suche',
+    },
     amazonId: 'Amazon-ID {id}',
     entity: {
       campaign: 'Kampagne',
@@ -1113,6 +1126,7 @@ export const de = {
         'Das Blatt dieser Sponsored-Brands-Kampagne ist unbekannt: zuerst eine aktuelle Bulk-Datei importieren.',
       TARGET_TYPE_NOT_SUPPORTED: 'Diese Art von Target lässt sich so nicht ändern.',
       BULK_FILE_PARENT_ARCHIVED: 'Die Kampagne bzw. Ad Group wird in derselben Datei archiviert.',
+      PARENT_NOT_CREATED: 'Die Kampagne bzw. Ad Group dieser Anlage wird nicht angelegt.',
     },
     followUp: {
       retry: 'Erneut versucht: {status}',
@@ -1334,6 +1348,13 @@ export const de = {
       eurRate:
         'Werte aus dem Katalog in EUR, umgerechnet mit 1 EUR = {rate} {currency} (Kurs vom {date}).',
       fromProfile: 'Gebote aus dem Profil: {values}',
+      bidKind: {
+        broad: 'weitgehend',
+        phrase: 'Wortgruppe',
+        exact: 'exakt',
+        product: 'Produkte',
+        category: 'Kategorien',
+      },
     },
     state: {
       label: 'Neue Kampagnen pausiert anlegen',
@@ -1346,6 +1367,11 @@ export const de = {
     saved: 'Entwurf gespeichert.',
     saveFailed: 'Speichern hat nicht geklappt.',
     discard: 'Entwurf verwerfen',
+    discardFailed: 'Verwerfen hat nicht geklappt.',
+    confirmDiscard: 'Diesen Entwurf verwerfen? Er verschwindet aus der Liste.',
+    confirmClose: 'Deine Änderungen sind nicht gespeichert. Ohne Speichern schließen?',
+    closeWithoutSaving: 'Ohne Speichern schließen',
+    keepEditing: 'Weiter bearbeiten',
     close: 'Schließen',
     channel: 'Übermitteln als',
     channelBulk: 'Bulk-Datei (Upload in der Werbekonsole)',
@@ -1950,6 +1976,19 @@ export const de = {
     text: 'Die Adresse gibt es nicht (mehr). Prüfe den Link oder nutze die Navigation.',
   },
   errors: {
+    CAMPAIGN_SETUP_FX_RATE_MISSING:
+      'Für die Währung dieses Profils gibt es noch keinen Tageskurs; die Werte des Katalogs (EUR) lassen sich nicht umrechnen. Der Kurs kommt mit dem nächsten Abruf der EZB-Kurse.',
+    CAMPAIGN_SETUP_VERSION_CONFLICT:
+      'Der Entwurf wurde inzwischen von jemand anderem geändert. Schließe ihn und öffne ihn neu.',
+    CAMPAIGN_SETUP_NOT_DRAFT: 'Dieser Entwurf ist schon übermittelt oder verworfen.',
+    CAMPAIGN_SETUP_NOT_FOUND:
+      'Diesen Entwurf, dieses Profil oder diese Produktgruppe gibt es nicht (mehr).',
+    CAMPAIGN_SETUP_PROFILE_CHANGED:
+      'Ein Entwurf bleibt in seinem Profil; lege für ein anderes Profil einen neuen an.',
+    CAMPAIGN_SETUP_PRODUCT_GROUP_MISMATCH: 'Die Produktgruppe gehört nicht zu diesem Profil.',
+    CAMPAIGN_SETUP_UNKNOWN_PRESET: 'Dieses Preset gibt es im Struktur-Katalog nicht (mehr).',
+    CAMPAIGN_SETUP_PROFILE_HAS_NO_CONNECTION:
+      'Dieses Profil hat keine Verbindung zu Amazon. Übermittle es als Bulk-Datei.',
     PRODUCT_GROUP_UNKNOWN_PRESET: 'Dieses Preset gibt es im Struktur-Katalog nicht (mehr).',
     STRUCTURE_CATALOG_FORBIDDEN: 'Nur Admins ändern den Struktur-Katalog.',
     STRUCTURE_CATALOG_VERSION_CONFLICT:
