@@ -158,6 +158,7 @@ export {
   type BulkFileCampaign,
   type BulkFileCell,
   type BulkFileChange,
+  type BulkFileCreate,
   type BulkFileSdTargeting,
   type BulkFileSheetKind,
   type BulkFileSkipReason,

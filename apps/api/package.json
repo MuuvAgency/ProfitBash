@@ -30,6 +30,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@profitbash/sheets": "workspace:*",
     "auth": "1.7.5",
     "tsup": "^8.5.1",
     "tsx": "^4.23.15"

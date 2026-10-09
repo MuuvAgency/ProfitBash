@@ -6,6 +6,7 @@ import {
   AD_CHANGE_ORIGINS,
   AD_CHANGE_REJECTIONS,
   AD_CHANGE_STATUSES,
+  AD_CHANGE_SUBMISSION_KINDS,
   AD_CHANGE_SUBMISSION_STATUSES,
   adChangeNegativeSchema,
   MAX_AD_CHANGES_PER_REQUEST,
@@ -83,6 +84,8 @@ export const adChangeSubmissionSchema = z
     accountName: z.string(),
     countryCode: z.string(),
     channel: z.enum(AD_CHANGE_CHANNELS),
+    /** `changes`: Änderungen; `setup`: Anlagen eines Setup-Entwurfs (Phase 4, 4.4). */
+    kind: z.enum(AD_CHANGE_SUBMISSION_KINDS),
     status: z.enum(AD_CHANGE_SUBMISSION_STATUSES),
     /** Grund, wenn die Übermittlung als Ganzes gescheitert ist bzw. warum sie noch wartet. */
     error: z.string().nullable(),
@@ -91,6 +94,7 @@ export const adChangeSubmissionSchema = z
     createdAt: timestamp,
     startedAt: timestamp.nullable(),
     finishedAt: timestamp.nullable(),
+    /** Änderungen bzw. Anlagen, gesamt und je Status. */
     changes: z.number().int(),
     counts: z.object({
       submitted: z.number().int(),
