@@ -127,8 +127,16 @@ describe('buildCampaignPlan: Struktur und Namen', () => {
   });
 
   it('prüft Namen gegen die Höchstlänge des Kontos (Vendoren 116 Zeichen)', () => {
-    const group = { name: 'g'.repeat(105), items: [{ asin: 'B0FLASCHE1', sku: null, isHero: true }] };
-    const profile = { countryCode: 'DE', currencyCode: 'EUR', accountType: 'vendor', clientName: null };
+    const group = {
+      name: 'g'.repeat(105),
+      items: [{ asin: 'B0FLASCHE1', sku: null, isHero: true }],
+    };
+    const profile = {
+      countryCode: 'DE',
+      currencyCode: 'EUR',
+      accountType: 'vendor',
+      clientName: null,
+    };
     const vendor = buildCampaignPlan(base({ profile, productGroup: group }));
     const seller = buildCampaignPlan(
       base({

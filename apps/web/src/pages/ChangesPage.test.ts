@@ -91,6 +91,7 @@ function submission(
     accountName: 'Demo DE',
     countryCode: 'DE',
     channel: 'api',
+    kind: 'changes',
     status: 'finished',
     error: null,
     createdBy: 'user-1',

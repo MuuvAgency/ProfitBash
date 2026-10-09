@@ -55,7 +55,9 @@ describe('campaignNameIssues', () => {
   });
 
   it('nimmt nur die Zeichen an, die Amazon für Namen nennt (Limits-Seite, 2026-10-09)', () => {
-    expect(campaignNameIssues('SP | EXACT1 | Größe XL (2er) - Café & Co. / 50 $ @ [a]_{b}~`\'\\')).toEqual([]);
+    expect(
+      campaignNameIssues("SP | EXACT1 | Größe XL (2er) - Café & Co. / 50 $ @ [a]_{b}~`'\\"),
+    ).toEqual([]);
     expect(campaignNameIssues('Łódź Ærø Œuvre ß ÿ')).toEqual(['invalidCharacters']);
     expect(campaignNameIssues('Łódź Œuvre ß ÿ')).toEqual([]);
     for (const name of ['SP · AUTO', 'Rabatt 20%', 'Neu!', '#1', 'a < b', 'Emoji 🙂']) {

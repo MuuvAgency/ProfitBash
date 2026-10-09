@@ -413,7 +413,10 @@ const PLACEMENTS = new Map([
   ['PLACEMENT_PRODUCT_PAGE', 'Placement Product Page'],
   ['SITE_AMAZON_BUSINESS', 'Placement Amazon Business'],
 ]);
-const OFF_AMAZON = { increaseReach: 'Increase reach', limitSpend: 'Limit off-Amazon spend' } as const;
+const OFF_AMAZON = {
+  increaseReach: 'Increase reach',
+  limitSpend: 'Limit off-Amazon spend',
+} as const;
 const EXPRESSIONS = { asin: 'asin', asinExpanded: 'asin-expanded', category: 'category' } as const;
 const SD_TARGETING_ENTITIES = {
   contextual: 'Contextual Targeting',
