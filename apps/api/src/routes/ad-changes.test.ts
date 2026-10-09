@@ -1,4 +1,9 @@
-import { recordAdChangeResults, schema } from '@profitbash/db';
+import {
+  recordAdChangeResults,
+  saveCampaignSetupDraft,
+  schema,
+  submitCampaignSetupDraft,
+} from '@profitbash/db';
 import { seedAdChangeFixture, type AdChangeFixture } from '@profitbash/db/testing';
 import type {
   AdChangeInput,
@@ -8,6 +13,8 @@ import type {
   RevertAdChangesResponse,
   SubmitAdChangesResponse,
 } from '@profitbash/shared';
+import { todayInTimezone } from '@profitbash/shared';
+import { openXlsx } from '@profitbash/sheets';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -26,6 +33,8 @@ const {
   amazonAdsProfiles,
   amazonAdsTargets,
   auditEvents,
+  campaignSetupDrafts,
+  campaignSetupItems,
   orgEntitlements,
 } = schema;
 
@@ -119,6 +128,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   const { db } = ctx.testDb;
   await db.delete(adChanges);
+  await db.delete(campaignSetupItems);
+  await db.delete(campaignSetupDrafts);
   await db.delete(adChangeSubmissions);
   await db.delete(auditEvents);
   await db.update(amazonAdsProfiles).set({ isHidden: false });
@@ -615,6 +626,123 @@ describe('Bulk-Datei', () => {
     });
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe('SUBMISSION_NOT_OPEN');
+  });
+});
+
+describe('Bulk-Datei eines Setups (4.4)', () => {
+  /** Entwurf mit einer SP-Kampagne im Profil ohne Connection, übermittelt als Bulk-Datei. */
+  async function setup(defaultBid = '0.85') {
+    const { db } = ctx.testDb;
+    const name = 'SP | EXACT | Lampen';
+    const draft = (await saveCampaignSetupDraft(db, {
+      userId: f.ada,
+      orgId: f.org,
+      draft: {
+        profileId: f.fileProfile,
+        productGroupId: null,
+        presetKey: 'muuv-standard',
+        name: 'Lampen',
+        campaignState: 'ENABLED',
+        inputs: { keywords: [], brandTerms: [], productTargets: [], categories: [], unlocks: {} },
+        campaigns: [
+          {
+            block: 'SP-KW-EXACT',
+            adProduct: 'SP',
+            targeting: 'keyword',
+            name,
+            state: 'ENABLED',
+            currencyCode: 'EUR',
+            dailyBudget: '20.00',
+            biddingStrategy: 'SALES_DOWN_ONLY',
+            sdOptimization: null,
+            costType: 'cpc',
+            offAmazon: false,
+            placements: null,
+            adGroup: { name, defaultBid },
+            ads: [{ asin: 'B0TEST0001', sku: 'SKU-1' }],
+            targets: [{ type: 'keyword', text: 'stehlampe', matchType: 'exact', bid: '0.90' }],
+            negatives: [],
+          },
+        ],
+      },
+    }))!;
+    const result = await submitCampaignSetupDraft(db, {
+      userId: f.ada,
+      orgId: f.org,
+      draftId: draft.id,
+      version: 1,
+      channel: 'bulk_file',
+      enqueue: async () => undefined,
+      review: () => null,
+    });
+    if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
+    return result.submission.id;
+  }
+
+  it('liefert die Datei mit den Anlagen und nennt die Übermittlung als Setup', async () => {
+    const submissionId = await setup();
+    const res = await request(ctx, `/api/ads/changes/submissions/${submissionId}/bulk-file`, {
+      method: 'GET',
+      cookie: editor,
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toMatch(
+      /^attachment; filename="profitbash-setup-datei-konto-de-\d{4}-\d{2}-\d{2}\.xlsx"$/,
+    );
+    const workbook = openXlsx(new Uint8Array(await res.arrayBuffer()));
+    const rows: string[][] = [];
+    workbook.forEachRow('Sponsored Products Campaigns', (cells) => rows.push(cells));
+    const entity = rows[0]!.indexOf('Entity');
+    const start = rows[0]!.indexOf('Start Date');
+    expect(rows.slice(1).map((row) => row[entity])).toEqual([
+      'Campaign',
+      'Ad Group',
+      'Product Ad',
+      'Keyword',
+    ]);
+    expect(rows[1]![start]).toBe(todayInTimezone('Europe/Berlin', new Date()).replaceAll('-', ''));
+
+    const detail = await call<AdChangeSubmissionDetail>(
+      'GET',
+      `/submissions/${submissionId}`,
+      editor,
+    );
+    expect(detail.body.submission).toMatchObject({
+      kind: 'setup',
+      changes: 4,
+      counts: { submitted: 4 },
+    });
+  });
+
+  it('lässt Anlagen scheitern, die nicht in die Datei passen, samt ihren Kindern', async () => {
+    const submissionId = await setup('0');
+    const res = await request(ctx, `/api/ads/changes/submissions/${submissionId}/bulk-file`, {
+      method: 'GET',
+      cookie: editor,
+    });
+    expect(res.status).toBe(200);
+    const items = await ctx.testDb.db
+      .select()
+      .from(campaignSetupItems)
+      .where(eq(campaignSetupItems.submissionId, submissionId))
+      .orderBy(campaignSetupItems.position);
+    expect(items.map((item) => [item.entityType, item.status, item.errorCode])).toEqual([
+      ['campaign', 'submitted', null],
+      ['ad_group', 'failed', 'BULK_FILE_INVALID_VALUE'],
+      ['product_ad', 'failed', 'PARENT_NOT_CREATED'],
+      ['keyword', 'failed', 'PARENT_NOT_CREATED'],
+    ]);
+  });
+
+  it('schließt ein Setup von Hand ab; fremde Organisation und ausgeblendetes Profil sehen es nicht', async () => {
+    const submissionId = await setup();
+    expect((await call('GET', `/submissions/${submissionId}/bulk-file`, foreign)).status).toBe(404);
+    const closed = await call('POST', `/submissions/${submissionId}/close`, editor, {
+      outcome: 'applied',
+    });
+    expect(closed.body).toEqual({ changes: 4 });
+    await ctx.testDb.db.update(amazonAdsProfiles).set({ isHidden: true });
+    expect((await call('GET', `/submissions/${submissionId}/bulk-file`, editor)).status).toBe(404);
   });
 });
 

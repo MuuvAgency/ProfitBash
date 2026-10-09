@@ -15,6 +15,8 @@ import {
   listPendingAdChanges,
   listSubmissionConnections,
   recordAdChangeResults,
+  getCampaignSetupSubmissionItems,
+  recordCampaignSetupResults,
   retryAdChanges,
   revertAdChanges,
   stageAdChanges,
@@ -54,8 +56,10 @@ import {
   type AdChange,
   type AdChangeCheck,
   type AdChangeSubmission,
+  todayInTimezone,
 } from '@profitbash/shared';
-import { buildSubmissionBulkFile } from '@profitbash/worker';
+import { buildSetupBulkFile, buildSubmissionBulkFile } from '@profitbash/worker';
+import type { Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { AppDeps, AppEnv } from '../context';
 import { ApiError } from '../errors';
@@ -312,6 +316,26 @@ function serializeChange(change: AdChangeRecord): AdChange {
   };
 }
 
+function xlsxResponse(
+  c: Context,
+  content: Uint8Array,
+  prefix: string,
+  submission: Pick<AdChangeSubmissionSummary, 'accountName' | 'countryCode' | 'createdAt'>,
+) {
+  const name = [
+    prefix,
+    slugify(submission.accountName) || 'konto',
+    slugify(submission.countryCode) || 'xx',
+    submission.createdAt.toISOString().slice(0, 10),
+  ].join('-');
+  // Kopie in einen eigenen Puffer: `Response` nimmt keine Sicht auf einen geteilten.
+  return c.body(new Uint8Array(content).buffer, 200, {
+    'Content-Type': XLSX,
+    'Content-Disposition': `attachment; filename="${name}.xlsx"`,
+    'Cache-Control': 'no-store',
+  });
+}
+
 function serializeSubmission(submission: AdChangeSubmissionSummary): AdChangeSubmission {
   return {
     ...submission,
@@ -378,10 +402,51 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
    * vor jedem Download und vor dem Abschließen als „hochgeladen“ (eine Entity kann inzwischen entfernt oder
    * archiviert sein). `null`, wenn der Nutzer die Übermittlung nicht sehen darf.
    */
+  /**
+   * Bulk-Datei eines Setups (4.4): Datei und übersprungene Anlagen; das Startdatum ist heute in der Zeitzone des
+   * Profils. `null`, wenn es keine sichtbare Setup-Übermittlung ist.
+   */
+  async function setupBulkFile(who: { userId: string; orgId: string }, submissionId: string) {
+    const found = await getCampaignSetupSubmissionItems(db, { ...who, submissionId });
+    if (!found) return null;
+    if (found.submission.channel !== 'bulk_file') {
+      throw new AdChangeError(
+        'SUBMISSION_NOT_BULK_FILE',
+        'Eine Bulk-Datei gibt es nur für Übermittlungen per Bulk-Datei.',
+      );
+    }
+    const file = buildSetupBulkFile(found.items, {
+      countryCode: found.profile.countryCode,
+      accountType: found.profile.accountType,
+      startDate: todayInTimezone(found.profile.timezone, new Date()),
+    });
+    return { submission: found.submission, file };
+  }
+
   async function settleBulkFile(
     who: { userId: string; orgId: string },
     submissionId: string,
   ): Promise<Skipped[] | null> {
+    const setup = await setupBulkFile(who, submissionId);
+    if (setup) {
+      const { skipped } = setup.file;
+      if (skipped.length > 0) {
+        const scope = { organizationId: who.orgId, submissionId, now: new Date() };
+        await recordCampaignSetupResults(db, {
+          ...scope,
+          results: skipped.map(({ itemId, code, message }) => ({
+            itemId,
+            outcome: 'failed',
+            code,
+            message,
+          })),
+        });
+        if (setup.submission.status === 'pending' || setup.submission.status === 'running') {
+          await finishAdChangeSubmission(db, scope);
+        }
+      }
+      return skipped.map(({ itemId, ...rest }) => ({ changeId: itemId, ...rest }));
+    }
     const found = await getBulkFileSubmissionRows(db, { ...who, submissionId });
     if (!found) return null;
     const { skipped } = buildSubmissionBulkFile(found.rows);
@@ -548,6 +613,26 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
     const who = actor(c);
     const submissionId = c.req.valid('param').id;
     let found: Awaited<ReturnType<typeof getBulkFileSubmissionRows>>;
+    let setup: Awaited<ReturnType<typeof setupBulkFile>>;
+    try {
+      setup = await setupBulkFile(who, submissionId);
+      if (setup) {
+        await settleBulkFile(who, submissionId);
+        setup = await setupBulkFile(who, submissionId);
+      }
+    } catch (error) {
+      throw toApiError(error);
+    }
+    if (setup) {
+      if (setup.file.content === null) {
+        throw new ApiError(
+          409,
+          'BULK_FILE_EMPTY',
+          'Keine Anlage dieses Setups passt in die Bulk-Datei.',
+        );
+      }
+      return xlsxResponse(c, setup.file.content, 'profitbash-setup', setup.submission);
+    }
     try {
       // Was inzwischen nicht mehr in die Datei passt, scheitert jetzt; die Datei enthält nur den Rest.
       found =
@@ -566,19 +651,7 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
         'Keine Änderung dieser Übermittlung passt in die Bulk-Datei.',
       );
     }
-    const { accountName, countryCode, createdAt } = found.submission;
-    const name = [
-      'profitbash-aenderungen',
-      slugify(accountName) || 'konto',
-      slugify(countryCode) || 'xx',
-      createdAt.toISOString().slice(0, 10),
-    ].join('-');
-    // Kopie in einen eigenen Puffer: `Response` nimmt keine Sicht auf einen geteilten.
-    return c.body(new Uint8Array(file.content).buffer, 200, {
-      'Content-Type': XLSX,
-      'Content-Disposition': `attachment; filename="${name}.xlsx"`,
-      'Cache-Control': 'no-store',
-    });
+    return xlsxResponse(c, file.content, 'profitbash-aenderungen', found.submission);
   });
 
   app.openapi({ ...closeRoute, middleware: write }, async (c) => {
