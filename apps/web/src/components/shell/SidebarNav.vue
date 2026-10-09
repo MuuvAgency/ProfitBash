@@ -10,8 +10,10 @@ withDefaults(
     groups: NavGroup[];
     /** Nur Icons; Beschriftung per `aria-label` und Tooltip. */
     collapsed?: boolean;
+    /** Zähler je Eintrag (ID → Text und Beschreibung), z. B. der Warenkorb an „Änderungen“. */
+    badges?: Record<string, { text: string; label: string }>;
   }>(),
-  { idPrefix: 'nav', collapsed: false },
+  { idPrefix: 'nav', collapsed: false, badges: () => ({}) },
 );
 
 const emit = defineEmits<{ navigate: [] }>();
@@ -41,12 +43,16 @@ const route = useRoute();
           <RouterLink
             v-tooltip.right="collapsed ? t(item.labelKey) : undefined"
             :to="item.path"
-            :aria-label="collapsed ? t(item.labelKey) : undefined"
+            :aria-label="
+              collapsed
+                ? [t(item.labelKey), badges[item.id]?.label].filter(Boolean).join(', ')
+                : undefined
+            "
             :aria-current="route.meta.navItemId === item.id ? 'page' : undefined"
             :class="[
               'flex items-center gap-space-sm rounded-control py-space-sm text-body-md outline-none transition-colors',
               'focus-visible:ring-2 focus-visible:ring-violet',
-              collapsed ? 'justify-center px-space-sm' : 'px-space-md',
+              collapsed ? 'relative justify-center px-space-sm' : 'px-space-md',
               route.meta.navItemId === item.id
                 ? 'bg-violet font-semibold text-on-violet shadow-active'
                 : 'text-on-panel/70 hover:bg-on-panel/10 hover:text-on-panel',
@@ -54,7 +60,18 @@ const route = useRoute();
             @click="emit('navigate')"
           >
             <i :class="['pi', `pi-${item.icon}`, 'shrink-0 text-body-lg']" aria-hidden="true" />
-            <span v-if="!collapsed" class="truncate">{{ t(item.labelKey) }}</span>
+            <span v-if="!collapsed" class="min-w-0 flex-1 truncate">{{ t(item.labelKey) }}</span>
+            <span
+              v-if="badges[item.id]"
+              data-nav-badge
+              :class="[
+                'shrink-0 rounded-full bg-on-panel/20 px-1.5 font-data text-data-sm font-semibold text-on-panel',
+                collapsed ? 'absolute right-1 top-1' : '',
+              ]"
+            >
+              <span aria-hidden="true">{{ badges[item.id]!.text }}</span>
+              <span class="sr-only">{{ badges[item.id]!.label }}</span>
+            </span>
           </RouterLink>
         </li>
       </ul>

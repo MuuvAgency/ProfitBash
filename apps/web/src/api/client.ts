@@ -37,6 +37,10 @@ export type SearchTermRowData = Schemas['SearchTermRow'];
 export type SearchTermNgramData = Schemas['SearchTermNgram'];
 export type SearchTermRulesData = Schemas['SearchTermRules'];
 export type SearchTermRuleOverridesData = Schemas['SearchTermRuleOverrides'];
+export type AdChangeInputData = Schemas['AdChangeInput'];
+export type PendingAdChangesData = Schemas['PendingAdChangesResponse'];
+export type StageAdChangesData = Schemas['StageAdChangesResponse'];
+export type OpenAdChangesData = Schemas['OpenAdChangesResponse'];
 
 export interface ApiOptions {
   /**
@@ -265,6 +269,28 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/explorer/rows', { body: input })),
       asinSearch: (input: AsinSearchInput): Promise<ExplorerRowsData> =>
         unwrap(client.POST('/api/ads/asin-search', { body: input })),
+    },
+
+    /** Änderungen (`/api/ads/changes/*`, Feature `changes`): Warenkorb je Nutzer, offene Änderungen fürs Grid. */
+    adChanges: {
+      pending: (): Promise<PendingAdChangesData> => unwrap(client.GET('/api/ads/changes/pending')),
+      /** Vormerken: je Eingabe ein Ergebnis in derselben Reihenfolge (viele IDs, deshalb im Body). */
+      stage: (changes: AdChangeInputData[]): Promise<StageAdChangesData> =>
+        unwrap(client.POST('/api/ads/changes/pending', { body: { origin: 'explorer', changes } })),
+      /** Genannte oder (ohne Angabe) alle eigenen vorgemerkten Änderungen verwerfen. */
+      discard: (changeIds?: string[]) =>
+        unwrap(
+          client.POST('/api/ads/changes/pending/discard', {
+            body: changeIds ? { changeIds } : {},
+          }),
+        ),
+      /** Offene Änderungen aller Nutzer (vorgemerkt oder übermittelt ohne Ergebnis), optional je Profil. */
+      open: (profileId?: string): Promise<OpenAdChangesData> =>
+        unwrap(
+          client.GET('/api/ads/changes/open', {
+            params: { query: profileId ? { profileId } : {} },
+          }),
+        ),
     },
 
     /** Mitglieder (F9, nur Org-Admins). Links zum Passwort-Setzen kommen nur beim Anlegen bzw. Neu-Erzeugen. */

@@ -23,6 +23,44 @@ describe('AppShell', () => {
     expect(wrapper.find('a[href="/admin/connections"]').exists()).toBe(false);
   });
 
+  it('zeigt am Eintrag „Änderungen“, wie viele Änderungen im eigenen Warenkorb liegen', async () => {
+    stubFetch({
+      'GET /api/me': json(meFixture()),
+      ...noUiState,
+      'GET /api/ads/changes/pending': json({
+        changes: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
+        check: { violations: [], largeChanges: [], tooMany: null },
+      }),
+    });
+    const { wrapper } = await mountWithApp(undefined, { path: '/ads/budgets' });
+    await vi.waitFor(() =>
+      expect(wrapper.find('aside a[href="/ads/changes"] [data-nav-badge]').exists()).toBe(true),
+    );
+    const link = wrapper.get('aside a[href="/ads/changes"]');
+    expect(link.get('[data-nav-badge] [aria-hidden="true"]').text()).toBe('3');
+    expect(link.get('[data-nav-badge] .sr-only').text()).toBe('3 ausstehend');
+    expect(wrapper.find('aside a[href="/ads/explorer"] [data-nav-badge]').exists()).toBe(false);
+  });
+
+  it('zeigt keinen Zähler bei leerem Warenkorb, ohne das Feature und wenn die Abfrage scheitert', async () => {
+    const { requests } = stubFetch({
+      'GET /api/me': json(meFixture({ features: ['budgets'] })),
+      ...noUiState,
+    });
+    const { wrapper } = await mountWithApp(undefined, { path: '/ads/budgets' });
+    await vi.waitFor(() => expect(wrapper.find('h1').exists()).toBe(true));
+    await flushPromises();
+    expect(requests.some((request) => request.path === '/api/ads/changes/pending')).toBe(false);
+
+    cleanupMounted();
+    stubFetch({ 'GET /api/me': json(meFixture()), ...noUiState });
+    const second = await mountWithApp(undefined, { path: '/ads/budgets' });
+    await vi.waitFor(() => expect(second.wrapper.find('h1').exists()).toBe(true));
+    await flushPromises();
+    expect(second.wrapper.find('[data-nav-badge]').exists()).toBe(false);
+    expect(second.wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+
   it('zeigt einen Ladefehler mit „Erneut versuchen“ und erholt sich danach', async () => {
     stubFetch({ 'GET /api/me': serverError });
     const { wrapper, router } = await mountWithApp(undefined, { path: '/' });
