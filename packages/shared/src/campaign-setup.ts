@@ -43,6 +43,8 @@ export const CAMPAIGN_SETUP_ITEM_ENTITIES = [
   'product_target',
   'negative_keyword',
   'negative_product_target',
+  /** Negativ in der Quelle eines Harvest-Begriffs (bestehende Kampagne und Ad Group, F7, 4.6). */
+  'source_negative',
 ] as const;
 export type CampaignSetupItemEntity = (typeof CAMPAIGN_SETUP_ITEM_ENTITIES)[number];
 
@@ -150,6 +152,16 @@ export const setupInputsSchema = z.strictObject({
     )
     .max(MAX_SETUP_INPUTS)
     .default([]),
+  /**
+   * Begriffe von der Harvest-Merkliste (4.6, F7/F8): Der Server liest Begriff, Quelle und CPC selbst. `bid` ersetzt
+   * den CPC der Merkliste, `single` legt eine eigene Kampagne an (wie bei Keywords).
+   */
+  harvest: z
+    .array(
+      z.strictObject({ markId: z.uuid(), single: z.boolean().optional(), bid: money.optional() }),
+    )
+    .max(MAX_SETUP_INPUTS)
+    .default([]),
   unlocks: z
     .record(
       z.string().max(32),
@@ -158,6 +170,25 @@ export const setupInputsSchema = z.strictObject({
     .default({}),
 });
 export type SetupInputs = z.output<typeof setupInputsSchema>;
+
+/**
+ * Vorschlag, einen Harvest-Begriff in seiner Quelle zu negieren (F7, 4.6): negativ exakt in der Ad Group der Quelle
+ * (bestehende SP-Kampagne). Abwählbar (`selected`); geschützte Begriffe schlägt die Engine nie vor.
+ */
+export const sourceNegativeSchema = z
+  .strictObject({
+    markId: z.uuid(),
+    searchTerm: keywordText,
+    amazonCampaignId: z.string().regex(/^\d{1,20}$/),
+    amazonAdGroupId: z.string().regex(/^\d{1,20}$/),
+    campaignName: name,
+    adGroupName: name,
+    negative: plannedNegativeSchema,
+    selected: z.boolean(),
+  })
+  .meta({ id: 'SourceNegative' });
+export type SourceNegative = z.output<typeof sourceNegativeSchema>;
+export const MAX_SETUP_SOURCE_NEGATIVES = MAX_SETUP_INPUTS;
 
 const draftName = z
   .string()
@@ -174,6 +205,7 @@ export const saveCampaignSetupDraftSchema = z
     campaignState: z.enum(CAMPAIGN_SETUP_STATES),
     inputs: setupInputsSchema,
     campaigns: z.array(plannedCampaignSchema).min(1).max(MAX_SETUP_CAMPAIGNS),
+    sourceNegatives: z.array(sourceNegativeSchema).max(MAX_SETUP_SOURCE_NEGATIVES).default([]),
   })
   .meta({ id: 'SaveCampaignSetupDraftRequest' });
 export type SaveCampaignSetupDraft = z.output<typeof saveCampaignSetupDraftSchema>;
@@ -213,7 +245,15 @@ export type CampaignSetupItemPayload =
       bid: string;
     }
   | { entity: 'negative_keyword'; text: string; matchType: 'negativeExact' | 'negativePhrase' }
-  | { entity: 'negative_product_target'; asin: string };
+  | { entity: 'negative_product_target'; asin: string }
+  | {
+      entity: 'source_negative';
+      /** Echte IDs der bestehenden Kampagne und Ad Group (Quelle des Harvest-Begriffs). */
+      amazonCampaignId: string;
+      amazonAdGroupId: string;
+      negative: PlannedNegative;
+      harvestMarkId: string;
+    };
 
 // ---------------------------------------------------------------------------
 // API (4.5)
@@ -246,6 +286,8 @@ export type PlanCampaignSetupRequest = z.input<typeof planCampaignSetupRequestSc
 export const planCampaignSetupResponseSchema = z
   .object({
     campaigns: z.array(plannedCampaignSchema),
+    /** Negativ-Vorschläge für die Quellen der Harvest-Begriffe (F7). */
+    sourceNegatives: z.array(sourceNegativeSchema),
     hints: z.array(setupIssueSchema),
     /** 1 EUR in der Währung des Profils und der Tag des Kurses. */
     eurRate: z.object({ rate: z.string(), date: z.string() }),
@@ -280,7 +322,12 @@ const draftFields = {
 };
 
 export const campaignSetupDraftSchema = z
-  .object({ ...draftFields, inputs: setupInputsSchema, campaigns: z.array(plannedCampaignSchema) })
+  .object({
+    ...draftFields,
+    inputs: setupInputsSchema,
+    campaigns: z.array(plannedCampaignSchema),
+    sourceNegatives: z.array(sourceNegativeSchema),
+  })
   .meta({ id: 'CampaignSetupDraft' });
 export type CampaignSetupDraft = z.infer<typeof campaignSetupDraftSchema>;
 

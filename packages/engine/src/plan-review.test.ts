@@ -237,4 +237,64 @@ describe('reviewCampaignPlan', () => {
       { severity: 'error', code: 'duplicateTarget', campaign: 'Doppelt', target: 'B0FREMD002' },
     ]);
   });
+
+  describe('Negatives in der Quelle (4.6)', () => {
+    const source = {
+      markId: '00000000-0000-4000-8000-000000000001',
+      searchTerm: 'trinkflasche 1l',
+      amazonCampaignId: '111',
+      amazonAdGroupId: '222',
+      campaignName: 'SP | AUTO | Flaschen',
+      adGroupName: 'Auto',
+      negative: { type: 'keyword', text: 'trinkflasche 1l', matchType: 'negativeExact' },
+      selected: true,
+    } as const;
+    const sourceAdGroups = new Set(['111:222']);
+
+    it('nimmt gültige gewählte Negatives an', () => {
+      expect(
+        reviewCampaignPlan(
+          input({ sourceNegatives: [source], protectedTerms: [], sourceAdGroups }),
+        ),
+      ).toEqual([]);
+    });
+
+    it('sperrt geschützte Begriffe, fehlende Quellen und Dubletten, abgewählte zählen nicht', () => {
+      const issues = reviewCampaignPlan(
+        input({
+          sourceNegatives: [
+            source,
+            source,
+            { ...source, amazonAdGroupId: '999' },
+            {
+              ...source,
+              negative: { type: 'keyword', text: 'nordwind becher', matchType: 'negativeExact' },
+            },
+            {
+              ...source,
+              selected: false,
+              negative: { type: 'keyword', text: 'nordwind tasse', matchType: 'negativeExact' },
+            },
+          ],
+          protectedTerms: ['Nordwind'],
+          sourceAdGroups,
+        }),
+      );
+      expect(issues).toEqual([
+        {
+          severity: 'error',
+          code: 'duplicateTarget',
+          campaign: 'SP | AUTO | Flaschen',
+          target: 'trinkflasche 1l',
+        },
+        {
+          severity: 'error',
+          code: 'sourceNegativeMissing',
+          campaign: 'SP | AUTO | Flaschen',
+          target: 'trinkflasche 1l',
+        },
+        { severity: 'error', code: 'sourceNegativeProtected', keyword: 'nordwind becher' },
+      ]);
+    });
+  });
 });
