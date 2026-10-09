@@ -29,7 +29,7 @@ import {
   type SetupInputs,
   type SetupTexts,
 } from './inputs';
-import { issueText, sortedIssues } from './issues';
+import { groupedIssues, issueText, sortedIssues } from './issues';
 
 /**
  * Assistent des Kampagnen-Setups (`phase-4.md` 4.5): Profil → Produktgruppe → Preset → Keywords und Ziele → Vorschau
@@ -168,7 +168,7 @@ const allAmountsValid = computed(() =>
 function removeCampaign(index: number) {
   campaigns.value = campaigns.value.filter((_, position) => position !== index);
 }
-const issues = computed(() => sortedIssues(hints.value));
+const issues = computed(() => groupedIssues(hints.value));
 const hasErrors = computed(() => hints.value.some((hint) => hint.severity === 'error'));
 
 // --- Speichern, Verwerfen, Übermitteln ---------------------------------------------------
@@ -179,9 +179,12 @@ const submit = useSubmitSetupDraft();
 const notice = ref<string | null>(null);
 const actionErrorKey = ref<string | null>(null);
 const channel = ref<AdChangeChannelData>('bulk_file');
-const submitted = ref<{ items: number; unsupported: number; channel: AdChangeChannelData } | null>(
-  null,
-);
+const submitted = ref<{
+  id: string;
+  items: number;
+  unsupported: number;
+  channel: AdChangeChannelData;
+} | null>(null);
 const rejected = ref<SetupIssueData[]>([]);
 
 const canSave = computed(
@@ -243,6 +246,7 @@ async function submitDraft() {
     }
     status.value = 'submitted';
     submitted.value = {
+      id: result.submission.id,
       items: result.items,
       unsupported: result.unsupported,
       channel: channel.value,
@@ -442,7 +446,7 @@ watch(version, () => (savedSnapshot.value = snapshot()));
           ]"
         >
           <span class="font-semibold">{{ t(`setup.severity.${issue.severity}`) }}:</span>
-          {{ issueText(t, te, issue) }}
+          {{ issueText(t, te, issue, blockLabel) }}
         </li>
       </ul>
       <div class="min-w-0 overflow-x-auto">
@@ -471,7 +475,7 @@ watch(version, () => (savedSnapshot.value = snapshot()));
               class="border-t border-line align-top"
             >
               <td class="py-space-xs pr-space-md">
-                <span data-campaign-name class="break-all font-data text-ink">{{
+                <span data-campaign-name class="break-words font-data text-ink">{{
                   campaign.name
                 }}</span>
               </td>
@@ -609,7 +613,7 @@ watch(version, () => (savedSnapshot.value = snapshot()));
           :key="index"
           class="rounded-control bg-loss-wash px-space-md py-space-xs text-body-sm text-on-loss-wash"
         >
-          {{ issueText(t, te, issue) }}
+          {{ issueText(t, te, issue, blockLabel) }}
         </li>
       </ul>
     </div>
@@ -635,7 +639,10 @@ watch(version, () => (savedSnapshot.value = snapshot()));
           )
         }}
       </p>
-      <RouterLink to="/ads/changes" class="font-semibold text-violet underline">
+      <RouterLink
+        :to="{ path: '/ads/changes', query: { tab: 'submissions', submission: submitted.id } }"
+        class="font-semibold text-violet underline"
+      >
         {{ t('setup.toChanges') }}
       </RouterLink>
     </div>

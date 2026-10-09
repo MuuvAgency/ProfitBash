@@ -268,6 +268,7 @@ describe('Änderungen: Ausstehend', () => {
         [`GET /api/ads/changes/submissions/${S1}`]: json({
           submission: submission(S1, { status: 'pending' }),
           changes: [change(C1, { status: 'submitted', submissionId: S1 })],
+          setupItems: [],
           entitiesSyncedAt: null,
         }),
       }),
@@ -365,8 +366,62 @@ describe('Änderungen: Übermittlungen', () => {
           followUp: { changeId: 'x', origin: 'retry', status: 'applied', submissionId: S2 },
         }),
       ],
+      setupItems: [],
       entitiesSyncedAt: '2026-10-01T06:00:00.000Z',
     });
+
+  it('zeigt die Anlagen eines Kampagnen-Setups mit Ergebnis', async () => {
+    const item = (position: number, patch: Record<string, unknown>) => ({
+      id: `00000000-0000-4000-8000-00000000f00${position}`,
+      position,
+      campaignRef: 'SP | EXACT | Flaschen',
+      adGroupRef: position === 0 ? null : 'SP | EXACT | Flaschen',
+      status: 'submitted',
+      amazonEntityId: null,
+      errorCode: null,
+      errorMessage: null,
+      ...patch,
+    });
+    stubFetch(
+      routes({
+        'GET /api/ads/changes/submissions': json({
+          submissions: [submission(S1, { kind: 'setup', channel: 'bulk_file', status: 'pending' })],
+        }),
+        [`GET /api/ads/changes/submissions/${S1}`]: json({
+          submission: submission(S1, { kind: 'setup', channel: 'bulk_file', status: 'pending' }),
+          changes: [],
+          setupItems: [
+            item(0, {
+              entityType: 'campaign',
+              payload: { entity: 'campaign', name: 'SP | EXACT | Flaschen' },
+              status: 'applied',
+              amazonEntityId: '4401',
+            }),
+            item(1, {
+              entityType: 'keyword',
+              payload: { entity: 'keyword', text: 'trinkflasche', matchType: 'exact', bid: '0.90' },
+              status: 'failed',
+              errorCode: 'PARENT_NOT_CREATED',
+              errorMessage: 'Die Kampagne wird nicht angelegt.',
+            }),
+          ],
+          entitiesSyncedAt: null,
+        }),
+      }),
+    );
+    const { wrapper } = await mountPage(`/ads/changes?tab=submissions&submission=${S1}`);
+    await vi.waitFor(() => expect(wrapper.find(`[data-submission="${S1}"]`).exists()).toBe(true));
+    expect(wrapper.get(`[data-submission="${S1}"]`).text()).toContain('Kampagnen-Setup');
+    const panel = await vi.waitFor(() => wrapper.get('[data-submission-detail]'));
+    await vi.waitFor(() => expect(panel.findAll('[data-setup-item]')).toHaveLength(2));
+    const [campaignRow, keywordRow] = panel.findAll('[data-setup-item]');
+    expect(campaignRow!.text()).toContain('Kampagne');
+    expect(campaignRow!.text()).toContain('SP | EXACT | Flaschen');
+    expect(campaignRow!.text()).toContain('Angelegt');
+    expect(campaignRow!.text()).toContain('4401');
+    expect(keywordRow!.text()).toContain('trinkflasche');
+    expect(keywordRow!.text()).toContain('Die Kampagne wird nicht angelegt. (PARENT_NOT_CREATED)');
+  });
 
   it('listet die Übermittlungen der Organisation und öffnet eine mit dem Ergebnis je Änderung', async () => {
     stubFetch(

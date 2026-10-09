@@ -10,6 +10,7 @@ import type {
   AdChangeSubmissionData,
   RevertAdChangesData,
   RevertAdChangesInput,
+  SetupItemData,
   SubmittedAdChangeData,
 } from '../api/client';
 import EmptyState from '../components/common/EmptyState.vue';
@@ -252,6 +253,36 @@ function changeStatusText(change: SubmittedAdChangeData): string {
     ? t('changes.change.waitingUpload')
     : t(`changes.change.status.${change.status}`);
 }
+/** Was eine Anlage des Setups anlegt, in einer Zeile (Name, Keyword, ASIN, Ausdruck). */
+function setupSummary(item: SetupItemData): string {
+  const payload = item.payload as Record<string, unknown>;
+  const text = (key: string) =>
+    typeof payload[key] === 'string' ? (payload[key] as string) : null;
+  switch (item.entityType) {
+    case 'campaign':
+    case 'ad_group':
+      return text('name') ?? item.campaignRef;
+    case 'placement':
+      return `${String(payload.placement)} ${String(payload.percentage)} %`;
+    case 'product_ad':
+      return [text('asin'), text('sku')].filter(Boolean).join(' · ');
+    case 'keyword':
+    case 'negative_keyword':
+      return `${text('text') ?? ''} (${text('matchType') ?? ''})`;
+    case 'product_target': {
+      const expression = payload.expression as { type?: string; value?: string } | undefined;
+      return `${expression?.type ?? ''} ${expression?.value ?? ''}`;
+    }
+    case 'negative_product_target':
+      return text('asin') ?? '';
+  }
+}
+function setupError(item: SetupItemData): string | null {
+  if (item.status !== 'failed' && item.status !== 'dismissed') return null;
+  if (!item.errorMessage) return item.errorCode;
+  return item.errorCode ? `${item.errorMessage} (${item.errorCode})` : item.errorMessage;
+}
+
 function errorOf(change: SubmittedAdChangeData): string | null {
   if (change.status !== 'failed' && change.status !== 'dismissed') return null;
   const known = change.errorCode && te(`changes.failure.${change.errorCode}`);
@@ -329,7 +360,10 @@ const conflictRows = computed(() =>
               {{ submission.accountName }} · {{ submission.countryCode }}
             </p>
             <p class="text-body-sm text-ink-secondary">
-              {{ t(`changes.channel.${submission.channel}`) }}
+              {{ t(`changes.channel.${submission.channel}`)
+              }}<template v-if="submission.kind === 'setup'">
+                · {{ t('changes.kind.setup') }}</template
+              >
             </p>
           </div>
           <div class="flex min-w-0 flex-col">
@@ -486,6 +520,51 @@ const conflictRows = computed(() =>
           <p v-for="line in notice.details" :key="line">{{ line }}</p>
         </div>
 
+        <ul
+          v-if="selected.setupItems.length"
+          class="flex flex-col"
+          :aria-label="t('changes.setupItemsLabel')"
+        >
+          <li
+            v-for="item in selected.setupItems"
+            :key="item.id"
+            data-setup-item
+            class="grid grid-cols-1 gap-space-xs rounded-control px-space-sm py-space-sm odd:bg-well sm:grid-cols-[minmax(0,0.9fr)_minmax(0,2fr)_minmax(0,1.6fr)] sm:items-center sm:gap-space-md"
+          >
+            <p class="text-body-sm text-ink-secondary">
+              {{ t(`changes.setupEntity.${item.entityType}`) }}
+            </p>
+            <div class="flex min-w-0 flex-col">
+              <p class="break-words font-data text-body-sm text-ink">{{ setupSummary(item) }}</p>
+              <p
+                v-if="item.entityType !== 'campaign' && item.entityType !== 'ad_group'"
+                class="break-words text-body-sm text-ink-secondary"
+              >
+                {{ item.campaignRef }}
+              </p>
+            </div>
+            <div class="flex min-w-0 flex-col gap-0.5 text-body-sm">
+              <p
+                :class="[
+                  'font-semibold',
+                  item.status === 'applied'
+                    ? 'text-lime-deep'
+                    : item.status === 'failed'
+                      ? 'text-on-loss-wash'
+                      : 'text-ink',
+                ]"
+              >
+                {{ t(`changes.setupStatus.${item.status}`) }}
+                <span v-if="item.amazonEntityId" class="font-data font-normal text-ink-secondary">
+                  · {{ t('changes.amazonId', { id: item.amazonEntityId }) }}</span
+                >
+              </p>
+              <p v-if="setupError(item)" class="break-words text-ink-secondary">
+                {{ setupError(item) }}
+              </p>
+            </div>
+          </li>
+        </ul>
         <ul class="flex flex-col">
           <li
             v-for="change in selected.changes"

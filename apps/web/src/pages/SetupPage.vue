@@ -154,8 +154,11 @@ async function openDraft(id: string) {
               {{ t(`setup.drafts.status.${draft.status}`) }}
             </span>
             <RouterLink
-              v-if="draft.status === 'submitted'"
-              to="/ads/changes"
+              v-if="draft.status === 'submitted' && draft.submissionId"
+              :to="{
+                path: '/ads/changes',
+                query: { tab: 'submissions', submission: draft.submissionId },
+              }"
               class="text-body-sm font-semibold text-violet underline"
             >
               {{ t('setup.drafts.toChanges') }}
