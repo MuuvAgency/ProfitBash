@@ -60,3 +60,4 @@ export {
   type AdChangeLimitLookup,
   type AdChangeLimitViolation,
 } from './ad-changes';
+export * from './naming';

@@ -21,3 +21,4 @@ export * from './tags';
 export * from './ad-changes';
 export * from './ad-changes-api';
 export * from './product-groups';
+export * from './structure-catalog';
