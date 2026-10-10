@@ -33,6 +33,7 @@ export * from './ad-change-queries';
 export * from './product-groups';
 export * from './goals';
 export * from './automation';
+export * from './automation-rules';
 export * from './structure-catalog';
 export * from './campaign-setup';
 export * from './campaign-setup-processing';

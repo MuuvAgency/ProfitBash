@@ -131,7 +131,7 @@ export async function saveStructureCatalog(
   }
 }
 
-function isUniqueViolation(error: unknown, constraint: string): boolean {
+export function isUniqueViolation(error: unknown, constraint: string): boolean {
   let current: unknown = error;
   for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
     const { code, constraint_name: name } = current as {

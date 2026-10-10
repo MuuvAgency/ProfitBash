@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { check, foreignKey, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { clients } from './app';
 import { organizations, users } from './auth';
 import { createdAt, updatedAt } from './columns';
@@ -47,3 +47,18 @@ export const clientAutomationSettings = pgTable(
     check('client_automation_settings_mode_ck', sql`${t.mode} in ('off', 'shadow', 'cart')`),
   ],
 );
+
+/**
+ * Regeln der Automatik je Organisation (`phase-5.md` 5.6a): eine geordnete Liste nach `automationRulesSchema`. Ohne
+ * Zeile gelten die Startregeln. `version` zählt jedes Speichern (gleichzeitige Änderungen enden mit 409).
+ */
+export const automationRules = pgTable('automation_rules', {
+  organizationId: uuid('organization_id')
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: 'cascade' }),
+  rules: jsonb('rules').$type<unknown>().notNull(),
+  version: integer('version').notNull(),
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
