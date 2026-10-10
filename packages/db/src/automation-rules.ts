@@ -3,12 +3,23 @@ import {
   DEFAULT_AUTOMATION_RULES,
   type AutomationRule,
 } from '@profitbash/shared';
+import { effectiveGoal, firstMatchingRule, type GoalSetting } from '@profitbash/engine';
 import { and, eq, inArray } from 'drizzle-orm';
-import { getOrgRole } from './access';
+import { getOrgRole, visibleProfilesScope } from './access';
 import { recordAuditEvent } from './audit';
 import { AutomationError, type AutomationAccessInput } from './automation';
 import type { Db } from './client';
-import { automationRules, clients } from './schema';
+import { listLatestEntityPeriodMetrics } from './entity-period-metrics';
+import { fxRatesOnOrBefore, latestFxRateDate } from './fx-rates';
+import {
+  amazonAdsAdGroups,
+  amazonAdsCampaigns,
+  amazonAdsProfiles,
+  amazonAdsTargets,
+  automationRules,
+  clients,
+  goals,
+} from './schema';
 import { isUniqueViolation } from './structure-catalog';
 
 /**
@@ -119,4 +130,124 @@ export async function saveAutomationRules(
     if (isUniqueViolation(error, 'automation_rules_pkey')) throw conflict();
     throw error;
   }
+}
+
+export interface RulePreviewRecord {
+  /** Je Regel (in der Reihenfolge der Liste) die Entities, für die sie als erste greift. */
+  counts: { ruleId: string; entities: number }[];
+  /** Aktive Targets bzw. Kampagnen mit Kennzahlen, gegen die geprüft wurde. */
+  targets: number;
+  campaigns: number;
+}
+
+const ACTIVE = 'ENABLED';
+
+/**
+ * Vorschau „würde heute für N Entities greifen“ für eine (auch ungespeicherte) Liste: alle aktiven Targets und
+ * Kampagnen der sichtbaren Profile mit ihrem Datenstand (`listLatestEntityPeriodMetrics`). `null` für Nicht-Mitglieder.
+ *
+ * shortcut: Ziel nur von Profil bzw. Client (ohne Produktgruppen) und ohne die Leitplanken; der Lauf (5.7) rechnet
+ * mit dem wirksamen Ziel je Target. Profile ohne EZB-Kurs für ihre Währung zählen nicht.
+ */
+export async function previewAutomationRules(
+  db: Db,
+  input: AutomationAccessInput & { rules: readonly AutomationRule[] },
+): Promise<RulePreviewRecord | null> {
+  const visible = await visibleProfilesScope(db, input);
+  if (visible === null) return null;
+  const profiles = await db
+    .select({
+      id: amazonAdsProfiles.id,
+      clientId: amazonAdsProfiles.clientId,
+      currencyCode: amazonAdsProfiles.currencyCode,
+    })
+    .from(amazonAdsProfiles)
+    .where(inArray(amazonAdsProfiles.id, visible.ids));
+  const rateDate = await latestFxRateDate(db);
+  const currencies = profiles.map((profile) => profile.currencyCode);
+  // Ohne Kurstabelle kennt `fxRatesOnOrBefore` nur EUR (Kurs 1); der Tag ist dann gleichgültig.
+  const rates = await fxRatesOnOrBefore(db, rateDate ?? '1970-01-01', currencies);
+  const goalRows = await db.select().from(goals).where(eq(goals.organizationId, input.orgId));
+  const goalSettings = goalRows.flatMap((row): GoalSetting[] => {
+    const metric = row.metric as GoalSetting['metric'];
+    if (row.clientId) return [{ scope: 'client', scopeId: row.clientId, metric, value: row.value }];
+    if (row.profileId)
+      return [{ scope: 'profile', scopeId: row.profileId, metric, value: row.value }];
+    return [];
+  });
+
+  const counts = new Map(input.rules.map((rule) => [rule.id, 0]));
+  const checked = { target: 0, campaign: 0 };
+  for (const profile of profiles) {
+    const eurRate = rates.get(profile.currencyCode)?.rate;
+    if (eurRate === undefined) continue;
+    const scope = { organizationId: input.orgId, profileId: profile.id };
+    const goalAcos =
+      effectiveGoal(goalSettings, {
+        clientId: profile.clientId,
+        profileId: profile.id,
+        productGroupIds: [],
+      })?.acos ?? null;
+    const campaigns = await db
+      .select({
+        id: amazonAdsCampaigns.id,
+        amazonId: amazonAdsCampaigns.amazonCampaignId,
+        state: amazonAdsCampaigns.state,
+      })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.profileId, profile.id));
+    const activeCampaigns = new Set(campaigns.filter((c) => c.state === ACTIVE).map((c) => c.id));
+    const adGroups = await db
+      .select({ id: amazonAdsAdGroups.id, state: amazonAdsAdGroups.state })
+      .from(amazonAdsAdGroups)
+      .where(eq(amazonAdsAdGroups.profileId, profile.id));
+    const activeAdGroups = new Set(adGroups.filter((g) => g.state === ACTIVE).map((g) => g.id));
+    const targets = await db
+      .select({
+        amazonId: amazonAdsTargets.amazonTargetId,
+        state: amazonAdsTargets.state,
+        campaignId: amazonAdsTargets.campaignId,
+        adGroupId: amazonAdsTargets.adGroupId,
+      })
+      .from(amazonAdsTargets)
+      .where(eq(amazonAdsTargets.profileId, profile.id));
+    const active = {
+      campaign: new Set(campaigns.filter((c) => activeCampaigns.has(c.id)).map((c) => c.amazonId)),
+      target: new Set(
+        targets
+          .filter(
+            (t) =>
+              t.state === ACTIVE &&
+              activeCampaigns.has(t.campaignId) &&
+              (t.adGroupId === null || activeAdGroups.has(t.adGroupId)),
+          )
+          .map((t) => t.amazonId),
+      ),
+    };
+    for (const level of ['target', 'campaign'] as const) {
+      for (const row of await listLatestEntityPeriodMetrics(db, { ...scope, level })) {
+        if (!active[level].has(row.amazonEntityId)) continue;
+        checked[level] += 1;
+        const rule = firstMatchingRule(input.rules, {
+          level,
+          clientId: profile.clientId,
+          metrics: {
+            impressions: row.impressions,
+            clicks: row.clicks,
+            orders: row.purchases,
+            spend: row.cost,
+            sales: row.sales,
+          },
+          goalAcos,
+          eurRate,
+        });
+        if (rule) counts.set(rule.id, counts.get(rule.id)! + 1);
+      }
+    }
+  }
+  return {
+    counts: input.rules.map((rule) => ({ ruleId: rule.id, entities: counts.get(rule.id)! })),
+    targets: checked.target,
+    campaigns: checked.campaign,
+  };
 }

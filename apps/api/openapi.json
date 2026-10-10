@@ -11218,6 +11218,57 @@
           "version"
         ],
         "additionalProperties": false
+      },
+      "AutomationRulesPreview": {
+        "type": "object",
+        "properties": {
+          "counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ruleId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "entities": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "ruleId",
+                "entities"
+              ]
+            }
+          },
+          "targets": {
+            "type": "integer"
+          },
+          "campaigns": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "counts",
+          "targets",
+          "campaigns"
+        ]
+      },
+      "PreviewAutomationRulesRequest": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationRule"
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -17421,6 +17472,67 @@
           },
           "409": {
             "description": "Inzwischen geändert.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/rules/preview": {
+      "post": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Vorschau: für wie viele Entities würde jede Regel heute greifen",
+        "description": "Speichert nichts. Geprüft werden aktive Targets und Kampagnen der sichtbaren Profile mit ihrem Datenstand; das Ziel kommt von Profil bzw. Client (ohne Produktgruppen), Leitplanken bleiben außen vor.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewAutomationRulesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Zähler je Regel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRulesPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
             "content": {
               "application/json": {
                 "schema": {

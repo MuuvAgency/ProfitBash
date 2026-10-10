@@ -3,16 +3,19 @@ import {
   AutomationError,
   getAutomationRules,
   getAutomationSettings,
+  previewAutomationRules,
   saveAutomationRules,
   type StoredAutomationRules,
   saveGuardrailDefaults,
   setClientAutomation,
 } from '@profitbash/db';
 import {
+  automationRulesPreviewSchema,
   automationRulesResponseSchema,
   automationSettingsSchema,
   errorResponseSchema,
   guardrailsSchema,
+  previewAutomationRulesRequestSchema,
   saveAutomationRulesRequestSchema,
   setClientAutomationRequestSchema,
 } from '@profitbash/shared';
@@ -99,6 +102,21 @@ const saveRulesRoute = createRoute({
   },
 });
 
+const previewRulesRoute = createRoute({
+  method: 'post',
+  path: '/ads/automations/rules/preview',
+  tags: ['Automationen'],
+  summary: 'Vorschau: für wie viele Entities würde jede Regel heute greifen',
+  description:
+    'Speichert nichts. Geprüft werden aktive Targets und Kampagnen der sichtbaren Profile mit ihrem Datenstand; ' +
+    'das Ziel kommt von Profil bzw. Client (ohne Produktgruppen), Leitplanken bleiben außen vor.',
+  request: { body: { content: json(previewAutomationRulesRequestSchema), required: true } },
+  responses: {
+    200: { description: 'Zähler je Regel.', content: json(automationRulesPreviewSchema) },
+    ...errors,
+  },
+});
+
 const STATUS_BY_CODE = {
   FORBIDDEN: [403, 'AUTOMATION_DEFAULTS_FORBIDDEN'],
   NOT_FOUND: [404, 'CLIENT_NOT_FOUND'],
@@ -169,4 +187,11 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     const saved = await run(() => saveAutomationRules(db, { ...actor(c), ...c.req.valid('json') }));
     return c.json(serializeRules(saved), 200);
   });
+
+  app.openapi({ ...previewRulesRoute, middleware: guard('view') }, async (c) =>
+    c.json(
+      await run(() => previewAutomationRules(db, { ...actor(c), ...c.req.valid('json') })),
+      200,
+    ),
+  );
 }
