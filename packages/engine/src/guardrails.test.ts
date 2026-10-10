@@ -102,6 +102,9 @@ describe('applyBudgetGuardrail', () => {
     expect(budget('50.00')).toEqual({ value: '80', limitedBy: ['budgetDecrease'] });
     expect(budget('85.00')).toEqual({ value: '85', limitedBy: [] });
     expect(budget('300.00')).toEqual({ value: '300', limitedBy: [] });
+    // Auf zwei Stellen, zur Basis hin.
+    expect(budget('85.123').value).toBe('85.13');
+    expect(budget('120.129').value).toBe('120.12');
   });
 
   it('hält Amazons Grenzen', () => {
@@ -122,5 +125,18 @@ describe('hasMinimumData', () => {
     expect(hasMinimumData({ clicks: 15, spend: '1.00' }, minimum)).toBe(true);
     expect(hasMinimumData({ clicks: 3, spend: '10.00' }, minimum)).toBe(true);
     expect(hasMinimumData({ clicks: 14, spend: '9.99' }, minimum)).toBe(false);
+  });
+
+  it('0 schaltet ein Kriterium ab; beide 0 heißt kein Minimum', () => {
+    expect(hasMinimumData({ clicks: 3, spend: '1.00' }, { minClicks: 15, minSpend: '0' })).toBe(
+      false,
+    );
+    expect(hasMinimumData({ clicks: 0, spend: '10.00' }, { minClicks: 0, minSpend: '10' })).toBe(
+      true,
+    );
+    expect(hasMinimumData({ clicks: 0, spend: '0' }, { minClicks: 0, minSpend: '10' })).toBe(false);
+    expect(hasMinimumData({ clicks: 0, spend: '0' }, { minClicks: 0, minSpend: '0.00' })).toBe(
+      true,
+    );
   });
 });

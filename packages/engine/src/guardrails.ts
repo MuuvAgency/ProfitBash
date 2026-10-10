@@ -100,8 +100,13 @@ export function applyBudgetGuardrail(input: {
   limit: AmazonLimit | null;
 }): GuardrailResult {
   const limitedBy: GuardrailReason[] = [];
-  let value = parseDecimal(input.proposed);
-  const lowest = parseDecimal(input.base)
+  const base = parseDecimal(input.base);
+  const proposed = parseDecimal(input.proposed);
+  let value = proposed.toDecimalPlaces(
+    PLACES,
+    proposed.greaterThan(base) ? Dec.ROUND_DOWN : Dec.ROUND_UP,
+  );
+  const lowest = base
     .times(new Dec(100).minus(input.maxDecreasePercent))
     .div(100)
     .toDecimalPlaces(PLACES, Dec.ROUND_UP);
@@ -112,13 +117,18 @@ export function applyBudgetGuardrail(input: {
   return { value: formatDecimal(clampToAmazon(value, input.limit, limitedBy)), limitedBy };
 }
 
-/** Mindestdaten für einen Vorschlag: genug Klicks **oder** genug Ausgaben (auch Ausgaben ohne Bestellung sagen etwas). */
+/**
+ * Mindestdaten für einen Vorschlag: genug Klicks **oder** genug Ausgaben (auch Ausgaben ohne Bestellung sagen etwas).
+ * Eine Schwelle von 0 schaltet ihr Kriterium ab; sind beide 0, gibt es kein Minimum.
+ */
 export function hasMinimumData(
   metrics: { clicks: number; spend: DecimalString },
   minimum: { minClicks: number; minSpend: DecimalString },
 ): boolean {
+  const minSpend = parseDecimal(minimum.minSpend);
+  if (minimum.minClicks === 0 && minSpend.isZero()) return true;
   return (
-    metrics.clicks >= minimum.minClicks ||
-    parseDecimal(metrics.spend).greaterThanOrEqualTo(minimum.minSpend)
+    (minimum.minClicks > 0 && metrics.clicks >= minimum.minClicks) ||
+    (!minSpend.isZero() && parseDecimal(metrics.spend).greaterThanOrEqualTo(minSpend))
   );
 }

@@ -1296,11 +1296,11 @@ export const de = {
       },
       minClicks: {
         label: 'Mindestdaten: Klicks',
-        hint: 'Ganze Zahl. Ein Vorschlag braucht so viele Klicks oder die Ausgaben daneben.',
+        hint: 'Ganze Zahl. Ein Vorschlag braucht so viele Klicks oder die Ausgaben daneben; 0 = zählt nicht.',
       },
       minSpendEur: {
         label: 'Mindestdaten: Ausgaben in EUR',
-        hint: 'Betrag mit höchstens zwei Nachkommastellen.',
+        hint: 'Betrag mit höchstens zwei Nachkommastellen; 0 = zählt nicht.',
       },
       maxBudgetDecreasePercent: {
         label: 'Höchste Budgetsenkung je Lauf in %',

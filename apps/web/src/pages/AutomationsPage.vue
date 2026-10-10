@@ -166,7 +166,11 @@ async function submitClient() {
               <template v-if="!canEditDefaults">{{ t('automations.defaults.adminOnly') }}</template>
             </p>
           </div>
-          <form class="flex flex-col gap-space-md" @submit.prevent="submitDefaults">
+          <form
+            class="flex flex-col gap-space-md"
+            @submit.prevent="submitDefaults"
+            @input="saveDefaults.reset()"
+          >
             <InlineError
               v-if="saveDefaults.isError.value"
               :message="t(failure(saveDefaults.error.value))"

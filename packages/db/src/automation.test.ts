@@ -144,6 +144,17 @@ describe('saveGuardrailDefaults', () => {
     expect(events[1]!.target).toMatchObject({ before: guardrails, after: DEFAULT_GUARDRAILS });
   });
 
+  it('schreibt nichts, wenn sich nichts ändert', async () => {
+    await saveGuardrailDefaults(testDb.db, { ...as(f.ada), guardrails: DEFAULT_GUARDRAILS });
+    await setClient();
+    await setClient({ mode: 'off' });
+    await setClient({ mode: 'off' });
+    expect((await testDb.db.select().from(auditEvents)).map((e) => e.action)).toEqual([
+      'client_automation.update',
+    ]);
+    expect(await testDb.db.select().from(automationDefaults)).toHaveLength(0);
+  });
+
   it('lehnt Editoren ab und liefert null für Nicht-Mitglieder', async () => {
     expect(await code(saveGuardrailDefaults(testDb.db, { ...as(f.emil), guardrails }))).toBe(
       'FORBIDDEN',

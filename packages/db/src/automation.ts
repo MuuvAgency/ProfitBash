@@ -8,6 +8,7 @@ import {
   type Guardrails,
 } from '@profitbash/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
+import { isDeepStrictEqual } from 'node:util';
 import { getOrgRole, listVisibleClientsAndProfiles, visibleProfilesScope } from './access';
 import { recordAuditEvent } from './audit';
 import type { Db } from './client';
@@ -111,7 +112,7 @@ export async function getAutomationSettings(
 
 /**
  * Speichert die Leitplanken der Organisation (nur Org-Admins, sonst `FORBIDDEN`), Audit
- * `automation_defaults.update`. `null` für Nicht-Mitglieder.
+ * `automation_defaults.update`; ohne Änderung schreibt es nichts. `null` für Nicht-Mitglieder.
  */
 export async function saveGuardrailDefaults(
   db: Db,
@@ -125,6 +126,7 @@ export async function saveGuardrailDefaults(
   // shortcut: letzter Schreiber gewinnt (kleines Formular, wenige Admins); bei Bedarf `version` wie beim Katalog.
   return db.transaction(async (tx) => {
     const before = await loadGuardrailDefaults(tx, input.orgId);
+    if (isDeepStrictEqual(before, input.guardrails)) return before;
     const values = { guardrails: input.guardrails, updatedBy: input.userId };
     await tx
       .insert(automationDefaults)
@@ -193,6 +195,7 @@ export async function setClientAutomation(
       .select()
       .from(clientAutomationSettings)
       .where(eq(clientAutomationSettings.clientId, input.clientId));
+    if (isDeepStrictEqual(toClientRecord(before), after)) return after;
     const values = { ...after, updatedBy: input.userId };
     await tx
       .insert(clientAutomationSettings)
