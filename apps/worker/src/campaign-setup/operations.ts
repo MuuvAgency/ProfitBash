@@ -19,6 +19,8 @@ import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
  * - Sponsored Display (4.9): Kampagne mit Taktik und Kostenart, Ad Group mit Gebotsoptimierung, Anzeigen, Ziele
  *   (Kontext bzw. Zielgruppe) und negative ASINs als SD-Anlagen; was SD nicht kennt („ähnlich wie“, Keywords),
  *   scheitert mit `SD_NOT_SUPPORTED`.
+ * - Sponsored Brands (4.10) nur per Bulk-Datei: Kampagnen scheitern mit `SB_BULK_FILE_ONLY`, ihre Kinder mit
+ *   `PARENT_NOT_CREATED`.
  */
 
 export interface SetupOperations {
@@ -30,6 +32,12 @@ export interface SetupOperations {
   /** Negatives in der Quelle, deren neues Ziel noch offen ist: gehen nach dessen Anlage raus (zweiter Aufruf). */
   deferred: string[];
 }
+
+/** Sponsored Brands legt ProfitBash in Phase 4 nur per Bulk-Datei an (4.10, entschieden 2026-10-10). */
+export const SB_BULK_FILE_ONLY = {
+  code: 'SB_BULK_FILE_ONLY',
+  message: 'Sponsored Brands wird nur per Bulk-Datei angelegt.',
+} as const;
 
 export const SD_NOT_SUPPORTED = {
   code: 'SD_NOT_SUPPORTED',
@@ -84,6 +92,8 @@ export function buildSetupOperations(
     if (row.status === 'submitted') result.rejected.push({ itemId: row.id, ...PARENT_NOT_CREATED });
   };
 
+  /** Kampagnen, die dieser Lauf nicht sendet (Sponsored Brands); ihre Kinder scheitern. */
+  const notSent = new Set<string>();
   for (const row of items) {
     const payload = row.payload;
     if (row.status === 'applied' && row.amazonEntityId !== null) {
@@ -130,6 +140,12 @@ export function buildSetupOperations(
             }
           : { ref: row.id, entity: 'negativeTarget', ...parents, asin: payload.negative.asin },
       );
+      continue;
+    }
+
+    if (payload.entity === 'campaign' && payload.adProduct === 'SB') {
+      result.rejected.push({ itemId: row.id, ...SB_BULK_FILE_ONLY });
+      notSent.add(row.id);
       continue;
     }
 
@@ -184,7 +200,7 @@ export function buildSetupOperations(
     }
 
     const campaign = campaigns.get(campaignKey(row));
-    if (!usable(campaign)) {
+    if (!usable(campaign) || notSent.has(campaign.id)) {
       reject(row);
       continue;
     }
@@ -283,6 +299,10 @@ export function buildSetupOperations(
       case 'audience_target':
         // Zielgruppen gibt es nur bei Sponsored Display.
         result.rejected.push({ itemId: row.id, ...SD_NOT_SUPPORTED });
+        break;
+      case 'sb_ad':
+        // Marken-Anzeigen gibt es nur bei Sponsored Brands (nur Bulk-Datei).
+        result.rejected.push({ itemId: row.id, ...SB_BULK_FILE_ONLY });
         break;
     }
   }

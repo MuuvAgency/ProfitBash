@@ -59,6 +59,7 @@ const inputs = {
   productTargets: [],
   categories: [],
   unlocks: {},
+  creative: null,
 };
 const plan = (cookie: string, profileId = f.profile, productGroupId = groupId) =>
   call<PlanCampaignSetupResponse>('POST', '/plan', cookie, {

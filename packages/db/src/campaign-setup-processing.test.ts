@@ -84,6 +84,7 @@ async function submitted(
       categories: [],
       harvest: [],
       unlocks: {},
+      creative: null,
     },
     campaigns: [{ ...plan, name, adGroup: { ...plan.adGroup, name } }],
     sourceNegatives: [],
@@ -570,6 +571,7 @@ describe('Harvest von der Merkliste (4.6)', () => {
         categories: [],
         harvest: [{ markId: used }, { markId: asin }, { markId: notPlanned }],
         unlocks: {},
+        creative: null,
       },
       sourceNegatives: [
         {

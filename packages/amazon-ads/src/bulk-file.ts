@@ -288,6 +288,8 @@ export type BulkFileCreate = { type: 'create' } & (
       offAmazon: 'increaseReach' | 'limitSpend' | null;
       /** Nur Sponsored Display (dort Pflicht): Taktik und Kostenart. */
       sd?: { tactic: 'contextual' | 'audience'; costType: 'cpc' | 'vcpm' };
+      /** Nur Sponsored Brands (dort Pflicht, 4.10): Marke des Sellers (Vendoren `null`). */
+      sb?: { brandEntityId: string | null };
     }
   | { entity: 'placement'; campaignId: string; placement: string; percentage: string }
   | {
@@ -328,6 +330,25 @@ export type BulkFileCreate = { type: 'create' } & (
       /** 7, 14, 30, 60, 90, 180 oder 365 (SD-Spec). */
       lookbackDays: number;
       bid: string | null;
+      state: CreateState;
+    } & CreateParents)
+  | ({
+      /**
+       * Anzeige von Sponsored Brands (4.10): `collection` = „Manual Collection ad“ (3–10 ASINs, Landing Page
+       * „Product list“), `video` = „Video ad“ (eine ASIN, Produktseite als Landing Page, Video aus der
+       * Asset-Bibliothek).
+       */
+      entity: 'sbAd';
+      format: 'collection' | 'video';
+      name: string;
+      brandName: string;
+      brandEntityId: string | null;
+      logoAssetId: string | null;
+      videoAssetId: string | null;
+      adTitle: string | null;
+      asins: string[];
+      /** Nur Video: Produktseite der ASIN auf dem Marktplatz. */
+      landingPageUrl: string | null;
       state: CreateState;
     } & CreateParents)
   | ({
@@ -450,6 +471,11 @@ const SD_BID_OPTIMIZATIONS = {
 } as const;
 // Wie `SD_LOOKBACK_DAYS` in `@profitbash/shared` (SD-v3-Spec); dieses Paket hängt nicht von `shared` ab.
 const SD_LOOKBACK_DAYS: ReadonlySet<number> = new Set([7, 14, 30, 60, 90, 180, 365]);
+/** Sponsored Brands (Guide): Marke 30 Zeichen, Titel der Kollektion 32, 3–10 ASINs je Kollektion. */
+const SB_LIMITS = { brandName: 30, adTitle: 32, collectionMin: 3, collectionMax: 10 } as const;
+const SB_AD_ENTITIES = { collection: 'Manual Collection ad', video: 'Video ad' } as const;
+const ASSET_ID = /^amzn1\.assetlibrary\.[A-Za-z0-9.:_-]{1,200}$/;
+const BRAND_ENTITY_ID = /^[A-Za-z0-9]{1,64}$/;
 const OFF_AMAZON = {
   increaseReach: 'Increase reach',
   limitSpend: 'Limit off-Amazon spend',
@@ -612,6 +638,7 @@ function rowFor(change: BulkFileChange, context: Context): Row {
     case 'create':
       // Anlagen für Sponsored Products (4.4) und Sponsored Display (4.9); SB folgt mit 4.10 (F1).
       if (kind === 'sd') return sdCreateRow(change);
+      if (kind === 'sbMultiAdGroup') return sbCreateRow(change);
       if (kind !== 'sp') throw notSupported();
       return createRow(change);
     case 'adGroup':
@@ -714,7 +741,9 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
   const parents = createParents;
   switch (change.entity) {
     case 'campaign':
-      if (change.biddingStrategy === null || change.sd !== undefined) throw invalid();
+      if (change.biddingStrategy === null || change.sd !== undefined || change.sb !== undefined) {
+        throw invalid();
+      }
       return {
         Entity: 'Campaign',
         ...create,
@@ -749,7 +778,8 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
         'Ad Group Default Bid': amount(change.defaultBid),
       };
     case 'audienceTarget':
-      // Zielgruppen gibt es nur bei Sponsored Display.
+    case 'sbAd':
+      // Zielgruppen gibt es nur bei Sponsored Display, Marken-Anzeigen nur bei Sponsored Brands.
       throw notSupported();
     case 'productAd':
       // Seller nennen die SKU, Vendoren die ASIN (Guide), nie beides.
@@ -897,7 +927,145 @@ function sdCreateRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
     case 'placement':
     case 'keyword':
     case 'negativeKeyword':
-      // Platzierungen und Keywords gibt es bei Sponsored Display nicht.
+    case 'sbAd':
+      // Platzierungen und Keywords gibt es bei Sponsored Display nicht, Marken-Anzeigen nur bei SB.
+      throw notSupported();
+  }
+}
+
+/** Text mit Höchstlänge in Zeichen (nicht UTF-16-Einheiten). */
+function limited(value: string, max: number): string {
+  const result = text(value);
+  if ([...result].length > max) throw invalid();
+  return result;
+}
+
+/** Anlage im Blatt „SB Multi Ad Group Campaigns“ (Guide „create SB multi-ad group campaigns“, 4.10). */
+function sbCreateRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
+  const create = { Operation: 'Create' } as const;
+  const bid = (value: string | null): Row => (value === null ? {} : { Bid: amount(value) });
+  const brand = (value: string | null): Row => {
+    if (value === null) return {};
+    if (!BRAND_ENTITY_ID.test(value)) throw invalid();
+    return { 'Brand Entity ID': value };
+  };
+  const asset = (value: string | null): string | null => {
+    if (value !== null && !ASSET_ID.test(value)) throw invalid();
+    return value;
+  };
+  switch (change.entity) {
+    case 'campaign':
+      if (change.sb === undefined || change.biddingStrategy !== null || change.offAmazon !== null) {
+        throw invalid();
+      }
+      return {
+        Entity: 'Campaign',
+        ...create,
+        'Campaign ID': textId(change.campaignId),
+        'Campaign Name': text(change.name),
+        'Start Date': date(change.startDate),
+        ...createState(change.state),
+        ...brand(change.sb.brandEntityId),
+        'Budget Type': 'Daily',
+        Budget: amount(change.dailyBudget),
+        // Amazon passt die Gebote je Platzierung selbst an; eigene Platzierungs-Zeilen legt das Setup nicht an.
+        'Bid Optimization': 'true',
+        ...(change.amazonPortfolioId !== null && { 'Portfolio ID': id(change.amazonPortfolioId) }),
+      };
+    case 'adGroup':
+      // SB-Ad-Groups haben kein Standardgebot (Gebote an den Zielen).
+      return {
+        Entity: 'Ad Group',
+        ...create,
+        'Campaign ID': parentId(change.campaignId),
+        'Ad Group ID': textId(change.adGroupId),
+        'Ad Group Name': text(change.name),
+        ...createState(change.state),
+      };
+    case 'sbAd': {
+      const asins = change.asins.map(asinOf);
+      if (new Set(asins).size !== asins.length) throw invalid();
+      const common: Row = {
+        Entity: SB_AD_ENTITIES[change.format],
+        ...create,
+        ...createParents(change),
+        'Ad Name': text(change.name),
+        ...createState(change.state),
+        ...brand(change.brandEntityId),
+      };
+      if (change.format === 'collection') {
+        if (asins.length < SB_LIMITS.collectionMin || asins.length > SB_LIMITS.collectionMax) {
+          throw invalid();
+        }
+        const logo = asset(change.logoAssetId);
+        return {
+          ...common,
+          'Landing Page Type': 'Product list',
+          'Brand Name': limited(change.brandName, SB_LIMITS.brandName),
+          ...(logo !== null && { 'Brand Logo Asset ID': logo }),
+          'Creative ASINs': asins.join(', '),
+          ...(change.adTitle !== null && { 'Ad Title': limited(change.adTitle, SB_LIMITS.adTitle) }),
+        };
+      }
+      if (change.format !== 'video') throw invalid();
+      const video = asset(change.videoAssetId);
+      const url = change.landingPageUrl;
+      if (asins.length !== 1 || video === null || url === null || !/^https:\/\/\S+$/.test(url)) {
+        throw invalid();
+      }
+      return {
+        ...common,
+        'Landing Page URL': url,
+        'Landing Page Type': 'Detail Page',
+        'Creative ASINs': asins[0]!,
+        'Video Asset IDs': video,
+      };
+    }
+    case 'keyword':
+      return {
+        Entity: 'Keyword',
+        ...create,
+        ...createParents(change),
+        ...createState(change.state),
+        ...bid(change.bid),
+        'Keyword Text': text(change.keywordText),
+        'Match Type': change.matchType,
+      };
+    case 'productTarget': {
+      const { type, value } = change.expression;
+      // „Ähnlich wie“ (`asin-expanded`) kennt Sponsored Brands nicht.
+      if (type === 'asinExpanded') throw invalid();
+      if (type === 'category' ? !/^\d+$/.test(value) : asinOf(value) !== value) throw invalid();
+      return {
+        Entity: 'Product Targeting',
+        ...create,
+        ...createParents(change),
+        ...createState(change.state),
+        ...bid(change.bid),
+        'Product Targeting Expression': `${EXPRESSIONS[type]}="${value}"`,
+      };
+    }
+    case 'negativeKeyword':
+      return {
+        Entity: 'Negative Keyword',
+        ...create,
+        ...createParents(change),
+        State: 'enabled',
+        'Keyword Text': text(change.keywordText),
+        'Match Type': change.matchType,
+      };
+    case 'negativeProductTarget':
+      return {
+        Entity: 'Negative Product Targeting',
+        ...create,
+        ...createParents(change),
+        State: 'enabled',
+        'Product Targeting Expression': `asin="${asinOf(change.asin)}"`,
+      };
+    case 'placement':
+    case 'productAd':
+    case 'audienceTarget':
+      // Platzierungen legt das Setup bei SB nicht an (`Bid Optimization` = true); Anzeigen sind `sbAd`.
       throw notSupported();
   }
 }
@@ -1005,6 +1173,8 @@ function createKey(change: Extract<BulkFileChange, { type: 'create' }>): string 
       return `create:productTarget:${parent}:${change.expression.type}:${lower(change.expression.value)}`;
     case 'audienceTarget':
       return `create:audienceTarget:${parent}:${change.audience}:${change.lookbackDays}`;
+    case 'sbAd':
+      return `create:sbAd:${parent}:${lower(change.name)}`;
     case 'negativeProductTarget':
       return `create:negativeProductTarget:${parent}:${lower(change.asin)}`;
   }

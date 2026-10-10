@@ -13,8 +13,9 @@ import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
 
 /**
  * Bulk-Datei einer Setup-Übermittlung (`docs/tasks/phase-4.md` 4.4): je offener Anlage eine `Create`-Zeile im
- * Blatt „Sponsored Products Campaigns“ bzw. seit 4.9 „Sponsored Display Campaigns“ (Blatt nach dem Anzeigentyp der
- * Kampagne), Kampagne und Ad Group unter ihrem Namen als vorläufige Text-ID. Die Datei
+ * Blatt „Sponsored Products Campaigns“ bzw. seit 4.9 „Sponsored Display Campaigns“ und seit 4.10 „SB Multi Ad Group
+ * Campaigns“ (Blatt nach dem Anzeigentyp der Kampagne), Kampagne und Ad Group unter ihrem Namen als vorläufige Text-ID.
+ * SB-Videos verlinken auf die Produktseite der ASIN auf dem Marktplatz des Profils. Die Datei
  * entsteht bei jedem Download neu und enthält nur, was noch nicht angelegt ist: Kinder schon angelegter Eltern nennen
  * deren echte ID (ein erneuter Upload legt nichts doppelt an); ist die ID noch nicht zugeordnet, warten sie auf den
  * nächsten Import (`waiting`). Das Startdatum ist der Tag des Downloads in der Zeitzone des Profils (Amazon lehnt
@@ -44,6 +45,32 @@ export interface SetupBulkFile {
   waiting: string[];
 }
 
+/** Domain der Produktseiten je Land des Profils (Landing Page von SB-Videos, 4.10). */
+const MARKETPLACE_DOMAINS: Readonly<Record<string, string>> = {
+  US: 'amazon.com',
+  CA: 'amazon.ca',
+  MX: 'amazon.com.mx',
+  BR: 'amazon.com.br',
+  UK: 'amazon.co.uk',
+  GB: 'amazon.co.uk',
+  DE: 'amazon.de',
+  FR: 'amazon.fr',
+  IT: 'amazon.it',
+  ES: 'amazon.es',
+  NL: 'amazon.nl',
+  SE: 'amazon.se',
+  PL: 'amazon.pl',
+  BE: 'amazon.com.be',
+  TR: 'amazon.com.tr',
+  AE: 'amazon.ae',
+  SA: 'amazon.sa',
+  EG: 'amazon.eg',
+  IN: 'amazon.in',
+  JP: 'amazon.co.jp',
+  AU: 'amazon.com.au',
+  SG: 'amazon.sg',
+};
+
 export const PARENT_NOT_CREATED = {
   code: 'PARENT_NOT_CREATED',
   message: 'Die Kampagne bzw. Ad Group dieser Anlage wird nicht angelegt.',
@@ -69,6 +96,15 @@ function toCreate(
         // Bestehendes Portfolio des Entwurfs (4.7, F9).
         amazonPortfolioId: payload.amazonPortfolioId ?? null,
       } as const;
+      if (payload.adProduct === 'SB') {
+        // Sponsored Brands (4.10): Marke des Sellers, Gebote je Platzierung passt Amazon an.
+        return {
+          ...common,
+          biddingStrategy: null,
+          offAmazon: null,
+          sb: { brandEntityId: payload.brandEntityId ?? null },
+        };
+      }
       if (payload.adProduct === 'SD') {
         // Sponsored Display (4.9): Taktik und Kostenart statt Gebotsstrategie, kein Off-Amazon (Einstellung von SP).
         return {
@@ -139,6 +175,27 @@ function toCreate(
         bid: payload.bid,
         state: 'ENABLED',
       };
+    case 'sb_ad': {
+      const domain = MARKETPLACE_DOMAINS[context.countryCode];
+      return {
+        type: 'create',
+        entity: 'sbAd',
+        ...parents,
+        format: payload.format,
+        name: payload.name,
+        brandName: payload.brandName,
+        brandEntityId: payload.brandEntityId,
+        logoAssetId: payload.logoAssetId,
+        videoAssetId: payload.videoAssetId,
+        adTitle: payload.adTitle,
+        asins: payload.asins,
+        landingPageUrl:
+          payload.format === 'video' && domain !== undefined && payload.asins.length === 1
+            ? `https://www.${domain}/dp/${payload.asins[0]}`
+            : null,
+        state: 'ENABLED',
+      };
+    }
     case 'audience_target':
       return {
         type: 'create',
@@ -201,7 +258,11 @@ export function buildSetupBulkFile(
   const kindByCampaign = new Map<string, BulkFileSheetKind>();
   for (const row of items) {
     if (row.payload.entity === 'campaign') {
-      kindByCampaign.set(campaignKey(row), row.payload.adProduct === 'SD' ? 'sd' : 'sp');
+      const { adProduct } = row.payload;
+      kindByCampaign.set(
+        campaignKey(row),
+        adProduct === 'SD' ? 'sd' : adProduct === 'SB' ? 'sbMultiAdGroup' : 'sp',
+      );
     }
   }
   // Neue Portfolios (4.7): eigenes Blatt, ohne Eltern.
@@ -284,10 +345,10 @@ export function buildSetupBulkFile(
   changes.length = 0;
   changes.push(...kept);
 
-  // Reihenfolge der Werbekonsole: Portfolios, Sponsored Products, Sponsored Display.
+  // Reihenfolge der Werbekonsole: Portfolios, Sponsored Products, SB mit mehreren Ad Groups, Sponsored Display.
   const sheets = [
     buildPortfolioBulkSheet(portfolios),
-    ...(['sp', 'sd'] as const).map((kind) =>
+    ...(['sp', 'sbMultiAdGroup', 'sd'] as const).map((kind) =>
       buildBulkSheet(
         kind,
         changes.filter((change) => sheetOf.get(change.ref) === kind),
