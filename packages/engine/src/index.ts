@@ -75,3 +75,4 @@ export {
   type BidStackStrategy,
 } from './bid-stack';
 export * from './goals';
+export * from './guardrails';
