@@ -13,3 +13,4 @@ export * from './structure-catalog';
 export * from './campaign-setup';
 export * from './notifications';
 export * from './goals';
+export * from './automation';
