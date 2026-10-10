@@ -5,8 +5,10 @@
 > `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` (Abschnitte C, D, E; entschieden: F-S7, F-S8, F-S9),
 > `design/DESIGN.md`.
 >
-> **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1–4.10. Nächster Schritt: 4.11.
+> **Status: abgeschlossen (2026-10-10) bis auf Punkte, die nicht am Code hängen** (Liste in 4.11): vor allem der
+> **erste echte Upload** einer Setup-, Portfolio-, SD- und SB-Datei in der Werbekonsole (ProfitBash ist noch nicht
+> live) und der erste Lauf über die API. Die Fragen F1–F13 sind entschieden (2026-10-09/10, die Nummern gelten nur in
+> dieser Datei). Fertig: 4.1–4.11.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -27,23 +29,34 @@ Die Agentur baut neue Werbestrukturen aus ProfitBash heraus, einheitlich und nac
 Navigation (`plan.md` §3): „Tools (Produktgruppen · Kampagnen-Setup · Portfolio)“ unter `/ads/tools/*`, Feature `tools`.
 Schreiben nur mit Recht `write` (Admin, Editor).
 
-## Definition of Done (Entwurf)
+## Definition of Done
 
-- [ ] Jede Anlage läuft über einen Entwurf und eine Übermittlung (`runJob`, `job_runs` bzw. Bulk-Datei), nie direkt aus der
-      Oberfläche an Amazon; je Übermittlung steht fest, wer was angelegt hat (`audit_event`).
-- [ ] Struktur-Katalog, Presets und Namensschema sind **Daten** der Organisation (änderbar, mit Startwerten), nichts davon
-      ist hart codiert; Bezeichnungen und Werte sind eigene (Eigenständigkeit, `CLAUDE.md`).
-- [ ] Der Plan aus Preset, Produktgruppe und Eingaben entsteht in `packages/engine` ohne I/O (Tests je Baustein und Preset).
-- [ ] Leitplanken aus dem Ideen-Dokument E: vCPM und Off-Amazon sind gesperrt und nur je Kampagne bewusst freischaltbar
-      (F-S7); Gebote und Budgets werden gegen die Grenzen von Amazon geprüft (wie Phase 3).
-- [ ] Doppelte Anlagen werden vor dem Übermitteln erkannt (gleicher Kampagnenname im Profil, Keyword schon exakt gebucht).
-- [ ] Die Bulk-Datei für Anlagen ist per Rundlauf mit dem Import-Leser getestet; nach dem nächsten Bulk-Import sind die
-      angelegten Entities ihrem Entwurf zugeordnet (über den Namen).
-- [ ] Beträge bleiben Decimal-Strings mit Währung; Amazon-IDs Strings.
-- [ ] Alle Zugriffe über den Access-Layer (ADR 002); Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
-- [ ] Tests gegen den Mock-Anbieter (msw bzw. `mock.ts`), keiner gegen echte Amazon-Endpunkte.
-- [ ] Browser-Pane geprüft wie in Phase 2 und 3 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole).
-- [ ] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
+Geprüft in 4.11 (2026-10-10), Belege je Punkt:
+
+- [x] Jede Anlage läuft über einen Entwurf und eine Übermittlung (`runJob`, `job_runs` bzw. Bulk-Datei), nie direkt aus der
+      Oberfläche an Amazon; je Übermittlung steht fest, wer was angelegt hat (`audit_event`). *Setups (4.4/4.5) und
+      Portfolios (4.7) als Übermittlung `setup` bzw. `portfolio`, Audit `ad_change_submission.create` mit `kind`.*
+- [x] Struktur-Katalog, Presets und Namensschema sind **Daten** der Organisation (änderbar, mit Startwerten), nichts davon
+      ist hart codiert; Bezeichnungen und Werte sind eigene (Eigenständigkeit, `CLAUDE.md`). *4.2; Formate der SB-Bausteine
+      seit 4.10 ebenfalls im Katalog (`sbAdFormat`).*
+- [x] Der Plan aus Preset, Produktgruppe und Eingaben entsteht in `packages/engine` ohne I/O (Tests je Baustein und Preset).
+      *`plan.test.ts`: je Start-Preset (6) und je Baustein (19) ein Test ohne Fehler-Hinweise mit anlegbaren Zeilen (4.11).*
+- [x] Leitplanken aus dem Ideen-Dokument E: vCPM und Off-Amazon sind gesperrt und nur je Kampagne bewusst freischaltbar
+      (F-S7); Gebote und Budgets werden gegen die Grenzen von Amazon geprüft (wie Phase 3). *Freischalten je Baustein (F13),
+      seit 4.9 auch beim Übermitteln gegen die Eingaben des Entwurfs; SB-vCPM gesperrt (Bulk-Datei ohne Kostenart).*
+- [x] Doppelte Anlagen werden vor dem Übermitteln erkannt (gleicher Kampagnenname im Profil, Keyword schon exakt gebucht).
+      *`reviewCampaignPlan` in der Transaktion des Übermittelns, auch gegen offene Setups.*
+- [x] Die Bulk-Datei für Anlagen ist per Rundlauf mit dem Import-Leser getestet; nach dem nächsten Bulk-Import sind die
+      angelegten Entities ihrem Entwurf zugeordnet (über den Namen). *Rundlauf für SP, SD, SB und Portfolios
+      (`bulk-export-roundtrip.test.ts`), Bestätigung `confirmCampaignSetupItems` je Entity (SB-Anzeige über den Namen).*
+- [x] Beträge bleiben Decimal-Strings mit Währung; Amazon-IDs Strings.
+- [x] Alle Zugriffe über den Access-Layer (ADR 002); Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
+      *API-Tests `product-groups`, `structure-catalog`, `portfolios`, `campaign-setup` (auch `brands`, `harvest`).*
+- [x] Tests gegen den Mock-Anbieter (msw bzw. `mock.ts`), keiner gegen echte Amazon-Endpunkte. *SP- und SD-Anlagen
+      Ende-zu-Ende gegen den Mock (`ad-changes-flow.test.ts`); SB nur per Bulk-Datei (entschieden).*
+- [x] Browser-Pane geprüft wie in Phase 2 und 3 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole). *Je Aufgabe; in 4.11
+      alle Tools-Seiten und „Änderungen“ in 1440/768/375 px ohne Überlauf und ohne Fehlermeldung, Hell-Modus.*
+- [x] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün. *Je PR der Phase (#72–#82 und der Abschluss-PR).*
 
 ## Fragen an Dominik
 
@@ -651,15 +664,26 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     fällt auf die Startwerte zurück (wie 4.3 bei `audience`; die Dev-DB hat keinen gespeicherten Katalog).
 
 ### 4.11 Abschluss
-- [ ] Definition of Done prüfen, Browser-Pane, offene Punkte festhalten.
+- [x] Definition of Done prüfen, Browser-Pane, offene Punkte festhalten.
+- [x] Umsetzung (2026-10-10): Tests je Preset und je Baustein ergänzt (`plan.test.ts`, kein Befund); Browser-Pane über
+  Produktgruppen, Kampagnen-Setup, Portfolio, Gebots-Simulator, Struktur-Katalog und „Änderungen“ in 1440, 768 und
+  375 px (kein Überlauf, keine Fehlermeldung), Hell-Modus; Konsole ohne Fehler der App.
+- **Offen nach Phase 4 (nicht am Code, bzw. braucht echte Daten):**
+  1. **Erster echter Upload** je Anlage-Art in der Werbekonsole: SP-Setup (4.4: `Bidding Adjustment` mit `Create`
+     ohne Strategie, Spalte „Off-Amazon ad serving“), Portfolio (4.7), SD (4.9: `Bid Optimization` beim Create,
+     `exact-product` für Ansichten, Spalte „ASIN“ für Vendoren), SB (4.10: Entity-Namen „Manual Collection ad“/„Video
+     ad“, `Bid Optimization` = true, Landing Page des Videos). ProfitBash ist noch nicht live; dafür braucht es ein
+     Profil, dessen echte Bulk-Datei importiert ist.
+  2. **Erster Lauf über die API** (`phase-1.md` 1.10, offene Punkte in ADR 005), danach SB über die API (v4).
+  3. **Wettbewerber-Liste je Client** (F-S9, Entscheidung 2026-10-09: später); bis dahin fallen Conquesting-Bausteine
+     mit Hinweis weg.
+  4. Deutsche Schreibweisen des Blatts „Brand Assets Data“ und der neuen SB-Spalten (ungeprüft, nur englische Datei).
+  5. Startdatum = Tag des Downloads (Upload am selben Tag in der Zeitzone des Profils).
 
 ## Offen vor dem Bau (nicht von Dominik zu entscheiden)
 
-- Der echte Upload der Bulk-Datei aus Phase 3 ging am 2026-10-09 durch (SP, ohne Fehlermeldung); für Anlagen bleibt offen:
-  Laut dem „Config“-Blatt der echten Datei braucht `Create` für eine Kampagne ID, Name, Tagesbudget, Targeting-Typ, Zustand,
-  Startdatum und Gebotsstrategie, für eine Product Ad Kampagne, Ad Group, SKU und Zustand.
-- Welche Stammdaten ein Vendor-Profil statt der SKU braucht.
-- Grenzen für Namen und Anzahl (Kampagnen je Konto, Keywords je Ad Group) von der Limits-Seite.
+Erledigt: Pflichtspalten laut „Config“-Blatt und Guides (4.4, 4.9, 4.10), Vendoren bewerben über die ASIN (4.4),
+Grenzen für Namen und Keywords von der Limits-Seite (4.4). Was noch offen ist, steht in 4.11.
 
 ## Bewusst nicht in Phase 4
 
