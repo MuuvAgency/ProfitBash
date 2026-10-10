@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { AUTOMATION_PROPOSAL_FILTERS, formatCurrency, formatNumber } from '@profitbash/shared';
+import {
+  AUTOMATION_PROPOSAL_FILTERS,
+  formatCurrency,
+  formatNumber,
+  MISSING_VALUE,
+} from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import { computed, ref, useId, watch } from 'vue';
@@ -46,7 +51,7 @@ const path = (x: AutomationProposalData) =>
     ? null
     : [x.campaignName ?? unknown.value, ...(x.adGroupName ? [x.adGroupName] : [])].join(' › ');
 function value(x: AutomationProposalData, raw: string | null) {
-  if (raw === null) return t('automations.proposals.noOwnBid');
+  if (raw === null) return MISSING_VALUE;
   if (x.field === 'state') {
     const key = `automations.proposals.state.${raw}`;
     return te(key) ? t(key) : raw;
@@ -238,6 +243,9 @@ const act = (kind: 'stage' | 'dismiss', ids: string[]) =>
               <span class="text-body-md text-ink">
                 {{ t(`automations.proposals.field.${x.field}`) }}
                 <span class="font-data">{{ value(x, x.before) }} → {{ value(x, x.after) }}</span>
+                <span v-if="x.detail.hasOwnBid === false" class="text-body-sm text-ink-secondary">
+                  ({{ t('automations.proposals.noOwnBid') }})
+                </span>
               </span>
               <span class="text-body-sm text-ink-secondary">{{ source(x) }}</span>
               <span v-if="x.limitedBy.length > 0" class="text-body-sm text-warn">

@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7. Als Nächstes: 5.8.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8. Als Nächstes: 5.9a.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -521,8 +521,35 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     Index erlaubt je Kampagne und Feld nur eine Automatik-Zeile. Der Enforcer legt den Vorrang fest.
 
 ### 5.8 Automationen: Läufe und Vorschläge
-- [ ] Tabs **Läufe** (je Profil, Datenstand, Anzahl Vorschläge, Status) und **Vorschläge** (Grid: Entity, vorher, nachher,
+- [x] Tabs **Läufe** (je Profil, Datenstand, Anzahl Vorschläge, Status) und **Vorschläge** (Grid: Entity, vorher, nachher,
       Regel/Optimizer, Leitplanke, Kennzahlen; „in meinen Warenkorb“ einzeln oder markiert, verwerfen).
+- [x] Umsetzung (2026-10-10):
+  - **Zugriffe** (`packages/db/src/automation-runs.ts`, über `visibleProfilesScope`): `listAutomationRuns` (die letzten
+    100 Läufe der sichtbaren Profile), `listAutomationProposals` (je Status `open` | `staged` | `dismissed`, neueste
+    zuerst, höchstens 500, dazu `total`; abgelöste erscheinen nie; ein `staged`-Vorschlag ohne Warenkorb-Zeile zählt
+    als verworfen), `stageAutomationProposals` (offene Vorschläge als `ad_changes` mit Herkunft `automation` in den
+    Warenkorb des Nutzers; liegt dort schon eine Änderung an der Stelle, bleibt der Vorschlag offen; Audit
+    `automation_proposals.stage`), `dismissAutomationProposals` (offene und im Warenkorb liegende, die Zeile wird
+    gelöscht, auch im Warenkorb eines anderen Nutzers; Übermitteltes bleibt; Audit `automation_proposals.dismiss`).
+  - **API** (Feature `automations`): `GET /ads/automations/runs` und `GET /ads/automations/proposals?status=` (`view`),
+    `POST /ads/automations/proposals/stage` und `…/dismiss` (`write`, bis zu 500 IDs im Body, Antwort
+    `{ changed, skipped }`). Schemas in `packages/shared/src/automation-runs.ts`.
+  - **Seite:** Tabs „Vorschläge“ (`automations/ProposalsTab.vue`: Filter nach Status, je Vorschlag Entity mit Pfad und
+    Profil, Kennzahlen und Ziel, vorher → nachher, Regel bzw. Optimizer, begrenzende Leitplanken; einzeln oder
+    markiert „In meinen Warenkorb“ und „Verwerfen“; danach laden Liste und Warenkorb neu) und „Läufe“
+    (`automations/RunsTab.vue`: Profil, Zeitpunkt, Modus, Datenstand, geprüfte Targets und Kampagnen, Vorschläge, im
+    Warenkorb, Hinweise `olderPeriod` und `responsibleMissing`). Viewer lesen nur. Skeleton, leere Zustände, Fehler.
+  - **Abweichung:** Liste statt Tabellen-Grid (gestapelte Zeilen, kein waagerechtes Scrollen auf dem Handy); ohne
+    Sortierung und ohne Filter nach Profil.
+  - **Nicht gebaut:** Vorschläge aus dem Warenkorb des Zuständigen in den eigenen umhängen (im Modus `cart` liegen
+    sie schon dort; andere können sie nur verwerfen); Rückfrage vor dem Verwerfen; Seiten über die ersten 500
+    hinaus; Kennzeichnung der Herkunft „Automatik“ auf der Seite „Änderungen“; die Gründe ohne Vorschlag je Lauf
+    (stehen in `counts`, werden noch nicht angezeigt).
+  - **Browser-Pane (2026-10-10):** nur Tabs, Filter und leere Zustände geprüft (Desktop dunkel, Handy; kein
+    waagerechtes Scrollen). **Nicht mit echten Vorschlägen geprüft:** Die Dev-DB hat keine Kennzahlen, und das
+    Aufräumen von Testdaten per psql war in dieser Session gesperrt. Beim ersten echten Import nachholen.
+  - **Offen (Aufräumen von Hand):** In der Dev-DB liegt aus der Prüfung von 5.6b eine Zeile in `automation_rules`
+    (Version 1, vier Regeln, darunter „Teure Klicks“) und ein Audit-Event `automation_rules.update`.
 
 ### 5.9a Budgets: Caps und Pacing (`/ads/budgets`)
 - [ ] Tabelle Caps: Profil, Monat (einmalig oder jeden Monat), Betrag in der Währung des Profils, Umfang (ganzes Profil,
