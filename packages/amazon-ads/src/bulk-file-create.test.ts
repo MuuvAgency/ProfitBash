@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildBulkSheet,
   buildSpBulkSheet,
   SP_BULK_COLUMNS,
   type BulkFileChange,
@@ -376,11 +375,12 @@ describe('buildSpBulkSheet: Anlagen', () => {
     expect(records[1]).toMatchObject({ 'Campaign ID': '4401', 'Ad Group ID': '5501' });
   });
 
-  it('legt in 4.4 nur Sponsored Products an', () => {
-    for (const kind of ['sb', 'sbMultiAdGroup', 'sd'] as const) {
-      expect(buildBulkSheet(kind, [create('c', campaign)]).skipped).toEqual([
-        { ref: 'c', reason: 'notSupportedInBulkFile' },
-      ]);
-    }
+  it('verlangt bei Sponsored Products eine Gebotsstrategie und kennt keine SD-Angaben', () => {
+    expect(build([create('c', { ...campaign, biddingStrategy: null })]).skipped).toEqual([
+      { ref: 'c', reason: 'invalidValue' },
+    ]);
+    expect(
+      build([create('c', { ...campaign, sd: { tactic: 'audience', costType: 'cpc' } })]).skipped,
+    ).toEqual([{ ref: 'c', reason: 'invalidValue' }]);
   });
 });

@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BIDDING_STRATEGIES,
   BUDGET_POLICIES,
+  BUDGET_TYPES,
+  COST_TYPES,
   classifySheet,
   entityKind,
   isSbMultiAdGroupSheet,
@@ -567,6 +569,102 @@ describe('Bulk-Datei für Anlagen: Rundlauf mit dem Leser des Bulk-Imports', () 
       expression: { productCategoryId: '5524098011' },
     });
     expect(mapValue(MATCH_TYPES, cell(7, 'matchType'))).toEqual({ value: 'EXACT', known: true });
+  });
+});
+
+/** Rundlauf für SD-Anlagen (`phase-4.md` 4.9): Kampagne mit Taktik, Ad Group, Anzeige und Ziele je Art. */
+describe('Bulk-Datei für SD-Anlagen: Rundlauf mit dem Leser des Bulk-Imports', () => {
+  it('liest Taktik, Budget, Kostenart und die Ausdrücke von Zielgruppe und Kontext zurück', () => {
+    const ids = { campaignId: 'SD | RT-VIEW | Lampen', adGroupId: 'SD | RT-VIEW | Lampen' };
+    const sheet = buildBulkSheet('sd', [
+      {
+        ref: 'c',
+        type: 'create',
+        entity: 'campaign',
+        campaignId: ids.campaignId,
+        name: ids.campaignId,
+        targetingType: 'manual',
+        state: 'ENABLED',
+        dailyBudget: '12.50',
+        startDate: '2099-10-10',
+        biddingStrategy: null,
+        amazonPortfolioId: null,
+        offAmazon: null,
+        sd: { tactic: 'audience', costType: 'cpc' },
+      },
+      {
+        ref: 'g',
+        type: 'create',
+        entity: 'adGroup',
+        ...ids,
+        name: ids.adGroupId,
+        defaultBid: '0.55',
+        state: 'ENABLED',
+        bidOptimization: 'conversions',
+      },
+      {
+        ref: 'a',
+        type: 'create',
+        entity: 'productAd',
+        ...ids,
+        sku: 'LAMPE-1',
+        asin: null,
+        state: 'ENABLED',
+      },
+      {
+        ref: 'v',
+        type: 'create',
+        entity: 'audienceTarget',
+        ...ids,
+        audience: 'views',
+        lookbackDays: 30,
+        bid: '0.60',
+        state: 'ENABLED',
+      },
+      {
+        ref: 't',
+        type: 'create',
+        entity: 'productTarget',
+        ...ids,
+        expression: { type: 'category', value: '5524098011' },
+        bid: null,
+        state: 'ENABLED',
+      },
+    ]);
+    expect(sheet.skipped).toEqual([]);
+    const workbook = openXlsx(writeXlsx([{ name: sheet.sheetName, rows: sheet.rows }]));
+    expect(workbook.sheets.map((entry) => classifySheet(entry.name))).toEqual(['sd']);
+    const rows: string[][] = [];
+    workbook.forEachRow(sheet.sheetName, (cells) => rows.push(cells));
+    const [header, ...data] = rows;
+    const columns = mapHeader(header!);
+    const cell = (row: number, column: BulkColumn) => data[row]![columns.get(column)!] ?? '';
+
+    expect(data.map((_, row) => entityKind(cell(row, 'entity')))).toEqual([
+      'campaign',
+      'adGroup',
+      'productAd',
+      'audienceTargeting',
+      'contextualTargeting',
+    ]);
+    expect(cell(0, 'campaignName')).toBe(ids.campaignId);
+    expect(cell(0, 'tactic')).toBe('T00030');
+    expect(mapValue(BUDGET_TYPES, cell(0, 'budgetType'))).toEqual({ value: 'DAILY', known: true });
+    expect(parseBulkAmount(cell(0, 'budget'))).toBe('12.5');
+    expect(mapValue(COST_TYPES, cell(0, 'costType'))).toEqual({ value: 'CPC', known: true });
+    expect(parseBulkDate(cell(0, 'startDate'))).toBe('2099-10-10');
+    expect(cell(1, 'adGroupName')).toBe(ids.adGroupId);
+    expect(parseBulkAmount(cell(1, 'adGroupDefaultBid'))).toBe('0.55');
+    expect(cell(2, 'sku')).toBe('LAMPE-1');
+    expect(parseTargetExpression(cell(3, 'targetingExpression'), '')).toMatchObject({
+      known: true,
+      targetType: 'audience',
+      expression: { event: 'VIEWS', lookback: 30 },
+    });
+    expect(parseTargetExpression(cell(4, 'targetingExpression'), '')).toMatchObject({
+      targetType: 'category',
+      expression: { productCategoryId: '5524098011' },
+    });
   });
 });
 

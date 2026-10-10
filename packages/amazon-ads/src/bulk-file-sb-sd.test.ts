@@ -49,7 +49,8 @@ describe('Blätter und Kopfzeilen', () => {
     expect(build('sbMultiAdGroup', []).sheetName).toBe('SB Multi Ad Group Campaigns');
     expect(build('sbMultiAdGroup', []).header).toEqual([...SB_MULTI_AD_GROUP_BULK_COLUMNS]);
     expect(build('sd', []).sheetName).toBe('Sponsored Display Campaigns');
-    expect(build('sd', []).header).toEqual([...SD_BULK_COLUMNS]);
+    // Die Spalte „ASIN“ gibt es nur für Anlagen von Vendoren (4.9).
+    expect(build('sd', []).header).toEqual(SD_BULK_COLUMNS.filter((column) => column !== 'ASIN'));
   });
 
   it('führt die Spalten, die die Zeilen brauchen, in der Schreibweise der echten Datei', () => {

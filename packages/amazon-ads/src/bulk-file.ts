@@ -172,6 +172,9 @@ export const SD_BULK_COLUMNS = [
   'Bid Optimization',
   'Cost Type',
   'Targeting Expression',
+  // Nur für Anlagen von Vendoren (4.9): Der Guide nennt „ASIN“ für Product Ads, die Datei eines Sellers hat nur
+  // „ASIN (Informational only)“. Erscheint nur, wenn eine Zeile sie belegt.
+  'ASIN',
 ] as const;
 
 /** Blatt der Bulk-Datei: SP, SB (älteres Blatt), SB mit mehreren Ad Groups, SD. */
@@ -262,7 +265,11 @@ interface CreateParents {
   adGroupId: string;
 }
 
-/** Anlage einer Entity für Sponsored Products (Guide „How to create Sponsored Products campaigns“). */
+/**
+ * Anlage einer Entity für Sponsored Products (Guide „How to create Sponsored Products campaigns“) und Sponsored
+ * Display (Guide „How to create Sponsored Display campaigns with bulksheets“, 4.9): SD-Kampagnen tragen `sd`
+ * (Taktik, Kostenart) statt einer Gebotsstrategie, SD-Ad-Groups die Gebotsoptimierung.
+ */
 export type BulkFileCreate = { type: 'create' } & (
   | {
       entity: 'campaign';
@@ -274,10 +281,13 @@ export type BulkFileCreate = { type: 'create' } & (
       dailyBudget: string;
       /** `YYYY-MM-DD`; heute oder später (Amazon lehnt vergangene Tage ab). */
       startDate: string;
-      biddingStrategy: AmazonAdsBiddingStrategy;
+      /** Nur Sponsored Products (dort Pflicht). */
+      biddingStrategy: AmazonAdsBiddingStrategy | null;
       amazonPortfolioId: string | null;
       /** Nur in den USA einstellbar; `null` lässt Amazons Standard. */
       offAmazon: 'increaseReach' | 'limitSpend' | null;
+      /** Nur Sponsored Display (dort Pflicht): Taktik und Kostenart. */
+      sd?: { tactic: 'contextual' | 'audience'; costType: 'cpc' | 'vcpm' };
     }
   | { entity: 'placement'; campaignId: string; placement: string; percentage: string }
   | {
@@ -287,6 +297,8 @@ export type BulkFileCreate = { type: 'create' } & (
       name: string;
       defaultBid: string;
       state: CreateState;
+      /** Nur Sponsored Display (dort Pflicht); `reach` gehört zu vCPM. */
+      bidOptimization?: 'clicks' | 'conversions' | 'reach';
     }
   | ({
       entity: 'productAd';
@@ -306,6 +318,15 @@ export type BulkFileCreate = { type: 'create' } & (
   | ({
       entity: 'productTarget';
       expression: { type: 'asin' | 'asinExpanded' | 'category'; value: string };
+      bid: string | null;
+      state: CreateState;
+    } & CreateParents)
+  | ({
+      /** Sponsored Display: wer die beworbenen Produkte angesehen bzw. gekauft hat. */
+      entity: 'audienceTarget';
+      audience: 'views' | 'purchases';
+      /** 7, 14, 30, 60, 90, 180 oder 365 (SD-Spec). */
+      lookbackDays: number;
       bid: string | null;
       state: CreateState;
     } & CreateParents)
@@ -414,7 +435,20 @@ const PLACEMENTS = new Map([
   ['PLACEMENT_PRODUCT_PAGE', 'Placement Product Page'],
   ['SITE_AMAZON_BUSINESS', 'Placement Amazon Business'],
 ]);
-const OPTIONAL_COLUMNS: ReadonlySet<string> = new Set(['Off-Amazon ad serving']);
+/** Spalten nur für Anlagen je Blatt: erscheinen nur, wenn eine Zeile sie belegt. */
+const OPTIONAL_COLUMNS: Partial<Record<BulkFileSheetKind, ReadonlySet<string>>> = {
+  sp: new Set(['Off-Amazon ad serving']),
+  sd: new Set(['ASIN']),
+};
+/** Sponsored Display (Guide): Taktik als ID, Kostenart und Gebotsoptimierung in der Schreibweise des Guides. */
+const SD_TACTICS = { contextual: 'T00020', audience: 'T00030' } as const;
+const SD_COST_TYPES = { cpc: 'CPC', vcpm: 'vCPM' } as const;
+const SD_BID_OPTIMIZATIONS = {
+  clicks: 'Optimize for page visits',
+  conversions: 'Optimize for conversions',
+  reach: 'Optimize for viewable impressions',
+} as const;
+const SD_LOOKBACK_DAYS: ReadonlySet<number> = new Set([7, 14, 30, 60, 90, 180, 365]);
 const OFF_AMAZON = {
   increaseReach: 'Increase reach',
   limitSpend: 'Limit off-Amazon spend',
@@ -575,7 +609,8 @@ function rowFor(change: BulkFileChange, context: Context): Row {
       };
     }
     case 'create':
-      // Anlagen gibt es in Phase 4 zuerst nur für Sponsored Products (F1: SD mit 4.9, SB mit 4.10).
+      // Anlagen für Sponsored Products (4.4) und Sponsored Display (4.9); SB folgt mit 4.10 (F1).
+      if (kind === 'sd') return sdCreateRow(change);
       if (kind !== 'sp') throw notSupported();
       return createRow(change);
     case 'adGroup':
@@ -666,15 +701,19 @@ function rowFor(change: BulkFileChange, context: Context): Row {
   }
 }
 
+const createParents = (ids: CreateParents): Row => ({
+  'Campaign ID': parentId(ids.campaignId),
+  'Ad Group ID': parentId(ids.adGroupId),
+});
+const createState = (value: CreateState) => ({ State: mapped(STATES, value) });
+
 function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
   const create = { Operation: 'Create' } as const;
-  const state = (value: CreateState) => ({ State: mapped(STATES, value) });
-  const parents = (ids: CreateParents): Row => ({
-    'Campaign ID': parentId(ids.campaignId),
-    'Ad Group ID': parentId(ids.adGroupId),
-  });
+  const state = createState;
+  const parents = createParents;
   switch (change.entity) {
     case 'campaign':
+      if (change.biddingStrategy === null || change.sd !== undefined) throw invalid();
       return {
         Entity: 'Campaign',
         ...create,
@@ -698,6 +737,7 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
         Percentage: percentageOf(change.percentage),
       };
     case 'adGroup':
+      if (change.bidOptimization !== undefined) throw invalid();
       return {
         Entity: 'Ad Group',
         ...create,
@@ -707,6 +747,9 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
         ...state(change.state),
         'Ad Group Default Bid': amount(change.defaultBid),
       };
+    case 'audienceTarget':
+      // Zielgruppen gibt es nur bei Sponsored Display.
+      throw notSupported();
     case 'productAd':
       // Seller nennen die SKU, Vendoren die ASIN (Guide), nie beides.
       if ((change.sku === null) === (change.asin === null)) throw invalid();
@@ -756,6 +799,105 @@ function createRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
         State: 'enabled',
         'Product Targeting Expression': `asin="${asinOf(change.asin)}"`,
       };
+  }
+}
+
+/** Anlage im Blatt „Sponsored Display Campaigns“ (Guide, 4.9). */
+function sdCreateRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
+  const create = { Operation: 'Create' } as const;
+  const bid = (value: string | null): Row => (value === null ? {} : { Bid: amount(value) });
+  switch (change.entity) {
+    case 'campaign': {
+      if (change.sd === undefined || change.biddingStrategy !== null) throw invalid();
+      // Off-Amazon ist eine Einstellung von SP; SD-Kampagnen kennen die Spalte nicht.
+      if (change.offAmazon !== null) throw invalid();
+      const { tactic, costType } = change.sd;
+      if (!Object.hasOwn(SD_TACTICS, tactic) || !Object.hasOwn(SD_COST_TYPES, costType)) {
+        throw invalid();
+      }
+      return {
+        Entity: 'Campaign',
+        ...create,
+        'Campaign ID': textId(change.campaignId),
+        'Campaign Name': text(change.name),
+        'Start Date': date(change.startDate),
+        ...createState(change.state),
+        Tactic: SD_TACTICS[tactic],
+        'Budget Type': 'daily',
+        Budget: amount(change.dailyBudget),
+        'Cost Type': SD_COST_TYPES[costType],
+        ...(change.amazonPortfolioId !== null && { 'Portfolio ID': id(change.amazonPortfolioId) }),
+      };
+    }
+    case 'adGroup': {
+      const optimization = change.bidOptimization;
+      if (optimization === undefined || !Object.hasOwn(SD_BID_OPTIMIZATIONS, optimization)) {
+        throw invalid();
+      }
+      return {
+        Entity: 'Ad Group',
+        ...create,
+        'Campaign ID': parentId(change.campaignId),
+        'Ad Group ID': textId(change.adGroupId),
+        'Ad Group Name': text(change.name),
+        ...createState(change.state),
+        'Ad Group Default Bid': amount(change.defaultBid),
+        'Bid Optimization': SD_BID_OPTIMIZATIONS[optimization],
+      };
+    }
+    case 'productAd':
+      // Seller nennen die SKU, Vendoren die ASIN (Guide), nie beides.
+      if ((change.sku === null) === (change.asin === null)) throw invalid();
+      return {
+        Entity: 'Product Ad',
+        ...create,
+        ...createParents(change),
+        ...createState(change.state),
+        ...(change.sku !== null ? { SKU: text(change.sku) } : { ASIN: asinOf(change.asin!) }),
+      };
+    case 'productTarget': {
+      const { type, value } = change.expression;
+      // „Ähnlich wie“ (`asin-expanded`) kennt Sponsored Display nicht.
+      if (type === 'asinExpanded') throw invalid();
+      if (type === 'category' ? !/^\d+$/.test(value) : asinOf(value) !== value) throw invalid();
+      return {
+        Entity: SD_TARGETING_ENTITIES.contextual,
+        ...create,
+        ...createParents(change),
+        ...createState(change.state),
+        ...bid(change.bid),
+        'Targeting Expression': `${EXPRESSIONS[type]}="${value}"`,
+      };
+    }
+    case 'audienceTarget':
+      if (
+        (change.audience !== 'views' && change.audience !== 'purchases') ||
+        !SD_LOOKBACK_DAYS.has(change.lookbackDays)
+      ) {
+        throw invalid();
+      }
+      return {
+        Entity: SD_TARGETING_ENTITIES.audience,
+        ...create,
+        ...createParents(change),
+        ...createState(change.state),
+        ...bid(change.bid),
+        // Wer die beworbenen Produkte selbst angesehen bzw. gekauft hat (Guide: `exact-product`).
+        'Targeting Expression': `${change.audience}=(exact-product lookback=${change.lookbackDays})`,
+      };
+    case 'negativeProductTarget':
+      return {
+        Entity: 'Negative Product Targeting',
+        ...create,
+        ...createParents(change),
+        State: 'enabled',
+        'Targeting Expression': `asin="${asinOf(change.asin)}"`,
+      };
+    case 'placement':
+    case 'keyword':
+    case 'negativeKeyword':
+      // Platzierungen und Keywords gibt es bei Sponsored Display nicht.
+      throw notSupported();
   }
 }
 
@@ -860,6 +1002,8 @@ function createKey(change: Extract<BulkFileChange, { type: 'create' }>): string 
       return `create:${change.entity}:${parent}:${change.matchType}:${lower(change.keywordText)}`;
     case 'productTarget':
       return `create:productTarget:${parent}:${change.expression.type}:${lower(change.expression.value)}`;
+    case 'audienceTarget':
+      return `create:audienceTarget:${parent}:${change.audience}:${change.lookbackDays}`;
     case 'negativeProductTarget':
       return `create:negativeProductTarget:${parent}:${lower(change.asin)}`;
   }
@@ -931,9 +1075,11 @@ export function buildBulkSheet(
     }
     records.push(row);
   }
-  // Spalten nur für Anlagen erscheinen nur, wenn eine Zeile sie belegt (Off-Amazon gibt es nur in den USA).
+  // Spalten nur für Anlagen erscheinen nur, wenn eine Zeile sie belegt (Off-Amazon gibt es nur in den USA, die
+  // ASIN bei SD nur für Vendoren).
+  const optional = OPTIONAL_COLUMNS[kind];
   const columns = sheet.columns.filter(
-    (column) => !OPTIONAL_COLUMNS.has(column) || records.some((row) => column in row),
+    (column) => !optional?.has(column) || records.some((row) => column in row),
   );
   const rows: BulkFileCell[][] = [
     [...columns],

@@ -41,10 +41,10 @@ const campaign = (
     ...overrides,
   });
 
-function read(content: Uint8Array) {
+function read(content: Uint8Array, sheet = 'Sponsored Products Campaigns') {
   const workbook = openXlsx(content);
   const rows: string[][] = [];
-  workbook.forEachRow('Sponsored Products Campaigns', (cells) => rows.push(cells));
+  workbook.forEachRow(sheet, (cells) => rows.push(cells));
   const [header, ...data] = rows;
   return {
     sheets: workbook.sheets.map((sheet) => sheet.name),
@@ -357,5 +357,107 @@ describe('buildSetupBulkFile', () => {
       startDate: '2026-10-10',
     });
     expect(read(withPortfolio.content!).rows[0]).toMatchObject({ 'Portfolio ID': '7001' });
+  });
+
+  it('schreibt Sponsored Display ins eigene Blatt, mit Taktik, Optimierung und Zielgruppe (4.9)', () => {
+    const SD = 'SD | RT-VIEW | Flaschen';
+    const sd = { campaignRef: SD, adGroupRef: SD };
+    const items = [
+      campaign(),
+      item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+      item(
+        {
+          entity: 'campaign',
+          adProduct: 'SD',
+          name: SD,
+          targetingType: 'manual',
+          state: 'PAUSED',
+          dailyBudget: '10.00',
+          currencyCode: 'USD',
+          biddingStrategy: null,
+          offAmazon: false,
+          amazonPortfolioId: null,
+          sdTactic: 'audience',
+          costType: 'cpc',
+        },
+        { campaignRef: SD, adGroupRef: null },
+      ),
+      item(
+        { entity: 'ad_group', name: SD, defaultBid: '0.55', bidOptimization: 'conversions' },
+        sd,
+      ),
+      item({ entity: 'product_ad', asin: 'B0TEST0001', sku: 'SKU-1' }, sd),
+      item(
+        { entity: 'audience_target', audience: 'purchases', lookbackDays: 60, bid: '0.50' },
+        sd,
+      ),
+    ];
+    // In den USA: SD-Kampagnen tragen keine Off-Amazon-Spalte (Einstellung von SP).
+    const file = buildSetupBulkFile(items, {
+      countryCode: 'US',
+      accountType: 'seller',
+      startDate: '2099-10-10',
+    });
+    expect(file.skipped).toEqual([]);
+    expect(file.rows).toBe(6);
+    const display = read(file.content!, 'Sponsored Display Campaigns');
+    expect(display.sheets).toEqual(['Sponsored Products Campaigns', 'Sponsored Display Campaigns']);
+    expect(display.rows).toEqual([
+      expect.objectContaining({
+        Product: 'Sponsored Display',
+        Entity: 'Campaign',
+        Operation: 'Create',
+        'Campaign ID': SD,
+        State: 'paused',
+        Tactic: 'T00030',
+        'Budget Type': 'daily',
+        Budget: '10.00',
+        'Cost Type': 'CPC',
+        'Start Date': '20991010',
+      }),
+      expect.objectContaining({
+        Entity: 'Ad Group',
+        'Campaign ID': SD,
+        'Ad Group ID': SD,
+        'Bid Optimization': 'Optimize for conversions',
+      }),
+      expect.objectContaining({ Entity: 'Product Ad', SKU: 'SKU-1', 'Ad Group ID': SD }),
+      expect.objectContaining({
+        Entity: 'Audience Targeting',
+        Bid: '0.50',
+        'Targeting Expression': 'purchases=(exact-product lookback=60)',
+      }),
+    ]);
+    expect(read(file.content!).rows.map((row) => row.Entity)).toEqual(['Campaign', 'Ad Group']);
+  });
+
+  it('lässt Kinder einer SD-Kampagne weg, die Display nicht kennt', () => {
+    const SD = 'SD | CAT | Flaschen';
+    const sd = { campaignRef: SD, adGroupRef: SD };
+    const file = buildSetupBulkFile(
+      [
+        item(
+          {
+            entity: 'campaign',
+            adProduct: 'SD',
+            name: SD,
+            targetingType: 'manual',
+            state: 'ENABLED',
+            dailyBudget: '10.00',
+            currencyCode: 'EUR',
+            biddingStrategy: null,
+            offAmazon: false,
+            sdTactic: 'contextual',
+            costType: 'cpc',
+          },
+          { campaignRef: SD, adGroupRef: null },
+        ),
+        item({ entity: 'ad_group', name: SD, defaultBid: '0.50', bidOptimization: 'clicks' }, sd),
+        item({ entity: 'negative_keyword', text: 'glas', matchType: 'negativeExact' }, sd),
+      ],
+      { countryCode: 'DE', accountType: 'seller', startDate: '2099-10-10' },
+    );
+    expect(file.rows).toBe(2);
+    expect(file.skipped).toEqual([expect.objectContaining({ code: 'BULK_FILE_NOT_SUPPORTED' })]);
   });
 });
