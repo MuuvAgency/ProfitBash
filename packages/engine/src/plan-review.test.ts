@@ -219,9 +219,7 @@ describe('reviewCampaignPlan', () => {
       { severity: 'info', code: 'offAmazonOnlyUs', campaign: 'SP' },
     ]);
     expect(
-      reviewCampaignPlan(
-        input({ campaigns: [sd], unlocks: { 'SD-RT-VIEWS': { vcpm: true } } }),
-      ),
+      reviewCampaignPlan(input({ campaigns: [sd], unlocks: { 'SD-RT-VIEWS': { vcpm: true } } })),
     ).toEqual([]);
   });
 

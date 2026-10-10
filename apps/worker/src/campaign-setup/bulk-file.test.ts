@@ -387,10 +387,7 @@ describe('buildSetupBulkFile', () => {
         sd,
       ),
       item({ entity: 'product_ad', asin: 'B0TEST0001', sku: 'SKU-1' }, sd),
-      item(
-        { entity: 'audience_target', audience: 'purchases', lookbackDays: 60, bid: '0.50' },
-        sd,
-      ),
+      item({ entity: 'audience_target', audience: 'purchases', lookbackDays: 60, bid: '0.50' }, sd),
     ];
     // In den USA: SD-Kampagnen tragen keine Off-Amazon-Spalte (Einstellung von SP).
     const file = buildSetupBulkFile(items, {

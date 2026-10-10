@@ -613,8 +613,7 @@ export async function submitCampaignSetupDraft(
             ...(!spec.supported && {
               status: 'failed',
               errorCode: 'AD_PRODUCT_NOT_SUPPORTED',
-              errorMessage:
-                'Sponsored Brands legt das Setup noch nicht an (kommt mit 4.10).',
+              errorMessage: 'Sponsored Brands legt das Setup noch nicht an (kommt mit 4.10).',
               resolvedAt: now,
             }),
           })),

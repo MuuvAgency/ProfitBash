@@ -589,7 +589,9 @@ describe('submitCampaignSetupDraft', () => {
       issues: [{ code: 'vcpmNotUnlocked', campaign: 'SD | RT-VIEW | Flaschen' }],
     });
     const unlocked = await save({
-      campaigns: [{ ...sd, name: 'SD | RT-VIEW | Flaschen 2', adGroup: { ...sd.adGroup, name: 'X' } }],
+      campaigns: [
+        { ...sd, name: 'SD | RT-VIEW | Flaschen 2', adGroup: { ...sd.adGroup, name: 'X' } },
+      ],
       inputs: {
         keywords: [],
         brandTerms: [],

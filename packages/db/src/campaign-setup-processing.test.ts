@@ -450,7 +450,11 @@ describe('Sponsored Display (4.9)', () => {
         ...parents,
         amazonTargetId: '7701',
         targetType: 'audience',
-        expression: { event: 'VIEWS', lookback: 30, bulkExpression: 'views=(exact-product lookback=30)' },
+        expression: {
+          event: 'VIEWS',
+          lookback: 30,
+          bulkExpression: 'views=(exact-product lookback=30)',
+        },
       },
     ]);
     const result = await confirmBulkFileAdChanges(db, {

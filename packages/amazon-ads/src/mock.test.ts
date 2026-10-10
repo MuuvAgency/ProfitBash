@@ -1018,7 +1018,13 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
         bid: null,
         state: 'ENABLED',
       },
-      { ref: 'n', entity: 'sdNegativeTarget', campaignRef: 'c', adGroupRef: 'g', asin: 'B0FREMD002' },
+      {
+        ref: 'n',
+        entity: 'sdNegativeTarget',
+        campaignRef: 'c',
+        adGroupRef: 'g',
+        asin: 'B0FREMD002',
+      },
     ];
 
     const outcome = await applyCreates(
@@ -1026,27 +1032,37 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
       connection,
       { amazonProfileId: DE, operations: SD_STRUCTURE },
     );
-    expect(outcome.results.map((r) => r.status)).toEqual(Array(SD_STRUCTURE.length).fill('applied'));
+    expect(outcome.results.map((r) => r.status)).toEqual(
+      Array(SD_STRUCTURE.length).fill('applied'),
+    );
     const id = Object.fromEntries(
       outcome.results.map((r) => [r.ref, r.status === 'applied' ? r.amazonId! : '']),
     );
 
-    expect((await exportRows('campaigns', 'SPONSORED_DISPLAY')).find((c) => c.amazonCampaignId === id.c)).toMatchObject({
+    expect(
+      (await exportRows('campaigns', 'SPONSORED_DISPLAY')).find((c) => c.amazonCampaignId === id.c),
+    ).toMatchObject({
       adProduct: 'SPONSORED_DISPLAY',
       name: 'SD | Mock | Neu',
       budgetAmount: '11',
       startDate: '2099-11-01',
     });
-    expect((await exportRows('adGroups', 'SPONSORED_DISPLAY')).find((g) => g.amazonAdGroupId === id.g)).toMatchObject({
+    expect(
+      (await exportRows('adGroups', 'SPONSORED_DISPLAY')).find((g) => g.amazonAdGroupId === id.g),
+    ).toMatchObject({
       amazonCampaignId: id.c,
       defaultBid: '0.55',
     });
-    expect((await exportRows('ads', 'SPONSORED_DISPLAY')).find((a) => a.amazonAdId === id.ad)).toMatchObject({
+    expect(
+      (await exportRows('ads', 'SPONSORED_DISPLAY')).find((a) => a.amazonAdId === id.ad),
+    ).toMatchObject({
       amazonAdGroupId: id.g,
       sku: 'NEU-SKU-1',
     });
     const targets = new Map(
-      (await exportRows('targets', 'SPONSORED_DISPLAY')).map((t) => [t.target.amazonTargetId, t] as const),
+      (await exportRows('targets', 'SPONSORED_DISPLAY')).map(
+        (t) => [t.target.amazonTargetId, t] as const,
+      ),
     );
     expect(targets.get(id.v!)).toMatchObject({
       kind: 'target',

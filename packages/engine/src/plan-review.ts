@@ -232,7 +232,12 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     for (const target of campaign.targets) {
       // `asin-expanded` gibt es nur bei Sponsored Products (Bulk-Guides, SD-Spec ohne „expanded“).
       if (target.type === 'product' && target.match === 'expanded' && campaign.adProduct !== 'SP') {
-        add({ severity: 'error', code: 'expandedNotAvailable', campaign: name, target: target.asin });
+        add({
+          severity: 'error',
+          code: 'expandedNotAvailable',
+          campaign: name,
+          target: target.asin,
+        });
       }
       if (target.type !== 'keyword') continue;
       if (tooLong(target.text, MAX_WORDS.keyword)) {
