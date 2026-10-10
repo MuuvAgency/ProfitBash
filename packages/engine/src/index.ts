@@ -74,3 +74,4 @@ export {
   type BidStackRow,
   type BidStackStrategy,
 } from './bid-stack';
+export * from './goals';
