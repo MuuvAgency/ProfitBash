@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a. Als Nächstes: 5.2b.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b. Als Nächstes: 5.3.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -225,8 +225,25 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     (Vorschläge 5.7, Caps 5.9b, Prüfungen 5.10) über `createNotification` mit eigenem `kind`.
 
 ### 5.2b Benachrichtigungen: Oberfläche
-- [ ] Glocke mit Zähler im Kopf (SSE-Client, ohne SSE Abfrage beim Fokus), Seite `/notifications` (Liste, Filter
+- [x] Glocke mit Zähler im Kopf (SSE-Client, ohne SSE Abfrage beim Fokus), Seite `/notifications` (Liste, Filter
       ungelesen/Art/Profil, alle gelesen), Loading, Empty, Error.
+- [x] Umsetzung (2026-10-10):
+  - **Live-Kanal** `apps/web/src/notifications/live.ts`: eine `EventSource` je aktiver Organisation (neu bei Wechsel,
+    zu beim Abmelden), gestartet in der App-Shell (`useNotificationStream`). Jede neue Nummer, `resync` und eine
+    Wiederverbindung laden alles unter dem Query-Schlüssel `notifications` neu (Doppelte aus Live und Nachholen zählen
+    einmal; die Reihenfolge kommt aus der neu geladenen Liste). Ohne `EventSource` nur Abfrage beim Fokus: Der Zähler
+    lädt bei jedem Fokus des Fensters neu (`refetchOnWindowFocus: 'always'`).
+  - **Glocke** (`NotificationBell.vue`) oben in der Sidebar (neben Ein-/Ausklappen) und in der mobilen Kopfzeile: Zahl
+    der ungelesenen (ab 100 „99+“, Zahl im `aria-label`), Popover mit den fünf neuesten, „Alle gelesen“, „Alle anzeigen“.
+  - **Seite** `/notifications` (`NotificationsPage.vue`): neueste zuerst, „Ältere laden“ (Seiten über `before`), Filter
+    Alle/Ungelesen, Art, Profil (die Profile der geladenen Benachrichtigungen; kein eigener Endpunkt), „Alle gelesen“,
+    je Eintrag gelesen setzen und „Öffnen“ (setzt gelesen und folgt dem Link). Skeleton, leerer Zustand (eigene Texte für
+    Filter), Fehler mit erneutem Versuch. Texte je Art über `notifications.kind.<kind>` (`labels.ts`).
+  - **Browser-Pane (2026-10-10):** Live-Zustellung gegen die Dev-DB (Einträge per SQL mit `pg_notify`), Glocke, Popover,
+    gelesen setzen, „Öffnen“, 1440 px, Tablet dunkel, Handy hell; Konsole ohne Fehler nach der Anmeldung. Testdaten
+    wieder gelöscht.
+  - **Offen:** Der Profilfilter kennt nur Profile aus schon geladenen Seiten; bei sehr vielen Benachrichtigungen
+    ggf. die sichtbaren Profile über einen eigenen Endpunkt laden.
 
 ### 5.3 Ziele (`/ads/goals`, vorgezogen aus Phase 6, F4)
 - [ ] Tabelle Ziele: Organisation, Client, optional Profil oder Produktgruppe; Kennzahl `acos` oder `roas` (eins aus dem

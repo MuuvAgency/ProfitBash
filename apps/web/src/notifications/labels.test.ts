@@ -34,7 +34,10 @@ describe('notificationTexts', () => {
       text: 'Seit 9 Tagen keine neue Bulk-Datei für Nordwind DE. Die Daten veralten.',
     });
     expect(
-      texts({ kind: 'file_import_failed', params: { fileName: 'bulk.xlsx', error: 'Spalte fehlt.' } }),
+      texts({
+        kind: 'file_import_failed',
+        params: { fileName: 'bulk.xlsx', error: 'Spalte fehlt.' },
+      }),
     ).toEqual({ title: 'Import fehlgeschlagen', text: 'bulk.xlsx (Nordwind DE): Spalte fehlt.' });
     expect(
       texts({ kind: 'submission_failed', params: { applied: 3, failed: 1, channel: 'bulk_file' } })
@@ -61,8 +64,8 @@ describe('notificationTexts', () => {
       texts({ kind: 'file_import_imported', profileName: null, params: { fileName: 'a.xlsx' } })
         .text,
     ).toBe('a.xlsx ist importiert.');
-    expect(texts({ kind: 'file_import_failed', profileName: null, params: { fileName: 'a.xlsx' } }).text).toBe(
-      'a.xlsx: Der Import ist fehlgeschlagen.',
-    );
+    expect(
+      texts({ kind: 'file_import_failed', profileName: null, params: { fileName: 'a.xlsx' } }).text,
+    ).toBe('a.xlsx: Der Import ist fehlgeschlagen.');
   });
 });

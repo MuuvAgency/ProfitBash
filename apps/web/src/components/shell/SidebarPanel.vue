@@ -4,6 +4,7 @@ import { formatNumber } from '@profitbash/shared';
 import { useI18n } from 'vue-i18n';
 import { usePendingCount } from '../../changes/queries';
 import { visibleNavigation } from '../../navigation/navigation';
+import NotificationBell from '../../notifications/NotificationBell.vue';
 import { useSessionStore } from '../../stores/session';
 import BrandMark from '../brand/BrandMark.vue';
 import AccountMenu from './AccountMenu.vue';
@@ -57,6 +58,7 @@ const toggleLabel = computed(() =>
       >
         <BrandMark :compact="collapsed" />
       </RouterLink>
+      <NotificationBell :collapsed="collapsed" :class="collapsed ? '' : 'ml-auto'" />
       <button
         v-if="collapsible"
         v-tooltip.right="collapsed ? toggleLabel : undefined"
