@@ -42,6 +42,10 @@ export type TargetAcosData = Schemas['TargetAcosResponse'];
 export type AutomationSettingsData = Schemas['AutomationSettings'];
 export type AutomationRulesData = Schemas['AutomationRulesResponse'];
 export type AutomationRulesPreviewData = Schemas['AutomationRulesPreview'];
+export type AutomationRunData = Schemas['AutomationRun'];
+export type AutomationProposalData = Schemas['AutomationProposal'];
+export type AutomationProposalsData = Schemas['AutomationProposalsResponse'];
+export type AutomationProposalActionData = Schemas['AutomationProposalActionResponse'];
 export type NotificationData = Schemas['Notification'];
 export type NotificationListData = Schemas['NotificationListResponse'];
 export type NotificationListQueryInput = NonNullable<
@@ -453,6 +457,15 @@ export function createApi(options: ApiOptions = {}) {
         input: Schemas['PreviewAutomationRulesRequest'],
       ): Promise<AutomationRulesPreviewData> =>
         unwrap(client.POST('/api/ads/automations/rules/preview', { body: input })),
+      /** Läufe und Vorschläge (5.8). */
+      runs: async (): Promise<AutomationRunData[]> =>
+        (await unwrap(client.GET('/api/ads/automations/runs'))).runs,
+      proposals: (status: AutomationProposalData['status']): Promise<AutomationProposalsData> =>
+        unwrap(client.GET('/api/ads/automations/proposals', { params: { query: { status } } })),
+      stageProposals: (ids: string[]): Promise<AutomationProposalActionData> =>
+        unwrap(client.POST('/api/ads/automations/proposals/stage', { body: { ids } })),
+      dismissProposals: (ids: string[]): Promise<AutomationProposalActionData> =>
+        unwrap(client.POST('/api/ads/automations/proposals/dismiss', { body: { ids } })),
     },
 
     /** Benachrichtigungen (5.2a/5.2b), für alle Mitglieder; neueste zuerst, Seiten über `before`. */

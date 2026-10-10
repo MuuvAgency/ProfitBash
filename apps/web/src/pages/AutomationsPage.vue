@@ -8,7 +8,9 @@ import { useI18n } from 'vue-i18n';
 import { api, ApiError } from '../api';
 import type { AutomationSettingsData } from '../api/client';
 import GuardrailFields from '../automations/GuardrailFields.vue';
+import ProposalsTab from '../automations/ProposalsTab.vue';
 import RulesTab from '../automations/RulesTab.vue';
+import RunsTab from '../automations/RunsTab.vue';
 import {
   parseGuardrailInputs,
   toGuardrailInputs,
@@ -22,7 +24,8 @@ import { useActiveOrgId, useSessionStore } from '../stores/session';
 
 /**
  * Seite „Automationen & Regeln“ (`phase-5.md` 5.4, 5.6b): Tabs „Einstellungen“ (Leitplanken der Organisation, je
- * Client Modus, zuständiger Nutzer und überschriebene Werte) und „Regeln“. Weitere Tabs folgen (5.8, 5.10).
+ * Client Modus, zuständiger Nutzer und überschriebene Werte), „Regeln“, „Vorschläge“ und „Läufe“ (5.8). Ein
+ * weiterer Tab folgt (5.10).
  */
 const { t } = useI18n();
 const id = useId();
@@ -31,7 +34,7 @@ const orgId = useActiveOrgId();
 const queryClient = useQueryClient();
 const canWrite = computed(() => session.me?.features.automations.write ?? false);
 
-const TABS = ['settings', 'rules'] as const;
+const TABS = ['settings', 'rules', 'proposals', 'runs'] as const;
 const tab = ref<(typeof TABS)[number]>('settings');
 const tabId = (name: string) => `${id}-tab-${name}`;
 function moveTab(step: number) {
@@ -169,6 +172,8 @@ async function submitClient() {
       <KeepAlive>
         <RulesTab v-if="tab === 'rules'" :clients="data?.clients" :can-write="canWrite" />
       </KeepAlive>
+      <ProposalsTab v-if="tab === 'proposals'" :can-write="canWrite" />
+      <RunsTab v-else-if="tab === 'runs'" />
       <template v-if="tab === 'settings'">
         <InlineError
           v-if="settingsQuery.isError.value"
