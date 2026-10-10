@@ -5,7 +5,8 @@
   am 2026-09-28 um Referenzdaten (`fx_rates`) ergänzt, am 2026-09-29 um gespeicherte Ansichten (`saved_views`),
   am 2026-10-07 um die Suchbegriff-Regeln (`search_term_rules`) und geschützte Begriffe, am 2026-10-08 um die
   abweichenden Regeln je Profil (`search_term_rule_overrides`) und die Änderungen an Amazon-Werbung (`ad_changes`),
-  am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`)
+  am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`),
+  am 2026-10-10 um Benachrichtigungen (`notifications`, `notification_reads`)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -95,6 +96,12 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   (`visibleProfilesScope()`), Zähler nur über sichtbare Profile, mit Audit-Event; das Recht (`write` bzw. `view` im
   Feature `tags`) prüft die API. Der Tag-Filter der Auswertungen (`ads-analytics.ts`) wirkt nur innerhalb der
   sichtbaren Profile der Auswahl: Ein Tag einer fremden Organisation trifft dort nichts.
+- **Benachrichtigungen** (ab Phase 5, 5.2a): `notifications` gehört der Organisation, optional einem Profil bzw.
+  einer Connection. Erzeugt werden sie als Systemzugriff in der Transaktion des Auslösers (Import, Übermittlung) bzw.
+  vom plattformweiten Job `notifications-check` (`notification-sources.ts`). Gelesen, gezählt und gelesen gesetzt
+  werden sie nur über `notifications.ts`: Profil sichtbar nach `visibleProfilesScope()` (Admins auch ausgeblendete),
+  ohne Profil Mitgliedschaft (`getOrgRole()`), dazu der Empfängerkreis (`audience`). Der SSE-Kanal der API prüft das je
+  Ereignis neu; `pg_notify` trägt nur IDs.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.
