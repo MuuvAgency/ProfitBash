@@ -23,6 +23,7 @@ import {
   parseBulkId,
   parseTargetExpression,
   PLACEMENTS,
+  SB_AD_TYPES,
   STATES,
   TARGETING_TYPES,
   type BulkColumn,
@@ -665,6 +666,104 @@ describe('Bulk-Datei für SD-Anlagen: Rundlauf mit dem Leser des Bulk-Imports', 
       targetType: 'category',
       expression: { productCategoryId: '5524098011' },
     });
+  });
+});
+
+/** Rundlauf für SB-Anlagen (`phase-4.md` 4.10): Kampagne, Ad Group, Kollektion, Video, Keyword. */
+describe('Bulk-Datei für SB-Anlagen: Rundlauf mit dem Leser des Bulk-Imports', () => {
+  it('liest Blatt, Entities, Budget-Typ, Anzeigen mit Format, Namen und ASINs zurück', () => {
+    const ids = { campaignId: 'SB | HEADER | Lampen', adGroupId: 'SB | HEADER | Lampen' };
+    const ad = {
+      type: 'create',
+      entity: 'sbAd',
+      ...ids,
+      state: 'ENABLED',
+      brandName: 'Lumen',
+      brandEntityId: 'ENTITY1',
+      logoAssetId: null,
+      adTitle: null,
+    } as const;
+    const sheet = buildBulkSheet('sbMultiAdGroup', [
+      {
+        ref: 'c',
+        type: 'create',
+        entity: 'campaign',
+        campaignId: ids.campaignId,
+        name: ids.campaignId,
+        targetingType: 'manual',
+        state: 'ENABLED',
+        dailyBudget: '15.00',
+        startDate: '2099-10-10',
+        biddingStrategy: null,
+        amazonPortfolioId: null,
+        offAmazon: null,
+        sb: { brandEntityId: 'ENTITY1' },
+      },
+      {
+        ref: 'g',
+        type: 'create',
+        entity: 'adGroup',
+        ...ids,
+        name: ids.adGroupId,
+        defaultBid: '0.90',
+        state: 'ENABLED',
+      },
+      {
+        ref: 'a',
+        ...ad,
+        format: 'collection',
+        name: 'Kollektion',
+        videoAssetId: null,
+        asins: ['B0LAMPE001', 'B0LAMPE002', 'B0LAMPE003'],
+        landingPageUrl: null,
+      },
+      {
+        ref: 'v',
+        ...ad,
+        format: 'video',
+        name: 'Video',
+        videoAssetId: 'amzn1.assetlibrary.asset1.video:version_v1',
+        asins: ['B0LAMPE001'],
+        landingPageUrl: 'https://www.amazon.de/dp/B0LAMPE001',
+      },
+      {
+        ref: 'k',
+        type: 'create',
+        entity: 'keyword',
+        ...ids,
+        keywordText: 'stehlampe',
+        matchType: 'exact',
+        bid: '0.90',
+        state: 'ENABLED',
+      },
+    ]);
+    expect(sheet.skipped).toEqual([]);
+    const workbook = openXlsx(writeXlsx([{ name: sheet.sheetName, rows: sheet.rows }]));
+    expect(workbook.sheets.map((entry) => classifySheet(entry.name))).toEqual(['sb']);
+    expect(isSbMultiAdGroupSheet(sheet.sheetName)).toBe(true);
+    const rows: string[][] = [];
+    workbook.forEachRow(sheet.sheetName, (cells) => rows.push(cells));
+    const [header, ...data] = rows;
+    const columns = mapHeader(header!);
+    const cell = (row: number, column: BulkColumn) => data[row]![columns.get(column)!] ?? '';
+
+    expect(data.map((_, row) => entityKind(cell(row, 'entity')))).toEqual([
+      'campaign',
+      'adGroup',
+      'sbAd',
+      'sbAd',
+      'keyword',
+    ]);
+    expect(mapValue(BUDGET_TYPES, cell(0, 'budgetType'))).toEqual({ value: 'DAILY', known: true });
+    expect(parseBulkAmount(cell(0, 'budget'))).toBe('15');
+    expect(cell(0, 'brandEntityId')).toBe('ENTITY1');
+    expect(cell(1, 'adGroupName')).toBe(ids.adGroupId);
+    expect(mapValue(SB_AD_TYPES, cell(2, 'entity')).value).toBe('MANUAL_COLLECTION');
+    expect(cell(2, 'adName')).toBe('Kollektion');
+    expect(cell(2, 'creativeAsins')).toBe('B0LAMPE001, B0LAMPE002, B0LAMPE003');
+    expect(mapValue(SB_AD_TYPES, cell(3, 'entity')).value).toBe('VIDEO');
+    expect(cell(3, 'creativeAsins')).toBe('B0LAMPE001');
+    expect(mapValue(MATCH_TYPES, cell(4, 'matchType'))).toEqual({ value: 'EXACT', known: true });
   });
 });
 

@@ -53,7 +53,11 @@ export type BulkColumn =
   | 'budgetCurrencyCode'
   | 'budgetPolicy'
   | 'budgetStartDate'
-  | 'budgetEndDate';
+  | 'budgetEndDate'
+  | 'adName'
+  | 'creativeAsins'
+  | 'brandEntityId'
+  | 'brandName';
 
 /**
  * Aliasse je Spalte (Englisch laut Bulksheets-Doku, Deutsch laut echter Datei). Kennzahlen (Impressions,
@@ -103,6 +107,11 @@ const COLUMN_ALIASES: Record<BulkColumn, readonly string[]> = {
   budgetPolicy: ['Budget Policy', 'Budget-Linie'],
   budgetStartDate: ['Budget Start Date', 'Anfangsdatum des Budgets'],
   budgetEndDate: ['Budget End Date', 'Budget-Enddatum'],
+  // Sponsored Brands (4.10); Deutsch ungeprüft.
+  adName: ['Ad Name', 'Anzeigenname'],
+  creativeAsins: ['Creative ASINs', 'Werbemittel-ASINs'],
+  brandEntityId: ['Brand Entity ID', 'Markeneinheits-ID'],
+  brandName: ['Brand Name', 'Markenname'],
 };
 
 /** Deutscher Anzeigename je Spalte für Meldungen (nie Zellinhalte). */
@@ -296,7 +305,9 @@ export type EntityKind =
   | 'audienceTargeting'
   | 'contextualTargeting'
   | 'biddingAdjustment'
-  /** Bekannt, aber (noch) nicht übernommen, z. B. SB-Ads (1.9). */
+  /** Anzeigen von Sponsored Brands je Format (4.10); das Format steht in `SB_AD_TYPES`. */
+  | 'sbAd'
+  /** Bekannt, aber (noch) nicht übernommen, z. B. Themen von SB. */
   | 'unsupported';
 
 const ENTITY_KINDS = valueMap({
@@ -324,18 +335,38 @@ const ENTITY_KINDS = valueMap({
   audienceTargeting: ['Audience Targeting', 'Zielgruppen-Targeting'],
   contextualTargeting: ['Contextual Targeting', 'Kontextbezogenes Targeting'],
   biddingAdjustment: ['Bidding Adjustment', 'Gebotsanpassung'],
-  // SB-Ads und SD-Negatives auf Zielgruppen: kommen mit 1.9 bzw. nach Sichtung echter Dateien.
-  unsupported: [
-    'Ad',
+  // SB-Anzeigen (4.10, Schreibweise des Guides); Deutsch ungeprüft.
+  sbAd: [
+    'Manual Collection Ad',
+    'Auto Collection Ad',
     'Product Collection Ad',
     'Video Ad',
     'Brand Video Ad',
     'Store Spotlight Ad',
+  ],
+  // SD-Negatives auf Zielgruppen und Themen: nach Sichtung echter Dateien.
+  unsupported: [
+    'Ad',
     'Negative Audience Targeting',
     'Theme',
     'Draft Campaign',
   ],
 });
+
+/** Format einer SB-Anzeige aus dem Entity-Namen (Schreibweise wie `adType` im Export). */
+export const SB_AD_TYPES = valueMap({
+  MANUAL_COLLECTION: ['Manual Collection Ad'],
+  AUTO_COLLECTION: ['Auto Collection Ad'],
+  PRODUCT_COLLECTION: ['Product Collection Ad'],
+  VIDEO: ['Video Ad'],
+  BRAND_VIDEO: ['Brand Video Ad'],
+  STORE_SPOTLIGHT: ['Store Spotlight Ad'],
+});
+
+/** „Brand Assets Data (Read-only)“: die Marken des Kontos für Sponsored Brands (4.10). */
+export function isBrandAssetsSheet(name: string): boolean {
+  return normalizeHeader(name) === 'brand assets data';
+}
 
 export function entityKind(raw: string): EntityKind | null {
   return (ENTITY_KINDS.get(normalizeValue(raw)) as EntityKind | undefined) ?? null;

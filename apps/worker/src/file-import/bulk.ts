@@ -10,6 +10,7 @@ import {
   upsertCampaigns,
   upsertNegativeTargets,
   upsertPortfolios,
+  replaceProfileBrands,
   upsertProductAds,
   upsertTargets,
   type AdGroupRecord,
@@ -20,6 +21,7 @@ import {
   type NegativeTargetRecord,
   type PortfolioRecord,
   type ProductAdRecord,
+  type ProfileBrand,
   type RemovableEntity,
   type TargetRecord,
 } from '@profitbash/db';
@@ -32,6 +34,7 @@ import {
   BUDGET_POLICIES,
   BUDGET_TYPES,
   classifySheet,
+  isBrandAssetsSheet,
   isSbMultiAdGroupSheet,
   columnLabel,
   COST_TYPES,
@@ -44,6 +47,7 @@ import {
   parseBulkId,
   parseTargetExpression,
   PLACEMENTS,
+  SB_AD_TYPES,
   STATES,
   TARGETING_TYPES,
   type BulkColumn,
@@ -119,6 +123,8 @@ export const importBulkFile: FileImporter = async (input) => {
       });
     }
   }
+  // Marken für Sponsored Brands (4.10): `null`, wenn die Datei das Blatt nicht enthält (dann bleibt die Liste).
+  const brands = readBrandAssets(workbook);
   // Der Dateiname der Werbekonsole gewinnt; der von Hand angegebene Zeitraum ist nur der Ausweg (2b.2c).
   const period = parseBulkPeriod(input.fileName) ?? input.period ?? null;
 
@@ -199,6 +205,7 @@ export const importBulkFile: FileImporter = async (input) => {
       });
     }
 
+    if (brands !== null && !unmatched) await replaceProfileBrands(tx, scope, brands);
     const counts: EntityUpsertCounts[] = [
       await upsertPortfolios(tx, scope, records.portfolios),
       await upsertCampaigns(tx, scope, records.campaigns),
@@ -595,6 +602,34 @@ class BulkCollector {
           },
         });
         return;
+      case 'sbAd': {
+        // SB-Anzeige (4.10): wie im Export eine Product Ad mit Format und Name in `extra`; die ASIN nur bei genau
+        // einem Produkt, sonst alle in `extra.asins`.
+        const asins = (cells.optionalText('creativeAsins') ?? '')
+          .split(',')
+          .map((asin) => asin.trim().toUpperCase())
+          .filter((asin) => /^[A-Z0-9]{10}$/.test(asin));
+        const name = cells.optionalText('adName');
+        this.productAds.push({
+          position,
+          record: {
+            ...BASE,
+            amazonAdId: cells.requiredId('adId'),
+            amazonAdGroupId: cells.requiredId('adGroupId'),
+            amazonCampaignId: cells.id('campaignId'),
+            adProduct,
+            asin: asins.length === 1 ? asins[0]! : null,
+            sku: null,
+            state: cells.requiredValue('state', STATES),
+            extra: {
+              adType: mapValue(SB_AD_TYPES, cells.text('entity')).value,
+              ...(name !== null && { name }),
+              ...(asins.length > 1 && { asins }),
+            },
+          },
+        });
+        return;
+      }
       case 'keyword':
       case 'negativeKeyword':
       case 'campaignNegativeKeyword': {
@@ -901,3 +936,28 @@ const uniqueCount = <T>(records: readonly T[], idOf: (record: T) => string) =>
 
 const sum = (counts: EntityUpsertCounts[], key: keyof EntityUpsertCounts) =>
   counts.reduce((total, count) => total + count[key], 0);
+
+/**
+ * Blatt „Brand Assets Data (Read-only)“ (4.10): `Brand Entity ID` und `Brand Name` je Zeile. `null`, wenn es das
+ * Blatt nicht gibt; Zeilen ohne gültige ID fallen weg.
+ */
+function readBrandAssets(workbook: ReturnType<typeof openXlsx>): ProfileBrand[] | null {
+  const sheet = workbook.sheets.find((entry) => isBrandAssetsSheet(entry.name));
+  if (!sheet) return null;
+  const brands: ProfileBrand[] = [];
+  let columns: Map<BulkColumn, number> | null = null;
+  workbook.forEachRow(sheet.name, (cells) => {
+    if (columns === null) {
+      columns = mapHeader(cells);
+      return;
+    }
+    const cell = (column: BulkColumn) => {
+      const index = columns!.get(column);
+      return index === undefined ? '' : (cells[index] ?? '').trim();
+    };
+    const brandEntityId = cell('brandEntityId');
+    if (!/^[A-Za-z0-9]{1,64}$/.test(brandEntityId)) return;
+    brands.push({ brandEntityId, name: cell('brandName') || null });
+  });
+  return brands;
+}

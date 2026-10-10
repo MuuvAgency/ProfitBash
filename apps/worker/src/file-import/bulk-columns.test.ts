@@ -253,7 +253,9 @@ describe('Werte', () => {
     expect(entityKind('Audience Targeting')).toBe('audienceTargeting');
     expect(entityKind('Contextual Targeting')).toBe('contextualTargeting');
     expect(entityKind('Portfolio')).toBe('portfolio');
-    expect(entityKind('Video Ad')).toBe('unsupported');
+    expect(entityKind('Video Ad')).toBe('sbAd');
+    expect(entityKind('Manual Collection ad')).toBe('sbAd');
+    expect(entityKind('Theme')).toBe('unsupported');
     expect(entityKind('Etwas anderes')).toBeNull();
   });
 });
