@@ -25,6 +25,7 @@ import { inputClass, labelClass } from '../catalog/draft';
 import {
   useDiscardSetupDraft,
   usePlanSetup,
+  usePortfolios,
   useSaveSetupDraft,
   useSubmitSetupDraft,
   useToolRights,
@@ -78,6 +79,11 @@ const sourceNegatives = ref<SourceNegativeData[]>(
     : [],
 );
 const useProfileBids = ref(true);
+/** Bestehendes Portfolio für alle neuen Kampagnen (4.7, F9); neue erst nach dem nächsten Import wählbar. */
+const portfolioId = ref<string | null>(props.draft?.portfolioId ?? null);
+const portfolios = usePortfolios(profileId);
+const portfolioChoices = computed(() => portfolios.data.value?.portfolios ?? []);
+const pendingPortfolios = computed(() => portfolios.data.value?.pending ?? []);
 const name = ref(props.draft?.name ?? '');
 const paused = ref(props.draft?.campaignState === 'PAUSED');
 // Eigene Kopie: Die Vorschau ist bearbeitbar, der Cache von Vue Query bleibt unberührt (structuredClone scheitert an
@@ -126,6 +132,7 @@ watch(profileId, (next, previous) => {
   if (previous === null || next === previous) return;
   harvest.value = [];
   sourceNegatives.value = [];
+  portfolioId.value = null;
 });
 watch(
   [profileId, productGroupId, presetKey, texts, unlocks, useProfileBids, harvest],
@@ -271,6 +278,7 @@ async function saveDraft(): Promise<boolean> {
         inputs: currentInputs(),
         campaigns: campaigns.value,
         sourceNegatives: sourceNegatives.value,
+        portfolioId: portfolioId.value,
       },
     });
     draftId.value = saved.id;
@@ -341,6 +349,7 @@ function snapshot() {
     unlocks.value,
     harvest.value,
     sourceNegatives.value,
+    portfolioId.value,
   ]);
 }
 const savedSnapshot = ref(snapshot());
@@ -414,6 +423,41 @@ function close() {
           {{ t('setup.presetHint') }}
         </p>
       </div>
+    </div>
+
+    <!-- Portfolio der neuen Kampagnen (4.7, F9) -->
+    <div v-if="profileId" class="flex max-w-md min-w-0 flex-col gap-space-xs">
+      <label :for="`${id}-portfolio`" :class="labelClass">{{ t('setup.portfolio.label') }}</label>
+      <select
+        :id="`${id}-portfolio`"
+        v-model="portfolioId"
+        data-setup-portfolio
+        :disabled="!editable"
+        :aria-describedby="`${id}-portfolio-hint`"
+        :class="inputClass"
+      >
+        <option :value="null">{{ t('setup.portfolio.none') }}</option>
+        <option v-for="item in portfolioChoices" :key="item.id" :value="item.id">
+          {{ item.name ?? item.amazonPortfolioId }}
+        </option>
+      </select>
+      <p :id="`${id}-portfolio-hint`" class="text-body-sm text-ink-secondary">
+        {{ t('setup.portfolio.hint') }}
+        <RouterLink to="/ads/tools/portfolios" class="font-semibold text-violet underline">{{
+          t('setup.portfolio.manage')
+        }}</RouterLink>
+      </p>
+      <p
+        v-if="pendingPortfolios.length"
+        data-setup-portfolio-pending
+        class="text-body-sm text-ink-secondary"
+      >
+        {{
+          t('setup.portfolio.pending', {
+            names: pendingPortfolios.map((entry) => entry.name).join(', '),
+          })
+        }}
+      </p>
     </div>
 
     <!-- 4: Keywords und Ziele -->

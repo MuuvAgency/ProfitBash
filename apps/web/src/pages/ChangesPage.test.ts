@@ -448,6 +448,60 @@ describe('Änderungen: Übermittlungen', () => {
     expect(panel.text()).toContain('über ihren Namen');
   });
 
+  it('zeigt ein neues Portfolio als eigene Übermittlung mit Hinweis zur Zuordnung (4.7)', async () => {
+    stubFetch(
+      routes({
+        'GET /api/ads/changes/submissions': json({
+          submissions: [
+            submission(S1, { kind: 'portfolio', channel: 'bulk_file', status: 'pending' }),
+          ],
+        }),
+        [`GET /api/ads/changes/submissions/${S1}`]: json({
+          submission: submission(S1, {
+            kind: 'portfolio',
+            channel: 'bulk_file',
+            status: 'pending',
+          }),
+          changes: [],
+          setupItems: [
+            {
+              id: '00000000-0000-4000-8000-00000000f001',
+              position: 0,
+              entityType: 'portfolio',
+              campaignRef: 'Garten',
+              adGroupRef: null,
+              payload: {
+                entity: 'portfolio',
+                name: 'Garten',
+                budget: {
+                  amount: '500.00',
+                  currencyCode: 'EUR',
+                  policy: 'monthlyRecurring',
+                  startDate: '2026-11-01',
+                  endDate: null,
+                },
+              },
+              status: 'submitted',
+              amazonEntityId: null,
+              errorCode: null,
+              errorMessage: null,
+            },
+          ],
+          entitiesSyncedAt: null,
+        }),
+      }),
+    );
+    const { wrapper } = await mountPage(`/ads/changes?tab=submissions&submission=${S1}`);
+    await vi.waitFor(() => expect(wrapper.find(`[data-submission="${S1}"]`).exists()).toBe(true));
+    expect(wrapper.get(`[data-submission="${S1}"]`).text()).toContain('Portfolio');
+    const panel = await vi.waitFor(() => wrapper.get('[data-submission-detail]'));
+    const row = await vi.waitFor(() => panel.get('[data-setup-item]'));
+    expect(row.text()).toContain('Portfolio');
+    expect(row.text()).toContain('Garten');
+    expect(row.text()).toContain('monatlich');
+    expect(panel.text()).toContain('nach dem nächsten Import');
+  });
+
   it('listet die Übermittlungen der Organisation und öffnet eine mit dem Ergebnis je Änderung', async () => {
     stubFetch(
       routes({

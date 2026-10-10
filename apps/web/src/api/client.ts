@@ -49,6 +49,9 @@ export type SubmitSetupData = Schemas['SubmitCampaignSetupResponse'];
 export type SetupIssueData = Schemas['SetupIssue'];
 export type PlannedCampaignData = SetupDraftData['campaigns'][number];
 export type SourceNegativeData = Schemas['SourceNegative'];
+export type PortfolioListData = Schemas['PortfolioList'];
+export type CreatePortfolioInput = Schemas['CreatePortfolioRequest'];
+export type CreatePortfolioData = Schemas['CreatePortfolioResponse'];
 export type SetupHarvestListData = Schemas['SetupHarvestList'];
 export type SetupHarvestMarkData = SetupHarvestListData['marks'][number];
 export type AssignTagsInput = Schemas['AssignTagsRequest'];
@@ -335,6 +338,12 @@ export function createApi(options: ApiOptions = {}) {
           ),
       },
       /** Kampagnen-Setup (`phase-4.md` 4.5): planen, Entwürfe, übermitteln. */
+      portfolios: {
+        list: (profileId: string): Promise<PortfolioListData> =>
+          unwrap(client.GET('/api/ads/tools/portfolios', { params: { query: { profileId } } })),
+        create: (body: CreatePortfolioInput): Promise<CreatePortfolioData> =>
+          unwrap(client.POST('/api/ads/tools/portfolios', { body })),
+      },
       setup: {
         plan: (input: PlanSetupInput): Promise<PlanSetupData> =>
           unwrap(client.POST('/api/ads/tools/setup/plan', { body: input })),

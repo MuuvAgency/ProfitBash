@@ -104,6 +104,12 @@ const routes: RouteRecordRaw[] = [
         meta: { feature: 'tools', navItemId: 'tools', titleKey: 'setup.title' },
       },
       {
+        path: 'ads/tools/portfolios',
+        name: 'portfolios',
+        component: () => import('../pages/PortfoliosPage.vue'),
+        meta: { feature: 'tools', navItemId: 'tools', titleKey: 'portfolios.title' },
+      },
+      {
         path: 'ads/tools/catalog',
         name: 'structure-catalog',
         component: () => import('../pages/CatalogPage.vue'),

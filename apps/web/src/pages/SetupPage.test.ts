@@ -87,6 +87,7 @@ const draft = {
   inputs,
   campaigns: [campaign('SP | EXACT | Flaschen')],
   sourceNegatives: [],
+  portfolioId: null,
 };
 
 type Responder = (request: RecordedRequest) => Response | Promise<Response>;
@@ -150,6 +151,7 @@ function routes(overrides: Record<string, Responder | Response> = {}) {
       profileBids: {},
     }),
     'GET /api/ads/tools/setup/harvest': json({ marks: [], truncated: false }),
+    'GET /api/ads/tools/portfolios': json({ portfolios: [], pending: [] }),
     'POST /api/ads/tools/setup/drafts': json({ ...draft, id: D1 }, 201),
     ...overrides,
   };
@@ -526,6 +528,49 @@ describe('Seite „Kampagnen-Setup“', () => {
       await choose('[data-setup-profile]', P1);
       await found('[data-harvest-error]');
       expect(document.querySelector('[data-setup-keywords]')).not.toBeNull();
+    });
+  });
+
+  it('ordnet die neuen Kampagnen einem bestehenden Portfolio zu (4.7)', async () => {
+    const PF1 = '00000000-0000-4000-8000-0000000000b9';
+    const { requests } = await mountPage({
+      'GET /api/ads/tools/portfolios': json({
+        portfolios: [
+          {
+            id: PF1,
+            amazonPortfolioId: '7001',
+            name: 'Bestand',
+            state: 'ENABLED',
+            budgetAmount: null,
+            budgetCurrencyCode: null,
+            budgetPolicy: null,
+            budgetStartDate: null,
+            budgetEndDate: null,
+            campaigns: 2,
+          },
+        ],
+        pending: [
+          {
+            itemId: '00000000-0000-4000-8000-0000000000f7',
+            submissionId: S1,
+            name: 'Unterwegs',
+            status: 'applied',
+            budget: null,
+            createdAt: '2026-10-10T08:00:00.000Z',
+          },
+        ],
+      }),
+    });
+    await click('[data-setup-new]');
+    await choose('[data-setup-profile]', P1);
+    await choose('[data-setup-group]', G1);
+    await choose('[data-setup-portfolio]', PF1);
+    expect((await found('[data-setup-portfolio-pending]')).textContent).toContain('Unterwegs');
+    await click('[data-setup-plan]');
+    await type('[data-setup-name]', 'Mit Portfolio');
+    await click('[data-setup-save]');
+    expect(body(requests, 'POST', '/api/ads/tools/setup/drafts')).toMatchObject({
+      portfolioId: PF1,
     });
   });
 });

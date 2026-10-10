@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 
-/** Unterseiten von „Tools“ (`phase-4.md`); weitere kommen mit Portfolio (4.7). */
-defineProps<{ current: 'product-groups' | 'setup' | 'catalog' }>();
+/** Unterseiten von „Tools“ (`phase-4.md`). */
+defineProps<{ current: 'product-groups' | 'setup' | 'portfolios' | 'catalog' }>();
 const { t } = useI18n();
 const tabs = [
   { key: 'product-groups', to: '/ads/tools/product-groups', label: 'tools.productGroups' },
   { key: 'setup', to: '/ads/tools/setup', label: 'tools.setup' },
+  { key: 'portfolios', to: '/ads/tools/portfolios', label: 'tools.portfolios' },
   { key: 'catalog', to: '/ads/tools/catalog', label: 'tools.catalog' },
 ] as const;
 </script>
