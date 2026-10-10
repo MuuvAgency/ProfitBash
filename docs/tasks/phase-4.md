@@ -589,6 +589,20 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
       von Hand ein; die Marken (`Brand Entity ID`) liest der Bulk-Import aus dem Blatt „Brand Assets Data“. Offen: woher die
       Asset-IDs kommen (das Blatt nennt sie nicht). Vorher den Guide
       „create SB multi-ad group campaigns“ je Anzeigenformat auswerten (Pflichtfelder je Format).
+- **Entschieden (Dominik, 2026-10-10):** `SB-HEADER-KW` legt eine **Manual Collection** an (Amazon hat „Product
+  collection“ abgeschafft): 3–10 Produkte der Produktgruppe. Werbemittel (Marke, Logo-ID, Video-ID, Titel) **einmal je
+  Entwurf** für alle SB-Kampagnen. Die `Brand Entity ID` liest der **Bulk-Import** aus dem Blatt „Brand Assets Data“,
+  der Assistent bietet sie zur Auswahl. Asset-IDs kopiert Dominik aus der Asset-Bibliothek der Werbekonsole. SB geht in
+  Phase 4 **nur per Bulk-Datei** raus (wie Portfolios), die API folgt mit dem echten API-Zugang.
+- **Guide-Befund (2026-10-10, `…/bulksheets/sb/sb-examples/create-sb-campaign` und `…/sb-examples/examples`):**
+  Kampagne Pflicht: ID, Name, Budget-Typ (`Daily`), Budget, Bid Optimization (`true`: Amazon passt an; `false` nur mit
+  eigenen Platzierungs-Zeilen), Brand Entity ID bei Sellern (Vendoren leer), Start optional `yyyyMMdd`. Ad Group: ID,
+  Name, State. Anzeige je Format: **Manual Collection ad** (Ad Name, Brand Name, 3–10 Creative ASINs, Landing Page
+  Type `Product list` oder `Store` mit URL, optional Brand Logo Asset ID, Ad Title bis 32 Zeichen); **Video ad** (Ad
+  Name, ein Creative ASIN, Landing Page `Detail Page` mit URL der Produktseite, Video Asset ID; nur US, UK, DE). Keyword
+  und Product Targeting wie bei SP (Bid, `category="…"` bzw. `asin="…"`). Grenzen: Kampagnenname 128, Marke 30,
+  Überschrift 50 (Japan 35). Das Blatt „Brand Assets Data“ der echten Datei hat nur `Brand Entity ID` und `Brand Name`
+  (keine Asset-IDs); das Blatt „SB Multi Ad Group Campaigns“ hat zusätzlich `Ad Title`, `Product Exclusions`, `Sites`.
 
 ### 4.11 Abschluss
 - [ ] Definition of Done prüfen, Browser-Pane, offene Punkte festhalten.
