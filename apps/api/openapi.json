@@ -7674,11 +7674,13 @@
           },
           "amazonCampaignId": {
             "type": "string",
-            "pattern": "^\\d{1,20}$"
+            "minLength": 1,
+            "maxLength": 64
           },
           "amazonAdGroupId": {
             "type": "string",
-            "pattern": "^\\d{1,20}$"
+            "minLength": 1,
+            "maxLength": 64
           },
           "campaignName": {
             "type": "string",

@@ -179,8 +179,9 @@ export const sourceNegativeSchema = z
   .strictObject({
     markId: z.uuid(),
     searchTerm: keywordText,
-    amazonCampaignId: z.string().regex(/^\d{1,20}$/),
-    amazonAdGroupId: z.string().regex(/^\d{1,20}$/),
+    /** Amazon-IDs als Strings (`CLAUDE.md`); ob sie im Profil bestehen, prüft das Übermitteln. */
+    amazonCampaignId: z.string().min(1).max(64),
+    amazonAdGroupId: z.string().min(1).max(64),
     campaignName: name,
     adGroupName: name,
     negative: plannedNegativeSchema,

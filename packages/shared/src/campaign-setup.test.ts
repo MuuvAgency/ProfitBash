@@ -5,6 +5,7 @@ import {
   plannedCampaignSchema,
   saveCampaignSetupDraftSchema,
   setupInputsSchema,
+  sourceNegativeSchema,
   type PlannedCampaign,
 } from './campaign-setup';
 
@@ -91,5 +92,21 @@ describe('saveCampaignSetupDraftSchema', () => {
       campaigns: Array(MAX_SETUP_CAMPAIGNS + 1).fill(campaign),
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('sourceNegativeSchema', () => {
+  it('nimmt Amazon-IDs als Strings jeder Länge bis 64 Zeichen (Demo-IDs haben 22 Ziffern)', () => {
+    const parsed = sourceNegativeSchema.safeParse({
+      markId: '00000000-0000-4000-8000-000000000001',
+      searchTerm: 'heringe alu',
+      amazonCampaignId: '7100000000000001000006',
+      amazonAdGroupId: '7100000000000001000007',
+      campaignName: 'SP Waldkauz Zeltheringe Auto 1',
+      adGroupName: 'Zeltheringe 1',
+      negative: { type: 'keyword', text: 'heringe alu', matchType: 'negativeExact' },
+      selected: true,
+    });
+    expect(parsed.success).toBe(true);
   });
 });
