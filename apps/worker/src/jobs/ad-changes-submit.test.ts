@@ -520,6 +520,7 @@ describe('submitConnectionAdChanges: Setups (4.4)', () => {
           categories: [],
           harvest: [],
           unlocks: {},
+          creative: null,
         },
         sourceNegatives,
         portfolioId: null,

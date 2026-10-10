@@ -83,6 +83,7 @@ const draftInput = (overrides: Partial<SaveCampaignSetupDraft> = {}): SaveCampai
     categories: [],
     harvest: [],
     unlocks: {},
+    creative: null,
   },
   campaigns: [campaign('SP | EXACT | Flaschen')],
   sourceNegatives: [],
@@ -599,6 +600,7 @@ describe('submitCampaignSetupDraft', () => {
         categories: [],
         harvest: [],
         unlocks: { 'SD-RT-VIEWS': { vcpm: true } },
+        creative: null,
       },
     });
     expect((await submit(unlocked.id, 1))?.status).toBe('submitted');

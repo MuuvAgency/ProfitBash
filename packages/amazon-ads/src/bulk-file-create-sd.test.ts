@@ -299,7 +299,7 @@ describe('buildBulkSheet(sd): Anlagen', () => {
     ]);
   });
 
-  it('kennt Zielgruppen nicht im Blatt von Sponsored Products, SB-Anlagen erst mit 4.10', () => {
+  it('kennt Zielgruppen nicht im Blatt von Sponsored Products und SD-Kampagnen nicht in den SB-Blättern', () => {
     expect(
       buildBulkSheet('sp', [
         create('v', {
@@ -313,10 +313,12 @@ describe('buildBulkSheet(sd): Anlagen', () => {
         }),
       ]).skipped,
     ).toEqual([{ ref: 'v', reason: 'notSupportedInBulkFile' }]);
-    for (const kind of ['sb', 'sbMultiAdGroup'] as const) {
-      expect(buildBulkSheet(kind, [create('c', campaign)]).skipped).toEqual([
-        { ref: 'c', reason: 'notSupportedInBulkFile' },
-      ]);
-    }
+    // Eine SD-Kampagne (mit `sd`, ohne `sb`) ist im SB-Blatt ungültig, das ältere SB-Blatt legt nichts an.
+    expect(buildBulkSheet('sbMultiAdGroup', [create('c', campaign)]).skipped).toEqual([
+      { ref: 'c', reason: 'invalidValue' },
+    ]);
+    expect(buildBulkSheet('sb', [create('c', campaign)]).skipped).toEqual([
+      { ref: 'c', reason: 'notSupportedInBulkFile' },
+    ]);
   });
 });
