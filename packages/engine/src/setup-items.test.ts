@@ -154,17 +154,67 @@ describe('planSetupItems', () => {
     });
   });
 
-  it('nimmt SB nur als Kampagne auf, die (noch) nicht angelegt wird', () => {
-    const items = planSetupItems(
-      [
-        {
-          ...sp,
-          adProduct: 'SB',
-          name: 'SB | HEADER | Flaschen',
-          biddingStrategy: null,
-          placements: null,
-        },
+  it('legt Sponsored Brands mit einer Anzeige je Format und den Werbemitteln des Entwurfs an (4.10)', () => {
+    const header: PlannedCampaign = {
+      ...sp,
+      block: 'SB-HEADER-KW',
+      adProduct: 'SB',
+      name: 'SB | HEADER | Flaschen',
+      biddingStrategy: null,
+      placements: null,
+      sbAdFormat: 'collection',
+      adGroup: { name: 'SB | HEADER | Flaschen', defaultBid: '0.90' },
+      ads: [
+        { asin: 'B0FLASCHE1', sku: 'FL-750' },
+        { asin: 'B0FLASCHE2', sku: 'FL-500' },
+        { asin: 'B0FLASCHE3', sku: null },
       ],
+      targets: [{ type: 'keyword', text: 'trinkflasche', matchType: 'exact', bid: '0.90' }],
+      negatives: [{ type: 'keyword', text: 'glas', matchType: 'negativePhrase' }],
+    };
+    const creative = {
+      brandEntityId: 'ENTITY1',
+      brandName: 'Waldkauz',
+      logoAssetId: 'amzn1.assetlibrary.asset1.logo',
+      videoAssetId: 'amzn1.assetlibrary.asset1.video',
+      adTitle: 'Für jeden Tag',
+    };
+    const items = planSetupItems([header], { campaignState: 'ENABLED', creative });
+    expect(items.map((item) => [item.entityType, item.supported])).toEqual([
+      ['campaign', true],
+      ['ad_group', true],
+      ['sb_ad', true],
+      ['keyword', true],
+      ['negative_keyword', true],
+    ]);
+    expect(items[0]!.payload).toMatchObject({ adProduct: 'SB', brandEntityId: 'ENTITY1' });
+    expect(items[2]!.payload).toEqual({
+      entity: 'sb_ad',
+      format: 'collection',
+      name: 'SB | HEADER | Flaschen',
+      brandName: 'Waldkauz',
+      brandEntityId: 'ENTITY1',
+      logoAssetId: 'amzn1.assetlibrary.asset1.logo',
+      videoAssetId: null,
+      adTitle: 'Für jeden Tag',
+      asins: ['B0FLASCHE1', 'B0FLASCHE2', 'B0FLASCHE3'],
+    });
+
+    const video = planSetupItems(
+      [{ ...header, block: 'SB-VIDEO-KW', name: 'SB | VIDEO', sbAdFormat: 'video', ads: [header.ads[0]!] }],
+      { campaignState: 'ENABLED', creative },
+    );
+    expect(video[2]!.payload).toMatchObject({
+      format: 'video',
+      videoAssetId: 'amzn1.assetlibrary.asset1.video',
+      adTitle: null,
+      asins: ['B0FLASCHE1'],
+    });
+  });
+
+  it('nimmt Sponsored Brands ohne Werbemittel nur als Kampagne auf, die nicht angelegt wird', () => {
+    const items = planSetupItems(
+      [{ ...sp, adProduct: 'SB', name: 'SB', biddingStrategy: null, placements: null }],
       { campaignState: 'ENABLED' },
     );
     expect(items.map((item) => [item.entityType, item.supported])).toEqual([['campaign', false]]);

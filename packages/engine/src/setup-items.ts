@@ -4,6 +4,7 @@ import type {
   CampaignSetupPlacement,
   CampaignSetupState,
   PlannedCampaign,
+  SbCreative,
   SourceNegative,
 } from '@profitbash/shared/campaign-setup';
 
@@ -15,8 +16,11 @@ import type {
  *
  * Sponsored Products und seit 4.9 Sponsored Display (F1): SD-Kampagnen tragen ihre Taktik (Zielgruppen bzw.
  * kontextbezogen) und Kostenart, die Ad Group die Gebotsoptimierung (`reach` nur mit freigeschaltetem vCPM),
- * Zielgruppen werden zu `audience_target`. SB-Kampagnen erscheinen als Kampagne mit `supported: false` (die
- * Übermittlung meldet sie als nicht angelegt) und ohne Kinder (4.10).
+ * Zielgruppen werden zu `audience_target`. Sponsored Brands (4.10): Kampagne mit der Marke des Entwurfs, Ad Group,
+ * **eine** Anzeige im Format des Bausteins (`sb_ad`: Kollektion mit allen Produkten bzw. Video mit dem einen
+ * Produkt, Werbemittel des Entwurfs), Ziele und Negatives. Ohne Werbemittel oder Format erscheint eine SB-Kampagne
+ * als Kampagne mit `supported: false` (die Übermittlung meldet sie als nicht angelegt) und ohne Kinder; die Prüfung
+ * beim Übermitteln sperrt das vorher.
  *
  * Gewählte Negatives in der Quelle eines Harvest-Begriffs (4.6, F7) stehen am Ende: Sie gehören zu bestehenden
  * Kampagnen und nennen deren echte IDs; `campaignRef` und `adGroupRef` sind dort nur die Namen zur Anzeige.
@@ -46,11 +50,15 @@ export function planSetupItems(
     sourceNegatives?: readonly SourceNegative[];
     /** Bestehendes Portfolio des Entwurfs für alle neuen Kampagnen (4.7, F9). */
     amazonPortfolioId?: string | null;
+    /** Werbemittel für Sponsored Brands (4.10). */
+    creative?: SbCreative | null;
   },
 ): SetupItemSpec[] {
   const items: SetupItemSpec[] = [];
   for (const campaign of campaigns) {
-    const supported = campaign.adProduct !== 'SB';
+    const sb = campaign.adProduct === 'SB';
+    const creative = options.creative ?? null;
+    const supported = !sb || (creative !== null && campaign.sbAdFormat !== undefined);
     const sd = campaign.adProduct === 'SD';
     const campaignRef = campaign.name;
     items.push({
@@ -73,6 +81,7 @@ export function planSetupItems(
           sdTactic: campaign.targeting === 'audience' ? 'audience' : 'contextual',
           costType: campaign.costType,
         }),
+        ...(sb && { brandEntityId: creative?.brandEntityId ?? null }),
       },
     });
     if (!supported) continue;
@@ -96,7 +105,22 @@ export function planSetupItems(
           campaign.costType === 'vcpm' ? 'reach' : (campaign.sdOptimization ?? 'clicks'),
       }),
     });
-    for (const ad of campaign.ads) child({ entity: 'product_ad', asin: ad.asin, sku: ad.sku });
+    if (sb && creative !== null && campaign.sbAdFormat !== undefined) {
+      const collection = campaign.sbAdFormat === 'collection';
+      child({
+        entity: 'sb_ad',
+        format: campaign.sbAdFormat,
+        name: campaign.name,
+        brandName: creative.brandName,
+        brandEntityId: creative.brandEntityId,
+        logoAssetId: creative.logoAssetId,
+        videoAssetId: collection ? null : creative.videoAssetId,
+        adTitle: collection ? creative.adTitle : null,
+        asins: campaign.ads.map((ad) => ad.asin),
+      });
+    } else {
+      for (const ad of campaign.ads) child({ entity: 'product_ad', asin: ad.asin, sku: ad.sku });
+    }
     for (const target of campaign.targets) {
       switch (target.type) {
         case 'keyword':

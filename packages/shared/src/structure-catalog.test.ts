@@ -186,6 +186,29 @@ describe('Prüfung eines geänderten Katalogs', () => {
     );
   });
 
+  it('verlangt bei Sponsored Brands ein Anzeigenformat und nur dort (4.10)', () => {
+    const formats = Object.fromEntries(
+      clone()
+        .blocks.filter((block) => block.adProduct === 'SB')
+        .map((block) => [block.key, block.sbAdFormat]),
+    );
+    expect(formats).toEqual({
+      'SB-HEADER-KW': 'collection',
+      'SB-VIDEO-KW': 'video',
+      'SB-PAT': 'collection',
+    });
+
+    const missing = clone();
+    missing.blocks.find((block) => block.key === 'SB-PAT')!.sbAdFormat = null;
+    missing.blocks[0]!.sbAdFormat = 'collection';
+    expect(found(missing)).toEqual(
+      expect.arrayContaining([
+        { issue: 'sbNeedsFormat', key: 'SB-PAT' },
+        { issue: 'formatOnlySb', key: 'SP-AUTO' },
+      ]),
+    );
+  });
+
   it('kennt im Namensschema nur bekannte Platzhalter', () => {
     const catalog = clone();
     catalog.naming.pattern = '{adType} | {unbekannt}';

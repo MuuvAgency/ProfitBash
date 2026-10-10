@@ -1,4 +1,8 @@
-import type { PlannedCampaign, SourceNegative } from '@profitbash/shared/campaign-setup';
+import type {
+  PlannedCampaign,
+  SbCreative,
+  SourceNegative,
+} from '@profitbash/shared/campaign-setup';
 import {
   NEGATIVE_KEYWORD_MAX_LENGTH,
   NEGATIVE_KEYWORD_MAX_WORDS,
@@ -17,7 +21,10 @@ import { comparableSearchTerm, createProtectedTermMatcher } from './search-terms
  * - `error` sperrt das Übermitteln: Name im Profil oder im Plan schon vergeben, Name ungültig, Grenzen von Amazon,
  *   Keyword zu lang, fehlende Anzeige, SKU oder Ziele, fremde Währung, Leitplanken nach F-S7 verletzt.
  * - `warning`: Keyword schon exakt gebucht, Off-Amazon freigeschaltet.
- * - `info`: Off-Amazon nur in den USA einstellbar; SB legt Phase 4 erst mit 4.10 an (SD seit 4.9).
+ * - `info`: Off-Amazon nur in den USA einstellbar.
+ *
+ * Sponsored Brands (4.10): Werbemittel des Entwurfs, bei Sellern die Marke, Kollektion mit 3–10 Produkten, Video mit
+ * Video-ID, genau einem Produkt und nur in den USA, in UK und DE (Guide).
  *
  * Gewählte Negatives in der Quelle (4.6, F7): Die Ad Group der Quelle muss als SP-Ad-Group im Profil bestehen,
  * geschützte Begriffe sperren (der Vorschlag nennt sie nie, ein geänderter Entwurf könnte es), Dubletten auch, und
@@ -46,6 +53,8 @@ export interface PlanReviewInput {
    * ohne Freischaltung sperren (der Plan kommt vom Client und könnte sie sonst einfach setzen).
    */
   unlocks?: Readonly<Record<string, { vcpm?: boolean; offAmazon?: boolean }>>;
+  /** Werbemittel des Entwurfs für Sponsored Brands (4.10). */
+  creative?: SbCreative | null;
 }
 
 export type PlanReviewIssue =
@@ -73,7 +82,18 @@ export type PlanReviewIssue =
       target: string;
     }
   | { severity: 'error'; code: 'missingSku'; asin: string }
-  | { severity: 'error'; code: 'portfolioMissing' }
+  | { severity: 'error'; code: 'portfolioMissing' | 'sbBrandEntityMissing' }
+  | {
+      severity: 'error';
+      code:
+        | 'sbCreativeMissing'
+        | 'sbFormatMissing'
+        | 'sbVideoMissing'
+        | 'sbVideoOneProduct'
+        | 'sbVideoNotAvailable';
+      campaign: string;
+    }
+  | { severity: 'error'; code: 'sbCollectionAsins'; campaign: string; count: number }
   | {
       severity: 'error';
       code: 'sourceNegativeMissing' | 'sourceNegativeNotPlanned';
@@ -92,7 +112,7 @@ export type PlanReviewIssue =
   | { severity: 'error'; code: 'keywordTooLong'; keyword: string }
   | { severity: 'warning'; code: 'keywordAlreadyExact'; keyword: string; existing: string }
   | { severity: 'warning'; code: 'offAmazonUnlocked'; campaign: string }
-  | { severity: 'info'; code: 'offAmazonOnlyUs' | 'adProductLater'; campaign: string };
+  | { severity: 'info'; code: 'offAmazonOnlyUs'; campaign: string };
 
 const AD_PRODUCT = { SP: 'SPONSORED_PRODUCTS', SB: 'SPONSORED_BRANDS', SD: 'SPONSORED_DISPLAY' };
 /** Positive Keywords: höchstens 10 Wörter (Limits-Seite), wie negative exakt. */
@@ -103,6 +123,10 @@ const MAX_WORDS = {
 };
 const tooLong = (text: string, maxWords: number) =>
   text.split(/\s+/u).length > maxWords || [...text].length > NEGATIVE_KEYWORD_MAX_LENGTH;
+
+/** Sponsored Brands (Guide): Kollektion mit 3–10 Produkten, Video nur in den USA, in UK und DE. */
+const SB_COLLECTION_ASINS = { min: 3, max: 10 };
+const SB_VIDEO_COUNTRIES: ReadonlySet<string> = new Set(['US', 'UK', 'GB', 'DE']);
 
 /** Ad-Group-Namen: höchstens 255 Zeichen (Limits-Seite), dieselben Zeichen wie Kampagnennamen. */
 const MAX_AD_GROUP_NAME_LENGTH = 255;
@@ -133,6 +157,16 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     issues.push(issue);
   };
   if (input.portfolioMissing) add({ severity: 'error', code: 'portfolioMissing' });
+  // Sponsored Brands (4.10): Marke der Seller einmal je Entwurf.
+  const creative = input.creative ?? null;
+  if (
+    creative !== null &&
+    creative.brandEntityId === null &&
+    input.profile.accountType === 'seller' &&
+    input.campaigns.some((campaign) => campaign.adProduct === 'SB')
+  ) {
+    add({ severity: 'error', code: 'sbBrandEntityMissing' });
+  }
   const maxNameLength = campaignNameMaxLength(input.profile.accountType);
   const taken = new Set(input.existing.campaignNames.map((name) => name.toLowerCase()));
   const planned = new Set<string>();
@@ -177,8 +211,26 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
         }
       }
     }
-    if (campaign.adProduct === 'SB')
-      add({ severity: 'info', code: 'adProductLater', campaign: name });
+    if (campaign.adProduct === 'SB') {
+      if (creative === null) add({ severity: 'error', code: 'sbCreativeMissing', campaign: name });
+      if (campaign.sbAdFormat === undefined) {
+        add({ severity: 'error', code: 'sbFormatMissing', campaign: name });
+      } else if (campaign.sbAdFormat === 'collection') {
+        const count = campaign.ads.length;
+        if (count < SB_COLLECTION_ASINS.min || count > SB_COLLECTION_ASINS.max) {
+          add({ severity: 'error', code: 'sbCollectionAsins', campaign: name, count });
+        }
+      } else {
+        if (creative !== null && creative.videoAssetId === null) {
+          add({ severity: 'error', code: 'sbVideoMissing', campaign: name });
+        }
+        if (campaign.ads.length !== 1)
+          add({ severity: 'error', code: 'sbVideoOneProduct', campaign: name });
+        if (!SB_VIDEO_COUNTRIES.has(input.profile.countryCode)) {
+          add({ severity: 'error', code: 'sbVideoNotAvailable', campaign: name });
+        }
+      }
+    }
     // Sponsored Display kennt keine Keywords (Guide, Spec).
     if (
       campaign.adProduct === 'SD' &&
