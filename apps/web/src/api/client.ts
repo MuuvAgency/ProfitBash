@@ -36,6 +36,11 @@ export type SearchTermAnalysisData = Schemas['SearchTermAnalysisResponse'];
 export type SearchTermRowData = Schemas['SearchTermRow'];
 export type HarvestMarkData = Schemas['HarvestMark'];
 export type TagData = Schemas['Tag'];
+export type NotificationData = Schemas['Notification'];
+export type NotificationListData = Schemas['NotificationListResponse'];
+export type NotificationListQueryInput = NonNullable<
+  paths['/api/notifications']['get']['parameters']['query']
+>;
 export type ProductGroupData = Schemas['ProductGroup'];
 export type ProductGroupListData = Schemas['ProductGroupListResponse'];
 export type AdvertisedProductsData = Schemas['AdvertisedProductsResponse'];
@@ -405,6 +410,16 @@ export function createApi(options: ApiOptions = {}) {
       /** Höchstens `MAX_TAG_ASSIGN_ENTITIES` Entities je Anfrage. */
       assign: (input: AssignTagsInput): Promise<AssignTagsData> =>
         unwrap(client.POST('/api/ads/tags/assign', { body: input })),
+    },
+
+    /** Benachrichtigungen (5.2a/5.2b), für alle Mitglieder; neueste zuerst, Seiten über `before`. */
+    notifications: {
+      list: (query: NotificationListQueryInput = {}): Promise<NotificationListData> =>
+        unwrap(client.GET('/api/notifications', { params: { query } })),
+      unreadCount: async (): Promise<number> =>
+        (await unwrap(client.GET('/api/notifications/unread-count'))).count,
+      markRead: async (input: { ids: string[] } | { all: true }): Promise<number> =>
+        (await unwrap(client.POST('/api/notifications/read', { body: input }))).updated,
     },
 
     /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */
