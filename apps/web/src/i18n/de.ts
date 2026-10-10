@@ -1487,8 +1487,7 @@ export const de = {
       hint: 'Gilt für alle SB-Kampagnen dieses Entwurfs. Asset-IDs kopierst du aus der Asset-Bibliothek der Werbekonsole (z. B. amzn1.assetlibrary.asset1.…). Sponsored Brands geht nur per Bulk-Datei raus.',
       brand: 'Marke',
       noBrand: 'Keine Marke (Vendoren)',
-      noBrands:
-        'Noch keine Marken: Importiere eine Bulk-Datei mit dem Blatt „Brand Assets Data“.',
+      noBrands: 'Noch keine Marken: Importiere eine Bulk-Datei mit dem Blatt „Brand Assets Data“.',
       brandsFailed: 'Die Marken konnten nicht geladen werden.',
       brandName: 'Markenname (höchstens 30 Zeichen)',
       logoAssetId: 'Logo (Asset-ID, optional)',
@@ -1611,10 +1610,10 @@ export const de = {
       adGroupNameInvalid: '{campaign}: Der Name der Ad Group ist ungültig ({issue}).',
       duplicateTarget: '{campaign}: „{target}“ steht doppelt in der Ad Group.',
       offAmazonOnlyUs: '{campaign}: Off-Amazon lässt sich nur in den USA einstellen.',
-      adProductLater: '{campaign}: Sponsored Brands legt das Setup noch nicht an.',
       sbCreativeMissing:
         '{campaign}: Sponsored Brands braucht Werbemittel (Marke, Logo, Video) im Abschnitt „Werbemittel“.',
-      sbBrandEntityMissing: 'Sponsored Brands: Seller brauchen eine Marke (aus dem letzten Bulk-Import).',
+      sbBrandEntityMissing:
+        'Sponsored Brands: Seller brauchen eine Marke (aus dem letzten Bulk-Import).',
       sbFormatMissing: '{campaign}: Der Baustein nennt kein Anzeigenformat.',
       sbCollectionAsins:
         '{campaign}: Eine Kollektion braucht 3 bis 10 Produkte; die Produktgruppe hat {count}.',

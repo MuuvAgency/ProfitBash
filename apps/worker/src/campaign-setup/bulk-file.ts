@@ -78,7 +78,7 @@ export const PARENT_NOT_CREATED = {
 
 function toCreate(
   row: CampaignSetupItemRow,
-  context: { countryCode: string; startDate: string },
+  context: { countryCode: string; accountType: string; startDate: string },
   parents: { campaignId: string; adGroupId: string },
 ): BulkFileCreate {
   const payload = row.payload;
@@ -102,7 +102,11 @@ function toCreate(
           ...common,
           biddingStrategy: null,
           offAmazon: null,
-          sb: { brandEntityId: payload.brandEntityId ?? null },
+          // Vendoren lassen die Marke leer (Guide).
+          sb: {
+            brandEntityId:
+              context.accountType === 'vendor' ? null : (payload.brandEntityId ?? null),
+          },
         };
       }
       if (payload.adProduct === 'SD') {
@@ -184,7 +188,7 @@ function toCreate(
         format: payload.format,
         name: payload.name,
         brandName: payload.brandName,
-        brandEntityId: payload.brandEntityId,
+        brandEntityId: context.accountType === 'vendor' ? null : payload.brandEntityId,
         logoAssetId: payload.logoAssetId,
         videoAssetId: payload.videoAssetId,
         adTitle: payload.adTitle,

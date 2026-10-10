@@ -140,7 +140,6 @@ export function useSetupDrafts() {
   });
 }
 
-/** Harvest-Merkliste eines Profils als Eingang des Setups (4.6). */
 /** Marken eines Profils für Sponsored Brands (4.10), aus dem letzten Bulk-Import. */
 export function useSetupBrands(profileId: Ref<string | null>) {
   const orgId = useActiveOrgId();
@@ -153,6 +152,7 @@ export function useSetupBrands(profileId: Ref<string | null>) {
   });
 }
 
+/** Harvest-Merkliste eines Profils als Eingang des Setups (4.6). */
 export function useSetupHarvest(profileId: Ref<string | null>) {
   const orgId = useActiveOrgId();
   const { canView } = useToolRights();

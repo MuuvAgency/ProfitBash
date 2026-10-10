@@ -642,6 +642,13 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     Collection ad“/„Video ad“, `Bid Optimization` als `true`, Landing Page des Videos). Deutsche Namen des Blatts
     „Brand Assets Data“ und der SB-Spalten sind ungeprüft. Kein Store Spotlight, keine Auto Collection, keine eigene
     Landing Page (Store) und kein Logo-Zuschnitt. Ein Satz Werbemittel je Entwurf (nicht je Kampagne).
+  - **Review-Befunde (eingearbeitet):** Der Plan meldet SB-vCPM (`sbVcpmNotAvailable`, bleibt CPC), zu kleine bzw.
+    große Kollektionen und Video außerhalb US/UK/DE schon beim Planen; der Assistent schickt keine SB-Freischaltungen
+    alter Entwürfe mit und prüft nur sichtbare Felder (ohne SB-Baustein keine Werbemittel, ohne Video-Baustein kein
+    Video). Kinder einer schon angelegten SB-Kampagne gehen nicht über die API raus; Vendoren schreiben keine
+    `Brand Entity ID`. **Bewusst so:** Die gewählte Marke wird beim Übermitteln nicht gegen die Liste des Profils
+    geprüft (eine veraltete ID lehnt Amazon beim Upload ab). Ein vor 4.10 gespeicherter Katalog ohne `sbAdFormat`
+    fällt auf die Startwerte zurück (wie 4.3 bei `audience`; die Dev-DB hat keinen gespeicherten Katalog).
 
 ### 4.11 Abschluss
 - [ ] Definition of Done prüfen, Browser-Pane, offene Punkte festhalten.

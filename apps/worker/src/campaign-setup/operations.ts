@@ -98,6 +98,8 @@ export function buildSetupOperations(
     const payload = row.payload;
     if (row.status === 'applied' && row.amazonEntityId !== null) {
       result.created.set(row.id, row.amazonEntityId);
+      // Kinder einer (per Bulk-Datei) angelegten SB-Kampagne gehen auch nicht über die API raus.
+      if (payload.entity === 'campaign' && payload.adProduct === 'SB') notSent.add(row.id);
       continue;
     }
     if (row.status !== 'submitted') continue;
