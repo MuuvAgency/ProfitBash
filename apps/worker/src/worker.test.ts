@@ -85,7 +85,7 @@ describe('startWorker', () => {
     await worker.stop();
   });
 
-  it('richtet die Zeitpläne ein (Refresh stündlich, Profile 05:00, Entities, Reports und Kurse 06:00 Berlin, Poll alle 10 Min.)', async () => {
+  it('richtet die Zeitpläne ein (Refresh stündlich, Profile 05:00, Entities, Reports und Kurse 06:00 Berlin, Benachrichtigungen 07:00, Poll alle 10 Min.)', async () => {
     const rows = await testDb.db.execute<{ name: string; cron: string; timezone: string }>(
       sql`select name, cron, timezone from pgboss.schedule order by name`,
     );
@@ -96,6 +96,7 @@ describe('startWorker', () => {
       { name: 'file-import-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'fx-rates-sync', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'job-runs-cleanup', cron: '30 3 * * *', timezone: 'Europe/Berlin' },
+      { name: 'notifications-check', cron: '0 7 * * *', timezone: 'Europe/Berlin' },
       { name: 'profiles-sync-all', cron: '0 5 * * *', timezone: 'Europe/Berlin' },
       { name: 'reports-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'token-refresh-all', cron: '0 * * * *', timezone: 'UTC' },

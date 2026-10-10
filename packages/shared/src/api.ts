@@ -377,9 +377,9 @@ export type ConnectionJobName = (typeof CONNECTION_JOB_NAMES)[number];
 
 /**
  * Plattformweite Jobs (`organization_id` null). `fx-rates-sync` erscheint trotzdem im Sync-Status jeder
- * Organisation (öffentliche Referenzdaten, Dominik 2026-09-28), `job-runs-cleanup` nicht.
+ * Organisation (öffentliche Referenzdaten, Dominik 2026-09-28), `job-runs-cleanup` und `notifications-check` (5.2a) nicht.
  */
-export const PLATFORM_JOB_NAMES = ['fx-rates-sync', 'job-runs-cleanup'] as const;
+export const PLATFORM_JOB_NAMES = ['fx-rates-sync', 'job-runs-cleanup', 'notifications-check'] as const;
 export type PlatformJobName = (typeof PLATFORM_JOB_NAMES)[number];
 
 /** Plattformweite Jobs, deren Läufe jede Organisation im Sync-Status sieht. */
