@@ -984,7 +984,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll" | "ad-changes-submit" | "file-import" | "fx-rates-sync";
+                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll" | "ad-changes-submit" | "file-import" | "automation-run" | "fx-rates-sync";
                     status?: "running" | "success" | "failed";
                 };
                 header?: never;
@@ -5590,7 +5590,7 @@ export interface paths {
             parameters: {
                 query?: {
                     unread?: "true" | "false";
-                    kind?: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring";
+                    kind?: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing";
                     profileId?: string;
                     before?: number;
                     limit?: number;
@@ -7354,7 +7354,7 @@ export interface components {
                 /** @enum {string} */
                 status: "pending" | "submitted" | "applied" | "failed" | "dismissed";
                 /** @enum {string} */
-                origin: "explorer" | "search_terms" | "revert" | "retry";
+                origin: "explorer" | "search_terms" | "revert" | "retry" | "automation" | "budget_cap";
                 /** Format: uuid */
                 originChangeId: string | null;
                 /** @enum {string} */
@@ -7635,7 +7635,7 @@ export interface components {
                 /** @enum {string} */
                 status: "pending" | "submitted" | "applied" | "failed" | "dismissed";
                 /** @enum {string} */
-                origin: "explorer" | "search_terms" | "revert" | "retry";
+                origin: "explorer" | "search_terms" | "revert" | "retry" | "automation" | "budget_cap";
                 /** Format: uuid */
                 originChangeId: string | null;
                 /** @enum {string} */
@@ -7717,7 +7717,7 @@ export interface components {
                 /** @enum {string} */
                 status: "pending" | "submitted" | "applied" | "failed" | "dismissed";
                 /** @enum {string} */
-                origin: "explorer" | "search_terms" | "revert" | "retry";
+                origin: "explorer" | "search_terms" | "revert" | "retry" | "automation" | "budget_cap";
                 /** Format: uuid */
                 originChangeId: string | null;
                 /** @enum {string} */
@@ -8679,7 +8679,7 @@ export interface components {
             id: string;
             seq: number;
             /** @enum {string} */
-            kind: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring";
+            kind: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing";
             /** @enum {string} */
             severity: "info" | "success" | "warning" | "error";
             /** Format: uuid */

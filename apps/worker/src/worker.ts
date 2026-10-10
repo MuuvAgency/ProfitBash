@@ -18,6 +18,11 @@ import { dispatchConnectionJobs } from './jobs/dispatch';
 import { syncConnectionEntities } from './jobs/entities-sync';
 import { syncFxRates } from './jobs/fx-rates-sync';
 import { cleanupJobRuns } from './jobs/job-runs-cleanup';
+import {
+  automationRunJobDataSchema,
+  dispatchAutomationRuns,
+  runAutomation,
+} from './jobs/automation-run';
 import { checkNotifications } from './jobs/notifications-check';
 import { syncConnectionProfiles } from './jobs/profiles-sync';
 import { syncConnectionReports } from './jobs/reports-sync';
@@ -26,6 +31,8 @@ import { refreshConnectionToken } from './jobs/token-refresh';
 import {
   CLEANUP_QUEUE,
   createJobQueue,
+  AUTOMATION_RUN_ALL_QUEUE,
+  AUTOMATION_RUN_QUEUE,
   FILE_IMPORT_QUEUE,
   FILE_IMPORT_SWEEP_QUEUE,
   createQueues,
@@ -155,6 +162,9 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
     enqueueFollowUp: async (job: { organizationId: string; profileId: string }) => {
       await jobs.enqueueFileImport(job);
     },
+    enqueueAutomationRun: async (job: { organizationId: string; profileId: string }) => {
+      await jobs.enqueueAutomationRun(job);
+    },
   };
   await boss.work<unknown>(FILE_IMPORT_QUEUE, workOptions, async (batch: Job<unknown>[]) => {
     for (const job of batch) {
@@ -179,6 +189,26 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
       }
       return { counters: { profiles: profiles.length, queued } };
     });
+  });
+
+  await boss.work<unknown>(AUTOMATION_RUN_QUEUE, workOptions, async (batch: Job<unknown>[]) => {
+    for (const job of batch) {
+      const parsed = automationRunJobDataSchema.safeParse(job.data);
+      if (!parsed.success) {
+        await runJob(AUTOMATION_RUN_QUEUE, { organizationId: null, scope: null }, () =>
+          Promise.reject(new JobFailure('Ungültige Jobdaten.')),
+        );
+        continue;
+      }
+      await runAutomation(runJob, { db, now: () => new Date() }, parsed.data);
+    }
+  });
+
+  // Plattformweiter Auslöser wie `file-import-all` (`organization_id` leer, nicht im Sync-Status).
+  await boss.work(AUTOMATION_RUN_ALL_QUEUE, workOptions, async () => {
+    await runJob(AUTOMATION_RUN_QUEUE, { organizationId: null, scope: null }, () =>
+      dispatchAutomationRuns({ db, enqueue: (job) => jobs.enqueueAutomationRun(job) }),
+    );
   });
 
   await boss.work(CLEANUP_QUEUE, workOptions, async () => {

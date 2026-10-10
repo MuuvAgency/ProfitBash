@@ -29,6 +29,12 @@ describe('notificationTexts', () => {
   });
 
   it('setzt Parameter, Profil und Weg ein', () => {
+    expect(texts({ kind: 'automation_proposals', params: { count: 1 } }).text).toBe(
+      'Nordwind DE: 1 Vorschlag liegt in deinem Warenkorb.',
+    );
+    expect(texts({ kind: 'automation_proposals', params: { count: 12 } }).text).toBe(
+      'Nordwind DE: 12 Vorschläge liegen in deinem Warenkorb.',
+    );
     expect(texts({ kind: 'bulk_file_stale', params: { days: 9 } })).toEqual({
       title: 'Keine neue Bulk-Datei',
       text: 'Seit 9 Tagen keine neue Bulk-Datei für Nordwind DE. Die Daten veralten.',

@@ -92,6 +92,7 @@ describe('startWorker', () => {
     expect([...rows]).toEqual([
       { name: 'ad-changes-submit-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'amazon-requests-poll-all', cron: '*/10 * * * *', timezone: 'UTC' },
+      { name: 'automation-run-all', cron: '30 7 * * *', timezone: 'Europe/Berlin' },
       { name: 'entities-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'file-import-all', cron: '*/10 * * * *', timezone: 'UTC' },
       { name: 'fx-rates-sync', cron: '0 6 * * *', timezone: 'Europe/Berlin' },

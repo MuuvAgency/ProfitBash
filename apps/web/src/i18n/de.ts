@@ -370,6 +370,7 @@ export const de = {
       'amazon-requests-poll': 'Aufträge abholen',
       'ad-changes-submit': 'Änderungen übermitteln',
       'file-import': 'Datei-Import',
+      'automation-run': 'Automatik-Lauf',
       'fx-rates-sync': 'Wechselkurse (EZB)',
     },
     /** Statt des Amazon-Kontos beim plattformweiten Kursabruf. */
@@ -2482,6 +2483,16 @@ export const de = {
         label: 'Amazon-Zugriff läuft ab',
         title: 'Amazon-Zugriff läuft ab',
         text: 'Die Amazon-Einwilligung für {account} läuft heute ab. Unter Clients & Connections neu verbinden. | Die Amazon-Einwilligung für {account} läuft in einem Tag ab. Unter Clients & Connections neu verbinden. | Die Amazon-Einwilligung für {account} läuft in {days} Tagen ab. Unter Clients & Connections neu verbinden.',
+      },
+      automation_proposals: {
+        label: 'Neue Vorschläge der Automatik',
+        title: 'Neue Vorschläge der Automatik',
+        text: '{profileName}: {count} Vorschlag liegt in deinem Warenkorb. | {profileName}: {count} Vorschläge liegen in deinem Warenkorb.',
+      },
+      automation_responsible_missing: {
+        label: 'Automatik ohne Zuständigen',
+        title: 'Automatik ohne Zuständigen',
+        text: 'Für {profileName} steht die Automatik auf „Warenkorb“, der zuständige Nutzer fehlt aber oder darf nicht mehr schreiben. Die Vorschläge bleiben im Protokoll, bis unter Automationen jemand zuständig ist.',
       },
     },
   },
