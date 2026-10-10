@@ -4,6 +4,7 @@ import {
   BLOCK_BIDDING_STRATEGIES,
   BLOCK_MATCH_TYPES,
   BLOCK_PRODUCT_MATCHES,
+  BLOCK_SB_AD_FORMATS,
   BLOCK_SD_OPTIMIZATIONS,
   BLOCK_TARGETINGS,
   CATALOG_AD_PRODUCTS,
@@ -40,6 +41,8 @@ export const CAMPAIGN_SETUP_ITEM_ENTITIES = [
   'placement',
   'ad_group',
   'product_ad',
+  /** Anzeige von Sponsored Brands je Format (4.10). */
+  'sb_ad',
   'keyword',
   'product_target',
   /** Zielgruppe von Sponsored Display (4.9). */
@@ -121,6 +124,8 @@ export const plannedCampaignSchema = z.strictObject({
   placements: z
     .strictObject({ topOfSearch: percent, productPages: percent, restOfSearch: percent })
     .nullable(),
+  /** Anzeigenformat (nur Sponsored Brands, aus dem Baustein, 4.10). */
+  sbAdFormat: z.enum(BLOCK_SB_AD_FORMATS).optional(),
   adGroup: z.strictObject({ name, defaultBid: money }),
   ads: z
     .array(z.strictObject({ asin, sku: z.string().min(1).max(40).nullable() }))
@@ -129,6 +134,38 @@ export const plannedCampaignSchema = z.strictObject({
   negatives: z.array(plannedNegativeSchema).max(MAX_SETUP_NEGATIVES_PER_CAMPAIGN),
 });
 export type PlannedCampaign = z.output<typeof plannedCampaignSchema>;
+
+/** Grenzen der Werbemittel von Sponsored Brands (Guide „create SB multi-ad group campaigns“). */
+export const SB_BRAND_NAME_MAX_LENGTH = 30;
+export const SB_AD_TITLE_MAX_LENGTH = 32;
+/** Asset-IDs der Asset-Bibliothek, z. B. `amzn1.assetlibrary.asset1.38f47f3…:version_v1`. */
+const assetId = z.string().regex(/^amzn1\.assetlibrary\.[A-Za-z0-9.:_-]{1,200}$/);
+
+/**
+ * Werbemittel für alle SB-Kampagnen eines Entwurfs (4.10, entschieden 2026-10-10): Marke (bei Sellern mit
+ * `brandEntityId` aus dem Blatt „Brand Assets Data“), optional Logo und Titel der Kollektion, Video für das Format
+ * `video`. Die Asset-IDs kopiert Dominik aus der Asset-Bibliothek; ProfitBash lädt nichts hoch.
+ */
+export const sbCreativeSchema = z
+  .strictObject({
+    brandEntityId: z.string().regex(/^[A-Za-z0-9]{1,64}$/).nullable().default(null),
+    brandName: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => [...value].length <= SB_BRAND_NAME_MAX_LENGTH),
+    logoAssetId: assetId.nullable().default(null),
+    videoAssetId: assetId.nullable().default(null),
+    adTitle: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((value) => [...value].length <= SB_AD_TITLE_MAX_LENGTH)
+      .nullable()
+      .default(null),
+  })
+  .meta({ id: 'SbCreative' });
+export type SbCreative = z.output<typeof sbCreativeSchema>;
 
 /**
  * Eingaben des Assistenten (4.5), damit ein Entwurf neu geplant werden kann: Keywords, Marken-Begriffe, fremde
@@ -176,6 +213,8 @@ export const setupInputsSchema = z.strictObject({
       z.strictObject({ vcpm: z.boolean().optional(), offAmazon: z.boolean().optional() }),
     )
     .default({}),
+  /** Werbemittel für Sponsored Brands (4.10); ohne sie sperrt die Prüfung SB-Kampagnen. */
+  creative: sbCreativeSchema.nullable().default(null),
 });
 export type SetupInputs = z.output<typeof setupInputsSchema>;
 
@@ -245,6 +284,8 @@ export type CampaignSetupItemPayload =
       /** Nur Sponsored Display (4.9): Taktik und Kostenart (CPC, vCPM nur freigeschaltet nach F-S7). */
       sdTactic?: 'contextual' | 'audience';
       costType?: 'cpc' | 'vcpm';
+      /** Nur Sponsored Brands (4.10): Marke des Sellers (Vendoren ohne). */
+      brandEntityId?: string | null;
     }
   | { entity: 'placement'; placement: CampaignSetupPlacement; percentage: number }
   | {
@@ -255,6 +296,18 @@ export type CampaignSetupItemPayload =
       bidOptimization?: 'clicks' | 'conversions' | 'reach';
     }
   | { entity: 'product_ad'; asin: string; sku: string | null }
+  | {
+      /** Anzeige von Sponsored Brands (4.10); Name = Name der Kampagne. */
+      entity: 'sb_ad';
+      format: (typeof BLOCK_SB_AD_FORMATS)[number];
+      name: string;
+      brandName: string;
+      brandEntityId: string | null;
+      logoAssetId: string | null;
+      videoAssetId: string | null;
+      adTitle: string | null;
+      asins: string[];
+    }
   | {
       entity: 'keyword';
       text: string;

@@ -538,6 +538,17 @@ describe('buildCampaignPlan: Review-Befunde', () => {
     });
   });
 
+  it('setzt bei Sponsored Brands das Format des Bausteins: Kollektion mit allen Produkten, Video mit dem Hero (4.10)', () => {
+    const plan = buildCampaignPlan(base({ preset: onlyBlocks('SB-HEADER-KW', 'SB-VIDEO-KW') }));
+    const header = one(plan.campaigns, 'SB-HEADER-KW');
+    const video = one(plan.campaigns, 'SB-VIDEO-KW');
+    expect(header.sbAdFormat).toBe('collection');
+    expect(header.ads.length).toBeGreaterThan(1);
+    expect(video.sbAdFormat).toBe('video');
+    expect(video.ads).toHaveLength(1);
+    expect(one(buildCampaignPlan(base()).campaigns, 'SP-AUTO').sbAdFormat).toBeUndefined();
+  });
+
   it('gibt allgemeinen SB-Keyword-Kampagnen die Marken-Negatives', () => {
     const plan = buildCampaignPlan(base({ preset: onlyBlocks('SP-BRAND-DEF', 'SB-HEADER-KW') }));
     expect(one(plan.campaigns, 'SB-HEADER-KW').negatives).toEqual([

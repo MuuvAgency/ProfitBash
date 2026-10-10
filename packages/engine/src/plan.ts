@@ -515,6 +515,8 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
           ...block.placements,
           ...(entry.topOfSearch !== undefined && { topOfSearch: entry.topOfSearch }),
         },
+        // Sponsored Brands: Anzeigenformat des Bausteins (4.10).
+        ...(block.adProduct === 'SB' && block.sbAdFormat !== null && { sbAdFormat: block.sbAdFormat }),
         adGroup: { name, defaultBid: defaultBid(block, entry) },
         ads: ads(block),
         targets: slot.targets,

@@ -241,7 +241,72 @@ describe('reviewCampaignPlan', () => {
     ).toContainEqual({ severity: 'error', code: 'keywordNotSd', campaign: 'SD' });
   });
 
-  it('legt Sponsored Display an, Sponsored Brands erst mit 4.10', () => {
+  describe('Sponsored Brands (4.10)', () => {
+    const asins = ['B0FLASCHE1', 'B0FLASCHE2', 'B0FLASCHE3'];
+    const sb = (overrides: Partial<PlannedCampaign> = {}) =>
+      campaign({
+        name: 'SB | HEADER',
+        block: 'SB-HEADER-KW',
+        adProduct: 'SB',
+        biddingStrategy: null,
+        placements: null,
+        sbAdFormat: 'collection',
+        ads: asins.map((asin) => ({ asin, sku: null })),
+        ...overrides,
+      });
+    const creative = {
+      brandEntityId: 'ENTITY1',
+      brandName: 'Waldkauz',
+      logoAssetId: null,
+      videoAssetId: null,
+      adTitle: null,
+    };
+
+    it('nimmt eine Kollektion mit 3 Produkten und Marke an', () => {
+      expect(reviewCampaignPlan(input({ campaigns: [sb()], creative }))).toEqual([]);
+    });
+
+    it('verlangt Werbemittel, bei Sellern die Marke, 3–10 Produkte und beim Video Video-ID, ein Produkt und den Marktplatz', () => {
+      const video = sb({
+        name: 'SB | VIDEO',
+        block: 'SB-VIDEO-KW',
+        sbAdFormat: 'video',
+        ads: [{ asin: 'B0FLASCHE1', sku: null }, { asin: 'B0FLASCHE2', sku: null }],
+      });
+      expect(reviewCampaignPlan(input({ campaigns: [sb()] }))).toEqual([
+        { severity: 'error', code: 'sbCreativeMissing', campaign: 'SB | HEADER' },
+      ]);
+      expect(
+        reviewCampaignPlan(
+          input({
+            profile: { countryCode: 'FR', currencyCode: 'EUR', accountType: 'seller' },
+            campaigns: [sb({ ads: [{ asin: 'B0FLASCHE1', sku: null }] }), video],
+            creative: { ...creative, brandEntityId: null },
+          }),
+        ),
+      ).toEqual([
+        { severity: 'error', code: 'sbBrandEntityMissing' },
+        { severity: 'error', code: 'sbCollectionAsins', campaign: 'SB | HEADER', count: 1 },
+        { severity: 'error', code: 'sbVideoMissing', campaign: 'SB | VIDEO' },
+        { severity: 'error', code: 'sbVideoOneProduct', campaign: 'SB | VIDEO' },
+        { severity: 'error', code: 'sbVideoNotAvailable', campaign: 'SB | VIDEO' },
+      ]);
+    });
+
+    it('braucht bei Vendoren keine Marken-ID und kennt kein Format ohne Baustein', () => {
+      expect(
+        reviewCampaignPlan(
+          input({
+            profile: { countryCode: 'DE', currencyCode: 'EUR', accountType: 'vendor' },
+            campaigns: [sb({ sbAdFormat: undefined })],
+            creative: { ...creative, brandEntityId: null },
+          }),
+        ),
+      ).toEqual([{ severity: 'error', code: 'sbFormatMissing', campaign: 'SB | HEADER' }]);
+    });
+  });
+
+  it('prüft Sponsored Display wie Sponsored Products (SKU, kein „ähnlich wie“)', () => {
     const sd = {
       adProduct: 'SD' as const,
       targeting: 'product' as const,
@@ -253,7 +318,6 @@ describe('reviewCampaignPlan', () => {
       input({
         profile: { countryCode: 'DE', currencyCode: 'EUR', accountType: 'seller' },
         campaigns: [
-          campaign({ name: 'SB', adProduct: 'SB', biddingStrategy: null, placements: null }),
           campaign({
             name: 'SD',
             ...sd,
@@ -268,7 +332,6 @@ describe('reviewCampaignPlan', () => {
       }),
     );
     expect(issues).toEqual([
-      { severity: 'info', code: 'adProductLater', campaign: 'SB' },
       // Auch Display bewirbt bei Sellern über die SKU (Guide „Product ad“).
       { severity: 'error', code: 'missingSku', asin: 'B0FLASCHE9' },
       { severity: 'error', code: 'expandedNotAvailable', campaign: 'SD', target: 'B0FREMD002' },

@@ -29,6 +29,12 @@ export const BLOCK_BIDDING_STRATEGIES = ['SALES_DOWN_ONLY', 'SALES_UP_AND_DOWN',
 export const BLOCK_SD_OPTIMIZATIONS = ['clicks', 'conversions'] as const;
 /** Zielgruppe von SD-Retargeting: wer die eigenen Produkte angesehen bzw. gekauft hat. */
 export const BLOCK_AUDIENCES = ['views', 'purchases'] as const;
+/**
+ * Anzeigenformat von Sponsored Brands (4.10): `collection` = „Manual Collection ad“ (3–10 Produkte der Gruppe; das
+ * frühere „Product collection“ hat Amazon abgeschafft), `video` = „Video ad“ (ein Produkt, Video aus der
+ * Asset-Bibliothek).
+ */
+export const BLOCK_SB_AD_FORMATS = ['collection', 'video'] as const;
 /** Rückblicke, die Amazon für Zielgruppen annimmt (SD-v3-Spec, `TargetingPredicateNested`, geprüft 2026-10-10). */
 export const SD_LOOKBACK_DAYS = [7, 14, 30, 60, 90, 180, 365] as const;
 const lookbackAllowed = (days: number) => (SD_LOOKBACK_DAYS as readonly number[]).includes(days);
@@ -94,6 +100,8 @@ export const catalogBlockSchema = z.strictObject({
   lookbackDays: z.number().int().min(1).max(365).nullable().default(null),
   /** Art der Zielgruppe (nur bei `targeting: 'audience'`). */
   audience: z.enum(BLOCK_AUDIENCES).nullable().default(null),
+  /** Anzeigenformat (nur und immer bei Sponsored Brands, 4.10). */
+  sbAdFormat: z.enum(BLOCK_SB_AD_FORMATS).nullable().default(null),
 });
 export type CatalogBlock = z.output<typeof catalogBlockSchema>;
 
@@ -207,6 +215,8 @@ export const structureCatalogSchema = z
         add('audienceOnlySd', { key });
       if (block.targeting === 'auto' && block.adProduct !== 'SP') add('autoOnlySp', { key });
       if (block.targeting === 'keyword' && block.adProduct === 'SD') add('keywordNotSd', { key });
+      if (block.adProduct === 'SB' && block.sbAdFormat === null) add('sbNeedsFormat', { key });
+      if (block.sbAdFormat !== null && block.adProduct !== 'SB') add('formatOnlySb', { key });
       if (block.lookbackDays !== null && block.targeting !== 'audience') {
         add('lookbackOnlyAudience', { key });
       }
@@ -277,6 +287,7 @@ type BlockSeed = Omit<
   | 'placements'
   | 'lookbackDays'
   | 'audience'
+  | 'sbAdFormat'
 > &
   Partial<CatalogBlock>;
 
@@ -288,6 +299,7 @@ const spBlock = (seed: BlockSeed): CatalogBlock => ({
   placements: { topOfSearch: 0, productPages: 0, restOfSearch: 0 },
   lookbackDays: null,
   audience: null,
+  sbAdFormat: null,
   ...seed,
 });
 const otherBlock = (seed: BlockSeed): CatalogBlock => ({
@@ -298,6 +310,7 @@ const otherBlock = (seed: BlockSeed): CatalogBlock => ({
   placements: null,
   lookbackDays: null,
   audience: null,
+  sbAdFormat: null,
   ...seed,
 });
 
@@ -473,6 +486,7 @@ const DEFAULT_BLOCKS: CatalogBlock[] = [
     source: 'generic',
     defaultBid: '0.90',
     dailyBudget: '15',
+    sbAdFormat: 'collection',
   }),
   otherBlock({
     key: 'SB-VIDEO-KW',
@@ -486,6 +500,7 @@ const DEFAULT_BLOCKS: CatalogBlock[] = [
     source: 'generic',
     defaultBid: '0.80',
     dailyBudget: '15',
+    sbAdFormat: 'video',
   }),
   otherBlock({
     key: 'SB-PAT',
@@ -499,6 +514,7 @@ const DEFAULT_BLOCKS: CatalogBlock[] = [
     source: 'competitor',
     defaultBid: '0.70',
     dailyBudget: '10',
+    sbAdFormat: 'collection',
   }),
   otherBlock({
     key: 'SD-CAT',
