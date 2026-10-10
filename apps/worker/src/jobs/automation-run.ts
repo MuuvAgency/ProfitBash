@@ -187,31 +187,34 @@ export async function runAutomation(
   deps: AutomationRunDeps,
   job: AutomationRunJobData,
 ): Promise<JobRunResult | null> {
-  const plan = await planAutomationRun(deps.db, job);
+  const scope = { organizationId: job.organizationId, scope: job.profileId };
+  let plan: Awaited<ReturnType<typeof planAutomationRun>>;
+  try {
+    plan = await planAutomationRun(deps.db, job);
+  } catch (error) {
+    // Auch ein Fehler vor dem Lauf gehört in `job_runs`, sonst bliebe er unsichtbar.
+    return runJob('automation-run', scope, () => Promise.reject(error));
+  }
   if (plan.skip !== null) return null;
-  return runJob(
-    'automation-run',
-    { organizationId: job.organizationId, scope: job.profileId },
-    async ({ runId }) => {
-      const entities = await loadAutomationRunEntities(deps.db, job, plan, deps.now());
-      const { proposals, counts } = computeAutomationProposals(plan, entities);
-      const saved = await saveAutomationRun(deps.db, {
-        ...job,
-        plan,
-        jobRunId: runId,
-        counts,
-        proposals,
-      });
-      return {
-        counters: {
-          targets: counts.targets!,
-          campaigns: counts.campaigns!,
-          proposals: saved.proposals,
-          staged: saved.staged,
-        },
-      };
-    },
-  );
+  return runJob('automation-run', scope, async ({ runId }) => {
+    const entities = await loadAutomationRunEntities(deps.db, job, plan, deps.now());
+    const { proposals, counts } = computeAutomationProposals(plan, entities);
+    const saved = await saveAutomationRun(deps.db, {
+      ...job,
+      plan,
+      jobRunId: runId,
+      counts,
+      proposals,
+    });
+    return {
+      counters: {
+        targets: counts.targets!,
+        campaigns: counts.campaigns!,
+        proposals: saved.proposals,
+        staged: saved.staged,
+      },
+    };
+  });
 }
 
 /** Täglicher Auslöser: plant für jedes Profil mit Kennzahlen einen Lauf ein (der prüft selbst, ob er fällig ist). */

@@ -3,6 +3,7 @@ import {
   schema,
   type AutomationRunEntities,
   type AutomationRunPlan,
+  type Db,
   type EntityPeriodMetric,
 } from '@profitbash/db';
 import {
@@ -174,6 +175,23 @@ describe('runAutomation', () => {
     expect(await run()).toBeNull();
     expect(await testDb.db.select().from(automationRuns)).toHaveLength(1);
     expect(await testDb.db.select().from(jobRuns)).toHaveLength(1);
+  });
+
+  it('hält einen Fehler beim Planen als fehlgeschlagenen Lauf fest (sichtbar im Sync-Status)', async () => {
+    const broken = {
+      select: () => {
+        throw new Error('Datenbank nicht erreichbar.');
+      },
+    } as unknown as Db;
+    const result = await runAutomation(
+      createJobRunner({ db: testDb.db, logger: () => {} }),
+      { db: broken, now: () => NOW },
+      job(),
+    );
+    expect(result).toMatchObject({ status: 'failed' });
+    expect(await testDb.db.select().from(jobRuns)).toMatchObject([
+      { job: 'automation-run', status: 'failed', scope: f.profile },
+    ]);
   });
 
   it('macht keinen Vorschlag für Entities mit einer händischen offenen Änderung', async () => {
