@@ -579,6 +579,8 @@ export async function submitCampaignSetupDraft(
         portfolioMissing: draft.portfolioId !== null && amazonPortfolioId === null,
         // Leitplanken (F-S7): vCPM und Off-Amazon nur, wo der Entwurf sie freigeschaltet hat.
         unlocks: draft.inputs.unlocks,
+        // Werbemittel für Sponsored Brands (4.10).
+        creative: draft.inputs.creative,
       });
       if (issues.some((issue) => issue.severity === 'error')) throw new ReviewRejected(issues);
 
@@ -596,6 +598,7 @@ export async function submitCampaignSetupDraft(
         campaignState: draft.campaignState as CampaignSetupState,
         sourceNegatives,
         amazonPortfolioId,
+        creative: draft.inputs.creative,
       });
       const now = new Date();
       for (let start = 0; start < specs.length; start += 1000) {

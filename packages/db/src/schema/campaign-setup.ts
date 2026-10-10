@@ -144,7 +144,7 @@ export const campaignSetupItems = pgTable(
     ),
     check(
       'campaign_setup_items_entity_type_ck',
-      sql`${t.entityType} in ('campaign', 'placement', 'ad_group', 'product_ad', 'keyword', 'product_target', 'audience_target', 'negative_keyword', 'negative_product_target', 'source_negative', 'portfolio')`,
+      sql`${t.entityType} in ('campaign', 'placement', 'ad_group', 'product_ad', 'sb_ad', 'keyword', 'product_target', 'audience_target', 'negative_keyword', 'negative_product_target', 'source_negative', 'portfolio')`,
     ),
     check(
       'campaign_setup_items_parent_ck',

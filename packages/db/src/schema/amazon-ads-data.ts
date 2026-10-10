@@ -100,6 +100,29 @@ export const amazonAdsPortfolios = pgTable(
   ],
 );
 
+/**
+ * Marken eines Profils für Sponsored Brands (`docs/tasks/phase-4.md` 4.10): aus dem Blatt „Brand Assets Data“ der
+ * Bulk-Datei (`Brand Entity ID`, `Brand Name`). Jeder Import mit dem Blatt ersetzt die Liste des Profils; fehlt eine
+ * Marke danach, trägt sie `removed_at`.
+ */
+export const amazonAdsBrands = pgTable(
+  'amazon_ads_brands',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: profileId(),
+    brandEntityId: text('brand_entity_id').notNull(),
+    name: text('name'),
+    removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    profileFk('amazon_ads_brands', t.profileId, t.organizationId),
+    unique('amazon_ads_brands_profile_entity_uq').on(t.profileId, t.brandEntityId),
+  ],
+);
+
 export const amazonAdsCampaigns = pgTable(
   'amazon_ads_campaigns',
   {

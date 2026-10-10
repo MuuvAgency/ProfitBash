@@ -246,6 +246,13 @@
       "when": 1791624270502,
       "tag": "0034_sd_setup",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791634762071,
+      "tag": "0035_sb_setup",
+      "breakpoints": true
     }
   ]
 }
