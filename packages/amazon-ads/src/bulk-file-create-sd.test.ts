@@ -21,9 +21,7 @@ function build(changes: BulkFileChange[]) {
     header: header as string[],
     records: rows.map((row) =>
       Object.fromEntries(
-        row.flatMap((cell, index) =>
-          cell === null ? [] : [[(header as string[])[index]!, cell]],
-        ),
+        row.flatMap((cell, index) => (cell === null ? [] : [[(header as string[])[index]!, cell]])),
       ),
     ),
   };
@@ -168,7 +166,12 @@ describe('buildBulkSheet(sd): Anlagen', () => {
         bid: null,
         state: 'ENABLED',
       }),
-      create('n', { type: 'create', entity: 'negativeProductTarget', ...parents, asin: 'B0FREMD002' }),
+      create('n', {
+        type: 'create',
+        entity: 'negativeProductTarget',
+        ...parents,
+        asin: 'B0FREMD002',
+      }),
     ]);
     expect(skipped).toEqual([]);
     expect(records[0]).toMatchObject({ Tactic: 'T00020', 'Cost Type': 'CPC' });

@@ -1699,7 +1699,8 @@ export const de = {
       presetDuplicateBlock: '{preset}: Baustein {block} zweimal',
       presetTopWithoutPlacements: '{preset}: {block} hat keine Platzierungen',
       presetLookbackWithoutAudience: '{preset}: {block} hat keinen Rückblick',
-      presetLookbackNotAllowed: '{preset}: {block} Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage',
+      presetLookbackNotAllowed:
+        '{preset}: {block} Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage',
       oneDefault: 'Genau ein Preset muss der Standard sein',
       namingNoPlaceholder: 'Das Namensschema braucht mindestens einen Platzhalter',
       namingUnknownPlaceholder: 'Unbekannter Platzhalter {name} im Namensschema',

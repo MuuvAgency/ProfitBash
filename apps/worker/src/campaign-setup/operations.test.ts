@@ -306,11 +306,19 @@ describe('buildSetupOperations', () => {
         item({ entity: 'product_ad', asin: 'B0TEST0001', sku: 'SKU-1' }, sd),
         item({ entity: 'audience_target', audience: 'views', lookbackDays: 30, bid: '0.60' }, sd),
         item(
-          { entity: 'product_target', expression: { type: 'asin', value: 'B0FREMD001' }, bid: '0.50' },
+          {
+            entity: 'product_target',
+            expression: { type: 'asin', value: 'B0FREMD001' },
+            bid: '0.50',
+          },
           sd,
         ),
         item(
-          { entity: 'product_target', expression: { type: 'category', value: '12345' }, bid: '0.40' },
+          {
+            entity: 'product_target',
+            expression: { type: 'category', value: '12345' },
+            bid: '0.40',
+          },
           sd,
         ),
         item({ entity: 'negative_product_target', asin: 'B0FREMD002' }, sd),
@@ -368,14 +376,28 @@ describe('buildSetupOperations', () => {
     const SD = 'SD | PAT | Flaschen';
     const sd = { campaignRef: SD, adGroupRef: SD };
     const expanded = item(
-      { entity: 'product_target', expression: { type: 'asinExpanded', value: 'B0FREMD001' }, bid: '0.50' },
+      {
+        entity: 'product_target',
+        expression: { type: 'asinExpanded', value: 'B0FREMD001' },
+        bid: '0.50',
+      },
       sd,
     );
-    const keyword = item({ entity: 'keyword', text: 'flasche', matchType: 'exact', bid: '0.50' }, sd);
+    const keyword = item(
+      { entity: 'keyword', text: 'flasche', matchType: 'exact', bid: '0.50' },
+      sd,
+    );
     const result = buildSetupOperations(
       [
         item(
-          { ...campaignPayload, adProduct: 'SD', name: SD, biddingStrategy: null, sdTactic: 'contextual', costType: 'cpc' },
+          {
+            ...campaignPayload,
+            adProduct: 'SD',
+            name: SD,
+            biddingStrategy: null,
+            sdTactic: 'contextual',
+            costType: 'cpc',
+          },
           { campaignRef: SD, adGroupRef: null },
         ),
         item({ entity: 'ad_group', name: SD, defaultBid: '0.50', bidOptimization: 'clicks' }, sd),
@@ -391,7 +413,12 @@ describe('buildSetupOperations', () => {
   });
 
   it('lässt eine Zielgruppe unter einer SP-Kampagne scheitern statt sie liegen zu lassen', () => {
-    const audience = item({ entity: 'audience_target', audience: 'views', lookbackDays: 30, bid: '0.60' });
+    const audience = item({
+      entity: 'audience_target',
+      audience: 'views',
+      lookbackDays: 30,
+      bid: '0.60',
+    });
     const result = buildSetupOperations(
       [
         item(campaignPayload),

@@ -382,7 +382,10 @@ function body(op: AmazonAdsCreateOperation): Record<string, unknown> {
         // Wer die beworbenen Produkte selbst angesehen bzw. gekauft hat (`exactProduct`).
         predicate = {
           type: expression.type,
-          value: [{ type: 'exactProduct' }, { type: 'lookback', value: String(expression.lookbackDays) }],
+          value: [
+            { type: 'exactProduct' },
+            { type: 'lookback', value: String(expression.lookbackDays) },
+          ],
         };
       } else if (expression.type === 'asinSameAs') {
         predicate = { type: 'asinSameAs', value: asin(expression.value) };

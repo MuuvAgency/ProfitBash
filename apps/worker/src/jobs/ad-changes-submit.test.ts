@@ -48,9 +48,7 @@ const NOW = new Date('2026-10-08T12:00:00Z');
 type Answer = (input: ApplyChangesInput) => ApplyChangesResult | Promise<ApplyChangesResult>;
 let answer: Answer;
 const calls: ApplyChangesInput[] = [];
-type CreateAnswer = (
-  input: ApplyCreatesInput,
-) => ApplyChangesResult | Promise<ApplyChangesResult>;
+type CreateAnswer = (input: ApplyCreatesInput) => ApplyChangesResult | Promise<ApplyChangesResult>;
 /** Jede Anlage gelingt mit einer neuen ID; schon angelegte behalten ihre. */
 const allCreated: CreateAnswer = (input) => ({
   results: input.operations.map((op, index) => ({
