@@ -18,6 +18,7 @@ import { dispatchConnectionJobs } from './jobs/dispatch';
 import { syncConnectionEntities } from './jobs/entities-sync';
 import { syncFxRates } from './jobs/fx-rates-sync';
 import { cleanupJobRuns } from './jobs/job-runs-cleanup';
+import { checkNotifications } from './jobs/notifications-check';
 import { syncConnectionProfiles } from './jobs/profiles-sync';
 import { syncConnectionReports } from './jobs/reports-sync';
 import { runConnectionJob, type ConnectionJobDefinition } from './jobs/run-connection-job';
@@ -33,6 +34,7 @@ import {
   FX_RATES_QUEUE,
   FX_RATES_RETRY_DELAY_SECONDS,
   logBossErrors,
+  NOTIFICATIONS_CHECK_QUEUE,
   SCHEDULES,
   type JobQueue,
 } from './queues';
@@ -182,6 +184,12 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
   await boss.work(CLEANUP_QUEUE, workOptions, async () => {
     await runJob(CLEANUP_QUEUE, { organizationId: null, scope: null }, () =>
       cleanupJobRuns({ db }),
+    );
+  });
+
+  await boss.work(NOTIFICATIONS_CHECK_QUEUE, workOptions, async () => {
+    await runJob(NOTIFICATIONS_CHECK_QUEUE, { organizationId: null, scope: null }, () =>
+      checkNotifications({ db }),
     );
   });
 

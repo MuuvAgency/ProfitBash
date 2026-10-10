@@ -26,6 +26,8 @@ export const DISPATCH_QUEUES = {
 } as const satisfies Record<string, ConnectionQueue>;
 
 export const CLEANUP_QUEUE = 'job-runs-cleanup';
+/** Benachrichtigungen (5.2a): keine Bulk-Datei seit 8 Tagen, Ablauf der Einwilligung, Aufräumen. Täglich. */
+export const NOTIFICATIONS_CHECK_QUEUE = 'notifications-check';
 /**
  * Datei-Import je Profil (1.11c), `singletonKey` = Profil-ID: höchstens ein wartender und ein laufender
  * Job je Profil. Ein Lauf arbeitet alle offenen Dateien des Profils ab; fällt ein Einplanen weg, weil schon
@@ -56,6 +58,8 @@ export const SCHEDULES = [
   { queue: CLEANUP_QUEUE, cron: '30 3 * * *', tz: 'Europe/Berlin' },
   { queue: FX_RATES_QUEUE, cron: '0 6 * * *', tz: 'Europe/Berlin' },
   { queue: FILE_IMPORT_SWEEP_QUEUE, cron: '*/10 * * * *' },
+  // Nach den Syncs am Morgen, vor dem Arbeitsbeginn.
+  { queue: NOTIFICATIONS_CHECK_QUEUE, cron: '0 7 * * *', tz: 'Europe/Berlin' },
 ] as const;
 
 /** So lange darf ein Job laufen, bevor pg-boss ihn als abgelaufen führt. */
@@ -72,6 +76,7 @@ const ALL_QUEUES = [
   ...CONNECTION_QUEUES,
   ...Object.keys(DISPATCH_QUEUES),
   CLEANUP_QUEUE,
+  NOTIFICATIONS_CHECK_QUEUE,
   FX_RATES_QUEUE,
   FILE_IMPORT_QUEUE,
   FILE_IMPORT_SWEEP_QUEUE,
