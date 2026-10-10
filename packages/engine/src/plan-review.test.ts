@@ -173,6 +173,7 @@ describe('reviewCampaignPlan', () => {
   it('hält die Leitplanken für vCPM und Off-Amazon ein (F-S7)', () => {
     const issues = reviewCampaignPlan(
       input({
+        unlocks: { 'SP-KW-EXACT': { vcpm: true, offAmazon: true } },
         campaigns: [
           campaign({ name: 'A', costType: 'vcpm' }),
           campaign({ name: 'B', offAmazon: true }),
@@ -196,6 +197,50 @@ describe('reviewCampaignPlan', () => {
       { severity: 'info', code: 'offAmazonOnlyUs', campaign: 'B' },
       { severity: 'error', code: 'offAmazonNotAvailable', campaign: 'C' },
     ]);
+  });
+
+  it('sperrt vCPM und Off-Amazon, die der Entwurf nicht für den Baustein freigeschaltet hat (F-S7)', () => {
+    const sd = campaign({
+      name: 'SD',
+      block: 'SD-RT-VIEWS',
+      adProduct: 'SD',
+      targeting: 'audience',
+      biddingStrategy: null,
+      placements: null,
+      sdOptimization: 'clicks',
+      costType: 'vcpm',
+      targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '5.00' }],
+    });
+    const sp = campaign({ name: 'SP', offAmazon: true });
+    expect(reviewCampaignPlan(input({ campaigns: [sd, sp] }))).toEqual([
+      { severity: 'error', code: 'vcpmNotUnlocked', campaign: 'SD' },
+      { severity: 'error', code: 'offAmazonNotUnlocked', campaign: 'SP' },
+      { severity: 'warning', code: 'offAmazonUnlocked', campaign: 'SP' },
+      { severity: 'info', code: 'offAmazonOnlyUs', campaign: 'SP' },
+    ]);
+    expect(
+      reviewCampaignPlan(
+        input({ campaigns: [sd], unlocks: { 'SD-RT-VIEWS': { vcpm: true } } }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('kennt bei Sponsored Display keine Keywords', () => {
+    expect(
+      reviewCampaignPlan(
+        input({
+          campaigns: [
+            campaign({
+              name: 'SD',
+              adProduct: 'SD',
+              biddingStrategy: null,
+              placements: null,
+              sdOptimization: 'clicks',
+            }),
+          ],
+        }),
+      ),
+    ).toContainEqual({ severity: 'error', code: 'keywordNotSd', campaign: 'SD' });
   });
 
   it('legt Sponsored Display an, Sponsored Brands erst mit 4.10', () => {

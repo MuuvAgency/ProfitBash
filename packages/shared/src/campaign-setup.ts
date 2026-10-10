@@ -83,10 +83,7 @@ export const plannedTargetSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('audience'),
     audience: z.enum(BLOCK_AUDIENCES),
-    lookbackDays: z
-      .number()
-      .int()
-      .refine((days) => (SD_LOOKBACK_DAYS as readonly number[]).includes(days)),
+    lookbackDays: z.literal(SD_LOOKBACK_DAYS),
     bid: money,
   }),
 ]);

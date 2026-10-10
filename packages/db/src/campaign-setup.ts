@@ -577,6 +577,8 @@ export async function submitCampaignSetupDraft(
           sourceNegatives.map((source) => source.amazonAdGroupId),
         ),
         portfolioMissing: draft.portfolioId !== null && amazonPortfolioId === null,
+        // Leitplanken (F-S7): vCPM und Off-Amazon nur, wo der Entwurf sie freigeschaltet hat.
+        unlocks: draft.inputs.unlocks,
       });
       if (issues.some((issue) => issue.severity === 'error')) throw new ReviewRejected(issues);
 
@@ -612,7 +614,7 @@ export async function submitCampaignSetupDraft(
               status: 'failed',
               errorCode: 'AD_PRODUCT_NOT_SUPPORTED',
               errorMessage:
-                'Sponsored Brands und Sponsored Display legt das Setup noch nicht an (kommt mit 4.9 bzw. 4.10).',
+                'Sponsored Brands legt das Setup noch nicht an (kommt mit 4.10).',
               resolvedAt: now,
             }),
           })),

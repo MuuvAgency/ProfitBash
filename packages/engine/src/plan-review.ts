@@ -41,6 +41,11 @@ export interface PlanReviewInput {
   sourceAdGroups?: ReadonlySet<string>;
   /** Das Portfolio des Entwurfs gibt es im Profil nicht mehr (4.7). */
   portfolioMissing?: boolean;
+  /**
+   * Freischaltungen je Baustein aus den Eingaben des Entwurfs (F-S7): vCPM bzw. Off-Amazon im gespeicherten Plan
+   * ohne Freischaltung sperren (der Plan kommt vom Client und könnte sie sonst einfach setzen).
+   */
+  unlocks?: Readonly<Record<string, { vcpm?: boolean; offAmazon?: boolean }>>;
 }
 
 export type PlanReviewIssue =
@@ -51,7 +56,10 @@ export type PlanReviewIssue =
       code:
         | 'currencyMismatch'
         | 'vcpmNotAvailable'
+        | 'vcpmNotUnlocked'
         | 'offAmazonNotAvailable'
+        | 'offAmazonNotUnlocked'
+        | 'keywordNotSd'
         | 'noAds'
         | 'noTargets'
         | 'autoWithTargets';
@@ -151,13 +159,18 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     }
 
     // Leitplanken (F-S7): vCPM nur SB/SD, Off-Amazon nur SP.
+    const unlock = input.unlocks?.[campaign.block] ?? {};
     if (campaign.costType === 'vcpm' && campaign.adProduct === 'SP') {
       add({ severity: 'error', code: 'vcpmNotAvailable', campaign: name });
+    } else if (campaign.costType === 'vcpm' && !unlock.vcpm) {
+      add({ severity: 'error', code: 'vcpmNotUnlocked', campaign: name });
     }
     if (campaign.offAmazon) {
       if (campaign.adProduct !== 'SP') {
         add({ severity: 'error', code: 'offAmazonNotAvailable', campaign: name });
       } else {
+        if (!unlock.offAmazon)
+          add({ severity: 'error', code: 'offAmazonNotUnlocked', campaign: name });
         add({ severity: 'warning', code: 'offAmazonUnlocked', campaign: name });
         if (input.profile.countryCode !== 'US') {
           add({ severity: 'info', code: 'offAmazonOnlyUs', campaign: name });
@@ -166,6 +179,13 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     }
     if (campaign.adProduct === 'SB')
       add({ severity: 'info', code: 'adProductLater', campaign: name });
+    // Sponsored Display kennt keine Keywords (Guide, Spec).
+    if (
+      campaign.adProduct === 'SD' &&
+      (campaign.targeting === 'keyword' || campaign.targets.some((t) => t.type === 'keyword'))
+    ) {
+      add({ severity: 'error', code: 'keywordNotSd', campaign: name });
+    }
 
     if (campaign.ads.length === 0) add({ severity: 'error', code: 'noAds', campaign: name });
     // SP und SD bewerben bei Sellern über die SKU (SB über die ASIN).
