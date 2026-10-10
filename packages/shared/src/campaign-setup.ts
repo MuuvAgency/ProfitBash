@@ -60,6 +60,9 @@ const percent = z.number().int().min(0).max(MAX_PLACEMENT_PERCENT);
 const name = z.string().min(1).max(255);
 /** Keywords: wie die Engine sie bereinigt (Wortgrenzen, Länge prüft die Engine gegen Amazons Grenzen). */
 const keywordText = z.string().min(1).max(255);
+/** Rückblick einer Zielgruppe: nur die Werte der SD-Spec (Union aus Literalen, damit die OpenAPI alle nennt). */
+const [lookback7, lookback14, ...lookbackRest] = SD_LOOKBACK_DAYS.map((days) => z.literal(days));
+const lookbackDaysSchema = z.union([lookback7!, lookback14!, ...lookbackRest]);
 
 export const plannedTargetSchema = z.discriminatedUnion('type', [
   z.strictObject({
@@ -83,7 +86,7 @@ export const plannedTargetSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('audience'),
     audience: z.enum(BLOCK_AUDIENCES),
-    lookbackDays: z.literal(SD_LOOKBACK_DAYS),
+    lookbackDays: lookbackDaysSchema,
     bid: money,
   }),
 ]);
