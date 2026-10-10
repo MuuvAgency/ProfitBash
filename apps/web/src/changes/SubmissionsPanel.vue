@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatDateTime, formatNumber } from '@profitbash/shared';
+import { formatCurrency, formatDateTime, formatDay, formatNumber } from '@profitbash/shared';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import { computed, nextTick, onMounted, ref, useId, watch } from 'vue';
@@ -275,6 +275,18 @@ function setupSummary(item: SetupItemData): string {
     }
     case 'negative_product_target':
       return text('asin') ?? '';
+    case 'portfolio': {
+      // Neues Portfolio (4.7): Name und Budget.
+      const budget = payload.budget as {
+        amount: string;
+        currencyCode: string;
+        policy: string;
+        startDate: string;
+        endDate: string | null;
+      } | null;
+      if (!budget) return `${text('name') ?? ''} · ${t('changes.portfolioNoBudget')}`;
+      return `${text('name') ?? ''} · ${formatCurrency(budget.amount, budget.currencyCode, locale.value)} ${t(`changes.portfolioPolicy.${budget.policy}`)} ${t('changes.portfolioFrom', { date: formatDay(budget.startDate, locale.value) })}`;
+    }
     case 'source_negative': {
       // Negativ in einer bestehenden Kampagne (4.6); die Spalte „Kampagne“ nennt die Quelle.
       const negative = payload.negative as
@@ -373,8 +385,8 @@ const conflictRows = computed(() =>
             </p>
             <p class="text-body-sm text-ink-secondary">
               {{ t(`changes.channel.${submission.channel}`)
-              }}<template v-if="submission.kind === 'setup'">
-                · {{ t('changes.kind.setup') }}</template
+              }}<template v-if="submission.kind !== 'changes'">
+                · {{ t(`changes.kind.${submission.kind}`) }}</template
               >
             </p>
           </div>
@@ -507,6 +519,9 @@ const conflictRows = computed(() =>
           <i class="pi pi-info-circle mr-space-xs text-warn" aria-hidden="true" />
           <template v-if="selected.submission.kind === 'setup'">{{
             t('changes.submission.setupBulkHint')
+          }}</template>
+          <template v-else-if="selected.submission.kind === 'portfolio'">{{
+            t('changes.submission.portfolioBulkHint')
           }}</template>
           <template v-else
             >{{

@@ -951,7 +951,10 @@ export const de = {
       api: 'API',
       bulk_file: 'Bulk-Datei',
     },
-    kind: { setup: 'Kampagnen-Setup' },
+    kind: { setup: 'Kampagnen-Setup', portfolio: 'Portfolio' },
+    portfolioNoBudget: 'ohne Budget',
+    portfolioPolicy: { monthlyRecurring: 'monatlich', dateRange: 'im Zeitraum' },
+    portfolioFrom: 'ab {date}',
     setupEntity: {
       campaign: 'Kampagne',
       placement: 'Gebotsanpassung',
@@ -962,6 +965,7 @@ export const de = {
       negative_keyword: 'Negatives Keyword',
       negative_product_target: 'Negative ASIN',
       source_negative: 'Negativ in der Quelle',
+      portfolio: 'Portfolio',
     },
     setupStatus: {
       submitted: 'Offen',
@@ -1096,6 +1100,8 @@ export const de = {
       },
       entitiesSyncedAt:
         'Portfolio und Enddatum der Kampagnen stammen vom Stand {date}. Wurden sie seitdem in der Werbekonsole geändert, setzt die Datei sie zurück.',
+      portfolioBulkHint:
+        'Die Datei enthält das Blatt „Portfolios“. Nach dem Upload bringt der nächste Bulk-Import die neue Portfolio-ID; erst danach lässt sich das Portfolio im Kampagnen-Setup zuordnen (nach dem nächsten Import).',
       setupBulkHint:
         'Neue Kampagnen: Datei herunterladen und am selben Tag in der Werbekonsole hochladen (Startdatum heute). Der nächste Bulk-Import ordnet die angelegten Entities über ihren Namen zu; ein erneuter Download enthält nur, was noch fehlt.',
       entitiesNeverSynced:
@@ -1283,9 +1289,68 @@ export const de = {
     tabs: 'Tools',
     productGroups: 'Produktgruppen',
     setup: 'Kampagnen-Setup',
+    portfolios: 'Portfolio',
     catalog: 'Struktur-Katalog',
   },
+  portfolios: {
+    eyebrow: 'Tools',
+    title: 'Portfolio',
+    description:
+      'Portfolios eines Profils ansehen und neue anlegen. Ein neues Portfolio geht als Bulk-Datei (Blatt „Portfolios“) raus; Kampagnen lassen sich ihm im Kampagnen-Setup erst nach dem nächsten Import zuordnen.',
+    profile: 'Profil',
+    chooseProfile: 'Profil wählen',
+    loadFailed: 'Die Portfolios ließen sich nicht laden.',
+    empty: 'Dieses Profil hat noch keine Portfolios.',
+    list: {
+      title: 'Portfolios',
+      name: 'Name',
+      budget: 'Budget',
+      campaigns: 'Kampagnen',
+      state: 'Zustand',
+      noBudget: 'ohne Obergrenze',
+      unnamed: '(ohne Namen)',
+    },
+    policy: {
+      MONTHLY_RECURRING: 'monatlich',
+      DATE_RANGE: 'im Zeitraum',
+      NO_CAP: 'ohne Obergrenze',
+    },
+    period: 'ab {start}',
+    periodRange: '{start} bis {end}',
+    pending: {
+      title: 'Angelegt, noch nicht importiert',
+      hint: 'Diese Portfolios stehen in einer Bulk-Datei. Nach dem Upload und dem nächsten Import erscheinen sie oben und lassen sich im Kampagnen-Setup wählen.',
+      submitted: 'Wartet auf den Upload',
+      applied: 'Hochgeladen, wartet auf den Import',
+      toSubmission: 'Zur Übermittlung',
+    },
+    form: {
+      title: 'Neues Portfolio',
+      name: 'Name',
+      withBudget: 'Mit Budget (Obergrenze)',
+      amount: 'Betrag (Währung des Profils)',
+      policy: 'Art',
+      monthlyRecurring: 'Monatlich (jeden Monat neu)',
+      dateRange: 'Im Zeitraum',
+      start: 'Start',
+      end: 'Ende (optional, später nicht mehr änderbar)',
+      create: 'Als Bulk-Datei anlegen',
+      invalid:
+        'Bitte Name und, mit Budget, einen Betrag (z. B. 500.00) und ein Startdatum angeben; das Ende darf nicht vor dem Start liegen.',
+      created: 'Angelegt. Die Bulk-Datei lädst du auf der Seite „Änderungen“ herunter.',
+      toChanges: 'Zu den Änderungen',
+      failed: 'Das Portfolio ließ sich nicht anlegen.',
+    },
+  },
   setup: {
+    portfolio: {
+      label: 'Portfolio (optional)',
+      none: 'Kein Portfolio',
+      hint: 'Alle neuen Kampagnen dieses Entwurfs kommen in das gewählte Portfolio.',
+      manage: 'Portfolios verwalten',
+      pending:
+        'Noch nicht wählbar (wartet auf Upload bzw. Import): {names}. Nach dem nächsten Import erscheinen sie hier.',
+    },
     harvest: {
       title: 'Von der Merkliste',
       hint: 'Vorgemerkte Suchbegriffe dieses Profils. Gewählte Begriffe plant das Preset wie Keywords; das Gebot ist der CPC der Merkliste, wenn du keines einträgst.',
@@ -1462,6 +1527,8 @@ export const de = {
       offAmazonOnlyUs: '{campaign}: Off-Amazon lässt sich nur in den USA einstellen.',
       adProductLater: '{campaign}: Sponsored Brands und Display legt das Setup noch nicht an.',
       harvestMarkMissing: 'Ein gewählter Begriff steht nicht mehr auf der Merkliste.',
+      portfolioMissing:
+        'Das Portfolio des Entwurfs gibt es im Profil nicht mehr; bitte ein anderes oder keines wählen.',
       sourceProtected: '„{keyword}“ ist geschützt und wird in der Quelle nie negiert.',
       sourceMissing: '„{keyword}“: Die Quelle gibt es im Profil nicht mehr; kein Negativ dort.',
       sourceNotSp:
@@ -2030,6 +2097,11 @@ export const de = {
     CAMPAIGN_SETUP_PROFILE_CHANGED:
       'Ein Entwurf bleibt in seinem Profil; lege für ein anderes Profil einen neuen an.',
     CAMPAIGN_SETUP_PRODUCT_GROUP_MISMATCH: 'Die Produktgruppe gehört nicht zu diesem Profil.',
+    CAMPAIGN_SETUP_PORTFOLIO_MISMATCH:
+      'Das Portfolio gehört nicht zu diesem Profil oder besteht nicht mehr. Bitte ein anderes wählen.',
+    PORTFOLIO_NAME_TAKEN:
+      'Ein Portfolio mit diesem Namen gibt es im Profil schon oder es wird gerade angelegt.',
+    PORTFOLIO_NOT_FOUND: 'Das Profil wurde nicht gefunden.',
     CAMPAIGN_SETUP_UNKNOWN_PRESET: 'Dieses Preset gibt es im Struktur-Katalog nicht (mehr).',
     CAMPAIGN_SETUP_PROFILE_HAS_NO_CONNECTION:
       'Dieses Profil hat keine Verbindung zu Amazon. Übermittle es als Bulk-Datei.',

@@ -4,6 +4,7 @@ import { api } from '../api';
 import { activeOrgRole } from '../navigation/navigation';
 import type {
   AdChangeChannelData,
+  CreatePortfolioInput,
   PlanSetupInput,
   ProductGroupData,
   SaveSetupDraftInput,
@@ -198,6 +199,35 @@ export function useSubmitSetupDraft() {
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: [SETUP_KEY] }),
+        queryClient.invalidateQueries({ queryKey: ['ad-changes'] }),
+      ]),
+  });
+}
+
+// --- Portfolios (4.7) ----------------------------------------------------------------------
+
+const PORTFOLIOS_KEY = 'portfolios';
+
+/** Portfolios eines Profils und angelegte, noch nicht importierte (F9). */
+export function usePortfolios(profileId: Ref<string | null>) {
+  const orgId = useActiveOrgId();
+  const { canView } = useToolRights();
+  return useQuery({
+    queryKey: computed(() => [PORTFOLIOS_KEY, orgId.value, profileId.value] as const),
+    queryFn: () => api.tools.portfolios.list(profileId.value!),
+    enabled: computed(() => canView.value && orgId.value !== null && profileId.value !== null),
+    staleTime: 15_000,
+  });
+}
+
+/** Portfolio anlegen: Liste und die Übermittlungen der Seite „Änderungen“ neu laden. */
+export function useCreatePortfolio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreatePortfolioInput) => api.tools.portfolios.create(input),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: [PORTFOLIOS_KEY] }),
         queryClient.invalidateQueries({ queryKey: ['ad-changes'] }),
       ]),
   });
