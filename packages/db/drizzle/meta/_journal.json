@@ -274,6 +274,13 @@
       "when": 1791656231852,
       "tag": "0038_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791658128632,
+      "tag": "0039_automation_settings",
+      "breakpoints": true
     }
   ]
 }
