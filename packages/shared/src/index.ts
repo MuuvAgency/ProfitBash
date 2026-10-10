@@ -23,3 +23,4 @@ export * from './ad-changes-api';
 export * from './product-groups';
 export * from './structure-catalog';
 export * from './campaign-setup';
+export * from './notifications';
