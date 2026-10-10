@@ -6,7 +6,7 @@ import {
   type AutomationRule,
   type Guardrails,
 } from '@profitbash/shared';
-import { and, desc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import { chunks, valueColumns } from './ad-change-entities';
 import { recordAuditEvent } from './audit';
 import { loadGuardrailDefaults } from './automation';
@@ -678,5 +678,5 @@ export async function listAutomationRunProfiles(db: Db): Promise<AutomationRunSc
     .from(m)
     .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, m.profileId))
     .where(and(isNull(amazonAdsProfiles.removedAt), eq(amazonAdsProfiles.isHidden, false)))
-    .orderBy(sql`1, 2`);
+    .orderBy(m.organizationId, m.profileId);
 }
