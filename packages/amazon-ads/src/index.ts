@@ -31,10 +31,10 @@ export {
   type RequestExportInput,
 } from './exports';
 export {
-  applySpCreates,
+  applyCreates,
   type AmazonAdsCreateEntity,
   type AmazonAdsCreateOperation,
-  type ApplySpCreatesInput,
+  type ApplyCreatesInput,
 } from './creates';
 export { createAmazonAdsClientFromConfig, type AmazonAdsClientConfig } from './configure';
 export {

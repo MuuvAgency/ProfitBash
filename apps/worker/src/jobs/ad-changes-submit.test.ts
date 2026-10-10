@@ -6,7 +6,7 @@ import {
   type AmazonAdsWriteResult,
   type ApplyChangesInput,
   type ApplyChangesResult,
-  type ApplySpCreatesInput,
+  type ApplyCreatesInput,
 } from '@profitbash/amazon-ads';
 import {
   saveCampaignSetupDraft,
@@ -49,7 +49,7 @@ type Answer = (input: ApplyChangesInput) => ApplyChangesResult | Promise<ApplyCh
 let answer: Answer;
 const calls: ApplyChangesInput[] = [];
 type CreateAnswer = (
-  input: ApplySpCreatesInput,
+  input: ApplyCreatesInput,
 ) => ApplyChangesResult | Promise<ApplyChangesResult>;
 /** Jede Anlage gelingt mit einer neuen ID; schon angelegte behalten ihre. */
 const allCreated: CreateAnswer = (input) => ({
@@ -62,7 +62,7 @@ const allCreated: CreateAnswer = (input) => ({
   retryAfterMs: null,
 });
 let createAnswer: CreateAnswer;
-const createCalls: ApplySpCreatesInput[] = [];
+const createCalls: ApplyCreatesInput[] = [];
 const enqueued: Array<{
   queue: ConnectionQueue;
   job: ConnectionJobData;
@@ -97,7 +97,7 @@ function deps(): ConnectionJobDeps {
         calls.push(input);
         return Promise.resolve(answer(input));
       },
-      applySpCreates(_connection, input) {
+      applyCreates(_connection, input) {
         createCalls.push(input);
         return Promise.resolve(createAnswer(input));
       },
@@ -675,7 +675,7 @@ describe('submitConnectionAdChanges: Setups (4.4)', () => {
     const submissionId = await setup();
     createAnswer = () => {
       throw new AmazonAdsWriteAbortedError(
-        'ads.applySpCreates',
+        'ads.applyCreates',
         [],
         new AmazonAdsHttpError('Kein Zugriff', 'sp.campaigns.create', 403, 'FORBIDDEN', null),
       );

@@ -192,8 +192,17 @@ function entryError(type: string, reason: string, location: string, message: str
 
 /**
  * Schreib-Endpunkte für SB (v4 und v3) und SD (3.2c): Der Mock bildet ihre Antwortformen nicht nach. Getestet sind
- * sie mit msw (`writes-sb-sd.test.ts`).
+ * sie mit msw (`writes-sb-sd.test.ts`). Ausnahme seit 4.9: **Anlagen** für Sponsored Display (`POST /sd/<entity>`,
+ * Antwort als Liste `{ code, <id> }`), damit das Setup über den API-Weg vorführbar ist.
  */
+const SD_CREATE_ROUTES: Readonly<Record<string, string>> = {
+  '/sd/campaigns': 'campaignId',
+  '/sd/adGroups': 'adGroupId',
+  '/sd/productAds': 'adId',
+  '/sd/targets': 'targetId',
+  '/sd/negativeTargets': 'targetId',
+};
+
 const UNMOCKED_WRITE_PATH =
   /^\/(sb\/v4\/(campaigns|adGroups|ads)(\/delete)?|sb\/(keywords|targets|negativeKeywords|negativeTargets)|sd\/(campaigns|adGroups|targets|productAds|negativeTargets))$/;
 
@@ -367,6 +376,137 @@ export function createMockWrites(simulation: MockWriteSimulation) {
     }
   }
 
+  /** Neue SD-Entity (4.9) in der Form der Demo-Daten (Taktik, Kostenart, Zielgruppen mit Ereignis und Rückblick). */
+  function rememberSdCreate(
+    profile: MockProfile,
+    path: string,
+    id: string,
+    item: Record<string, unknown>,
+  ) {
+    const created = overlayOf(profile).created;
+    const state = (text(item.state) ?? 'enabled').toUpperCase();
+    const campaignId = text(item.campaignId) ?? '';
+    const adGroupId = text(item.adGroupId) ?? '';
+    // SD-Ziele nennen nur die Ad Group; die Kampagne kommt von ihr.
+    const campaignOf = (group: string) =>
+      created.adGroups.find((entry) => entry.id === group)?.campaignId ?? '';
+    const startDate = text(item.startDate);
+    switch (path) {
+      case '/sd/campaigns':
+        created.campaigns.push({
+          id,
+          adProduct: 'SPONSORED_DISPLAY',
+          name: String(item.name),
+          state,
+          targeting: String(item.tactic),
+          costType: String(item.costType).toUpperCase(),
+          budget: text(item.budget) ?? '0',
+          portfolioId: text(item.portfolioId) ?? null,
+          ...(startDate !== undefined &&
+            /^\d{8}$/.test(startDate) && {
+              startDate: `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(6)}`,
+            }),
+        });
+        return;
+      case '/sd/adGroups':
+        created.adGroups.push({
+          id,
+          campaignId,
+          name: String(item.name),
+          state,
+          defaultBid: text(item.defaultBid) ?? null,
+        });
+        return;
+      case '/sd/productAds': {
+        const sku = text(item.sku);
+        created.ads.push({
+          id,
+          campaignId,
+          adGroupId,
+          state,
+          adType: 'PRODUCT_AD',
+          asins: [text(item.asin) ?? mockAsinOf(sku ?? id)],
+          ...(sku !== undefined && { sku }),
+        });
+        return;
+      }
+      default: {
+        const [predicate] = Array.isArray(item.expression)
+          ? (item.expression as Array<Record<string, unknown>>)
+          : [];
+        const negative = path === '/sd/negativeTargets';
+        const base = {
+          id,
+          campaignId: campaignOf(adGroupId),
+          adGroupId,
+          state: negative ? 'ENABLED' : state,
+          negative,
+          bid: text(item.bid) ?? null,
+        };
+        const type = predicate?.type;
+        if (type === 'views' || type === 'purchases') {
+          const parts = Array.isArray(predicate!.value)
+            ? (predicate!.value as Array<Record<string, unknown>>)
+            : [];
+          const lookback = Number(parts.find((part) => part.type === 'lookback')?.value);
+          created.targets.push({
+            ...base,
+            targetType: 'AUDIENCE',
+            details: { event: String(type).toUpperCase(), lookback },
+          });
+        } else if (type === 'asinCategorySameAs') {
+          created.targets.push({
+            ...base,
+            targetType: 'PRODUCT_CATEGORY',
+            details: { productCategoryId: text(predicate!.value) },
+          });
+        } else {
+          created.targets.push({
+            ...base,
+            targetType: 'PRODUCT',
+            details: { matchType: 'PRODUCT_EXACT', asin: text(predicate?.value) },
+          });
+        }
+      }
+    }
+  }
+
+  /** SD-Anlage (4.9): Liste `{ code, <id> }` in der Reihenfolge der Anfrage; Gebote und Budgets gegen die Grenzen. */
+  function handleSdCreate(path: string, body: unknown, profile: MockProfile): Response {
+    const idKey = SD_CREATE_ROUTES[path]!;
+    const country = COUNTRY_BY_CURRENCY[profile.currencyCode] ?? '';
+    const items = Array.isArray(body) ? (body as Record<string, unknown>[]) : [];
+    const list = items.map((item) => {
+      for (const [field, value] of [
+        ['budget', item.budget],
+        ['default_bid', item.defaultBid],
+        ['bid', item.bid],
+      ] as const) {
+        if (typeof value !== 'string') continue;
+        const issue = amazonAdsValueLimitIssue({
+          adProduct: 'SPONSORED_DISPLAY',
+          countryCode: country,
+          field,
+          value,
+        });
+        if (issue) {
+          return {
+            code: field === 'budget' ? 'BUDGET_OUT_OF_RANGE' : 'BID_OUT_OF_RANGE',
+            description: `Mock: Wert außerhalb der Grenzen des Marktplatzes (${issue.min} bis ${issue.max}).`,
+          };
+        }
+      }
+      created += 1;
+      const id = `${idPrefix}${String(created).padStart(4, '0')}`;
+      rememberSdCreate(profile, path, id, item);
+      return { code: 'SUCCESS', [idKey]: id };
+    });
+    return new Response(JSON.stringify(list), {
+      status: 207,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   /** Das Konto mit den gemerkten Änderungen des Profils (für die Exports). */
   function overlay(account: MockAccount): MockAccount {
     const changes = overlays.get(account.profile.amazonProfileId);
@@ -514,6 +654,23 @@ export function createMockWrites(simulation: MockWriteSimulation) {
     url: URL,
     profile: MockProfile | undefined,
   ): Promise<Response | null> {
+    if (request.method === 'POST' && Object.hasOwn(SD_CREATE_ROUTES, url.pathname)) {
+      if (!profile) {
+        return Response.json(
+          { code: 'FORBIDDEN', details: 'Mock: Profil unbekannt.' },
+          { status: 403 },
+        );
+      }
+      if (throttled > 0) {
+        throttled -= 1;
+        return Response.json(
+          { code: 'THROTTLED', message: 'Mock: zu viele Anfragen.' },
+          { status: 429, headers: { 'Retry-After': '120' } },
+        );
+      }
+      const body = parseJsonLossless(await request.text(), { decimals: 'string' });
+      return handleSdCreate(url.pathname, body, profile);
+    }
     if (UNMOCKED_WRITE_PATH.test(url.pathname) && request.method !== 'GET') {
       // Klarer Grund statt „nicht gefunden“: Der Client meldet ihn je Änderung.
       return Response.json(
