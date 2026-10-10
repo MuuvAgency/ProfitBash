@@ -104,7 +104,7 @@ export const NAVIGATION: readonly NavGroup[] = [
         path: '/ads/goals',
         icon: 'flag',
         access: { feature: 'goals' },
-        phase: 6,
+        phase: 5,
       },
     ],
   },

@@ -78,17 +78,20 @@ export const goalSchema = z
   .meta({ id: 'Goal' });
 export type Goal = z.infer<typeof goalSchema>;
 
+// Nicht `.nullable()`: das machte die OpenAPI-Komponente `Goal` selbst nullable.
+const nullableGoalSchema = z.union([goalSchema, z.null()]);
+
 const productGroupGoalsSchema = z.object({
   id: z.uuid(),
   name: z.string(),
-  goal: goalSchema.nullable(),
+  goal: nullableGoalSchema,
 });
 
 const profileGoalsSchema = z.object({
   id: z.uuid(),
   accountName: z.string(),
   countryCode: z.string(),
-  goal: goalSchema.nullable(),
+  goal: nullableGoalSchema,
   productGroups: z.array(productGroupGoalsSchema),
 });
 
@@ -99,7 +102,7 @@ export const goalsOverviewSchema = z
       z.object({
         id: z.uuid(),
         name: z.string(),
-        goal: goalSchema.nullable(),
+        goal: nullableGoalSchema,
         profiles: z.array(profileGoalsSchema),
       }),
     ),

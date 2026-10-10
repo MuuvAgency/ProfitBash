@@ -36,6 +36,9 @@ export type SearchTermAnalysisData = Schemas['SearchTermAnalysisResponse'];
 export type SearchTermRowData = Schemas['SearchTermRow'];
 export type HarvestMarkData = Schemas['HarvestMark'];
 export type TagData = Schemas['Tag'];
+export type GoalData = Schemas['Goal'];
+export type GoalsOverviewData = Schemas['GoalsOverview'];
+export type TargetAcosData = Schemas['TargetAcosResponse'];
 export type NotificationData = Schemas['Notification'];
 export type NotificationListData = Schemas['NotificationListResponse'];
 export type NotificationListQueryInput = NonNullable<
@@ -410,6 +413,17 @@ export function createApi(options: ApiOptions = {}) {
       /** Höchstens `MAX_TAG_ASSIGN_ENTITIES` Entities je Anfrage. */
       assign: (input: AssignTagsInput): Promise<AssignTagsData> =>
         unwrap(client.POST('/api/ads/tags/assign', { body: input })),
+    },
+
+    /** Ziele (`phase-5.md` 5.3): Ziel-ACoS bzw. -ROAS je Client, Profil oder Produktgruppe, mit Rechner. */
+    goals: {
+      overview: (): Promise<GoalsOverviewData> => unwrap(client.GET('/api/ads/goals')),
+      set: (input: Schemas['SetGoalRequest']): Promise<GoalData> =>
+        unwrap(client.PUT('/api/ads/goals', { body: input })),
+      remove: (id: string) =>
+        unwrap(client.DELETE('/api/ads/goals/{id}', { params: { path: { id } } })),
+      calculate: (input: Schemas['TargetAcosRequest']): Promise<TargetAcosData> =>
+        unwrap(client.POST('/api/ads/goals/calculate', { body: input })),
     },
 
     /** Benachrichtigungen (5.2a/5.2b), für alle Mitglieder; neueste zuerst, Seiten über `before`. */

@@ -10513,7 +10513,14 @@
                   "type": "string"
                 },
                 "goal": {
-                  "$ref": "#/components/schemas/Goal"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Goal"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "profiles": {
                   "type": "array",
@@ -10531,7 +10538,14 @@
                         "type": "string"
                       },
                       "goal": {
-                        "$ref": "#/components/schemas/Goal"
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Goal"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "productGroups": {
                         "type": "array",
@@ -10546,7 +10560,14 @@
                               "type": "string"
                             },
                             "goal": {
-                              "$ref": "#/components/schemas/Goal"
+                              "anyOf": [
+                                {
+                                  "$ref": "#/components/schemas/Goal"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             }
                           },
                           "required": [
@@ -10591,7 +10612,14 @@
                   "type": "string"
                 },
                 "goal": {
-                  "$ref": "#/components/schemas/Goal"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Goal"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "productGroups": {
                   "type": "array",
@@ -10606,7 +10634,14 @@
                         "type": "string"
                       },
                       "goal": {
-                        "$ref": "#/components/schemas/Goal"
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/Goal"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -10633,10 +10668,7 @@
         ]
       },
       "Goal": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": "object",
         "properties": {
           "id": {
             "type": "string",

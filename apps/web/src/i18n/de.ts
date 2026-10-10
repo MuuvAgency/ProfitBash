@@ -127,7 +127,7 @@ export const de = {
       tools: 'Produktgruppen, Kampagnen-Setup nach eigenem Schema und Portfolios.',
       budgets: 'Budget-Obergrenzen mit Pacing und automatischer Einhaltung.',
       automations: 'Regeln, Gebotsoptimierung und Dayparting als tägliche Pipeline.',
-      goals: 'Ziele für TACoS, ACoS, ROAS und Wachstum je Client.',
+      goals: 'Ziel-ACoS und -ROAS je Client, Profil und Produktgruppe, mit Rechner.',
       pnl: 'Gewinn- und Verlustrechnung je Client aus Umsatz, Kosten und Werbung.',
       sales: 'Umsatzentwicklung, Wochentage und Bestellzeiten.',
       products: 'Leistung nach Produkt und Marke.',
@@ -1238,6 +1238,57 @@ export const de = {
       resultOutOfRange: 'Das Ergebnis wäre kein gültiger Betrag über 0.',
     },
   },
+  goals: {
+    title: 'Ziele',
+    description:
+      'Ziel-ACoS bzw. -ROAS je Client, Profil und Produktgruppe. Ohne eigenes Ziel gilt das der Ebene darüber. Die Automatik rechnet mit dem wirksamen Ziel.',
+    loadFailed: 'Die Ziele konnten nicht geladen werden.',
+    later: 'TACoS- und Wachstumsziele: braucht Umsatzdaten (Phase 7).',
+    unassigned: 'Ohne Client',
+    none: 'Kein Ziel',
+    value: 'ACoS {acos} % · ROAS {roas}',
+    empty: {
+      title: 'Noch keine Profile',
+      text: 'Ziele hängen an Clients, Profilen und Produktgruppen. Lade zuerst eine Bulk-Datei hoch oder verbinde ein Konto.',
+    },
+    scope: { client: 'Client', profile: 'Profil', productGroup: 'Produktgruppe' },
+    inherited: { client: 'gilt vom Client', profile: 'gilt vom Profil' },
+    metric: { acos: 'ACoS', roas: 'ROAS' },
+    preview: { acos: 'entspricht ACoS {value} %', roas: 'entspricht ROAS {value}' },
+    field: {
+      metric: 'Kennzahl',
+      value: { acos: 'Ziel-ACoS in %', roas: 'Ziel-ROAS' },
+    },
+    issue: {
+      format: {
+        acos: 'Zahl mit höchstens zwei Nachkommastellen.',
+        roas: 'Zahl mit höchstens zwei Nachkommastellen.',
+      },
+      range: { acos: 'ACoS über 0 bis 100 %.', roas: 'ROAS von 1 bis 100.' },
+    },
+    edit: {
+      action: 'Ziel für „{name}“ bearbeiten',
+      title: 'Ziel für „{name}“',
+      remove: 'Ziel entfernen',
+    },
+    calc: {
+      toggle: 'Rechner',
+      hint: 'Je Einheit, alle Beträge in derselben Währung. Gespeichert wird nur das übernommene Ziel.',
+      field: {
+        price: 'Verkaufspreis',
+        unitCost: 'Kosten je Einheit',
+        fees: 'Amazon-Gebühren',
+        margin: 'Gewünschte Marge in %',
+      },
+      run: 'Berechnen',
+      apply: 'Als Ziel übernehmen',
+      breakEven: 'Break-even-ACoS',
+      target: 'Ziel-ACoS',
+      noTarget: 'nach Kosten und Marge bleibt nichts für Werbung.',
+      invalid:
+        'Bitte Zahlen eingeben: Preis über 0, Beträge mit höchstens vier Nachkommastellen, Marge bis 100 %.',
+    },
+  },
   tags: {
     title: 'Tags',
     description:
@@ -2305,6 +2356,7 @@ export const de = {
     PRODUCT_GROUP_SKU_NOT_ALLOWED: 'Vendor-Profile haben keine SKU.',
     TAG_NAME_TAKEN: 'Ein Tag mit diesem Namen gibt es schon.',
     TAG_NOT_FOUND: 'Dieses Tag gibt es nicht (mehr).',
+    GOAL_NOT_FOUND: 'Dieses Ziel oder sein Objekt gibt es nicht (mehr).',
     TAG_LIMIT_REACHED: 'Die Organisation hat schon die Höchstzahl an Tags.',
     INVALID_EMAIL_OR_PASSWORD: 'E-Mail-Adresse oder Passwort ist falsch.',
     FORBIDDEN: 'Dafür fehlen dir die Rechte.',
