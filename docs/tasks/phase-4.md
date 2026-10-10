@@ -433,6 +433,12 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     mehr auf der Merkliste stehen; ein Profilwechsel leert Auswahl und Vorschläge; ein ungültiges Gebot wird erklärt.
     Audit des Leerens wie `removeHarvestMarks` (`id` = Organisation, `profileIds`). Tests: abgelehntes Keyword behält
     den Begriff auf der Merkliste, zweiter Aufruf im Job, Profilwechsel im Assistenten.
+  - Geprüft im Browser-Pane (Demo-Daten, 2026-10-10): Merkliste im Assistenten (Begriff und ASIN aus einer
+    Auto-Kampagne), Planen mit beiden, ein Vorschlag abgewählt, als Bulk-Datei übermittelt (25 Anlagen), Detail auf
+    der Seite „Änderungen“ mit „Negativ in der Quelle“, Download der Datei, Handy (Tabelle scrollt in sich). Dabei
+    gefunden und behoben: Die Prüfung der Quell-IDs verlangte höchstens 20 Ziffern (Demo-IDs haben 22; jetzt String
+    bis 64 Zeichen, Bestand prüft das Übermitteln) und schnelle Klicks hintereinander überschrieben die Auswahl (lokale
+    Kopie im Auswahlfeld). Testdaten danach gelöscht.
   - **Offen bzw. bewusst so:** Die Suchbegriff-Analyse verlinkt noch nicht ins Setup (Einstieg ist der Assistent).
     Ein Begriff kann in mehreren offenen Entwürfen stehen; die Warnung „schon exakt gebucht“ zählt offene Setups
     mit. Negativ immer exakt in der Ad Group (nicht Kampagnenebene, nicht Wortgruppe). Der CPC einer Merkliste in

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatCurrency, formatNumber } from '@profitbash/shared';
-import { computed, toRef, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { PlanSetupInput } from '../../api/client';
 import InlineError from '../../components/common/InlineError.vue';
@@ -24,40 +24,54 @@ const session = useSessionStore();
 const locale = computed(() => session.preferences.locale);
 const harvest = useSetupHarvest(toRef(props, 'profileId'));
 const marks = computed(() => harvest.data.value?.marks ?? []);
-const byId = computed(() => new Map(selection.value.map((entry) => [entry.markId, entry])));
+/**
+ * Lokale Kopie der Auswahl: Das Modell kommt erst nach dem nächsten Rendern des Assistenten zurück; mehrere Klicks
+ * davor (oder ein Klick und eine Eingabe) bauen so aufeinander auf statt sich zu überschreiben.
+ */
+const current = ref<Selection[]>([...selection.value]);
+watch(selection, (next) => (current.value = [...next]));
+function commit(next: Selection[]) {
+  current.value = next;
+  selection.value = next;
+}
+const byId = computed(() => new Map(current.value.map((entry) => [entry.markId, entry])));
 // Einträge eines Entwurfs, die nicht mehr auf der Merkliste stehen (entfernt, schon geerntet), fallen aus der Auswahl.
 watch(
   () => harvest.data.value,
   (data) => {
     if (!data || data.truncated) return;
     const known = new Set(data.marks.map((mark) => mark.id));
-    if (selection.value.some((entry) => !known.has(entry.markId))) {
-      selection.value = selection.value.filter((entry) => known.has(entry.markId));
+    if (current.value.some((entry) => !known.has(entry.markId))) {
+      commit(current.value.filter((entry) => known.has(entry.markId)));
     }
   },
   { immediate: true },
 );
 
 function toggle(markId: string, checked: boolean) {
-  selection.value = checked
-    ? [...selection.value, { markId }]
-    : selection.value.filter((entry) => entry.markId !== markId);
+  commit(
+    checked
+      ? [...current.value, { markId }]
+      : current.value.filter((entry) => entry.markId !== markId),
+  );
 }
 function patch(markId: string, change: Partial<Selection>) {
-  selection.value = selection.value.map((entry) => {
-    if (entry.markId !== markId) return entry;
-    const next: Selection = { ...entry, ...change };
-    if (!next.bid) delete next.bid;
-    if (!next.single) delete next.single;
-    return next;
-  });
+  commit(
+    current.value.map((entry) => {
+      if (entry.markId !== markId) return entry;
+      const next: Selection = { ...entry, ...change };
+      if (!next.bid) delete next.bid;
+      if (!next.single) delete next.single;
+      return next;
+    }),
+  );
 }
 const MONEY = /^\d{1,7}(\.\d{1,2})?$/;
 const bidInvalid = (markId: string) => {
   const bid = byId.value.get(markId)?.bid;
   return bid !== undefined && !MONEY.test(bid);
 };
-const anyBidInvalid = computed(() => selection.value.some((entry) => bidInvalid(entry.markId)));
+const anyBidInvalid = computed(() => current.value.some((entry) => bidInvalid(entry.markId)));
 const amount = (value: string, currency: string) => formatCurrency(value, currency, locale.value);
 const count = (value: number) => formatNumber(String(value), locale.value);
 </script>

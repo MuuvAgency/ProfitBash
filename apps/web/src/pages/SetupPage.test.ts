@@ -434,6 +434,22 @@ describe('Seite „Kampagnen-Setup“', () => {
       });
     });
 
+    it('übernimmt mehrere Begriffe, auch bei schnell aufeinander folgenden Klicks', async () => {
+      const { requests } = await mountPage(harvestRoutes);
+      await click('[data-setup-new]');
+      await choose('[data-setup-profile]', P1);
+      await choose('[data-setup-group]', G1);
+      await found(`[data-harvest-mark="${M2}"]`);
+      document
+        .querySelectorAll<HTMLInputElement>('[data-harvest-pick]')
+        .forEach((box) => box.click());
+      await flushPromises();
+      await click('[data-setup-plan]');
+      expect(body(requests, 'POST', '/api/ads/tools/setup/plan')).toMatchObject({
+        inputs: { harvest: [{ markId: M1 }, { markId: M2 }] },
+      });
+    });
+
     it('erklärt ein ungültiges Gebot und sperrt das Planen', async () => {
       await mountPage(harvestRoutes);
       await click('[data-setup-new]');
