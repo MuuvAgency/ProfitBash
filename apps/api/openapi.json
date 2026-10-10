@@ -10787,6 +10787,202 @@
           "margin"
         ],
         "additionalProperties": false
+      },
+      "AutomationSettings": {
+        "type": "object",
+        "properties": {
+          "defaults": {
+            "$ref": "#/components/schemas/Guardrails"
+          },
+          "canEditDefaults": {
+            "type": "boolean"
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "shadow",
+                    "cart"
+                  ]
+                },
+                "responsibleUserId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "overrides": {
+                  "$ref": "#/components/schemas/GuardrailOverrides"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "mode",
+                "responsibleUserId",
+                "overrides"
+              ]
+            }
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "userId",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "defaults",
+          "canEditDefaults",
+          "clients",
+          "members"
+        ]
+      },
+      "Guardrails": {
+        "type": "object",
+        "properties": {
+          "maxBidChangePercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "bidFloorCpcPercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "bidFloorEur": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maxBidEur": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minClicks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "minSpendEur": {
+            "type": "string"
+          },
+          "maxBudgetDecreasePercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "maxBidChangePercent",
+          "bidFloorCpcPercent",
+          "bidFloorEur",
+          "maxBidEur",
+          "minClicks",
+          "minSpendEur",
+          "maxBudgetDecreasePercent"
+        ],
+        "additionalProperties": false
+      },
+      "GuardrailOverrides": {
+        "type": "object",
+        "properties": {
+          "maxBidChangePercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "bidFloorCpcPercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "bidFloorEur": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maxBidEur": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minClicks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "minSpendEur": {
+            "type": "string"
+          },
+          "maxBudgetDecreasePercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetClientAutomationRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "cart"
+            ]
+          },
+          "responsibleUserId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/GuardrailOverrides"
+          }
+        },
+        "required": [
+          "mode",
+          "responsibleUserId",
+          "overrides"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -16700,6 +16896,187 @@
           },
           "403": {
             "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/settings": {
+      "get": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Leitplanken der Organisation und Einstellungen der sichtbaren Clients",
+        "responses": {
+          "200": {
+            "description": "Einstellungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/settings/defaults": {
+      "put": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Leitplanken der Organisation speichern (nur Org-Admins)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Guardrails"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Einstellungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/settings/clients/{clientId}": {
+      "put": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Modus, zuständigen Nutzer und Leitplanken eines Clients setzen (Recht „write“)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "clientId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetClientAutomationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Einstellungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Client nicht gefunden.",
             "content": {
               "application/json": {
                 "schema": {
