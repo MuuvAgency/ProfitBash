@@ -87,7 +87,7 @@ export const adChanges = pgTable(
     status: text('status').notNull().default('pending'),
     /** Leer genau im Warenkorb (`pending`). */
     submissionId: uuid('submission_id'),
-    /** `explorer` | `search_terms` | `revert` | `retry` (`AD_CHANGE_ORIGINS`). */
+    /** `explorer` | `search_terms` | `revert` | `retry` | `automation` | `budget_cap` (`AD_CHANGE_ORIGINS`). */
     origin: text('origin').notNull(),
     /** Bei `revert` und `retry`: die Änderung, die zurückgenommen bzw. wiederholt wird (3.3). */
     originChangeId: uuid('origin_change_id').references((): AnyPgColumn => adChanges.id),
@@ -155,7 +155,7 @@ export const adChanges = pgTable(
     check('ad_changes_pending_ck', sql`(${t.status} = 'pending') = (${t.submissionId} is null)`),
     check(
       'ad_changes_origin_ck',
-      sql`${t.origin} in ('explorer', 'search_terms', 'revert', 'retry')`,
+      sql`${t.origin} in ('explorer', 'search_terms', 'revert', 'retry', 'automation', 'budget_cap')`,
     ),
     check(
       'ad_changes_entity_type_ck',
@@ -179,6 +179,10 @@ export const adChanges = pgTable(
     uniqueIndex('ad_changes_pending_uq')
       .on(t.createdBy, t.entityType, t.entityId, t.field)
       .where(sql`${t.status} = 'pending' and ${t.operation} = 'update'`),
+    // Automatik (5.7): je Entity und Feld höchstens ein offener Vorschlag im Warenkorb, egal in wessen.
+    uniqueIndex('ad_changes_automation_pending_uq')
+      .on(t.entityType, t.entityId, t.field)
+      .where(sql`${t.status} = 'pending' and ${t.origin} in ('automation', 'budget_cap')`),
     index('ad_changes_entity_idx').on(t.entityId, t.entityType),
     index('ad_changes_submission_idx').on(t.submissionId),
     index('ad_changes_campaign_idx').on(t.campaignId),

@@ -236,8 +236,18 @@ export type AdChangeUpdateInput = Extract<AdChangeInput, { operation: 'update' }
 export type AdChangeAdjustInput = Extract<AdChangeInput, { operation: 'adjust' }>;
 export type AdChangeCreateNegativeInput = Extract<AdChangeInput, { operation: 'create_negative' }>;
 
-/** Woher eine Änderung stammt. `revert` und `retry` setzt nur der Server (3.3). */
-export const AD_CHANGE_ORIGINS = ['explorer', 'search_terms', 'revert', 'retry'] as const;
+/**
+ * Woher eine Änderung stammt. `revert` und `retry` setzt nur der Server (3.3), `automation` der Lauf der Automatik
+ * (`phase-5.md` 5.7) und `budget_cap` der Enforcer (5.9b).
+ */
+export const AD_CHANGE_ORIGINS = [
+  'explorer',
+  'search_terms',
+  'revert',
+  'retry',
+  'automation',
+  'budget_cap',
+] as const;
 export type AdChangeOrigin = (typeof AD_CHANGE_ORIGINS)[number];
 export const AD_CHANGE_USER_ORIGINS = ['explorer', 'search_terms'] as const;
 

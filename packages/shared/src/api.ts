@@ -391,8 +391,11 @@ export const SHARED_PLATFORM_JOB_NAMES = [
   'fx-rates-sync',
 ] as const satisfies readonly PlatformJobName[];
 
-/** Jobs je Profil (Scope = Profil-ID): Datei-Import aus der Werbekonsole (`phase-1.md` 1.11c). */
-export const PROFILE_JOB_NAMES = ['file-import'] as const;
+/**
+ * Jobs je Profil (Scope = Profil-ID): Datei-Import aus der Werbekonsole (`phase-1.md` 1.11c) und der Lauf der
+ * Automatik (`phase-5.md` 5.7).
+ */
+export const PROFILE_JOB_NAMES = ['file-import', 'automation-run'] as const;
 export type ProfileJobName = (typeof PROFILE_JOB_NAMES)[number];
 
 /** Jobs im Sync-Status (und im Filter): die der Connections und Profile und die geteilten plattformweiten. */
