@@ -346,6 +346,33 @@ describe('loadHarvestMarkSources (4.6)', () => {
     await testDb.db.delete(amazonAdsNegativeTargets);
   });
 
+  it('erkennt auch Negatives exakt auf Ebene der Quell-Kampagne', async () => {
+    await mark(ids.ada, ids.de, ['LED Lampe']);
+    const [campaign] = await testDb.db
+      .select({ id: amazonAdsCampaigns.id })
+      .from(amazonAdsCampaigns)
+      .where(eq(amazonAdsCampaigns.amazonCampaignId, 'C1'));
+    await testDb.db.insert(amazonAdsNegativeTargets).values({
+      organizationId: ids.org,
+      profileId: ids.de,
+      level: 'campaign',
+      campaignId: campaign!.id,
+      adGroupId: null,
+      amazonTargetId: 'N2',
+      adProduct: SP,
+      targetType: 'keyword',
+      keywordText: 'led lampe',
+      matchType: 'EXACT',
+      state: 'ENABLED',
+    });
+    try {
+      const [loaded] = await loadHarvestMarkSources(testDb.db, { profileId: ids.de });
+      expect(loaded?.alreadyNegative).toBe(true);
+    } finally {
+      await testDb.db.delete(amazonAdsNegativeTargets);
+    }
+  });
+
   it('liest nur die genannten Einträge des Profils', async () => {
     const result = await mark(ids.ada, ids.de, ['LED Lampe', 'lampe holz']);
     const first = result!.results[0]!;

@@ -421,9 +421,22 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
   - **API:** `GET /api/ads/tools/setup/harvest?profileId=` (Feature `tools`, `view`; 404 für unsichtbare Profile),
     `inputs.harvest` und `deselectedSources` an `POST …/setup/plan` (Antwort mit `sourceNegatives`),
     `sourceNegatives` an Entwürfen. Die Seite „Änderungen“ zeigt die Zeilen als „Negativ in der Quelle“.
+  - **Review-Befunde (eingearbeitet):** Ein Negativ in der Quelle hängt am neuen Ziel seines Begriffs: Als angelegt
+    zählen nur Ziele von Sponsored Products (`plannedSpTerms`; SB/SD legt das Setup noch nicht an), die Prüfung beim
+    Übermitteln sperrt Negatives ohne geplantes Ziel (`sourceNegativeNotPlanned`). Über die API geht das Negativ erst
+    in einem zweiten Aufruf desselben Laufs raus, wenn das Ziel angelegt ist (`deferred`); scheitert das Ziel, scheitert
+    das Negativ mit `HARVEST_TARGET_NOT_CREATED`. In der Bulk-Datei steht es nur, wenn das Ziel mit in der Datei steht
+    oder schon angelegt ist (Amazon verarbeitet die Datei als Ganzes: lehnt Amazon dort nur das Keyword ab, greift
+    das Negativ trotzdem; der Import zeigt das, die Zeile bleibt dann offen). ASIN-Begriffe aus Keyword-Ad-Groups
+    bekommen keinen Vorschlag (`sourceKeywordAdGroup`, negative Produkt-Ziele gehen dort nicht). „Schon negiert“
+    zählt auch Negatives exakt auf Ebene der Quell-Kampagne. Die Auswahl eines Entwurfs verliert Einträge, die nicht
+    mehr auf der Merkliste stehen; ein Profilwechsel leert Auswahl und Vorschläge; ein ungültiges Gebot wird erklärt.
+    Audit des Leerens wie `removeHarvestMarks` (`id` = Organisation, `profileIds`). Tests: abgelehntes Keyword behält
+    den Begriff auf der Merkliste, zweiter Aufruf im Job, Profilwechsel im Assistenten.
   - **Offen bzw. bewusst so:** Die Suchbegriff-Analyse verlinkt noch nicht ins Setup (Einstieg ist der Assistent).
     Ein Begriff kann in mehreren offenen Entwürfen stehen; die Warnung „schon exakt gebucht“ zählt offene Setups
-    mit. Negativ immer exakt in der Ad Group (nicht Kampagnenebene, nicht Wortgruppe).
+    mit. Negativ immer exakt in der Ad Group (nicht Kampagnenebene, nicht Wortgruppe). Der CPC einer Merkliste in
+    fremder Währung (Profil hat die Währung gewechselt) wird nicht als Gebot genommen; die Spalte zeigt ihn trotzdem.
 
 ### 4.7 Portfolio anlegen
 - [ ] Blatt „Portfolios“ der Bulk-Datei (`Create`), Dialog unter `/ads/tools/portfolios`, Zuordnung beim Setup (F9).

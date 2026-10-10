@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { formatCurrency, formatNumber } from '@profitbash/shared';
-import { computed, toRef } from 'vue';
+import { computed, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { PlanSetupInput } from '../../api/client';
 import InlineError from '../../components/common/InlineError.vue';
@@ -25,6 +25,18 @@ const locale = computed(() => session.preferences.locale);
 const harvest = useSetupHarvest(toRef(props, 'profileId'));
 const marks = computed(() => harvest.data.value?.marks ?? []);
 const byId = computed(() => new Map(selection.value.map((entry) => [entry.markId, entry])));
+// Einträge eines Entwurfs, die nicht mehr auf der Merkliste stehen (entfernt, schon geerntet), fallen aus der Auswahl.
+watch(
+  () => harvest.data.value,
+  (data) => {
+    if (!data || data.truncated) return;
+    const known = new Set(data.marks.map((mark) => mark.id));
+    if (selection.value.some((entry) => !known.has(entry.markId))) {
+      selection.value = selection.value.filter((entry) => known.has(entry.markId));
+    }
+  },
+  { immediate: true },
+);
 
 function toggle(markId: string, checked: boolean) {
   selection.value = checked
@@ -45,6 +57,7 @@ const bidInvalid = (markId: string) => {
   const bid = byId.value.get(markId)?.bid;
   return bid !== undefined && !MONEY.test(bid);
 };
+const anyBidInvalid = computed(() => selection.value.some((entry) => bidInvalid(entry.markId)));
 const amount = (value: string, currency: string) => formatCurrency(value, currency, locale.value);
 const count = (value: number) => formatNumber(String(value), locale.value);
 </script>
@@ -151,6 +164,14 @@ const count = (value: number) => formatNumber(String(value), locale.value);
           </tbody>
         </table>
       </div>
+      <p
+        v-if="anyBidInvalid"
+        data-harvest-invalid
+        role="alert"
+        class="text-body-sm text-on-loss-wash"
+      >
+        {{ t('setup.harvest.invalidBid') }}
+      </p>
       <p v-if="harvest.data.value?.truncated" class="text-body-sm text-ink-secondary">
         {{ t('setup.harvest.truncated', { count: count(marks.length) }) }}
       </p>

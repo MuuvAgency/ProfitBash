@@ -50,7 +50,8 @@ export type HarvestHint =
         | 'sourceNotSp'
         | 'sourceAlreadyNegative'
         | 'sourceIsExact'
-        | 'sourceNotPlanned';
+        | 'sourceNotPlanned'
+        | 'sourceKeywordAdGroup';
       keyword: string;
     };
 
@@ -106,6 +107,26 @@ export function harvestInputs(input: {
   return { keywords, productTargets, hints };
 }
 
+/**
+ * Begriffe, die der Plan als Ziel anlegt: Keywords in Vergleichsform, ASINs groß. Nur Sponsored Products, denn SB
+ * und SD legt das Setup noch nicht an (4.9/4.10); ein Negativ in der Quelle ohne angelegtes Ziel kostete Traffic.
+ */
+export function plannedSpTerms(campaigns: readonly PlannedCampaign[]): {
+  keywords: Set<string>;
+  asins: Set<string>;
+} {
+  const keywords = new Set<string>();
+  const asins = new Set<string>();
+  for (const campaign of campaigns) {
+    if (campaign.adProduct !== 'SP') continue;
+    for (const target of campaign.targets) {
+      if (target.type === 'keyword') keywords.add(comparableSearchTerm(target.text));
+      if (target.type === 'product') asins.add(target.asin.toUpperCase());
+    }
+  }
+  return { keywords, asins };
+}
+
 export function planSourceNegatives(input: {
   marks: readonly HarvestMarkSource[];
   /** Der Plan des Setups (nur Begriffe, die er anlegt, werden in der Quelle negiert). */
@@ -117,14 +138,7 @@ export function planSourceNegatives(input: {
 }): { sourceNegatives: SourceNegative[]; hints: HarvestHint[] } {
   const isProtected = createProtectedTermMatcher(input.protectedTerms);
   const deselected = new Set(input.deselected ?? []);
-  const plannedKeywords = new Set<string>();
-  const plannedAsins = new Set<string>();
-  for (const campaign of input.campaigns) {
-    for (const target of campaign.targets) {
-      if (target.type === 'keyword') plannedKeywords.add(comparableSearchTerm(target.text));
-      if (target.type === 'product') plannedAsins.add(target.asin.toUpperCase());
-    }
-  }
+  const { keywords: plannedKeywords, asins: plannedAsins } = plannedSpTerms(input.campaigns);
 
   const sourceNegatives: SourceNegative[] = [];
   const hints: HarvestHint[] = [];
@@ -138,6 +152,9 @@ export function planSourceNegatives(input: {
       skip('sourceMissing', mark.searchTerm);
     else if (mark.adProduct !== 'SPONSORED_PRODUCTS') skip('sourceNotSp', mark.searchTerm);
     else if (mark.alreadyNegative) skip('sourceAlreadyNegative', mark.searchTerm);
+    // Negative Produkt-Ziele nimmt Amazon nur in Auto- und Produkt-Targeting-Ad-Groups an.
+    else if (asin !== null && mark.sourceKeyword !== null)
+      skip('sourceKeywordAdGroup', mark.searchTerm);
     else if (
       mark.sourceKeyword !== null &&
       mark.sourceKeyword.matchType.toUpperCase() === 'EXACT' &&

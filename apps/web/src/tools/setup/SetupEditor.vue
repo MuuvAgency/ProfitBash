@@ -123,7 +123,9 @@ watch(productGroupId, (next) => {
 const planStale = ref(false);
 // Ein anderes Profil hat eine andere Merkliste.
 watch(profileId, (next, previous) => {
-  if (previous !== null && next !== previous) harvest.value = [];
+  if (previous === null || next === previous) return;
+  harvest.value = [];
+  sourceNegatives.value = [];
 });
 watch(
   [profileId, productGroupId, presetKey, texts, unlocks, useProfileBids, harvest],

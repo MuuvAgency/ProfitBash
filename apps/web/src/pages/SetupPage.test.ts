@@ -434,6 +434,67 @@ describe('Seite „Kampagnen-Setup“', () => {
       });
     });
 
+    it('erklärt ein ungültiges Gebot und sperrt das Planen', async () => {
+      await mountPage(harvestRoutes);
+      await click('[data-setup-new]');
+      await choose('[data-setup-profile]', P1);
+      await choose('[data-setup-group]', G1);
+      await click(`[data-harvest-mark="${M1}"] [data-harvest-pick]`);
+      await type(`[data-harvest-mark="${M1}"] [data-harvest-bid]`, '1,10');
+      expect((await found('[data-harvest-invalid]')).textContent).toContain('Gebot');
+      expect((await found<HTMLButtonElement>('[data-setup-plan]')).disabled).toBe(true);
+    });
+
+    it('nimmt Einträge, die nicht mehr auf der Merkliste stehen, aus einem Entwurf', async () => {
+      const gone = '00000000-0000-4000-8000-0000000000f9';
+      const { requests } = await mountPage({
+        ...harvestRoutes,
+        [`GET /api/ads/tools/setup/drafts/${D1}`]: json({
+          ...draft,
+          inputs: { ...inputs, harvest: [{ markId: M1 }, { markId: gone }] },
+        }),
+      });
+      await click(`[data-draft="${D1}"] [data-draft-open]`);
+      await found(`[data-harvest-mark="${M1}"]`);
+      await click('[data-setup-plan]');
+      expect(body(requests, 'POST', '/api/ads/tools/setup/plan')).toMatchObject({
+        inputs: { harvest: [{ markId: M1 }] },
+      });
+    });
+
+    it('leert Auswahl und Vorschläge beim Wechsel des Profils', async () => {
+      const P2 = '00000000-0000-4000-8000-0000000000a2';
+      const groupsResponse = routes()['GET /api/ads/tools/product-groups'] as Response;
+      const groups = (await groupsResponse.clone().json()) as { profiles: object[] };
+      await mountPage({
+        ...harvestRoutes,
+        'GET /api/ads/tools/product-groups': json({
+          ...groups,
+          profiles: [
+            ...groups.profiles,
+            {
+              id: P2,
+              accountName: 'Waldkauz FR',
+              countryCode: 'FR',
+              accountType: 'seller',
+              clientId: C1,
+            },
+          ],
+        }),
+      });
+      await click('[data-setup-new]');
+      await choose('[data-setup-profile]', P1);
+      await choose('[data-setup-group]', G1);
+      await click(`[data-harvest-mark="${M1}"] [data-harvest-pick]`);
+      await click('[data-setup-plan]');
+      await found('[data-source-negative]');
+      await choose('[data-setup-profile]', P2);
+      expect(document.querySelector('[data-source-negative]')).toBeNull();
+      await choose('[data-setup-profile]', P1);
+      const pick = await found<HTMLInputElement>(`[data-harvest-mark="${M1}"] [data-harvest-pick]`);
+      expect(pick.checked).toBe(false);
+    });
+
     it('zeigt einen leeren Zustand ohne vorgemerkte Begriffe', async () => {
       await mountPage();
       await click('[data-setup-new]');

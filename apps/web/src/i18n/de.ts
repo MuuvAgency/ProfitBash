@@ -1305,6 +1305,8 @@ export const de = {
       pickLabel: '„{term}“ übernehmen',
       bidLabel: 'Gebot für „{term}“',
       singleLabel: '„{term}“ als eigene Kampagne',
+      invalidBid:
+        'Ein Gebot ist ungültig (z. B. 0.85, mit Punkt, höchstens zwei Nachkommastellen); Planen geht erst danach.',
     },
     sources: {
       title: 'In der Quelle negieren',
@@ -1468,6 +1470,10 @@ export const de = {
       sourceIsExact: '„{keyword}“ ist in der Quelle selbst exakt gebucht; kein Negativ dort.',
       sourceNotPlanned:
         '„{keyword}“ legt der Plan nicht an; ohne neue Kampagne bleibt die Quelle unverändert.',
+      sourceKeywordAdGroup:
+        '„{keyword}“ kam aus einer Keyword-Ad-Group; negative ASINs gehen dort nicht, die Quelle bleibt.',
+      sourceNegativeNotPlanned:
+        '{campaign}: „{target}“ legt der Entwurf nicht als Sponsored Products an; kein Negativ in der Quelle.',
       sourceNegativeMissing:
         '{campaign}: Die Ad Group für das Negativ „{target}“ gibt es nicht mehr.',
       sourceNegativeProtected: '„{keyword}“ ist geschützt und darf nicht negiert werden.',

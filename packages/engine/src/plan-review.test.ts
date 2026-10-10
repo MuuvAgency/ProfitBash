@@ -251,17 +251,54 @@ describe('reviewCampaignPlan', () => {
     } as const;
     const sourceAdGroups = new Set(['111:222']);
 
+    const planned = [
+      campaign({
+        targets: [{ type: 'keyword', text: 'trinkflasche 1l', matchType: 'exact', bid: '0.90' }],
+      }),
+    ];
+
     it('nimmt gültige gewählte Negatives an', () => {
       expect(
         reviewCampaignPlan(
-          input({ sourceNegatives: [source], protectedTerms: [], sourceAdGroups }),
+          input({
+            campaigns: planned,
+            sourceNegatives: [source],
+            protectedTerms: [],
+            sourceAdGroups,
+          }),
         ),
       ).toEqual([]);
+    });
+
+    it('sperrt Negatives, deren Begriff der Plan nicht als Sponsored Products anlegt', () => {
+      expect(
+        reviewCampaignPlan(
+          input({
+            campaigns: [campaign(), { ...planned[0]!, adProduct: 'SB', name: 'SB' }],
+            sourceNegatives: [source],
+            protectedTerms: [],
+            sourceAdGroups,
+          }),
+        ),
+      ).toContainEqual({
+        severity: 'error',
+        code: 'sourceNegativeNotPlanned',
+        campaign: 'SP | AUTO | Flaschen',
+        target: 'trinkflasche 1l',
+      });
     });
 
     it('sperrt geschützte Begriffe, fehlende Quellen und Dubletten, abgewählte zählen nicht', () => {
       const issues = reviewCampaignPlan(
         input({
+          campaigns: [
+            campaign({
+              targets: [
+                { type: 'keyword', text: 'trinkflasche 1l', matchType: 'exact', bid: '0.90' },
+                { type: 'keyword', text: 'nordwind becher', matchType: 'exact', bid: '0.90' },
+              ],
+            }),
+          ],
           sourceNegatives: [
             source,
             source,
