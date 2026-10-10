@@ -5578,6 +5578,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sichtbare Benachrichtigungen, neueste zuerst (Filter: ungelesen, Art, Profil; Seiten über `before`) */
+        get: {
+            parameters: {
+                query?: {
+                    unread?: "true" | "false";
+                    kind?: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring";
+                    profileId?: string;
+                    before?: number;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Benachrichtigungen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NotificationListResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine aktive Organisation. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Zahl der ungelesenen, sichtbaren Benachrichtigungen */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Anzahl. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NotificationUnreadCountResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine aktive Organisation. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Benachrichtigungen für den angemeldeten Nutzer auf gelesen setzen (IDs oder alle)
+         * @description Unsichtbare oder unbekannte IDs werden übergangen; `updated` zählt die neu gelesenen.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MarkNotificationsReadRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MarkNotificationsReadResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine aktive Organisation. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7834,6 +8027,40 @@ export interface components {
         };
         SetClientPresetRequest: {
             presetKey: string | null;
+        };
+        NotificationListResponse: {
+            items: components["schemas"]["Notification"][];
+            nextBefore: number | null;
+        };
+        Notification: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            /** @enum {string} */
+            kind: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring";
+            /** @enum {string} */
+            severity: "info" | "success" | "warning" | "error";
+            /** Format: uuid */
+            profileId: string | null;
+            profileName: string | null;
+            params: {
+                [key: string]: string | number;
+            };
+            link: string | null;
+            createdAt: string;
+            readAt: string | null;
+        };
+        NotificationUnreadCountResponse: {
+            count: number;
+        };
+        MarkNotificationsReadResponse: {
+            updated: number;
+        };
+        MarkNotificationsReadRequest: {
+            ids: string[];
+        } | {
+            /** @enum {boolean} */
+            all: true;
         };
     };
     responses: never;

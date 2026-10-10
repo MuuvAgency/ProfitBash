@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1. Als Nächstes: 5.2a.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a. Als Nächstes: 5.2b.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -173,14 +173,48 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
       SB-Blätter sind ungeprüft; fehlen sie, meldet der Import das (siehe oben).
 
 ### 5.2a Benachrichtigungen: Daten, Versand, Quellen (`packages/db`, `apps/api`, `apps/worker`)
-- [ ] Tabellen: Benachrichtigung (Organisation, optional Profil, Art, Schwere, i18n-Parameter, Link, Erzeugt, Schlüssel
+- [x] Tabellen: Benachrichtigung (Organisation, optional Profil, Art, Schwere, i18n-Parameter, Link, Erzeugt, Schlüssel
       gegen Dubletten), Lesestatus je Nutzer. Sichtbar nur für Mitglieder, die das Profil sehen (Access-Layer).
-- [ ] Erzeugen in der Transaktion des Auslösers, dazu Postgres `NOTIFY`; die API hört mit `LISTEN` und schiebt per SSE
+- [x] Erzeugen in der Transaktion des Auslösers, dazu Postgres `NOTIFY`; die API hört mit `LISTEN` und schiebt per SSE
       (`/api/notifications/stream`) an verbundene Clients, auch wenn Worker und API getrennt laufen (`WORKER_MODE`);
       Heartbeat, Wiederaufnahme über `Last-Event-ID`. API: Liste, ungelesen zählen, gelesen setzen.
-- [ ] Quellen: Datei-Import fertig bzw. fehlgeschlagen, Übermittlung abgeschlossen bzw. mit Fehlern, keine Bulk-Datei seit
+- [x] Quellen: Datei-Import fertig bzw. fehlgeschlagen, Übermittlung abgeschlossen bzw. mit Fehlern, keine Bulk-Datei seit
       8 Tagen (aus `file_imports`, einmal je Profil und Woche), Ablauf der Amazon-Einwilligung (30/14/3 Tage vorher; nur mit
       Mock prüfbar, es gibt keine echten Connections). Aufräumen gelesener Einträge nach 90 Tagen.
+- **Empfänger (Dominik, 2026-10-10):** Import und Übermittlung an den Auslöser (Uploader bzw. wer übermittelt hat),
+  Fehler zusätzlich an alle Org-Admins; „keine Bulk-Datei“ an alle, die das Profil sehen; Einwilligung nur an Org-Admins.
+- [x] Umsetzung (2026-10-10, Stand für 5.2b und später):
+  - **Tabellen** `notifications` und `notification_reads` (Migration `0037_notifications`): `seq` (Identity) für
+    Reihenfolge, Seiten und `Last-Event-ID`; `audience` `members` | `admins` | `recipient` mit `recipient_user_id`;
+    `kind` als Text (`NOTIFICATION_KINDS` in `packages/shared/src/notifications.ts`), `params` als JSON für die i18n-Texte,
+    `dedupe_key` eindeutig je Organisation. Profil und Connection mit zusammengesetzten Fremdschlüsseln (`ON DELETE
+    CASCADE`).
+  - **`packages/db/src/notifications.ts`:** `createNotification` (Insert mit `ON CONFLICT DO NOTHING`, dann
+    `pg_notify('profitbash_notifications', {id, organizationId})`, kommt erst nach dem Commit an), Sichtbarkeit:
+    Profil über `visibleProfilesScope` (Admins auch ausgeblendete), ohne Profil alle Mitglieder; dazu `audience`.
+    `listNotifications` (neueste zuerst, Filter ungelesen/Art/Profil, Seiten über `before`), `countUnreadNotifications`,
+    `markNotificationsRead` (IDs oder alle, unsichtbare übergangen, Audit `notification.read` nur bei Änderung),
+    `listNotificationsAfter` (Wiederaufnahme), `cleanupNotifications` (gelesene nach 90, alle nach 365 Tagen).
+  - **Quellen:** `closeFileImport` (auch beim Aufgeben einer Datei) und `closeAdChangeSubmission` (Übergang auf
+    abgeschlossen; „mit Fehlern“, wenn die Übermittlung scheitert oder eine Änderung `failed` ist) erzeugen die Meldung
+    in ihrer Transaktion; händisches Abschließen einer Bulk-Übermittlung und ein sofort abgeschlossenes Setup ohne
+    anlegbare Kampagnen melden nichts (`notify: false`). `notification-sources.ts`: `notifyStaleBulkFiles` (Datei-Profile
+    ohne Connection, nicht entfernt oder ausgeblendet; Stand = Upload der letzten importierten Bulk-Datei, sonst Anlage
+    des Profils; Schlüssel je angefangener Woche ab Tag 8) und `notifyExpiringConsents` (Stufe 30/14/3 im Schlüssel,
+    3 Tage als Fehler).
+  - **Job** `notifications-check` täglich 07:00 Berlin (plattformweit, nicht im Sync-Status): erst aufräumen, dann die
+    zeitgesteuerten Quellen.
+  - **API** (`routes/notifications.ts`, alle Mitglieder): `GET /notifications`, `GET /notifications/unread-count`,
+    `POST /notifications/read`, `GET /notifications/stream` (SSE: Ereignisse `ready` mit `retry`, `notification` mit
+    `id` = `seq`, `ping` als Heartbeat alle 25 s, `resync` nach Unterbrechung des LISTEN oder wenn mehr als 100 nachzuholen
+    wären). `NotificationHub` (`notification-hub.ts`) hält eine eigene `LISTEN`-Verbindung auf `DATABASE_URL_DIRECT` und
+    prüft je Ereignis für jeden Abonnenten der Organisation die Sichtbarkeit; beim Herunterfahren schließt er die
+    offenen Kanäle. Ohne Hub antwortet der Kanal mit 503.
+  - **Offen für 5.2b:** Der Client erkennt Doppelte an `seq` (erst abonnieren, dann nachholen) und lädt bei `resync`
+    Liste und Zähler neu. Eine Nummer, die vor einer kleineren committet, kann bei der Wiederaufnahme fehlen (seltene
+    Überholung paralleler Transaktionen); die Liste beim Öffnen der Glocke gleicht das aus.
+  - **Offen für später:** SSE hinter dem Proxy von Railway prüfen (siehe unten); Benachrichtigungen neuer Quellen
+    (Vorschläge 5.7, Caps 5.9b, Prüfungen 5.10) über `createNotification` mit eigenem `kind`.
 
 ### 5.2b Benachrichtigungen: Oberfläche
 - [ ] Glocke mit Zähler im Kopf (SSE-Client, ohne SSE Abfrage beim Fokus), Seite `/notifications` (Liste, Filter
