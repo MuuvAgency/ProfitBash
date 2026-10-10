@@ -39,6 +39,8 @@ export interface PlanReviewInput {
   protectedTerms?: readonly string[];
   /** Bestehende SP-Ad-Groups des Profils als `amazonCampaignId:amazonAdGroupId`. */
   sourceAdGroups?: ReadonlySet<string>;
+  /** Das Portfolio des Entwurfs gibt es im Profil nicht mehr (4.7). */
+  portfolioMissing?: boolean;
 }
 
 export type PlanReviewIssue =
@@ -58,6 +60,7 @@ export type PlanReviewIssue =
   | { severity: 'error'; code: 'adGroupNameInvalid'; campaign: string; issue: string }
   | { severity: 'error'; code: 'duplicateTarget'; campaign: string; target: string }
   | { severity: 'error'; code: 'missingSku'; asin: string }
+  | { severity: 'error'; code: 'portfolioMissing' }
   | {
       severity: 'error';
       code: 'sourceNegativeMissing' | 'sourceNegativeNotPlanned';
@@ -116,6 +119,7 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     seen.add(key);
     issues.push(issue);
   };
+  if (input.portfolioMissing) add({ severity: 'error', code: 'portfolioMissing' });
   const maxNameLength = campaignNameMaxLength(input.profile.accountType);
   const taken = new Set(input.existing.campaignNames.map((name) => name.toLowerCase()));
   const planned = new Set<string>();

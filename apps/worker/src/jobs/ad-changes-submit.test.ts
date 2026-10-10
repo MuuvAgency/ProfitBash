@@ -524,6 +524,7 @@ describe('submitConnectionAdChanges: Setups (4.4)', () => {
           unlocks: {},
         },
         sourceNegatives,
+        portfolioId: null,
         campaigns: [
           {
             block: 'SP-KW-EXACT',

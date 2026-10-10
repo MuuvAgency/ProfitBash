@@ -17,6 +17,7 @@ import {
   adChangeSubmissions,
   amazonAdsProfiles,
   amazonAdsTargetDailyMetrics,
+  amazonAdsPortfolios,
   auditEvents,
   campaignSetupDrafts,
   clients,
@@ -85,6 +86,7 @@ const draftInput = (overrides: Partial<SaveCampaignSetupDraft> = {}): SaveCampai
   },
   campaigns: [campaign('SP | EXACT | Flaschen')],
   sourceNegatives: [],
+  portfolioId: null,
   ...overrides,
 });
 
@@ -634,5 +636,53 @@ describe('submitCampaignSetupDraft', () => {
       .from(adChangeSubmissions)
       .where(and(eq(adChangeSubmissions.kind, 'setup')));
     expect(submissions).toHaveLength(1);
+  });
+});
+
+describe('Portfolio des Entwurfs (4.7, F9)', () => {
+  async function portfolio(profileId: string, amazonPortfolioId: string) {
+    const [row] = await testDb.db
+      .insert(amazonAdsPortfolios)
+      .values({
+        organizationId: f.org,
+        profileId,
+        amazonPortfolioId,
+        name: `P ${amazonPortfolioId}`,
+      })
+      .returning({ id: amazonAdsPortfolios.id });
+    return row!.id;
+  }
+
+  it('nimmt nur Portfolios desselben Profils', async () => {
+    const foreign = await portfolio(f.fileProfile, '7101');
+    expect(await code(save({ portfolioId: foreign }))).toBe('PORTFOLIO_MISMATCH');
+    const own = await portfolio(f.profile, '7102');
+    const saved = await save({ portfolioId: own });
+    expect(saved.portfolioId).toBe(own);
+  });
+
+  it('übermittelt die Kampagnen mit der Portfolio-ID und sperrt ein entferntes Portfolio', async () => {
+    const own = await portfolio(f.profile, '7103');
+    const first = await save({ portfolioId: own });
+    const result = await submit(first.id, 1);
+    if (result?.status !== 'submitted') throw new Error(JSON.stringify(result));
+    const [campaignItem] = await testDb.db
+      .select()
+      .from(campaignSetupItems)
+      .where(eq(campaignSetupItems.submissionId, result.submission.id))
+      .orderBy(campaignSetupItems.position);
+    expect(campaignItem!.payload).toMatchObject({ entity: 'campaign', amazonPortfolioId: '7103' });
+
+    const second = await save({
+      portfolioId: own,
+      campaigns: [campaign('SP | EXACT | Zweite')],
+    });
+    await testDb.db
+      .update(amazonAdsPortfolios)
+      .set({ removedAt: new Date() })
+      .where(eq(amazonAdsPortfolios.id, own));
+    const rejected = await submit(second.id, 1);
+    expect(rejected?.status).toBe('rejected');
+    expect(rejected?.issues).toContainEqual({ severity: 'error', code: 'portfolioMissing' });
   });
 });

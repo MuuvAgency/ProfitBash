@@ -87,6 +87,7 @@ async function submitted(
     },
     campaigns: [{ ...plan, name, adGroup: { ...plan.adGroup, name } }],
     sourceNegatives: [],
+    portfolioId: null,
     ...extra,
   };
   const saved = (await saveCampaignSetupDraft(testDb.db, { ...who(), draft }))!;

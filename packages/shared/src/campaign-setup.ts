@@ -45,6 +45,8 @@ export const CAMPAIGN_SETUP_ITEM_ENTITIES = [
   'negative_product_target',
   /** Negativ in der Quelle eines Harvest-Begriffs (bestehende Kampagne und Ad Group, F7, 4.6). */
   'source_negative',
+  /** Neues Portfolio (4.7, F9), eigene Übermittlung der Art `portfolio` ohne Entwurf. */
+  'portfolio',
 ] as const;
 export type CampaignSetupItemEntity = (typeof CAMPAIGN_SETUP_ITEM_ENTITIES)[number];
 
@@ -207,6 +209,8 @@ export const saveCampaignSetupDraftSchema = z
     inputs: setupInputsSchema,
     campaigns: z.array(plannedCampaignSchema).min(1).max(MAX_SETUP_CAMPAIGNS),
     sourceNegatives: z.array(sourceNegativeSchema).max(MAX_SETUP_SOURCE_NEGATIVES).default([]),
+    /** Bestehendes Portfolio des Profils für alle neuen Kampagnen (4.7, F9), interne ID. */
+    portfolioId: z.uuid().nullable().default(null),
   })
   .meta({ id: 'SaveCampaignSetupDraftRequest' });
 export type SaveCampaignSetupDraft = z.output<typeof saveCampaignSetupDraftSchema>;
@@ -230,6 +234,8 @@ export type CampaignSetupItemPayload =
       currencyCode: string;
       biddingStrategy: (typeof BLOCK_BIDDING_STRATEGIES)[number] | null;
       offAmazon: boolean;
+      /** Bestehendes Portfolio des Entwurfs (4.7); fehlt bei Zeilen vor 4.7. */
+      amazonPortfolioId?: string | null;
     }
   | { entity: 'placement'; placement: CampaignSetupPlacement; percentage: number }
   | { entity: 'ad_group'; name: string; defaultBid: string }
@@ -254,7 +260,8 @@ export type CampaignSetupItemPayload =
       amazonAdGroupId: string;
       negative: PlannedNegative;
       harvestMarkId: string;
-    };
+    }
+  | { entity: 'portfolio'; name: string; budget: PortfolioBudget | null };
 
 // ---------------------------------------------------------------------------
 // API (4.5)
@@ -310,6 +317,7 @@ export type PlanCampaignSetupResponse = z.infer<typeof planCampaignSetupResponse
 const draftFields = {
   id: z.uuid(),
   profileId: z.uuid(),
+  portfolioId: z.uuid().nullable(),
   productGroupId: z.uuid().nullable(),
   presetKey: z.string(),
   name: z.string(),
@@ -404,3 +412,77 @@ export const setupHarvestListResponseSchema = z
   })
   .meta({ id: 'SetupHarvestList' });
 export type SetupHarvestListResponse = z.infer<typeof setupHarvestListResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Portfolios (4.7, F9)
+// ---------------------------------------------------------------------------
+
+export const PORTFOLIO_BUDGET_POLICIES = ['dateRange', 'monthlyRecurring'] as const;
+export const MAX_PORTFOLIO_NAME_LENGTH = 128;
+
+const day = z.iso.date();
+
+/** Budget eines neuen Portfolios (Guide „Use portfolios with bulksheets“); ohne Budget: keine Obergrenze. */
+export const portfolioBudgetSchema = z
+  .strictObject({
+    amount: money,
+    policy: z.enum(PORTFOLIO_BUDGET_POLICIES),
+    startDate: day,
+    endDate: day.nullable(),
+  })
+  .refine((budget) => budget.endDate === null || budget.endDate >= budget.startDate, {
+    message: 'Das Enddatum liegt vor dem Startdatum.',
+    path: ['endDate'],
+  });
+export type PortfolioBudget = z.output<typeof portfolioBudgetSchema> & { currencyCode: string };
+
+export const createPortfolioRequestSchema = z
+  .strictObject({
+    profileId: z.uuid(),
+    name: z
+      .string()
+      .transform((value) => value.normalize('NFC').split(/\s+/u).filter(Boolean).join(' '))
+      .pipe(z.string().min(1).max(MAX_PORTFOLIO_NAME_LENGTH)),
+    budget: portfolioBudgetSchema.nullable(),
+  })
+  .meta({ id: 'CreatePortfolioRequest' });
+export type CreatePortfolioRequest = z.output<typeof createPortfolioRequestSchema>;
+
+export const portfolioListResponseSchema = z
+  .object({
+    portfolios: z.array(
+      z.object({
+        id: z.uuid(),
+        amazonPortfolioId: z.string(),
+        name: z.string().nullable(),
+        state: z.string().nullable(),
+        budgetAmount: z.string().nullable(),
+        budgetCurrencyCode: z.string().nullable(),
+        budgetPolicy: z.string().nullable(),
+        budgetStartDate: z.string().nullable(),
+        budgetEndDate: z.string().nullable(),
+        campaigns: z.number().int(),
+      }),
+    ),
+    /** Angelegt, aber vom Import noch nicht bestätigt (Kampagnen lassen sich erst danach zuordnen). */
+    pending: z.array(
+      z.object({
+        itemId: z.uuid(),
+        submissionId: z.uuid(),
+        name: z.string(),
+        status: z.enum(['submitted', 'applied']),
+        budget: z
+          .object({
+            amount: z.string(),
+            currencyCode: z.string(),
+            policy: z.enum(PORTFOLIO_BUDGET_POLICIES),
+            startDate: z.string(),
+            endDate: z.string().nullable(),
+          })
+          .nullable(),
+        createdAt: timestamp,
+      }),
+    ),
+  })
+  .meta({ id: 'PortfolioList' });
+export type PortfolioListResponse = z.infer<typeof portfolioListResponseSchema>;

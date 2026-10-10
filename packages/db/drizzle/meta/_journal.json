@@ -232,6 +232,13 @@
       "when": 1791579910542,
       "tag": "0032_harvest_setup",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791618169846,
+      "tag": "0033_portfolio_create",
+      "breakpoints": true
     }
   ]
 }
