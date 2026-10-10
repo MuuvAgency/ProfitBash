@@ -4629,6 +4629,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/tools/setup/brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Marken eines Profils für Sponsored Brands (4.10), aus dem Blatt „Brand Assets Data“ des Bulk-Imports */
+        get: {
+            parameters: {
+                query: {
+                    profileId: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Marken. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SetupBrandList"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Entwurf, Profil oder Produktgruppe nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/tools/setup/harvest": {
         parameters: {
             query?: never;
@@ -6880,7 +6954,7 @@ export interface components {
             id: string;
             position: number;
             /** @enum {string} */
-            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "audience_target" | "negative_keyword" | "negative_product_target" | "source_negative" | "portfolio";
+            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "sb_ad" | "keyword" | "product_target" | "audience_target" | "negative_keyword" | "negative_product_target" | "source_negative" | "portfolio";
             campaignRef: string;
             adGroupRef: string | null;
             payload: {
@@ -7104,6 +7178,8 @@ export interface components {
                     productPages: number;
                     restOfSearch: number;
                 } | null;
+                /** @enum {string} */
+                sbAdFormat?: "collection" | "video";
                 adGroup: {
                     name: string;
                     defaultBid: string;
@@ -7241,11 +7317,30 @@ export interface components {
                         offAmazon?: boolean;
                     };
                 };
+                creative?: components["schemas"]["SbCreative"];
             };
             /** @default true */
             useProfileBids: boolean;
             /** @default [] */
             deselectedSources: string[];
+        };
+        /** @default null */
+        SbCreative: {
+            /** @default null */
+            brandEntityId: string | null;
+            brandName: string;
+            /** @default null */
+            logoAssetId: string | null;
+            /** @default null */
+            videoAssetId: string | null;
+            /** @default null */
+            adTitle: string | null;
+        } | null;
+        SetupBrandList: {
+            brands: {
+                brandEntityId: string;
+                name: string | null;
+            }[];
         };
         SetupHarvestList: {
             marks: {
@@ -7364,6 +7459,7 @@ export interface components {
                         offAmazon?: boolean;
                     };
                 };
+                creative?: components["schemas"]["SbCreative"];
             };
             campaigns: {
                 block: string;
@@ -7388,6 +7484,8 @@ export interface components {
                     productPages: number;
                     restOfSearch: number;
                 } | null;
+                /** @enum {string} */
+                sbAdFormat?: "collection" | "video";
                 adGroup: {
                     name: string;
                     defaultBid: string;
@@ -7484,6 +7582,7 @@ export interface components {
                         offAmazon?: boolean;
                     };
                 };
+                creative?: components["schemas"]["SbCreative"];
             };
             campaigns: {
                 block: string;
@@ -7508,6 +7607,8 @@ export interface components {
                     productPages: number;
                     restOfSearch: number;
                 } | null;
+                /** @enum {string} */
+                sbAdFormat?: "collection" | "video";
                 adGroup: {
                     name: string;
                     defaultBid: string;
@@ -7698,6 +7799,11 @@ export interface components {
                  * @enum {string|null}
                  */
                 audience: "views" | "purchases" | null;
+                /**
+                 * @default null
+                 * @enum {string|null}
+                 */
+                sbAdFormat: "collection" | "video" | null;
             }[];
             edges: {
                 from: string;

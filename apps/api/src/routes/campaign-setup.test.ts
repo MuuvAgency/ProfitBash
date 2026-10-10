@@ -23,6 +23,7 @@ import {
 
 const {
   adChangeSubmissions,
+  amazonAdsBrands,
   amazonAdsProfiles,
   amazonAdsTargetDailyMetrics,
   auditEvents,
@@ -551,5 +552,33 @@ describe('Harvest von der Merkliste (4.6)', () => {
       .select({ entityType: campaignSetupItems.entityType })
       .from(campaignSetupItems);
     expect(items.map((item) => item.entityType)).toContain('source_negative');
+  });
+});
+
+describe('Marken für Sponsored Brands (4.10)', () => {
+  beforeEach(async () => {
+    await ctx.testDb.db.delete(amazonAdsBrands);
+    await ctx.testDb.db.insert(amazonAdsBrands).values([
+      { organizationId: f.org, profileId: f.profile, brandEntityId: 'ENTITYWALD', name: 'Waldkauz' },
+      {
+        organizationId: f.org,
+        profileId: f.profile,
+        brandEntityId: 'ENTITYALT',
+        name: 'Alt',
+        removedAt: new Date(),
+      },
+    ]);
+  });
+
+  it('liest die Marken eines Profils, auch für Viewer', async () => {
+    const res = await call<{ brands: unknown[] }>('GET', `/brands?profileId=${f.profile}`, viewer);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ brands: [{ brandEntityId: 'ENTITYWALD', name: 'Waldkauz' }] });
+  });
+
+  it('zeigt fremde und ausgeblendete Profile nicht', async () => {
+    expect((await call('GET', `/brands?profileId=${f.profile}`, foreign)).status).toBe(404);
+    await ctx.testDb.db.update(amazonAdsProfiles).set({ isHidden: true });
+    expect((await call('GET', `/brands?profileId=${f.profile}`, admin)).status).toBe(404);
   });
 });

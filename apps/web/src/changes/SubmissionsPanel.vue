@@ -275,6 +275,11 @@ function setupSummary(item: SetupItemData): string {
       const expression = payload.expression as { type?: string; value?: string } | undefined;
       return `${t(`changes.setupExpression.${expression?.type ?? 'asin'}`)} ${expression?.value ?? ''}`;
     }
+    case 'sb_ad': {
+      // SB-Anzeige (4.10): Format, Marke und Produkte.
+      const asins = Array.isArray(payload.asins) ? (payload.asins as string[]) : [];
+      return `${t(`changes.setupSbFormat.${text('format') ?? 'collection'}`)} · ${text('brandName') ?? ''} · ${asins.join(', ')}`;
+    }
     case 'audience_target':
       // SD-Zielgruppe (4.9): wer die beworbenen Produkte angesehen bzw. gekauft hat.
       return t(`changes.setupAudience.${text('audience') ?? 'views'}`, {

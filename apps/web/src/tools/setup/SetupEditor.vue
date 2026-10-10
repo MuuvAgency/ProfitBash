@@ -37,7 +37,9 @@ import {
   type SetupInputs,
   type SetupTexts,
 } from './inputs';
+import { creativeFormIssues, creativeToForm, formToCreative, type CreativeForm } from './creative';
 import HarvestPicker from './HarvestPicker.vue';
+import SbCreativeFields from './SbCreativeFields.vue';
 import { groupedIssues, issueText, sortedIssues } from './issues';
 
 /**
@@ -78,6 +80,9 @@ const sourceNegatives = ref<SourceNegativeData[]>(
     ? (JSON.parse(JSON.stringify(props.draft.sourceNegatives)) as SourceNegativeData[])
     : [],
 );
+/** Werbemittel für Sponsored Brands (4.10), ein Satz je Entwurf. */
+const creativeForm = ref<CreativeForm>(creativeToForm(props.draft?.inputs.creative));
+const creativeValid = computed(() => creativeFormIssues(creativeForm.value).length === 0);
 const useProfileBids = ref(true);
 /** Bestehendes Portfolio für alle neuen Kampagnen (4.7, F9); neue erst nach dem nächsten Import wählbar. */
 const portfolioId = ref<string | null>(props.draft?.portfolioId ?? null);
@@ -112,6 +117,14 @@ const group = computed(
 const preset = computed(() => props.catalog.presets.find((p) => p.key === presetKey.value) ?? null);
 const blockLabel = (key: string) =>
   props.catalog.blocks.find((block) => block.key === key)?.label ?? key;
+/** SB-Bausteine des Presets (4.10): Nur dann fragt der Assistent nach Werbemitteln, beim Video auch nach dem Video. */
+const sbBlocks = computed(() =>
+  (preset.value?.blocks ?? []).flatMap((entry) => {
+    const block = props.catalog.blocks.find((b) => b.key === entry.block);
+    return block?.adProduct === 'SB' ? [block] : [];
+  }),
+);
+const needsVideo = computed(() => sbBlocks.value.some((block) => block.sbAdFormat === 'video'));
 /** Bausteine des Presets, die sich freischalten lassen: vCPM bei SB/SD, Off-Amazon bei SP. */
 const unlockable = computed(() =>
   (preset.value?.blocks ?? []).flatMap((entry) => {
@@ -140,6 +153,8 @@ watch(profileId, (next, previous) => {
   harvest.value = [];
   sourceNegatives.value = [];
   portfolioId.value = null;
+  // Marken gehören zum Profil (4.10).
+  creativeForm.value = { ...creativeForm.value, brandEntityId: '' };
 });
 watch(
   [profileId, productGroupId, presetKey, texts, unlocks, useProfileBids, harvest],
@@ -165,7 +180,8 @@ const canPlan = computed(
     presetKey.value &&
     harvestValid.value,
 );
-const currentInputs = () => textsToInputs(texts.value, unlocks.value, harvest.value);
+const currentInputs = () =>
+  textsToInputs(texts.value, unlocks.value, harvest.value, formToCreative(creativeForm.value));
 async function plan() {
   if (!canPlan.value || planMutation.isPending.value) return;
   planErrorKey.value = null;
@@ -265,7 +281,8 @@ const canSave = computed(
     name.value.trim() !== '' &&
     allAmountsValid.value &&
     profileId.value !== null &&
-    presetKey.value !== null,
+    presetKey.value !== null &&
+    creativeValid.value,
 );
 
 async function saveDraft(): Promise<boolean> {
@@ -357,6 +374,7 @@ function snapshot() {
     harvest.value,
     sourceNegatives.value,
     portfolioId.value,
+    creativeForm.value,
   ]);
 }
 const savedSnapshot = ref(snapshot());
@@ -517,6 +535,13 @@ function close() {
         v-model="harvest"
         :profile-id="profileId"
         :disabled="!editable"
+      />
+      <SbCreativeFields
+        v-if="sbBlocks.length"
+        v-model="creativeForm"
+        :profile-id="profileId"
+        :disabled="!editable"
+        :needs-video="needsVideo"
       />
       <div v-if="unlockable.length" class="flex flex-col gap-space-xs">
         <span :class="labelClass">{{ t('setup.unlocks') }}</span>

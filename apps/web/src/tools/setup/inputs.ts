@@ -35,9 +35,11 @@ export function textsToInputs(
   texts: SetupTexts,
   unlocks: SetupInputs['unlocks'],
   harvest: SetupInputs['harvest'] = [],
+  creative: SetupInputs['creative'] = null,
 ): SetupInputs {
   return {
     harvest,
+    creative,
     keywords: [
       ...lines(texts.keywords).map((text) => ({ text })),
       ...lines(texts.single).map((text) => ({ text, single: true })),
