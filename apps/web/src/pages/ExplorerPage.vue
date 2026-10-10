@@ -76,6 +76,8 @@ import { errorMessageKey } from '../i18n';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
 import { explorerTarget, filtersFromView, viewState } from '../saved-views/view-state';
 import { useSessionStore } from '../stores/session';
+import { simulatorLink } from '../tools/bid-simulator/link';
+import { useToolRights } from '../tools/queries';
 import type { SavedView } from '@profitbash/shared';
 
 /**
@@ -246,6 +248,7 @@ function linkFor(row: GridRow) {
 // --- Bearbeiten (`phase-3.md` 3.5) ---------------------------------------------------------
 
 const { canView: canViewChanges, canWrite: canWriteChanges } = useChangeRights();
+const { canView: canViewTools } = useToolRights();
 
 // --- Tags (`phase-3.md` 3.7) ----------------------------------------------------------------
 
@@ -811,6 +814,16 @@ const truncatedText = computed(() => {
             :disabled="!biddingRow"
             @click="biddingOpen = biddingRow"
           />
+          <!-- Gebots-Simulator (4.8, F12) mit Strategie und Platzierungen dieser Kampagne. -->
+          <RouterLink
+            v-if="canViewTools && biddingRow"
+            data-bulk="simulate"
+            :to="simulatorLink(biddingRow)"
+            class="flex min-h-8 items-center gap-space-xs rounded-control px-space-sm text-body-sm font-semibold text-violet outline-none hover:bg-tile focus-visible:ring-2 focus-visible:ring-violet"
+          >
+            <i class="pi pi-calculator" aria-hidden="true" />
+            {{ t('explorer.bulk.action.simulate') }}
+          </RouterLink>
         </div>
 
         <InlineError
