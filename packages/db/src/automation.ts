@@ -100,7 +100,11 @@ export async function getAutomationSettings(
   return {
     defaults: await loadGuardrailDefaults(db, access.orgId),
     canEditDefaults: role === 'admin',
-    clients: clients.map((c) => ({ id: c.id, name: c.name, ...toClientRecord(byClient.get(c.id)) })),
+    clients: clients.map((c) => ({
+      id: c.id,
+      name: c.name,
+      ...toClientRecord(byClient.get(c.id)),
+    })),
     members: writers,
   };
 }

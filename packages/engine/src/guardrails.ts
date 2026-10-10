@@ -67,7 +67,9 @@ export function applyBidGuardrails(input: {
 
   /** Hält `value` an `bound` auf, aber nie hinter der Basis. */
   const hold = (bound: Dec, reason: GuardrailReason) => {
-    const held = raise ? Dec.max(base, Dec.min(value, bound)) : Dec.min(base, Dec.max(value, bound));
+    const held = raise
+      ? Dec.max(base, Dec.min(value, bound))
+      : Dec.min(base, Dec.max(value, bound));
     if (!held.equals(value)) limitedBy.push(reason);
     value = held;
   };

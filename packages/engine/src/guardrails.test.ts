@@ -51,7 +51,10 @@ describe('applyBidGuardrails', () => {
   });
 
   it('senkt nicht unter den Boden aus CPC-Anteil und absolutem Wert (der höhere gilt)', () => {
-    expect(bid({ proposed: '0.80', cpc: '1.80' })).toEqual({ value: '0.9', limitedBy: ['bidFloor'] });
+    expect(bid({ proposed: '0.80', cpc: '1.80' })).toEqual({
+      value: '0.9',
+      limitedBy: ['bidFloor'],
+    });
     expect(
       bid({ proposed: '0.80', cpc: '1.00', guardrails: { ...guardrails, bidFloor: '0.85' } }),
     ).toEqual({ value: '0.85', limitedBy: ['bidFloor'] });

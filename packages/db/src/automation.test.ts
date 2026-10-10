@@ -109,7 +109,9 @@ describe('getAutomationSettings', () => {
     expect(settings).toEqual({
       defaults: DEFAULT_GUARDRAILS,
       canEditDefaults: false,
-      clients: [{ id: client, name: 'Kunde', mode: 'shadow', responsibleUserId: null, overrides: {} }],
+      clients: [
+        { id: client, name: 'Kunde', mode: 'shadow', responsibleUserId: null, overrides: {} },
+      ],
       members: [
         { userId: f.ada, name: 'Ada' },
         { userId: f.emil, name: 'Emil' },
@@ -152,9 +154,9 @@ describe('saveGuardrailDefaults', () => {
 
   it('wirkt nicht auf andere Organisationen', async () => {
     await saveGuardrailDefaults(testDb.db, { ...as(f.ada), guardrails });
-    expect(
-      (await getAutomationSettings(testDb.db, as(other.ada, other.org)))!.defaults,
-    ).toEqual(DEFAULT_GUARDRAILS);
+    expect((await getAutomationSettings(testDb.db, as(other.ada, other.org)))!.defaults).toEqual(
+      DEFAULT_GUARDRAILS,
+    );
   });
 });
 

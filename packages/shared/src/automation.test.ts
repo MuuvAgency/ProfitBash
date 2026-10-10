@@ -43,7 +43,9 @@ describe('setClientAutomationRequestSchema', () => {
 
   it('lehnt unbekannte Modi und Felder ab', () => {
     const base = { mode: 'shadow', responsibleUserId: null, overrides: {} };
-    expect(setClientAutomationRequestSchema.safeParse({ ...base, mode: 'auto' }).success).toBe(false);
+    expect(setClientAutomationRequestSchema.safeParse({ ...base, mode: 'auto' }).success).toBe(
+      false,
+    );
     expect(
       setClientAutomationRequestSchema.safeParse({ ...base, overrides: { foo: 1 } }).success,
     ).toBe(false);
