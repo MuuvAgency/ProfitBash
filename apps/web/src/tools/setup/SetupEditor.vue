@@ -125,11 +125,16 @@ const sbBlocks = computed(() =>
   }),
 );
 const needsVideo = computed(() => sbBlocks.value.some((block) => block.sbAdFormat === 'video'));
-/** Bausteine des Presets, die sich freischalten lassen: vCPM bei SB/SD, Off-Amazon bei SP. */
+/**
+ * Bausteine des Presets, die sich freischalten lassen: vCPM bei SD, Off-Amazon bei SP. SB-vCPM geht nicht per
+ * Bulk-Datei (das Blatt kennt keine Kostenart, 4.10).
+ */
 const unlockable = computed(() =>
   (preset.value?.blocks ?? []).flatMap((entry) => {
     const block = props.catalog.blocks.find((b) => b.key === entry.block);
-    return block ? [{ key: block.key, label: block.label, vcpm: block.adProduct !== 'SP' }] : [];
+    return block && block.adProduct !== 'SB'
+      ? [{ key: block.key, label: block.label, vcpm: block.adProduct === 'SD' }]
+      : [];
   }),
 );
 
@@ -255,7 +260,14 @@ function removeCampaign(index: number) {
 }
 const amountEdited = (campaignName: string) =>
   dropHints(campaignName, ['budgetOutOfRange', 'bidOutOfRange']);
-const issues = computed(() => groupedIssues(hints.value));
+// „Braucht Werbemittel“ gilt nicht mehr, sobald welche eingetragen sind (4.10).
+const issues = computed(() =>
+  groupedIssues(
+    formToCreative(creativeForm.value) === null
+      ? hints.value
+      : hints.value.filter((hint) => hint.code !== 'needsCreative'),
+  ),
+);
 const hasErrors = computed(() => hints.value.some((hint) => hint.severity === 'error'));
 
 // --- Speichern, Verwerfen, Übermitteln ---------------------------------------------------

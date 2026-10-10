@@ -90,7 +90,8 @@ export type PlanReviewIssue =
         | 'sbFormatMissing'
         | 'sbVideoMissing'
         | 'sbVideoOneProduct'
-        | 'sbVideoNotAvailable';
+        | 'sbVideoNotAvailable'
+        | 'sbVcpmNotAvailable';
       campaign: string;
     }
   | { severity: 'error'; code: 'sbCollectionAsins'; campaign: string; count: number }
@@ -196,6 +197,9 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     const unlock = input.unlocks?.[campaign.block] ?? {};
     if (campaign.costType === 'vcpm' && campaign.adProduct === 'SP') {
       add({ severity: 'error', code: 'vcpmNotAvailable', campaign: name });
+    } else if (campaign.costType === 'vcpm' && campaign.adProduct === 'SB') {
+      // Das Blatt „SB Multi Ad Group Campaigns“ hat keine Spalte „Cost Type“ (SB nur per Bulk-Datei, 4.10).
+      add({ severity: 'error', code: 'sbVcpmNotAvailable', campaign: name });
     } else if (campaign.costType === 'vcpm' && !unlock.vcpm) {
       add({ severity: 'error', code: 'vcpmNotUnlocked', campaign: name });
     }

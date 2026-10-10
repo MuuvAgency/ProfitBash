@@ -239,6 +239,12 @@ Offen für den ersten echten Lauf: ob `exactProduct` für Ansichten so angenomme
 Beispiel des Bulk-Guides zeigt `similar-product`); ob die Kampagne mit `T00030` und nur Zielgruppen ohne weitere
 Angaben (`creativeType`) angelegt wird; ob die Antwort die neue ID als Zahl oder Text liefert (beides wird gelesen).
 
+### Sponsored Brands: Anlagen nur per Bulk-Datei (Phase 4, 4.10)
+
+Entschieden (Dominik, 2026-10-10): Neue SB-Kampagnen legt ProfitBash in Phase 4 nur per Bulk-Datei an (Blatt „SB
+Multi Ad Group Campaigns“); über die API scheitern sie mit `SB_BULK_FILE_ONLY`. SB v4 (Kampagnen, Ad Groups,
+Anzeigen je Format) folgt mit dem echten API-Zugang.
+
 ## Begründung
 
 - Nur GA-Schnittstellen, und alle drei Anzeigentypen sind abgedeckt (v1 ohne SD bräuchte einen zweiten Weg).

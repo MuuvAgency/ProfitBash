@@ -293,6 +293,18 @@ describe('reviewCampaignPlan', () => {
       ]);
     });
 
+    it('sperrt vCPM bei SB: Das Blatt kennt keine Kostenart (auch freigeschaltet)', () => {
+      expect(
+        reviewCampaignPlan(
+          input({
+            campaigns: [sb({ costType: 'vcpm' })],
+            creative,
+            unlocks: { 'SB-HEADER-KW': { vcpm: true } },
+          }),
+        ),
+      ).toEqual([{ severity: 'error', code: 'sbVcpmNotAvailable', campaign: 'SB | HEADER' }]);
+    });
+
     it('braucht bei Vendoren keine Marken-ID und kennt kein Format ohne Baustein', () => {
       expect(
         reviewCampaignPlan(
