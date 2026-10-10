@@ -371,6 +371,103 @@ describe('Bestätigung durch den Bulk-Import (Zuordnung über Namen)', () => {
   });
 });
 
+describe('Sponsored Display (4.9)', () => {
+  const SD_NAME = 'SD | RT-VIEW | Flaschen';
+  const sdPlan: PlannedCampaign = {
+    ...plan,
+    block: 'SD-RT-VIEWS',
+    adProduct: 'SD',
+    targeting: 'audience',
+    name: SD_NAME,
+    biddingStrategy: null,
+    sdOptimization: 'conversions',
+    placements: null,
+    adGroup: { name: SD_NAME, defaultBid: '0.55' },
+    targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '0.60' }],
+    negatives: [],
+  };
+
+  it('legt SD-Kampagnen an und bestätigt Zielgruppen über Ereignis und Rückblick', async () => {
+    const id = await submitted('bulk_file', f.profile, SD_NAME, { campaigns: [sdPlan] });
+    expect((await items(id)).map((row) => [row.entityType, row.status, row.errorCode])).toEqual([
+      ['campaign', 'submitted', null],
+      ['ad_group', 'submitted', null],
+      ['product_ad', 'submitted', null],
+      ['audience_target', 'submitted', null],
+    ]);
+
+    const { db } = testDb;
+    const SD = 'SPONSORED_DISPLAY';
+    const [campaign] = await db
+      .insert(amazonAdsCampaigns)
+      .values({
+        organizationId: f.org,
+        profileId: f.profile,
+        amazonCampaignId: '4401',
+        adProduct: SD,
+        name: SD_NAME,
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsCampaigns.id });
+    const [adGroup] = await db
+      .insert(amazonAdsAdGroups)
+      .values({
+        organizationId: f.org,
+        profileId: f.profile,
+        campaignId: campaign!.id,
+        amazonAdGroupId: '5501',
+        adProduct: SD,
+        name: SD_NAME,
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsAdGroups.id });
+    const parents = {
+      organizationId: f.org,
+      profileId: f.profile,
+      campaignId: campaign!.id,
+      adGroupId: adGroup!.id,
+      adProduct: SD,
+      state: 'ENABLED',
+    };
+    await db
+      .insert(amazonAdsProductAds)
+      .values({ ...parents, amazonAdId: '6601', asin: 'B0TEST0001', sku: 'SKU-1' });
+    await db.insert(amazonAdsTargets).values([
+      // Andere Zielgruppe (Käufe) und anderer Rückblick zählen nicht.
+      {
+        ...parents,
+        amazonTargetId: '7702',
+        targetType: 'audience',
+        expression: { event: 'PURCHASES', lookback: 30 },
+      },
+      {
+        ...parents,
+        amazonTargetId: '7703',
+        targetType: 'audience',
+        expression: { event: 'VIEWS', lookback: 60 },
+      },
+      {
+        ...parents,
+        amazonTargetId: '7701',
+        targetType: 'audience',
+        expression: { event: 'VIEWS', lookback: 30, bulkExpression: 'views=(exact-product lookback=30)' },
+      },
+    ]);
+    const result = await confirmBulkFileAdChanges(db, {
+      organizationId: f.org,
+      profileId: f.profile,
+      now: new Date(),
+    });
+    expect(result).toEqual({ confirmed: 4, finished: 1 });
+    expect((await items(id)).map((row) => row.amazonEntityId)).toEqual([
+      '4401',
+      '5501',
+      '6601',
+      '7701',
+    ]);
+  });
+});
+
 describe('closeBulkFileSubmission für Setups', () => {
   it('schließt offene Anlagen als angewendet bzw. verworfen ab', async () => {
     const applied = await submitted();

@@ -239,6 +239,13 @@
       "when": 1791618169846,
       "tag": "0033_portfolio_create",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791624270502,
+      "tag": "0034_sd_setup",
+      "breakpoints": true
     }
   ]
 }

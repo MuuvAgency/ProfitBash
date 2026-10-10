@@ -196,7 +196,7 @@ const PLACEMENTS: Record<string, string> = {
  * Ordnet offene Anlagen von Setup-Übermittlungen per Bulk-Datei den Entities zu, die der Import inzwischen kennt
  * (in dessen Transaktion): Kampagne über den Namen im Profil (ohne Groß/Klein, nicht entfernt), Ad Group über den
  * Namen in der Kampagne, darunter Anzeige (SKU bzw. ASIN), Keyword (Text und Match-Typ), Produkt-Target (ASIN bzw.
- * „ähnlich wie“), Kategorie und Negatives (Text bzw. ASIN). Gebotsanpassungen gelten als angelegt, wenn die Kampagne
+ * „ähnlich wie“), Kategorie, SD-Zielgruppe (Ereignis und Rückblick, 4.9) und Negatives (Text bzw. ASIN). Gebotsanpassungen gelten als angelegt, wenn die Kampagne
  * den Prozentsatz zeigt. Bestätigte Zeilen tragen danach die echte Amazon-ID; der Rest bleibt offen. Liefert die
  * Zahl der bestätigten Zeilen und die betroffenen Übermittlungen.
  */
@@ -496,6 +496,23 @@ async function findChild(
           .limit(1),
       );
     }
+    case 'audience_target':
+      // SD-Zielgruppe (4.9): Ereignis und Rückblick, wie Bulk-Import und Export sie ablegen.
+      return first(
+        tx
+          .select({ id: t.amazonTargetId })
+          .from(t)
+          .where(
+            and(
+              eq(t.adGroupId, adGroupId),
+              eq(t.targetType, 'audience'),
+              sql`upper(${t.expression}->>'event') = ${payload.audience.toUpperCase()}`,
+              sql`${t.expression}->>'lookback' = ${String(payload.lookbackDays)}`,
+              isNull(t.removedAt),
+            ),
+          )
+          .limit(1),
+      );
     case 'negative_keyword':
       return first(
         tx

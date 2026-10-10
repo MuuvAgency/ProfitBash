@@ -469,13 +469,11 @@ describe('submitCampaignSetupDraft', () => {
       campaignState: 'PAUSED',
       campaigns: [
         campaign('SP | EXACT | Flaschen'),
-        campaign('SD | RT | Flaschen', {
-          adProduct: 'SD',
-          targeting: 'audience',
+        // Sponsored Brands legt das Setup erst mit 4.10 an (SD seit 4.9).
+        campaign('SB | HEADER | Flaschen', {
+          adProduct: 'SB',
           biddingStrategy: null,
           placements: null,
-          sdOptimization: 'clicks',
-          targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '0.60' }],
           negatives: [],
         }),
       ],
@@ -486,7 +484,7 @@ describe('submitCampaignSetupDraft', () => {
       items: 7,
       unsupported: 1,
       // Hinweise sperren nicht.
-      issues: [{ severity: 'info', code: 'adProductLater', campaign: 'SD | RT | Flaschen' }],
+      issues: [{ severity: 'info', code: 'adProductLater', campaign: 'SB | HEADER | Flaschen' }],
     });
     if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
     expect(result.submission).toMatchObject({
@@ -576,13 +574,11 @@ describe('submitCampaignSetupDraft', () => {
   it('schließt eine Übermittlung ohne anlegbare Kampagne sofort ab', async () => {
     const created = await save({
       campaigns: [
-        campaign('SD | RT | Flaschen', {
-          adProduct: 'SD',
-          targeting: 'audience',
+        // Sponsored Brands legt das Setup erst mit 4.10 an (SD seit 4.9).
+        campaign('SB | HEADER | Flaschen', {
+          adProduct: 'SB',
           biddingStrategy: null,
           placements: null,
-          sdOptimization: 'clicks',
-          targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '0.60' }],
           negatives: [],
         }),
       ],
