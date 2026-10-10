@@ -285,7 +285,14 @@ function setupSummary(item: SetupItemData): string {
         endDate: string | null;
       } | null;
       if (!budget) return `${text('name') ?? ''} · ${t('changes.portfolioNoBudget')}`;
-      return `${text('name') ?? ''} · ${formatCurrency(budget.amount, budget.currencyCode, locale.value)} ${t(`changes.portfolioPolicy.${budget.policy}`)} ${t('changes.portfolioFrom', { date: formatDay(budget.startDate, locale.value) })}`;
+      return `${text('name') ?? ''} · ${formatCurrency(budget.amount, budget.currencyCode, locale.value)} ${t(`changes.portfolioPolicy.${budget.policy}`)} ${
+        budget.endDate
+          ? t('portfolios.periodRange', {
+              start: formatDay(budget.startDate, locale.value),
+              end: formatDay(budget.endDate, locale.value),
+            })
+          : t('changes.portfolioFrom', { date: formatDay(budget.startDate, locale.value) })
+      }`;
     }
     case 'source_negative': {
       // Negativ in einer bestehenden Kampagne (4.6); die Spalte „Kampagne“ nennt die Quelle.

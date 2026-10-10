@@ -113,6 +113,7 @@ describe('Portfolios (/api/ads/tools/portfolios)', () => {
       cookie: editor,
     });
     expect(file.status).toBe(200);
+    expect(file.headers.get('content-disposition')).toMatch(/filename="profitbash-portfolio-/);
     const workbook = openXlsx(new Uint8Array(await file.arrayBuffer()));
     expect(workbook.sheets.map((sheet) => sheet.name)).toEqual(['Portfolios']);
 

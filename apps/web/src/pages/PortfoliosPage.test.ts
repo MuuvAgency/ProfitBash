@@ -125,6 +125,8 @@ describe('Seite „Portfolio“', () => {
     const row = await found(`[data-portfolio="${PF1}"]`);
     expect(row.textContent).toContain('Bestand');
     expect(row.textContent).toContain('4');
+    expect(row.textContent).toContain('Aktiv');
+    expect(row.textContent).toContain('monatlich');
     const pending = await found('[data-portfolio-pending]');
     expect(pending.textContent).toContain('Unterwegs');
     expect(pending.querySelector('a')?.getAttribute('href')).toBe(

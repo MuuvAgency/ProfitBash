@@ -478,7 +478,7 @@ describe('Änderungen: Übermittlungen', () => {
                   currencyCode: 'EUR',
                   policy: 'monthlyRecurring',
                   startDate: '2026-11-01',
-                  endDate: null,
+                  endDate: '2027-01-31',
                 },
               },
               status: 'submitted',
@@ -499,6 +499,7 @@ describe('Änderungen: Übermittlungen', () => {
     expect(row.text()).toContain('Portfolio');
     expect(row.text()).toContain('Garten');
     expect(row.text()).toContain('monatlich');
+    expect(row.text()).toContain('01.11.2026 bis 31.01.2027');
     expect(panel.text()).toContain('nach dem nächsten Import');
   });
 

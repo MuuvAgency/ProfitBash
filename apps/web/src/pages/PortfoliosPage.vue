@@ -25,7 +25,9 @@ import ToolsTabs from '../tools/ToolsTabs.vue';
  * angelegte, noch nicht importierte. Ein neues Portfolio (Name, optional Budget monatlich oder im Zeitraum) geht als
  * Bulk-Datei raus (Seite „Änderungen“); zuordnen lässt es sich im Kampagnen-Setup erst nach dem nächsten Import.
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
+const stateLabel = (state: string | null) =>
+  state === null ? '—' : te(`explorer.state.${state}`) ? t(`explorer.state.${state}`) : state;
 const id = useId();
 const session = useSessionStore();
 const locale = computed(() => session.preferences.locale);
@@ -208,7 +210,7 @@ async function submit() {
                     <td class="py-space-xs pr-space-md text-right font-data tabular-nums">
                       {{ formatNumber(String(entry.campaigns), locale) }}
                     </td>
-                    <td class="py-space-xs text-ink-secondary">{{ entry.state ?? '—' }}</td>
+                    <td class="py-space-xs text-ink-secondary">{{ stateLabel(entry.state) }}</td>
                   </tr>
                 </tbody>
               </table>
