@@ -40,6 +40,8 @@ export const productGroups = pgTable(
     // Ein Name je Profil (ohne Groß-/Kleinschreibung).
     uniqueIndex('product_groups_profile_name_uq').on(t.profileId, sql`lower(${t.name})`),
     index('product_groups_org_idx').on(t.organizationId),
+    // Ziel des zusammengesetzten Fremdschlüssels der Ziele (kein Ziel über Org-Grenzen).
+    unique('product_groups_id_org_uq').on(t.id, t.organizationId),
   ],
 );
 
