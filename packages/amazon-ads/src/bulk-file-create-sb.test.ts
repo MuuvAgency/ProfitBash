@@ -14,9 +14,7 @@ function build(changes: BulkFileChange[]) {
     ...result,
     records: rows.map((row) =>
       Object.fromEntries(
-        row.flatMap((cell, index) =>
-          cell === null ? [] : [[(header as string[])[index]!, cell]],
-        ),
+        row.flatMap((cell, index) => (cell === null ? [] : [[(header as string[])[index]!, cell]])),
       ),
     ),
   };
@@ -96,7 +94,12 @@ describe('buildBulkSheet(sbMultiAdGroup): Anlagen', () => {
         keywordText: 'glas',
         matchType: 'negativePhrase',
       }),
-      create('na', { type: 'create', entity: 'negativeProductTarget', ...parents, asin: 'B0FREMD002' }),
+      create('na', {
+        type: 'create',
+        entity: 'negativeProductTarget',
+        ...parents,
+        asin: 'B0FREMD002',
+      }),
     ]);
     expect(skipped).toEqual([]);
     expect(records).toEqual([

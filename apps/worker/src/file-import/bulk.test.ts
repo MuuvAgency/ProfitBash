@@ -737,7 +737,12 @@ describe('importBulkFile', () => {
           State: 'enabled',
         },
         // Unbekannte Entities werden übergangen und geloggt.
-        { Entity: 'Theme', 'Campaign ID': SBC, 'Ad Group ID': SBAG, 'Keyword ID': '610000000000009' },
+        {
+          Entity: 'Theme',
+          'Campaign ID': SBC,
+          'Ad Group ID': SBAG,
+          'Keyword ID': '610000000000009',
+        },
       ]),
       // Älteres SB-Blatt: Kampagnen ohne eigene Ad-Group-Zeilen.
       sheet('Sponsored Brands Campaigns', sbHeader, [
@@ -948,10 +953,14 @@ describe('importBulkFile', () => {
     ];
     const sb = (row: Record<string, TestCell>) => ({ Product: 'Sponsored Brands', ...row });
     const content = buildXlsx([
-      sheet('Brand Assets Data (Read-only)', ['Brand Entity ID', 'Brand Name'], [
-        { 'Brand Entity ID': 'ENTITYWALD', 'Brand Name': 'Waldkauz' },
-        { 'Brand Entity ID': 'ENTITYZWEI', 'Brand Name': 'Zweitmarke' },
-      ]),
+      sheet(
+        'Brand Assets Data (Read-only)',
+        ['Brand Entity ID', 'Brand Name'],
+        [
+          { 'Brand Entity ID': 'ENTITYWALD', 'Brand Name': 'Waldkauz' },
+          { 'Brand Entity ID': 'ENTITYZWEI', 'Brand Name': 'Zweitmarke' },
+        ],
+      ),
       sheet('SB Multi Ad Group Campaigns', header, [
         sb({
           Entity: 'Campaign',

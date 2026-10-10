@@ -559,7 +559,12 @@ describe('Marken für Sponsored Brands (4.10)', () => {
   beforeEach(async () => {
     await ctx.testDb.db.delete(amazonAdsBrands);
     await ctx.testDb.db.insert(amazonAdsBrands).values([
-      { organizationId: f.org, profileId: f.profile, brandEntityId: 'ENTITYWALD', name: 'Waldkauz' },
+      {
+        organizationId: f.org,
+        profileId: f.profile,
+        brandEntityId: 'ENTITYWALD',
+        name: 'Waldkauz',
+      },
       {
         organizationId: f.org,
         profileId: f.profile,

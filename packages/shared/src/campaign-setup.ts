@@ -148,7 +148,11 @@ const assetId = z.string().regex(/^amzn1\.assetlibrary\.[A-Za-z0-9.:_-]{1,200}$/
  */
 export const sbCreativeSchema = z
   .strictObject({
-    brandEntityId: z.string().regex(/^[A-Za-z0-9]{1,64}$/).nullable().default(null),
+    brandEntityId: z
+      .string()
+      .regex(/^[A-Za-z0-9]{1,64}$/)
+      .nullable()
+      .default(null),
     brandName: z
       .string()
       .trim()

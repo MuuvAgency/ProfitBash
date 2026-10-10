@@ -468,9 +468,7 @@ describe('submitCampaignSetupDraft', () => {
   it('legt eine Übermittlung der Art setup mit einer Zeile je Entity an, Eltern zuerst', async () => {
     const created = await save({
       campaignState: 'PAUSED',
-      campaigns: [
-        campaign('SP | EXACT | Flaschen'),
-      ],
+      campaigns: [campaign('SP | EXACT | Flaschen')],
     });
     const result = await submit(created.id, 1);
     expect(result).toMatchObject({

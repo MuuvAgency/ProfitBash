@@ -45,8 +45,8 @@ describe('Werbemittel für Sponsored Brands', () => {
         adTitle: 'x'.repeat(33),
       }),
     ).toEqual(['brandName', 'logoAssetId', 'adTitle']);
-    expect(
-      creativeFormIssues({ ...emptyCreativeForm(), brandName: 'x'.repeat(31) }),
-    ).toEqual(['brandName']);
+    expect(creativeFormIssues({ ...emptyCreativeForm(), brandName: 'x'.repeat(31) })).toEqual([
+      'brandName',
+    ]);
   });
 });
