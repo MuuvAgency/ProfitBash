@@ -260,10 +260,11 @@ export const BUDGET_TYPES = valueMap({
 export const COST_TYPES = valueMap({ CPC: ['cpc'], VCPM: ['vcpm'] });
 
 /** Budget-Linie der Portfolios (Portfolios-API: `budget.policy`). Deutsch bis auf „Keine Obergrenze“ ungeprüft. */
+// Dazu die Schreibweise des Guides zum Anlegen (`noCap`, `monthlyRecurring`, `dateRange`, 4.7).
 export const BUDGET_POLICIES = valueMap({
-  NO_CAP: ['No Cap', 'Keine Obergrenze'],
-  MONTHLY_RECURRING: ['Monthly Recurring', 'Monatlich wiederkehrend'],
-  DATE_RANGE: ['Date Range', 'Datumsbereich'],
+  NO_CAP: ['No Cap', 'Keine Obergrenze', 'noCap'],
+  MONTHLY_RECURRING: ['Monthly Recurring', 'Monatlich wiederkehrend', 'monthlyRecurring'],
+  DATE_RANGE: ['Date Range', 'Datumsbereich', 'dateRange'],
 });
 
 export interface MappedValue {

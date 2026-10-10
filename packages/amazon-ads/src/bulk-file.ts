@@ -947,3 +947,72 @@ export function buildBulkSheet(
 /** Zeilen des Blatts „Sponsored Products Campaigns“. */
 export const buildSpBulkSheet = (changes: readonly BulkFileChange[]): BulkSheet =>
   buildBulkSheet('sp', changes);
+
+// ---------------------------------------------------------------------------
+// Portfolios anlegen (`docs/tasks/phase-4.md` 4.7, F9)
+// ---------------------------------------------------------------------------
+
+/**
+ * Blatt „Portfolios“ (Guide „Use portfolios with bulksheets“): Product „Portfolios“, Entity „Portfolio“, Operation
+ * „Create“, Portfolio ID leer, Name Pflicht. Ein Budget braucht Betrag, Währung des Marktplatzes, Policy
+ * (`dateRange` | `monthlyRecurring`) und Startdatum; das Enddatum ist optional und später nicht mehr änderbar. Ohne
+ * Budget bleiben die Budget-Spalten leer (keine Obergrenze). Kampagnen lassen sich erst nach dem nächsten Import
+ * zuordnen: Die neue Portfolio-ID kennt erst die nächste heruntergeladene Datei.
+ */
+export const PORTFOLIO_BULK_SHEET_NAME = 'Portfolios';
+export const PORTFOLIO_BULK_COLUMNS = [
+  'Product',
+  'Entity',
+  'Operation',
+  'Portfolio ID',
+  'Portfolio Name',
+  'Budget Amount',
+  'Budget Currency Code',
+  'Budget Policy',
+  'Budget Start Date',
+  'Budget End Date',
+] as const;
+
+export type BulkFilePortfolioBudgetPolicy = 'dateRange' | 'monthlyRecurring';
+
+export interface BulkFilePortfolioCreate {
+  ref: string;
+  name: string;
+  budget: {
+    amount: string;
+    currencyCode: string;
+    policy: BulkFilePortfolioBudgetPolicy;
+    /** `YYYY-MM-DD`. */
+    startDate: string;
+    endDate: string | null;
+  } | null;
+}
+
+export function buildPortfolioBulkSheet(creates: readonly BulkFilePortfolioCreate[]): BulkSheet {
+  const rows: BulkFileCell[][] = [[...PORTFOLIO_BULK_COLUMNS]];
+  const skipped: BulkSheet['skipped'] = [];
+  const seen = new Set<string>();
+  for (const create of creates) {
+    try {
+      const name = text(create.name);
+      const key = name.toLowerCase();
+      if (seen.has(key)) throw new Skip('duplicate');
+      const budget = create.budget;
+      let cells: BulkFileCell[] = [null, null, null, null, null];
+      if (budget !== null) {
+        if (!/^[A-Z]{3}$/.test(budget.currencyCode)) throw invalid();
+        if (budget.policy !== 'dateRange' && budget.policy !== 'monthlyRecurring') throw invalid();
+        const start = date(budget.startDate);
+        const end = budget.endDate === null ? null : date(budget.endDate);
+        if (end !== null && end < start) throw invalid();
+        cells = [amount(budget.amount), budget.currencyCode, budget.policy, start, end];
+      }
+      seen.add(key);
+      rows.push(['Portfolios', 'Portfolio', 'Create', null, name, ...cells]);
+    } catch (error) {
+      if (!(error instanceof Skip)) throw error;
+      skipped.push({ ref: create.ref, reason: error.reason });
+    }
+  }
+  return { sheetName: PORTFOLIO_BULK_SHEET_NAME, rows, skipped };
+}
