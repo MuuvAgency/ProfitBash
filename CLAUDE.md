@@ -41,6 +41,10 @@ Regeln für generierte better-auth-Tabellen als eigene SQL-Migration (`drizzle-k
   - Neue Logik und Bugfixes mit `superpowers:test-driven-development`: Test zuerst, Fehlschlag (RED) prüfen, dann Code.
   - Nach jeder abgeschlossenen Aufgabe `superpowers:requesting-code-review` (unabhängiger Reviewer), Befunde fixen oder begründet zurückweisen.
   - Vor jeder „fertig"-Meldung `superpowers:verification-before-completion`: gesamte Suite, typecheck, lint, build.
+- **Ponytail-Plugin nutzen (Dominik, 2026-10-10):** immer aktiv (Stufe `full`): kleinste vollständige Änderung, Vorhandenes
+  wiederverwenden, keine Abstraktion auf Vorrat; bekannte Abkürzungen als `shortcut:`-Kommentar. Nach jeder Aufgabe
+  zusätzlich `ponytail:ponytail-review` auf den Diff. TDD, Validierung an Grenzen, Audit, Access-Layer und die Zustände
+  im Frontend werden dadurch nie gekürzt. Jede Antwort endet mit: was ausgelassen oder nicht geprüft wurde, und Risiken.
 - **Bis zu drei Aufgabenpunkte je Session** (z. B. 2.3–2.5) in der Reihenfolge der Phasen-Datei (Dominik, 2026-09-28).
   Je Aufgabe ein eigener Branch von main, Review, Verifikation und PR. Fragen an Dominik möglichst zu Beginn der Session
   sammeln, damit danach ohne Unterbrechung gearbeitet werden kann. Der Stand steht im Repo (`docs/`), nicht im Chat.
