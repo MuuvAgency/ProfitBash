@@ -321,4 +321,41 @@ describe('buildSetupBulkFile', () => {
     ]);
     expect(read(file.content!).rows.map((row) => row['Keyword Text'])).toContain('trinkflasche');
   });
+
+  it('schreibt neue Portfolios ins Blatt „Portfolios“ und das Portfolio an neue Kampagnen (4.7)', () => {
+    const portfolioRow = item(
+      {
+        entity: 'portfolio',
+        name: 'Garten',
+        budget: {
+          amount: '500.00',
+          currencyCode: 'EUR',
+          policy: 'monthlyRecurring',
+          startDate: '2026-11-01',
+          endDate: null,
+        },
+      },
+      { campaignRef: 'Garten', adGroupRef: null },
+    );
+    const file = buildSetupBulkFile([portfolioRow], {
+      countryCode: 'DE',
+      accountType: 'seller',
+      startDate: '2026-10-10',
+    });
+    expect(file.rows).toBe(1);
+    const workbook = openXlsx(file.content!);
+    expect(workbook.sheets.map((sheet) => sheet.name)).toEqual(['Portfolios']);
+    const rows: string[][] = [];
+    workbook.forEachRow('Portfolios', (cells) => rows.push(cells));
+    expect(rows[1]).toEqual(
+      expect.arrayContaining(['Portfolios', 'Portfolio', 'Create', 'Garten', 'monthlyRecurring']),
+    );
+
+    const withPortfolio = buildSetupBulkFile([campaign({ amazonPortfolioId: '7001' })], {
+      countryCode: 'DE',
+      accountType: 'seller',
+      startDate: '2026-10-10',
+    });
+    expect(read(withPortfolio.content!).rows[0]).toMatchObject({ 'Portfolio ID': '7001' });
+  });
 });

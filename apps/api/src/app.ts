@@ -17,6 +17,7 @@ import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMemberRoutes } from './routes/members';
 import { registerMeRoutes } from './routes/me';
 import { registerCampaignSetupRoutes } from './routes/campaign-setup';
+import { registerPortfolioRoutes } from './routes/portfolios';
 import { registerProductGroupRoutes } from './routes/product-groups';
 import { registerStructureCatalogRoutes } from './routes/structure-catalog';
 import { registerTagRoutes } from './routes/tags';
@@ -108,6 +109,7 @@ export function createApp(options: CreateAppOptions) {
   registerMemberRoutes(app, deps);
   registerProductGroupRoutes(app, deps);
   registerCampaignSetupRoutes(app, deps);
+  registerPortfolioRoutes(app, deps);
   registerStructureCatalogRoutes(app, deps);
 
   app.doc31('/openapi.json', {

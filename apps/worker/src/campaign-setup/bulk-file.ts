@@ -1,4 +1,10 @@
-import { buildSpBulkSheet, type BulkFileChange, type BulkFileCreate } from '@profitbash/amazon-ads';
+import {
+  buildPortfolioBulkSheet,
+  buildSpBulkSheet,
+  type BulkFileChange,
+  type BulkFileCreate,
+  type BulkFilePortfolioCreate,
+} from '@profitbash/amazon-ads';
 import type { CampaignSetupItemRow } from '@profitbash/db';
 import { writeXlsx } from '@profitbash/sheets';
 import { BULK_FILE_SKIPS } from '../ad-changes/bulk-file';
@@ -15,6 +21,7 @@ import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
  * Off-Amazon (F-S7): Die Spalte gibt es laut Guide nur in den USA. Dort schreibt die Datei „Limit off-Amazon spend“,
  * außer der Baustein wurde bewusst freigeschaltet („Increase reach“); sonst bleibt sie leer (Amazons Standard).
  *
+ * Neue Portfolios (4.7) stehen im Blatt „Portfolios“; neue Kampagnen tragen das bestehende Portfolio des Entwurfs.
  * Negatives in der Quelle eines Harvest-Begriffs (4.6) nennen die echten IDs der bestehenden Kampagne und Ad Group.
  *
  * Was nicht in die Datei passt, scheitert mit Grund (`skipped`); Kinder einer Kampagne oder Ad Group, die nicht in
@@ -59,7 +66,8 @@ function toCreate(
         startDate: context.startDate,
         // Nur SP-Kampagnen kommen hierher; ohne Strategie gilt Amazons Standard „nur senken“.
         biddingStrategy: payload.biddingStrategy ?? 'SALES_DOWN_ONLY',
-        amazonPortfolioId: null,
+        // Bestehendes Portfolio des Entwurfs (4.7, F9).
+        amazonPortfolioId: payload.amazonPortfolioId ?? null,
         offAmazon:
           context.countryCode === 'US'
             ? payload.offAmazon
@@ -122,6 +130,9 @@ function toCreate(
       };
     case 'negative_product_target':
       return { type: 'create', entity: 'negativeProductTarget', ...parents, asin: payload.asin };
+    case 'portfolio':
+      // Steht im Blatt „Portfolios“ (`buildSetupBulkFile`), nie im SP-Blatt.
+      throw new Error('Portfolio-Zeilen gehören ins Blatt „Portfolios“.');
     case 'source_negative':
       return payload.negative.type === 'keyword'
         ? {
@@ -156,6 +167,8 @@ export function buildSetupBulkFile(
    */
   const parents = new Map<string, string | 'waiting'>();
   const changes: BulkFileChange[] = [];
+  // Neue Portfolios (4.7): eigenes Blatt, ohne Eltern.
+  const portfolios: BulkFilePortfolioCreate[] = [];
 
   // Die Zeilen sind nach Position sortiert: Eltern stehen vor ihren Kindern.
   for (const row of items) {
@@ -168,6 +181,10 @@ export function buildSetupBulkFile(
       continue;
     }
     if (row.status !== 'submitted') continue;
+    if (row.payload.entity === 'portfolio') {
+      portfolios.push({ ref: row.id, name: row.payload.name, budget: row.payload.budget });
+      continue;
+    }
 
     // Negatives in der Quelle (4.6) gehören zu bestehenden Kampagnen: echte IDs aus der Zeile.
     const source = row.payload.entity === 'source_negative' ? row.payload : null;
@@ -228,12 +245,18 @@ export function buildSetupBulkFile(
   changes.length = 0;
   changes.push(...kept);
 
-  const sheet = buildSpBulkSheet(changes);
-  for (const { ref, reason } of sheet.skipped)
-    skipped.push({ itemId: ref, ...BULK_FILE_SKIPS[reason] });
-  const count = sheet.rows.length - 1;
+  const sheets = [buildPortfolioBulkSheet(portfolios), buildSpBulkSheet(changes)];
+  for (const sheet of sheets) {
+    for (const { ref, reason } of sheet.skipped)
+      skipped.push({ itemId: ref, ...BULK_FILE_SKIPS[reason] });
+  }
+  const filled = sheets.filter((sheet) => sheet.rows.length > 1);
+  const count = filled.reduce((sum, sheet) => sum + sheet.rows.length - 1, 0);
   return {
-    content: count > 0 ? writeXlsx([{ name: sheet.sheetName, rows: sheet.rows }]) : null,
+    content:
+      count > 0
+        ? writeXlsx(filled.map((sheet) => ({ name: sheet.sheetName, rows: sheet.rows })))
+        : null,
     rows: count,
     skipped,
     waiting,
