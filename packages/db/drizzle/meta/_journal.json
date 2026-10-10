@@ -281,6 +281,13 @@
       "when": 1791658128632,
       "tag": "0039_automation_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791659406909,
+      "tag": "0040_automation_rules",
+      "breakpoints": true
     }
   ]
 }

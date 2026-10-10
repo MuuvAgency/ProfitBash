@@ -28,7 +28,8 @@ import {
 
 export class AutomationError extends Error {
   constructor(
-    public readonly code: 'FORBIDDEN' | 'NOT_FOUND' | 'INVALID_RESPONSIBLE',
+    public readonly code:
+      'FORBIDDEN' | 'NOT_FOUND' | 'INVALID_RESPONSIBLE' | 'VERSION_CONFLICT' | 'UNKNOWN_CLIENT',
     message: string,
   ) {
     super(message);
