@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1–4.7. Nächster Schritt: 4.8.
+> Datei). Fertig: 4.1–4.8. Nächster Schritt: 4.9.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -496,9 +496,36 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     einer Portfolio-Datei steht aus.
 
 ### 4.8 Gebots-Stack-Simulator (`packages/engine`, `apps/web`)
-- [ ] **Vorher gegen die aktuelle Amazon-Doku prüfen**, wie Strategie, Platzierung, Zielgruppen- und B2B-Anpassung
+- [x] **Vorher gegen die aktuelle Amazon-Doku prüfen**, wie Strategie, Platzierung, Zielgruppen- und B2B-Anpassung
       zusammenwirken (Ideen-Dokument D nennt Annahmen aus Folien).
-- [ ] Engine-Funktion ohne I/O (Spanne je Platzierung), Seite bzw. Aufruf aus dem Explorer (F12).
+- [x] Engine-Funktion ohne I/O (Spanne je Platzierung), Seite bzw. Aufruf aus dem Explorer (F12).
+- [x] Umsetzung (Stand für 4.9 und später):
+  - **Doku-Befund (2026-10-10):** SP-v3-Spec (`SponsoredProductsPlacement`, `shopperCohortBidding`,
+    `SponsoredProductsBiddingStrategy`) und Amazon-Guide „Dynamische Gebote“ (`advertising.amazon.com/library/guides/
+    dynamic-bidding-sponsored-products`). Platzierungen (oben, Produktseiten, Rest der Suche) und Amazon Business
+    (`SITE_AMAZON_BUSINESS`) je 0–900 %, **multiplikativ** (Beispiel der Spec: 1,00 × 1,5 oben × 2 Business = 3,00).
+    Zielgruppen (`shopperCohortBidding`, höchstens 10 je Kampagne, je 0–900 %) wirken auf das schon angepasste Gebot
+    (Beispiel: 1,00 × 1,5 × 2 = 3,00). „Dynamisch erhöhen und senken“ ändert das Gebot laut aktuellem Guide auf
+    **allen** Platzierungen um bis zu ±100 % (1,00 → höchstens 2,00); die Aufteilung „oben +100 %, sonst +50 %“ aus
+    dem Ideen-Dokument D stammt aus älteren Seiten und gilt nicht mehr. „Nur senken“ bis −100 %, „fest“ unverändert.
+    Dass die Strategie auf das angepasste Gebot wirkt, ist Amazons Rechnung in der Werbekonsole; die Spec beziffert
+    es nicht ausdrücklich (Annahme). Regelbasierte Gebote beziffert Amazon nicht (Hinweis). Welche von mehreren
+    passenden Zielgruppen gilt, sagt die Doku nicht: Der Simulator rechnet je Zielgruppe eine Zeile.
+  - **Engine** (`packages/engine/src/bid-stack.ts`, `simulateBidStack`): Zeilen je Platzierung × Amazon Business
+    (falls gesetzt) × Zielgruppe (ohne und je eine) mit Faktor, Mindest- und Höchstgebot (zwei Stellen, half-even)
+    und dem höchsten Gebot insgesamt; ungültige Eingaben (`RangeError`): Gebot ≤ 0, Anpassung außerhalb 0–900 oder
+    nicht ganzzahlig, mehr als 10 Zielgruppen.
+  - **Seite** `/ads/tools/bid-simulator` (Reiter „Gebots-Simulator“, Feature `tools`, `view`): rechnet im Browser,
+    lädt keine Daten. Eingaben Basisgebot, Strategie, drei Platzierungen, Amazon Business, Zielgruppen (bis 10);
+    Tabelle mit Faktor, mindestens, höchstens; Fehlerhinweis statt Tabelle bei ungültigen Werten.
+  - **Aufruf aus dem Explorer (F12):** In der Leiste markierter Zeilen erscheint für genau eine SP-Kampagne „Gebot
+    simulieren“ (wie „Strategie und Platzierungen“); der Link trägt Strategie, Platzierungen, Amazon Business,
+    Währung und Namen als wenige Query-Werte (`simulatorLink`, keine IDs). Das Basisgebot trägt man ein (es gilt je
+    Keyword bzw. Ad Group, nicht je Kampagne).
+  - **Offen bzw. bewusst so:** Kein CPC-Bezug aus echten Platzierungsdaten (Ideen-Dokument D) und kein gestapelter
+    Balken: Die Platzierungsberichte liegen ProfitBash noch nicht vor. SB und SD rechnet der Simulator nicht (andere
+    Regeln, kommt bei Bedarf mit 4.9/4.10). Zielgruppen-Anpassungen bestehender Kampagnen kennt der Import nicht;
+    sie werden von Hand eingetragen.
 
 ### 4.9 Setup für Sponsored Display (F1)
 - [ ] Bausteine `SD-CAT`, `SD-PAT`, `SD-RT-VIEWS`, `SD-RT-PURCHASE` anlegen: Kampagne (Taktik, **nur CPC**, vCPM gesperrt nach
