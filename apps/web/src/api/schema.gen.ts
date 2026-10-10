@@ -8323,18 +8323,18 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 name: string;
-                goal: components["schemas"]["Goal"];
+                goal: components["schemas"]["Goal"] | null;
                 profiles: {
                     /** Format: uuid */
                     id: string;
                     accountName: string;
                     countryCode: string;
-                    goal: components["schemas"]["Goal"];
+                    goal: components["schemas"]["Goal"] | null;
                     productGroups: {
                         /** Format: uuid */
                         id: string;
                         name: string;
-                        goal: components["schemas"]["Goal"];
+                        goal: components["schemas"]["Goal"] | null;
                     }[];
                 }[];
             }[];
@@ -8343,12 +8343,12 @@ export interface components {
                 id: string;
                 accountName: string;
                 countryCode: string;
-                goal: components["schemas"]["Goal"];
+                goal: components["schemas"]["Goal"] | null;
                 productGroups: {
                     /** Format: uuid */
                     id: string;
                     name: string;
-                    goal: components["schemas"]["Goal"];
+                    goal: components["schemas"]["Goal"] | null;
                 }[];
             }[];
         };
@@ -8361,7 +8361,7 @@ export interface components {
             acos: string;
             roas: string;
             updatedAt: string;
-        } | null;
+        };
         SetGoalRequest: {
             scope: {
                 /** @enum {string} */
