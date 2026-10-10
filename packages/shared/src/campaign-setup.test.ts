@@ -74,8 +74,10 @@ describe('saveCampaignSetupDraftSchema', () => {
       brandTerms: [],
       productTargets: [],
       categories: [],
+      harvest: [],
       unlocks: {},
     });
+    expect(parsed.sourceNegatives).toEqual([]);
   });
 
   it('begrenzt die Zahl der Kampagnen', () => {
