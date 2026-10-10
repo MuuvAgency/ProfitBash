@@ -243,9 +243,11 @@ const revertible = computed(() => (selected.value?.changes ?? []).some(canRevert
 const downloadable = computed(
   () =>
     isBulkFile.value &&
-    (selected.value?.changes ?? []).some(
+    ((selected.value?.changes ?? []).some(
       (change) => change.status === 'submitted' || change.status === 'applied',
-    ),
+    ) ||
+      // Anlagen eines Setups bzw. ein neues Portfolio (4.4, 4.7): Die Datei enthält die offenen Zeilen.
+      (selected.value?.setupItems ?? []).some((item) => item.status === 'submitted')),
 );
 
 function changeStatusText(change: SubmittedAdChangeData): string {
@@ -452,7 +454,7 @@ const conflictRows = computed(() =>
             </p>
           </div>
           <div v-if="canWrite" class="flex flex-wrap items-end gap-space-sm">
-            <div v-if="selected.submission.kind !== 'setup'" class="flex flex-col gap-space-xs">
+            <div v-if="selected.submission.kind === 'changes'" class="flex flex-col gap-space-xs">
               <label :for="`${id}-channel`" class="text-label-eyebrow uppercase text-ink-tertiary">
                 {{ t('changes.action.channel') }}
               </label>

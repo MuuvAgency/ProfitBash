@@ -37,7 +37,7 @@ const code = async (promise: Promise<unknown>) => {
 const budget = {
   amount: '500.00',
   policy: 'monthlyRecurring',
-  startDate: '2026-11-01',
+  startDate: '2099-11-01',
   endDate: null,
 } as const;
 
@@ -131,6 +131,39 @@ describe('createPortfolioRequest', () => {
         }),
       ),
     ).toBe('NAME_TAKEN');
+  });
+
+  it('lehnt ein Budget ab, das vor heute (Zeitzone des Profils) beginnt', async () => {
+    expect(
+      await code(
+        createPortfolioRequest(testDb.db, {
+          ...as(f.ada),
+          request: {
+            profileId: f.profile,
+            name: 'Vergangen',
+            budget: { ...budget, startDate: '2020-01-01' },
+          },
+          now: new Date('2026-10-10T10:00:00Z'),
+        }),
+      ),
+    ).toBe('START_IN_PAST');
+  });
+
+  it('gibt den Namen frei, wenn die Datei als hochgeladen gilt, der Import das Portfolio aber nicht zeigt', async () => {
+    const first = await createPortfolioRequest(testDb.db, {
+      ...as(f.ada),
+      request: { profileId: f.profile, name: 'Garten', budget: null },
+    });
+    await closeBulkFileSubmission(testDb.db, {
+      ...as(f.ada),
+      submissionId: first!.submission.id,
+      outcome: 'applied',
+    });
+    const second = await createPortfolioRequest(testDb.db, {
+      ...as(f.ada),
+      request: { profileId: f.profile, name: 'Garten', budget: null },
+    });
+    expect(second!.submission.kind).toBe('portfolio');
   });
 
   it('kennt nur sichtbare Profile und liefert null für Nicht-Mitglieder', async () => {

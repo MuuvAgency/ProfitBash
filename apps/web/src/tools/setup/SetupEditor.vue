@@ -84,6 +84,13 @@ const portfolioId = ref<string | null>(props.draft?.portfolioId ?? null);
 const portfolios = usePortfolios(profileId);
 const portfolioChoices = computed(() => portfolios.data.value?.portfolios ?? []);
 const pendingPortfolios = computed(() => portfolios.data.value?.pending ?? []);
+/** Das Portfolio eines Entwurfs ist nach dem Laden nicht mehr in der Liste (entfernt). */
+const portfolioMissing = computed(
+  () =>
+    portfolioId.value !== null &&
+    portfolios.data.value !== undefined &&
+    !portfolioChoices.value.some((item) => item.id === portfolioId.value),
+);
 const name = ref(props.draft?.name ?? '');
 const paused = ref(props.draft?.campaignState === 'PAUSED');
 // Eigene Kopie: Die Vorschau ist bearbeitbar, der Cache von Vue Query bleibt unberührt (structuredClone scheitert an
@@ -446,6 +453,22 @@ function close() {
         <RouterLink to="/ads/tools/portfolios" class="font-semibold text-violet underline">{{
           t('setup.portfolio.manage')
         }}</RouterLink>
+      </p>
+      <InlineError
+        v-if="portfolios.isError.value"
+        data-setup-portfolio-error
+        :message="t('setup.portfolio.loadFailed')"
+        retryable
+        :retrying="portfolios.isFetching.value"
+        @retry="portfolios.refetch()"
+      />
+      <p
+        v-if="portfolioMissing"
+        data-setup-portfolio-missing
+        role="alert"
+        class="text-body-sm text-on-loss-wash"
+      >
+        {{ t('setup.portfolio.missing') }}
       </p>
       <p
         v-if="pendingPortfolios.length"
