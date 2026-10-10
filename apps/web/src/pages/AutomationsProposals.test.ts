@@ -93,7 +93,7 @@ async function mountTab(
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector);
 const row = (id: string) => $(`[data-proposal-row="${id}"]`)!;
-const text = (element: Element) => element.textContent!.replace(/ /g, ' ');
+const text = (element: Element) => element.textContent!.replaceAll('\u00a0', ' ');
 const posts = (requests: RecordedRequest[]) =>
   requests.filter((r) => r.method === 'POST').map((r) => [r.path, r.body]);
 async function click(element: HTMLElement | null | undefined) {
