@@ -1,5 +1,5 @@
 {
-  "id": "ecba9a5f-cdfe-4010-b3fd-c5c1c9c118c1",
+  "id": "36098d1d-50db-4591-b85a-84822841b666",
   "prevId": "2f484284-0e56-4cbb-9a72-aa4ededa55f4",
   "version": "7",
   "dialect": "postgresql",
@@ -3393,6 +3393,57 @@
               "expression": "imported_at",
               "isExpression": false,
               "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "amazon_ads_entity_period_metrics_latest_idx": {
+          "name": "amazon_ads_entity_period_metrics_latest_idx",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "level",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "amazon_campaign_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "amazon_entity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ad_product",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "imported_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_end",
+              "isExpression": false,
+              "asc": false,
               "nulls": "last"
             }
           ],

@@ -67,15 +67,25 @@ const REQUIRED: readonly MetricColumn[] = [
   'units',
 ];
 
-/** Spalten der Kennzahlen laut Kopfzeile; `null`, wenn eine Pflichtspalte fehlt. */
-export function mapMetricHeader(header: readonly string[]): Map<MetricColumn, number> | null {
+/**
+ * Spalten der Kennzahlen laut Kopfzeile. `columns` ist `null`, wenn eine Pflichtspalte fehlt; `missing` nennt sie,
+ * wenn das Blatt einen Teil der Pflichtspalten hat (abweichender Spaltenname statt abgewählter Leistungsdaten).
+ */
+export function mapMetricHeader(header: readonly string[]): {
+  columns: Map<MetricColumn, number> | null;
+  missing: string[];
+} {
   const result = new Map<MetricColumn, number>();
   header.forEach((text, index) => {
-    const views = VIEWS_SUFFIX.test(text.replace(/[   ]/g, ' ').trim());
+    const views = VIEWS_SUFFIX.test(text.replace(/[\u00a0\u2007\u202f]/g, ' ').trim());
     const column = (views ? VIEWS : PLAIN).get(normalizeHeader(text));
     if (column && !result.has(column)) result.set(column, index);
   });
-  return REQUIRED.every((column) => result.has(column)) ? result : null;
+  const missing = REQUIRED.filter((column) => !result.has(column));
+  if (missing.length === 0) return { columns: result, missing: [] };
+  if (missing.length === REQUIRED.length) return { columns: null, missing: [] };
+  // Deutscher Name für Meldungen (der letzte Alias).
+  return { columns: null, missing: missing.map((column) => ALIASES.plain[column]!.at(-1)!) };
 }
 
 /**
