@@ -12,6 +12,7 @@ import { registerAnalyticsRoutes } from './routes/analytics';
 import { registerClientRoutes } from './routes/clients';
 import { registerConnectionRoutes } from './routes/connections';
 import { isFileUpload, registerFileImportRoutes } from './routes/file-imports';
+import { registerAutomationRoutes } from './routes/automations';
 import { registerGoalRoutes } from './routes/goals';
 import { registerHealthRoutes } from './routes/health';
 import { registerJobRunRoutes } from './routes/job-runs';
@@ -115,6 +116,7 @@ export function createApp(options: CreateAppOptions) {
   registerStructureCatalogRoutes(app, deps);
   registerNotificationRoutes(app, deps);
   registerGoalRoutes(app, deps);
+  registerAutomationRoutes(app, deps);
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

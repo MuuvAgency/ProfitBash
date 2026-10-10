@@ -6027,6 +6027,205 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/automations/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Leitplanken der Organisation und Einstellungen der sichtbaren Clients */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Einstellungen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationSettings"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/automations/settings/defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Leitplanken der Organisation speichern (nur Org-Admins) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["Guardrails"];
+                };
+            };
+            responses: {
+                /** @description Einstellungen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationSettings"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/automations/settings/clients/{clientId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Modus, zuständigen Nutzer und Leitplanken eines Clients setzen (Recht „write“) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    clientId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetClientAutomationRequest"];
+                };
+            };
+            responses: {
+                /** @description Einstellungen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationSettings"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Client nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8382,6 +8581,50 @@ export interface components {
             unitCost: string;
             fees: string;
             margin: string;
+        };
+        AutomationSettings: {
+            defaults: components["schemas"]["Guardrails"];
+            canEditDefaults: boolean;
+            clients: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** @enum {string} */
+                mode: "off" | "shadow" | "cart";
+                /** Format: uuid */
+                responsibleUserId: string | null;
+                overrides: components["schemas"]["GuardrailOverrides"];
+            }[];
+            members: {
+                /** Format: uuid */
+                userId: string;
+                name: string;
+            }[];
+        };
+        Guardrails: {
+            maxBidChangePercent: number;
+            bidFloorCpcPercent: number;
+            bidFloorEur: string | null;
+            maxBidEur: string | null;
+            minClicks: number;
+            minSpendEur: string;
+            maxBudgetDecreasePercent: number;
+        };
+        GuardrailOverrides: {
+            maxBidChangePercent?: number;
+            bidFloorCpcPercent?: number;
+            bidFloorEur?: string | null;
+            maxBidEur?: string | null;
+            minClicks?: number;
+            minSpendEur?: string;
+            maxBudgetDecreasePercent?: number;
+        };
+        SetClientAutomationRequest: {
+            /** @enum {string} */
+            mode: "off" | "shadow" | "cart";
+            /** Format: uuid */
+            responsibleUserId: string | null;
+            overrides: components["schemas"]["GuardrailOverrides"];
         };
     };
     responses: never;
