@@ -259,6 +259,31 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
 - [ ] API hinter `requireFeature('goals', …)`, Seite mit Liste je Client, Bearbeiten, Rechner im Dialog; TACoS und Wachstum
       als Hinweis „braucht Umsatzdaten (Phase 7)“. Navigation (`phase: 6` → 5) und Platzhaltertext anpassen.
 
+- **Stand (2026-10-10, in Arbeit, Branch `5.3-goals`):**
+  - **Fertig, mit Tests:** Engine `packages/engine/src/goals.ts` (`goalValues`: ACoS in Prozent ↔ ROAS = 100 / ACoS,
+    gesetzter Wert exakt, der andere auf zwei Stellen; `effectiveGoal`: Produktgruppe vor Profil vor Client, bei
+    mehreren Gruppen das strengste Ziel; `calculateTargetAcos`: Break-even = (Preis − Kosten − Gebühren) / Preis,
+    Ziel = Break-even − Marge, `null`, wenn nichts bleibt). Shared `packages/shared/src/goals.ts` (`GOAL_METRICS`,
+    `GOAL_SCOPES`, Grenzen ACoS über 0 bis 100 %, ROAS 1 bis 100, höchstens zwei Nachkommastellen, Komma erlaubt;
+    `setGoalRequestSchema`, `goalSchema`, `goalsOverviewSchema`, `targetAcosRequestSchema`/`…ResponseSchema`).
+  - **Entwurf für den Rest (Claude, noch nicht gebaut):**
+    - Tabelle `goals`: Organisation, genau eins von `client_id` | `profile_id` | `product_group_id` (Check), `metric`
+      (`acos` | `roas`), `value` (`numeric`), `created_by`/`updated_by`, Zeitstempel; je Ziel-Objekt höchstens ein Ziel
+      (Teil-Unique-Indizes); zusammengesetzte Fremdschlüssel auf Client und Profil (`ON DELETE CASCADE`), für
+      Produktgruppen dazu `unique (id, organization_id)` an `product_groups` ergänzen.
+    - `packages/db/src/goals.ts`: `getGoalsOverview` (über `listVisibleClientsAndProfiles`: Clients mit sichtbarem
+      Profil, Profile ohne Client, Produktgruppen der sichtbaren Profile, je mit Ziel), `setGoal` (Upsert je Ziel-Objekt,
+      nur sichtbare Objekte, Audit `goal.set` mit vorher/nachher), `deleteGoal` (Audit `goal.delete`). Tests: fremde
+      Organisation, ausgeblendetes Profil, Client ohne sichtbares Profil.
+    - API hinter `requireFeature('goals', …)`: `GET /ads/goals` (Übersicht, `view`), `PUT /ads/goals` (`write`),
+      `DELETE /ads/goals/{id}` (`write`), `POST /ads/goals/calculate` (Rechner auf dem Server, weil das Web kein
+      `decimal.js` hat, ADR 003; `view`). Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
+    - Seite `/ads/goals`: je Client eine Kachel mit Ziel des Clients, darunter Profile und Produktgruppen mit eigenem
+      oder geerbtem Ziel („gilt vom Client“), Bearbeiten im Dialog (ACoS oder ROAS, der andere Wert als Vorschau),
+      Rechner im Dialog („als Ziel übernehmen“ setzt den Ziel-ACoS), Hinweis TACoS/Wachstum „braucht Umsatzdaten
+      (Phase 7)“; Loading, Empty, Error. Navigation `goals`: `phase: 6` → 5, Platzhaltertext `placeholder…goals`
+      anpassen, Seite in `PAGES` (`router/index.ts`).
+
 ### 5.4 Leitplanken und Automations-Einstellungen (`packages/shared`, `packages/db`, `apps/api`, `apps/web`)
 - [ ] Einstellungen je Organisation mit eigenen Startwerten, je Client überschreibbar (F-S6): höchste Gebotsänderung je
       7 Tage (%), Gebotsboden (% des CPC und absolut), höchstes Gebot, Mindestdaten für einen Vorschlag (Klicks,
