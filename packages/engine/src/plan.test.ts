@@ -6,7 +6,7 @@ import {
 } from '@profitbash/shared/structure-catalog';
 import { describe, expect, it } from 'vitest';
 import type { AdChangeLimitLookup } from './ad-changes';
-import { buildCampaignPlan, type PlanInput, type PlannedCampaign } from './plan';
+import { buildCampaignPlan, planSetupItems, type PlanInput, type PlannedCampaign } from './plan';
 
 const catalog: StructureCatalog = DEFAULT_STRUCTURE_CATALOG;
 const preset = (key: string): CatalogPreset => catalog.presets.find((p) => p.key === key)!;
@@ -628,4 +628,68 @@ describe('buildCampaignPlan: Review-Befunde', () => {
       matchType: 'negativeExact',
     });
   });
+});
+
+/**
+ * Abschluss (`phase-4.md` 4.11, Definition of Done „Tests je Baustein und Preset“): Jedes Start-Preset und jeder
+ * Baustein des Katalogs ergibt mit vollständigen Eingaben gültige Kampagnen ohne Fehler, und jede Kampagne wird zu
+ * anlegbaren Zeilen der Übermittlung.
+ */
+describe('buildCampaignPlan: alle Presets und Bausteine (4.11)', () => {
+  const full = (overrides: Partial<PlanInput> = {}) =>
+    base({
+      productGroup: {
+        name: 'Flaschen',
+        items: [
+          { asin: 'B0FLASCHE1', sku: 'FL-750', isHero: true },
+          { asin: 'B0FLASCHE2', sku: 'FL-500', isHero: false },
+          { asin: 'B0FLASCHE3', sku: 'FL-1000', isHero: false },
+        ],
+      },
+      conquestAsins: ['B0KONKUR01'],
+      ...overrides,
+    });
+  const creative = {
+    brandEntityId: 'ENTITY1',
+    brandName: 'Waldkauz',
+    logoAssetId: null,
+    videoAssetId: 'amzn1.assetlibrary.asset1.video',
+    adTitle: null,
+  };
+
+  it.each(DEFAULT_STRUCTURE_CATALOG.presets.map((entry) => entry.key))(
+    'plant das Preset „%s“ ohne Fehler, jeder Baustein mit Kampagne oder Grund',
+    (key) => {
+      const plan = buildCampaignPlan(full({ preset: preset(key) }));
+      expect(plan.hints.filter((hint) => hint.severity === 'error')).toEqual([]);
+      for (const campaign of plan.campaigns) {
+        expect(plannedCampaignSchema.safeParse(campaign).success, campaign.name).toBe(true);
+      }
+      for (const entry of preset(key).blocks) {
+        const planned = byBlock(plan.campaigns, entry.block).length > 0;
+        const skipped = plan.hints.some((hint) => 'block' in hint && hint.block === entry.block);
+        expect(planned || skipped, entry.block).toBe(true);
+      }
+      const items = planSetupItems(plan.campaigns, { campaignState: 'ENABLED', creative });
+      expect(items.filter((item) => !item.supported)).toEqual([]);
+    },
+  );
+
+  it.each(DEFAULT_STRUCTURE_CATALOG.blocks.map((block) => block.key))(
+    'legt für den Baustein „%s“ Kampagnen seiner Art an',
+    (key) => {
+      const block = catalog.blocks.find((entry) => entry.key === key)!;
+      const plan = buildCampaignPlan(full({ preset: onlyBlocks(key) }));
+      expect(plan.hints.filter((hint) => hint.severity === 'error')).toEqual([]);
+      const campaigns = byBlock(plan.campaigns, key);
+      expect(campaigns.length).toBeGreaterThan(0);
+      for (const campaign of campaigns) {
+        expect(campaign).toMatchObject({ adProduct: block.adProduct, targeting: block.targeting });
+        expect(campaign.ads.length).toBeGreaterThan(0);
+        if (block.targeting !== 'auto') expect(campaign.targets.length).toBeGreaterThan(0);
+      }
+      const items = planSetupItems(campaigns, { campaignState: 'ENABLED', creative });
+      expect(items.every((item) => item.supported)).toBe(true);
+    },
+  );
 });
