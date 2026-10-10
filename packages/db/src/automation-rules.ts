@@ -193,10 +193,21 @@ export async function previewAutomationRules(
         id: amazonAdsCampaigns.id,
         amazonId: amazonAdsCampaigns.amazonCampaignId,
         state: amazonAdsCampaigns.state,
+        extra: amazonAdsCampaigns.extra,
       })
       .from(amazonAdsCampaigns)
       .where(eq(amazonAdsCampaigns.profileId, profile.id));
     const activeCampaigns = new Set(campaigns.filter((c) => c.state === ACTIVE).map((c) => c.id));
+    // vCPM-Gebote gelten je 1000 Impressions (`plan.md` §5): Gebotsregeln lassen sie aus.
+    const cpcCampaigns = new Set(
+      campaigns
+        .filter((c) => activeCampaigns.has(c.id))
+        .filter(
+          (c) =>
+            String((c.extra as { costType?: unknown } | null)?.costType).toLowerCase() !== 'vcpm',
+        )
+        .map((c) => c.id),
+    );
     const adGroups = await db
       .select({ id: amazonAdsAdGroups.id, state: amazonAdsAdGroups.state })
       .from(amazonAdsAdGroups)
@@ -218,7 +229,7 @@ export async function previewAutomationRules(
           .filter(
             (t) =>
               t.state === ACTIVE &&
-              activeCampaigns.has(t.campaignId) &&
+              cpcCampaigns.has(t.campaignId) &&
               (t.adGroupId === null || activeAdGroups.has(t.adGroupId)),
           )
           .map((t) => t.amazonId),

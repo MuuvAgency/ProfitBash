@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5. Als Nächstes: 5.6a.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a. Als Nächstes: 5.6b.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -384,10 +384,46 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     festgehalten hat; braucht 5.8 das, `limitedBy` dort mitgeben.
 
 ### 5.6a Regeln: Modell, Engine, API
-- [ ] Regel = Name, Ebene (Target; Kampagne für Budgets), Bedingungen (Kennzahl im Zeitraum, Vergleich, Wert, auch
+- [x] Regel = Name, Ebene (Target; Kampagne für Budgets), Bedingungen (Kennzahl im Zeitraum, Vergleich, Wert, auch
       relativ zum Ziel), Aktion (Gebot bzw. Budget ± % oder absolut, setzen, pausieren), Gültigkeit je Client oder für
       alle, abschaltbar. Je Client: **erste passende Regel gewinnt**, sonst der Optimizer (Ideen-Dokument F).
-- [ ] Startregeln als Daten (eigene Werte), API mit Audit, Vorschau „würde heute für N Entities greifen“.
+- [x] Startregeln als Daten (eigene Werte), API mit Audit, Vorschau „würde heute für N Entities greifen“.
+- [x] Umsetzung (2026-10-10, Stand für 5.6b und 5.7):
+  - **Shared** `packages/shared/src/automation-rules.ts` (auch als Einstiegspunkt `@profitbash/shared/automation-rules`
+    für die Engine): Regel = `id`, `name`, `level` (`target` → Gebot, `campaign` → Budget), 1–5 `conditions` (alle
+    müssen zutreffen: Kennzahl `impressions` | `clicks` | `spend` | `sales` | `orders` | `acos` | `cpc`, Vergleich
+    `gt` | `gte` | `lt` | `lte`, Wert; beim ACoS wahlweise `relativeToGoal` = Prozent des wirksamen Ziels), `action`
+    (`changePercent` −100 bis +500, `changeAbsolute`, `set`, `pause`), `clientId` (`null` = alle) und `enabled`.
+    Beträge in EUR wie die Leitplanken. Höchstens 50 Regeln. **Startregeln (eigene Werte):** „Viele Klicks ohne
+    Bestellung“ (ab 30 Klicks, 0 Bestellungen → Gebot −20 %), „ACoS weit über dem Ziel“ (ab 20 Klicks, ACoS ≥ 150 %
+    des Ziels → Gebot −15 %), „Kampagne weit über dem Ziel“ (ab 50 € Ausgaben, ACoS ≥ 200 % des Ziels → Budget −10 %,
+    abgeschaltet).
+  - **Engine** `packages/engine/src/rules.ts`: `firstMatchingRule(rules, subject)` (Reihenfolge der Liste;
+    abgeschaltete, andere Ebenen und Regeln anderer Clients übersprungen; Regeln eines Clients gelten nicht für
+    Profile ohne Client) und `ruleProposal(action, current, eurRate)` → gewünschter Wert oder `{ pause: true }`.
+    ACoS ohne Umsatz, aber mit Ausgaben liegt über jeder Schwelle; ohne Ausgaben bzw. Klicks gibt es keinen ACoS
+    bzw. CPC und die Bedingung passt nicht; ohne Ziel passt „relativ zum Ziel“ nicht. `eurRate` = ein Euro in der
+    Währung des Profils.
+  - **Tabelle** `automation_rules` (Migration `0040_automation_rules`): eine Liste je Organisation als Dokument mit
+    `version`, ohne Zeile die Startregeln (wie der Struktur-Katalog). **Zugriffe**
+    `packages/db/src/automation-rules.ts`: `loadAutomationRules` (für den Lauf), `getAutomationRules`,
+    `saveAutomationRules` (ganze Liste, `VERSION_CONFLICT`, `UNKNOWN_CLIENT`, Audit `automation_rules.update` mit
+    vorher/nachher), `previewAutomationRules`.
+  - **API** (Feature `automations`): `GET /ads/automations/rules` (`view`), `PUT /ads/automations/rules` (`write`;
+    409 `AUTOMATION_RULES_VERSION_CONFLICT`, 400 `AUTOMATION_RULES_UNKNOWN_CLIENT`), `POST
+    /ads/automations/rules/preview` (`view`, speichert nichts; auch für ungespeicherte Listen).
+  - **Vorschau:** je Regel die Entities, für die sie als erste greift, über aktive Targets (Target, Ad Group und
+    Kampagne `ENABLED`, keine vCPM-Kampagne) und aktive Kampagnen der sichtbaren Profile, mit dem Datenstand je
+    Entity; dazu die Zahl der geprüften Targets und Kampagnen. **Vereinfacht (`shortcut:` im Code):** Ziel nur von
+    Profil bzw. Client (ohne Produktgruppen), ohne Leitplanken, ohne geschützte Begriffe; Profile ohne EZB-Kurs
+    ihrer Währung zählen nicht. Die Vorschau lädt alle Targets der sichtbaren Profile: im Editor (5.6b) nur auf
+    Knopfdruck auslösen.
+  - **Für 5.7:** Reihenfolge je Entity: Regel (erste passende) → sonst Optimizer → Leitplanken. `pause` und `set`
+    bei geschützten Begriffen auslassen; Gebotsregeln nicht auf vCPM; Datenstand älter als die neueste Datei des
+    Profils (`findProfileMetricsState`) ausfiltern; `eurRate` und Ziel je Target wie beim Optimizer. Regeln eines
+    gelöschten Clients bleiben in der Liste und greifen nie (der Editor sollte sie kennzeichnen).
+  - **Nicht nach TDD:** Der API-Test für `GET`/`PUT /rules` entstand zusammen mit der Route (kein Fehlschlag
+    vorher gesehen); alle übrigen Tests liefen zuerst rot.
 
 ### 5.6b Regeln: Editor
 - [ ] Tab „Regeln“ auf `/ads/automations`: Liste mit Reihenfolge, Bearbeiten, Vorschau.
