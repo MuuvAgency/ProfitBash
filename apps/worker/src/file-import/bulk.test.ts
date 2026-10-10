@@ -23,6 +23,7 @@ const {
   adChangeSubmissions,
   adChanges,
   amazonAdsAdGroups,
+  amazonAdsBrands,
   amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
   amazonAdsNegativeTargets,
@@ -102,6 +103,7 @@ beforeEach(async () => {
     amazonAdsAdGroups,
     amazonAdsCampaigns,
     amazonAdsPortfolios,
+    amazonAdsBrands,
     fileImports,
     jobRuns,
   ]) {
@@ -727,7 +729,15 @@ describe('importBulkFile', () => {
           'Match Type': 'negativePhrase',
           State: 'enabled',
         },
-        { Entity: 'Video Ad', 'Campaign ID': SBC, 'Ad Group ID': SBAG, 'Ad ID': '510000000000001' },
+        {
+          Entity: 'Video Ad',
+          'Campaign ID': SBC,
+          'Ad Group ID': SBAG,
+          'Ad ID': '510000000000001',
+          State: 'enabled',
+        },
+        // Unbekannte Entities werden übergangen und geloggt.
+        { Entity: 'Theme', 'Campaign ID': SBC, 'Ad Group ID': SBAG, 'Keyword ID': '610000000000009' },
       ]),
       // Älteres SB-Blatt: Kampagnen ohne eigene Ad-Group-Zeilen.
       sheet('Sponsored Brands Campaigns', sbHeader, [
@@ -807,7 +817,8 @@ describe('importBulkFile', () => {
       adGroups: 2,
       targets: 5,
       negatives: 2,
-      productAds: 1,
+      // SD-Anzeige und SB-Video (seit 4.10).
+      productAds: 2,
       invalidRows: 0,
       removed: 0,
     });
@@ -900,7 +911,10 @@ describe('importBulkFile', () => {
       matchType: 'PHRASE',
     });
 
-    const [ad] = await db.select().from(amazonAdsProductAds);
+    const [ad] = await db
+      .select()
+      .from(amazonAdsProductAds)
+      .where(eq(amazonAdsProductAds.adProduct, SD));
     expect(ad).toMatchObject({
       amazonAdId: SDAD,
       adProduct: SD,
@@ -908,10 +922,101 @@ describe('importBulkFile', () => {
       sku: 'WK-SD-01',
       asin: null,
     });
-    // SB-Ads kommen erst mit 1.9: übergangen und geloggt, nicht ungültig.
+    // SB-Anzeigen liest der Import seit 4.10 (eigener Test); Themen bleiben übergangen und geloggt, nicht ungültig.
     expect(logs).toContainEqual(
       expect.objectContaining({ msg: 'bulk_import.entity_skipped', entity: 'unsupported' }),
     );
+  });
+
+  it('liest Marken aus „Brand Assets Data“ und SB-Anzeigen mit Format und Namen (4.10)', async () => {
+    const SBC = '310000000000001';
+    const SBAG = '410000000000001';
+    const header = [
+      'Product',
+      'Entity',
+      'Operation',
+      'Campaign ID',
+      'Ad Group ID',
+      'Ad ID',
+      'Campaign Name',
+      'Ad Group Name',
+      'Ad Name',
+      'State',
+      'Budget Type',
+      'Budget',
+      'Creative ASINs',
+    ];
+    const sb = (row: Record<string, TestCell>) => ({ Product: 'Sponsored Brands', ...row });
+    const content = buildXlsx([
+      sheet('Brand Assets Data (Read-only)', ['Brand Entity ID', 'Brand Name'], [
+        { 'Brand Entity ID': 'ENTITYWALD', 'Brand Name': 'Waldkauz' },
+        { 'Brand Entity ID': 'ENTITYZWEI', 'Brand Name': 'Zweitmarke' },
+      ]),
+      sheet('SB Multi Ad Group Campaigns', header, [
+        sb({
+          Entity: 'Campaign',
+          'Campaign ID': SBC,
+          'Campaign Name': 'SB | HEADER | Flaschen',
+          State: 'enabled',
+          'Budget Type': 'Daily',
+          Budget: 15,
+        }),
+        sb({
+          Entity: 'Ad Group',
+          'Campaign ID': SBC,
+          'Ad Group ID': SBAG,
+          'Ad Group Name': 'SB | HEADER | Flaschen',
+          State: 'enabled',
+        }),
+        sb({
+          Entity: 'Manual Collection ad',
+          'Campaign ID': SBC,
+          'Ad Group ID': SBAG,
+          'Ad ID': '510000000000001',
+          'Ad Name': 'SB | HEADER | Flaschen',
+          State: 'enabled',
+          'Creative ASINs': 'B0TEST0001, B0TEST0002, B0TEST0003',
+        }),
+        sb({
+          Entity: 'Video ad',
+          'Campaign ID': SBC,
+          'Ad Group ID': SBAG,
+          'Ad ID': '510000000000002',
+          'Ad Name': 'SB | VIDEO',
+          State: 'paused',
+          'Creative ASINs': 'B0TEST0001',
+        }),
+      ]),
+    ]);
+    await run(content);
+
+    const ads = await db
+      .select()
+      .from(amazonAdsProductAds)
+      .orderBy(asc(amazonAdsProductAds.amazonAdId));
+    expect(ads.map((ad) => [ad.amazonAdId, ad.adProduct, ad.asin, ad.state, ad.extra])).toEqual([
+      [
+        '510000000000001',
+        SB,
+        null,
+        'ENABLED',
+        {
+          adType: 'MANUAL_COLLECTION',
+          name: 'SB | HEADER | Flaschen',
+          asins: ['B0TEST0001', 'B0TEST0002', 'B0TEST0003'],
+        },
+      ],
+      ['510000000000002', SB, 'B0TEST0001', 'PAUSED', { adType: 'VIDEO', name: 'SB | VIDEO' }],
+    ]);
+    const brands = await db
+      .select({ id: amazonAdsBrands.brandEntityId, name: amazonAdsBrands.name })
+      .from(amazonAdsBrands)
+      .where(eq(amazonAdsBrands.profileId, ids.profile))
+      .orderBy(asc(amazonAdsBrands.brandEntityId));
+    expect(brands).toEqual([
+      { id: 'ENTITYWALD', name: 'Waldkauz' },
+      { id: 'ENTITYZWEI', name: 'Zweitmarke' },
+    ]);
   });
 
   it('löst die Kampagne über eine vorhandene Ad Group auf, sonst zählt die Zeile als ungültig', async () => {
