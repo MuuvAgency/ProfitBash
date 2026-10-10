@@ -7495,9 +7495,49 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "number",
-                            "enum": [
-                              7
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "enum": [
+                                  7
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  14
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  30
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  60
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  90
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  180
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  365
+                                ]
+                              }
                             ]
                           },
                           "bid": {
@@ -8685,9 +8725,49 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "number",
-                            "enum": [
-                              7
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "enum": [
+                                  7
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  14
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  30
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  60
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  90
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  180
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  365
+                                ]
+                              }
                             ]
                           },
                           "bid": {
@@ -9257,9 +9337,49 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "number",
-                            "enum": [
-                              7
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "enum": [
+                                  7
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  14
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  30
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  60
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  90
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  180
+                                ]
+                              },
+                              {
+                                "type": "number",
+                                "enum": [
+                                  365
+                                ]
+                              }
                             ]
                           },
                           "bid": {
