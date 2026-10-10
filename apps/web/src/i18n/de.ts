@@ -1282,8 +1282,8 @@ export const de = {
       },
       run: 'Berechnen',
       apply: 'Als Ziel übernehmen',
-      breakEven: 'Break-even-ACoS',
-      target: 'Ziel-ACoS',
+      breakEven: 'Break-even-ACoS {value} %',
+      target: 'Ziel-ACoS {value} %',
       noTarget: 'nach Kosten und Marge bleibt nichts für Werbung.',
       invalid:
         'Bitte Zahlen eingeben: Preis über 0, Beträge mit höchstens vier Nachkommastellen, Marge bis 100 %.',

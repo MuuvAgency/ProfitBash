@@ -196,18 +196,13 @@ export async function deleteGoal(
   db: Db,
   input: GoalAccessInput & { id: string },
 ): Promise<true | null> {
+  if ((await visibleProfilesScope(db, input)) === null) return null;
   return db.transaction(async (tx) => {
     const [row] = await tx
       .select()
       .from(goals)
       .where(and(eq(goals.id, input.id), eq(goals.organizationId, input.orgId)));
-    const visible = await canSeeScope(
-      tx,
-      input,
-      row ? scopeOf(row) : { type: 'profile', id: input.id },
-    );
-    if (visible === null) return null;
-    if (!row || !visible) throw notFound();
+    if (!row || !(await canSeeScope(tx, input, scopeOf(row)))) throw notFound();
     await tx.delete(goals).where(eq(goals.id, row.id));
     await recordAuditEvent(tx, {
       organizationId: input.orgId,
@@ -220,6 +215,6 @@ export async function deleteGoal(
         before: { metric: row.metric, value: toRecord(row).value },
       },
     });
-    return true;
+    return true as const;
   });
 }

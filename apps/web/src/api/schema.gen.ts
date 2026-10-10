@@ -8376,7 +8376,6 @@ export interface components {
         TargetAcosResponse: {
             breakEvenAcos: string;
             targetAcos: string | null;
-            targetRoas: string | null;
         };
         TargetAcosRequest: {
             price: string;

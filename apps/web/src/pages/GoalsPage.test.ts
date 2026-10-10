@@ -147,11 +147,7 @@ describe('Seite „Ziele“', () => {
 
   it('rechnet den Ziel-ACoS auf dem Server und übernimmt ihn', async () => {
     const { requests } = await mountPage({
-      'POST /api/ads/goals/calculate': json({
-        breakEvenAcos: '40',
-        targetAcos: '25',
-        targetRoas: '4',
-      }),
+      'POST /api/ads/goals/calculate': json({ breakEvenAcos: '40', targetAcos: '25' }),
     });
     await openEdit('Ziel für „Neuheiten“ bearbeiten');
     button('Rechner')!.click();
@@ -173,6 +169,32 @@ describe('Seite „Ziele“', () => {
     expect(
       document.querySelector<HTMLInputElement>('input[name="goal-metric"][value="acos"]')!.checked,
     ).toBe(true);
+  });
+
+  it('Enter im Rechner rechnet, statt das Ziel zu speichern; neue Zeile, leerer Rechner', async () => {
+    const { requests } = await mountPage({
+      'POST /api/ads/goals/calculate': json({ breakEvenAcos: '40', targetAcos: '25' }),
+    });
+    await openEdit('Ziel für „Kunde Eins“ bearbeiten');
+    button('Rechner')!.click();
+    for (const field of ['price', 'unitCost', 'fees', 'margin']) {
+      await type(`[data-calc="${field}"]`, '5');
+    }
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    document.querySelector('[data-calc="price"]')!.dispatchEvent(enter);
+    await flushPromises();
+
+    expect(enter.defaultPrevented).toBe(true);
+    expect(sent(requests, 'POST')).toHaveLength(1);
+    expect(sent(requests, 'PUT')).toHaveLength(0);
+
+    button('Abbrechen')!.click();
+    await flushPromises();
+    await openEdit('Ziel für „Neuheiten“ bearbeiten');
+    button('Rechner')!.click();
+    await vi.waitFor(() =>
+      expect(document.querySelector<HTMLInputElement>('[data-calc="price"]')?.value).toBe(''),
+    );
   });
 
   it('entfernt ein Ziel', async () => {

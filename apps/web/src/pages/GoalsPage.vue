@@ -119,6 +119,7 @@ function openEdit(row: Row) {
   value.value = row.goal?.value.replace('.', ',') ?? '';
   errorKey.value = null;
   calcOpen.value = false;
+  Object.assign(calc, { price: '', unitCost: '', fees: '', margin: '' });
   calcResult.value = null;
   calcErrorKey.value = null;
   save.reset();
@@ -354,18 +355,24 @@ function applyCalc() {
                   inputmode="decimal"
                   autocomplete="off"
                   class="h-11 min-w-0 rounded-control bg-tile px-space-md font-data text-ink outline-none focus-visible:ring-2 focus-visible:ring-violet"
+                  @keydown.enter.prevent="calculate"
                 />
               </div>
             </div>
             <InlineError v-if="calcErrorKey" :message="t(calcErrorKey)" />
-            <p v-if="calcResult" data-calc-result class="text-body-md text-ink" aria-live="polite">
-              {{ t('goals.calc.breakEven') }}
-              <span class="font-data">{{ number(calcResult.breakEvenAcos) }} %</span>
-              <template v-if="calcResult.targetAcos">
-                · {{ t('goals.calc.target') }}
-                <span class="font-data">{{ number(calcResult.targetAcos) }} %</span>
-              </template>
-              <template v-else> · {{ t('goals.calc.noTarget') }}</template>
+            <p
+              v-if="calcResult"
+              data-calc-result
+              class="font-data text-body-md text-ink"
+              aria-live="polite"
+            >
+              {{ t('goals.calc.breakEven', { value: number(calcResult.breakEvenAcos) }) }}
+              ·
+              {{
+                calcResult.targetAcos
+                  ? t('goals.calc.target', { value: number(calcResult.targetAcos) })
+                  : t('goals.calc.noTarget')
+              }}
             </p>
             <div class="flex flex-wrap gap-space-sm">
               <Button
