@@ -264,6 +264,18 @@ describe('Seite „Automationen“: Regeln', () => {
     expect(document.body.textContent).not.toContain('inzwischen von jemand anderem geändert');
   });
 
+  it('verwirft den Entwurf beim Wechsel der Organisation (sonst landete er in der anderen)', async () => {
+    let calls = 0;
+    const third = DEFAULT_AUTOMATION_RULES[2];
+    const { session } = await mountRules({
+      'GET /api/ads/automations/rules': () => json(calls++ === 0 ? stored() : stored([third], 7)),
+    });
+    await click(inRow(R2, '[data-rule-up]'));
+    session.me = { ...session.me!, activeOrganizationId: 'org-2' };
+    await vi.waitFor(() => expect(order()).toEqual([R3]));
+    expect($<HTMLButtonElement>('[data-rules-save]')!.disabled).toBe(true);
+  });
+
   it('kennzeichnet Regeln eines Clients, den es nicht mehr gibt', async () => {
     const [first, second] = DEFAULT_AUTOMATION_RULES;
     await mountRules({

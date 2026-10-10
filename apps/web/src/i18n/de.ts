@@ -1261,7 +1261,6 @@ export const de = {
         'Die Regeln wurden inzwischen von jemand anderem geändert. Verwirf deinen Entwurf, um den neuen Stand zu laden.',
       staleDraft:
         'Es gibt inzwischen einen neueren Stand der Regeln. Speichern wird deshalb abgelehnt; verwirf den Entwurf, um ihn zu laden.',
-      position: 'Platz {n}',
       allClients: 'Alle Clients',
       unknownClient: 'Client gelöscht oder nicht sichtbar',
       unknownClientHint:
