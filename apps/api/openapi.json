@@ -10496,6 +10496,272 @@
             "additionalProperties": false
           }
         ]
+      },
+      "GoalsOverview": {
+        "type": "object",
+        "properties": {
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "goal": {
+                  "$ref": "#/components/schemas/Goal"
+                },
+                "profiles": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "accountName": {
+                        "type": "string"
+                      },
+                      "countryCode": {
+                        "type": "string"
+                      },
+                      "goal": {
+                        "$ref": "#/components/schemas/Goal"
+                      },
+                      "productGroups": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "goal": {
+                              "$ref": "#/components/schemas/Goal"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "goal"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "accountName",
+                      "countryCode",
+                      "goal",
+                      "productGroups"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "goal",
+                "profiles"
+              ]
+            }
+          },
+          "unassignedProfiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "accountName": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string"
+                },
+                "goal": {
+                  "$ref": "#/components/schemas/Goal"
+                },
+                "productGroups": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "goal": {
+                        "$ref": "#/components/schemas/Goal"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "goal"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "accountName",
+                "countryCode",
+                "goal",
+                "productGroups"
+              ]
+            }
+          }
+        },
+        "required": [
+          "clients",
+          "unassignedProfiles"
+        ]
+      },
+      "Goal": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "acos",
+              "roas"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "acos": {
+            "type": "string"
+          },
+          "roas": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "metric",
+          "value",
+          "acos",
+          "roas",
+          "updatedAt"
+        ]
+      },
+      "SetGoalRequest": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "client",
+                  "profile",
+                  "productGroup"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "metric": {
+            "type": "string",
+            "enum": [
+              "acos",
+              "roas"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "metric",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "TargetAcosResponse": {
+        "type": "object",
+        "properties": {
+          "breakEvenAcos": {
+            "type": "string"
+          },
+          "targetAcos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetRoas": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "breakEvenAcos",
+          "targetAcos",
+          "targetRoas"
+        ]
+      },
+      "TargetAcosRequest": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "string"
+          },
+          "unitCost": {
+            "type": "string"
+          },
+          "fees": {
+            "type": "string"
+          },
+          "margin": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "price",
+          "unitCost",
+          "fees",
+          "margin"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -16176,6 +16442,239 @@
           },
           "403": {
             "description": "Keine aktive Organisation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/goals": {
+      "get": {
+        "tags": [
+          "Ziele"
+        ],
+        "summary": "Sichtbare Clients, Profile und Produktgruppen mit ihrem Ziel",
+        "responses": {
+          "200": {
+            "description": "Übersicht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalsOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Ziele"
+        ],
+        "summary": "Ziel eines Clients, Profils oder einer Produktgruppe setzen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetGoalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gesetzt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ziel oder Ziel-Objekt nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/goals/{id}": {
+      "delete": {
+        "tags": [
+          "Ziele"
+        ],
+        "summary": "Ziel löschen (Recht „write“)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Gelöscht."
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ziel oder Ziel-Objekt nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/goals/calculate": {
+      "post": {
+        "tags": [
+          "Ziele"
+        ],
+        "summary": "Rechner: Break-even- und Ziel-ACoS aus Preis, Kosten, Gebühren und Marge",
+        "description": "Speichert nichts.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetAcosRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetAcosResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
             "content": {
               "application/json": {
                 "schema": {
