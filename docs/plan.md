@@ -22,10 +22,10 @@ dass sie später ohne Umbau dazukommen (siehe §5).
 | **2b – Suchbegriffe & Organic** | Suchbegriffe aus dem Datei-Import: N-Gramme, Einstufung Harvest/Negieren/Beobachten (read-only), Impression-Share je Suchbegriff; SQP-CSV-Import (Brand Analytics) mit Organic-Indikator als Band, Funnel-Lücken, Branded-Check | – (Datei-Import aus 1.11) |
 | **3 – Ändern** | Pending-Changes-Warenkorb → Submit an Amazon, Submissions, History und Revert, Bulk-Dialoge, Tags, Suchbegriff-Aktionen aus 2b (Negativ, Harvest) | Ads-API (Write), bis dahin Bulk-Datei |
 | **4 – Tools** | Produktgruppen, Kampagnen-Setup nach **eigenem, konfigurierbarem** Struktur-Katalog (Bausteine, Graduation-Kanten, sechs Presets je Client und ASIN) und Namensschema, Bulk-Datei-Export, Gebots-Stack-Simulator, Portfolio anlegen | – |
-| **5 – Automatisieren** | Budget-Caps mit Enforcer und Pacing, Notifications (SSE), Regeln und Bid-Optimizer als tägliche Pipeline mit Leitplanken und Schattenmodus, Graduation- und Preset-Vorschläge, Prüfungen „kein Geld verbrennen“, **Dayparting** (Tagesbudget über den Tag verteilen) | – |
-| **6 – Steuern** | Ziele (TACoS/ACoS/ROAS/Wachstum) je Client mit Target-ACoS-Rechner, Kundenzugang (Client-Orgs, Profil-Freigaben), Audit-Log-UI, Plattform-Admin, Impersonation | – |
+| **5 – Automatisieren** | Budget-Caps mit Enforcer und Pacing, Notifications (SSE), Regeln und Bid-Optimizer als tägliche Pipeline mit Leitplanken und Schattenmodus, Graduation- und Preset-Vorschläge, Prüfungen „kein Geld verbrennen“, **Ziele** (ACoS/ROAS je Client mit Target-ACoS-Rechner, vorgezogen aus Phase 6) | – (Kennzahlen aus der Bulk-Datei) |
+| **6 – Steuern** | Kundenzugang (Client-Orgs, Profil-Freigaben), Audit-Log-UI, Plattform-Admin, Impersonation | – |
 | **7 – Profit** | Bestellungen, Gebühren, Retouren, Einkaufspreise (COGS), Versand, OPEX, P&L, organische Umsätze → echtes TACoS und Netto-Profit | **Amazon SP-API** |
-| später | Otto, eBay, Shopify, DSP, KI-Assistent/MCP-Schnittstelle | jeweilige APIs |
+| später | **Dayparting** (Tagesbudget über den Tag verteilen; verschoben am 2026-10-10, `phase-5.md` F7), Otto, eBay, Shopify, DSP, KI-Assistent/MCP-Schnittstelle | Ads-API mit stündlichen Daten, jeweilige APIs |
 
 **Hinweis TACoS:** Echtes TACoS braucht organische Umsätze aus der SP-API. Bis Phase 7 zeigt das
 Dashboard Ads-Kennzahlen. Die **SP-API-Registrierung sollte parallel jetzt starten**, weil die Freigabe dauert.
@@ -39,10 +39,12 @@ Verfeinern der jeweiligen Phasen-Datei übernommen:
   Warenkorb; neue Kampagnen aktiv): Struktur-Katalog mit Bausteinen, Graduation-Kanten und allen sechs Presets, je Client und ASIN (C.2b, F-S8); Phrase
   optional, Default Breit-Cluster; vCPM und Off-Amazon standardmäßig gesperrt, je Kampagne bewusst freischaltbar (E, F-S7);
   Conquesting-Liste von Hand je Client (F-S9); Bulk-Erzeugung mit zentraler Locale-Abbildung (C.3); Gebots-Stack-Simulator (D).
-- **Phase 5:** Optimizer-Leitplanken (max. Änderung je Woche, Gebotsboden, Mindestdaten) als Defaults je Organisation, je Client
+- **Phase 5** (`docs/tasks/phase-5.md`, Fragen entschieden am 2026-10-10: Kennzahlen als Zeitraumsummen aus der Bulk-Datei,
+  Schattenmodus, dann Warenkorb, Caps je Profil und Monat, Ziele vorgezogen, Dayparting verschoben, Benachrichtigungen nur in
+  der App): Optimizer-Leitplanken (max. Änderung je Woche, Gebotsboden, Mindestdaten) als Defaults je Organisation, je Client
   überschreibbar (F, F-S6); Schattenmodus je Client; Graduation- und Preset-Wechsel als Vorschläge im Warenkorb; Organic-
   Benachrichtigungen erst nach zwei Wochen in Folge; Prüfungen aus E (Off-Amazon-Spend, Placements, Reserved Share of Voice).
-- **Phase 6/7:** Rechner (Target-ACoS, Deal & Coupon, LTV), B2B-Inkrementalität, Preisverlauf im Organic-Tracker, SQP per SP-API,
+- **Phase 6/7:** Rechner (Deal & Coupon, LTV; Target-ACoS kommt mit den Zielen in Phase 5), B2B-Inkrementalität, Preisverlauf im Organic-Tracker, SQP per SP-API,
   automatische Conquesting-Kriterien, Absatzprognose mit Bestand als Gebots-Leitplanke (G, A.2).
 - **Eigenständigkeit:** Schwellen, Kataloge und Bezeichnungen sind eigene, konfigurierbare Daten; keine Werte, Texte oder Tabellen
   aus den Quellen 1:1.
@@ -61,8 +63,8 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 | | Tags | `/ads/tags/*` | `tags` | 3 | – |
 | | Tools (Produktgruppen · Kampagnen-Setup · Portfolio) | `/ads/tools/*` | `tools` | 4 | `amazon_ads` (Builder) |
 | | Budgets | `/ads/budgets` | `budgets` | 5 | `werbekosten_ppc` |
-| | Automationen & Regeln (inkl. Dayparting) | `/ads/automations` | `automations` | 5 | `amazon_ads` |
-| | Ziele | `/ads/goals` | `goals` | 6 | – |
+| | Automationen & Regeln | `/ads/automations` | `automations` | 5 | `amazon_ads` |
+| | Ziele | `/ads/goals` | `goals` | 5 | – |
 | Profit | Profitabilität (P&L) | `/profit/pnl` | `profit` | 7 | `profitabilit_t_p_l` |
 | | Verkaufsanalyse | `/profit/sales` | `profit` | 7 | `verkaufsanalyse` |
 | | Produkte & Marken | `/profit/products` | `profit` | 7 | `marken_produkte` |
