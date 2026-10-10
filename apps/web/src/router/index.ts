@@ -39,6 +39,7 @@ const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteCompone
   connections: () => import('../pages/ConnectionsPage.vue'),
   members: () => import('../pages/MembersPage.vue'),
   sync: () => import('../pages/SyncStatusPage.vue'),
+  notifications: () => import('../pages/NotificationsPage.vue'),
 };
 
 function navRoute(item: NavItem): RouteRecordRaw {
