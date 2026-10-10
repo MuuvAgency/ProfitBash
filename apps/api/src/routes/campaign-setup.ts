@@ -104,7 +104,8 @@ const brandsRoute = createRoute({
   method: 'get',
   path: '/ads/tools/setup/brands',
   tags: TAGS,
-  summary: 'Marken eines Profils für Sponsored Brands (4.10), aus dem Blatt „Brand Assets Data“ des Bulk-Imports',
+  summary:
+    'Marken eines Profils für Sponsored Brands (4.10), aus dem Blatt „Brand Assets Data“ des Bulk-Imports',
   request: { query: z.object({ profileId: z.uuid() }) },
   responses: {
     200: { description: 'Marken.', content: json(setupBrandListResponseSchema) },

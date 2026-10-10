@@ -1004,7 +1004,9 @@ function sbCreateRow(change: Extract<BulkFileChange, { type: 'create' }>): Row {
           'Brand Name': limited(change.brandName, SB_LIMITS.brandName),
           ...(logo !== null && { 'Brand Logo Asset ID': logo }),
           'Creative ASINs': asins.join(', '),
-          ...(change.adTitle !== null && { 'Ad Title': limited(change.adTitle, SB_LIMITS.adTitle) }),
+          ...(change.adTitle !== null && {
+            'Ad Title': limited(change.adTitle, SB_LIMITS.adTitle),
+          }),
         };
       }
       if (change.format !== 'video') throw invalid();

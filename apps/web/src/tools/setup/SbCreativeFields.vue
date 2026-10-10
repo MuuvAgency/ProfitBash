@@ -36,7 +36,8 @@ function pickBrand(brandEntityId: string) {
     ...form.value,
     brandEntityId,
     // Den Namen der Marke vorbelegen, wenn noch keiner eingetragen ist.
-    brandName: form.value.brandName.trim() === '' && brand?.name ? brand.name : form.value.brandName,
+    brandName:
+      form.value.brandName.trim() === '' && brand?.name ? brand.name : form.value.brandName,
   };
 }
 
@@ -94,7 +95,9 @@ const fields = computed((): Field[] => [
           :data-setup-creative-field="field.key"
           :maxlength="field.maxlength"
           :aria-invalid="touched && issues.has(field.key) ? 'true' : undefined"
-          :aria-describedby="touched && issues.has(field.key) ? `${id}-${field.key}-hint` : undefined"
+          :aria-describedby="
+            touched && issues.has(field.key) ? `${id}-${field.key}-hint` : undefined
+          "
           :class="[
             inputClass,
             field.key.endsWith('AssetId') && 'font-data',

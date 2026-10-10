@@ -27,7 +27,11 @@ beforeEach(async () => {
   await testDb.db.update(amazonAdsProfiles).set({ isHidden: false });
 });
 
-const scope = () => ({ organizationId: f.org, profileId: f.profile, now: new Date('2099-10-10T10:00:00Z') });
+const scope = () => ({
+  organizationId: f.org,
+  profileId: f.profile,
+  now: new Date('2099-10-10T10:00:00Z'),
+});
 const as = (userId: string) => ({ userId, orgId: f.org, profileId: f.profile });
 
 describe('replaceProfileBrands', () => {
@@ -69,7 +73,9 @@ describe('listProfileBrands', () => {
       { brandEntityId: 'ENTITYA', name: 'Anker' },
       { brandEntityId: 'ENTITYZ', name: 'Zelt' },
     ]);
-    expect(await listProfileBrands(testDb.db, { ...as(f.ada), orgId: crypto.randomUUID() })).toBeNull();
+    expect(
+      await listProfileBrands(testDb.db, { ...as(f.ada), orgId: crypto.randomUUID() }),
+    ).toBeNull();
     await testDb.db
       .update(amazonAdsProfiles)
       .set({ isHidden: true })

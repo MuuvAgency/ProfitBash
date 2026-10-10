@@ -271,7 +271,10 @@ describe('reviewCampaignPlan', () => {
         name: 'SB | VIDEO',
         block: 'SB-VIDEO-KW',
         sbAdFormat: 'video',
-        ads: [{ asin: 'B0FLASCHE1', sku: null }, { asin: 'B0FLASCHE2', sku: null }],
+        ads: [
+          { asin: 'B0FLASCHE1', sku: null },
+          { asin: 'B0FLASCHE2', sku: null },
+        ],
       });
       expect(reviewCampaignPlan(input({ campaigns: [sb()] }))).toEqual([
         { severity: 'error', code: 'sbCreativeMissing', campaign: 'SB | HEADER' },

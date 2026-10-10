@@ -201,7 +201,15 @@ describe('planSetupItems', () => {
     });
 
     const video = planSetupItems(
-      [{ ...header, block: 'SB-VIDEO-KW', name: 'SB | VIDEO', sbAdFormat: 'video', ads: [header.ads[0]!] }],
+      [
+        {
+          ...header,
+          block: 'SB-VIDEO-KW',
+          name: 'SB | VIDEO',
+          sbAdFormat: 'video',
+          ads: [header.ads[0]!],
+        },
+      ],
       { campaignState: 'ENABLED', creative },
     );
     expect(video[2]!.payload).toMatchObject({

@@ -345,12 +345,7 @@ const ENTITY_KINDS = valueMap({
     'Store Spotlight Ad',
   ],
   // SD-Negatives auf Zielgruppen und Themen: nach Sichtung echter Dateien.
-  unsupported: [
-    'Ad',
-    'Negative Audience Targeting',
-    'Theme',
-    'Draft Campaign',
-  ],
+  unsupported: ['Ad', 'Negative Audience Targeting', 'Theme', 'Draft Campaign'],
 });
 
 /** Format einer SB-Anzeige aus dem Entity-Namen (Schreibweise wie `adType` im Export). */
