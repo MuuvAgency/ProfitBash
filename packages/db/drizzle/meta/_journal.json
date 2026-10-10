@@ -267,6 +267,13 @@
       "when": 1791652855878,
       "tag": "0037_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791656231852,
+      "tag": "0038_goals",
+      "breakpoints": true
     }
   ]
 }
