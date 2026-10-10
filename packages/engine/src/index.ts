@@ -62,3 +62,15 @@ export {
 } from './ad-changes';
 export * from './naming';
 export * from './plan';
+export {
+  BID_STACK_PLACEMENTS,
+  BID_STACK_STRATEGIES,
+  MAX_BID_ADJUSTMENT_PERCENT,
+  MAX_BID_STACK_AUDIENCES,
+  simulateBidStack,
+  type BidStackInput,
+  type BidStackPlacement,
+  type BidStackResult,
+  type BidStackRow,
+  type BidStackStrategy,
+} from './bid-stack';
