@@ -150,6 +150,11 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
   `viewable_impressions` (nur SD) ist die Basis für vCPM. Bei SD-Kampagnen mit `costType` VCPM (`extra.costType` der Kampagne)
   gelten Gebote je 1000 sichtbare Impressionen, nicht je Klick; Gebotsregeln müssen das trennen. SB-Reports sind in v3 „Preview“:
   SB-Kampagnen mit `isMultiAdGroupsEnabled=false` haben Entities, aber keine Kennzahlen; die UI erklärt das bei SB-Summen.
+- **Kennzahlen aus der Bulk-Datei (Phase 5, 5.1):** Datei-Profile haben keine Tageswerte, sondern Summen je Kampagne, Ad Group,
+  Target, Anzeige und Platzierung über den Download-Zeitraum (`amazon_ads_entity_period_metrics`). Die Spaltennamen nennen kein
+  Attributionsfenster; **Annahme:** die Standards der Konsole (SP 7 Tage bei Sellern, 14 bei Vendoren; SB und SD 14 Tage). SD
+  liefert „Sales“ usw. und daneben „… (Views & Clicks)“, gespeichert getrennt. Gegen bekannte Konsolen-Werte prüfen, sobald
+  ProfitBash live ist.
 
 ## 6. Betriebskosten-Stufen
 

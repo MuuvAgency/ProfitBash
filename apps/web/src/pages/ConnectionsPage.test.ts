@@ -959,6 +959,9 @@ describe('Datei-Importe (1.11f)', () => {
                 searchTerms: 359,
                 searchTermsWithoutPeriod: 1,
                 invalidSearchTermRows: 2,
+                entityMetrics: 140,
+                entityMetricsWithoutPeriod: 1,
+                invalidEntityMetricRows: 3,
               },
             }),
           ],
@@ -978,6 +981,10 @@ describe('Datei-Importe (1.11f)', () => {
     expect(text).toContain('359 Suchbegriffe');
     expect(text).toContain('1 Suchbegriff ohne Zeitraum (Dateiname geändert)');
     expect(text).toContain('2 ungültige Suchbegriff-Zeilen');
+    // Kennzahlen der Kampagnen-Blätter (5.1).
+    expect(text).toContain('140 Kennzahlen-Zeilen');
+    expect(text).toContain('1 Kennzahlen-Zeile ohne Zeitraum (Dateiname geändert)');
+    expect(text).toContain('3 ungültige Kennzahlen-Zeilen');
     expect(text).toContain('vollständig');
     expect(text).toContain('Keine Kampagne der Datei passt zu den bisherigen Kampagnen');
   });
