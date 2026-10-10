@@ -45,7 +45,7 @@ import {
  * Übermitteln: Ein Entwurf wird zu **einer** Übermittlung der Art `setup` (Seite „Änderungen“, ein Entwurf = eine
  * Bulk-Datei) mit je einer Zeile in `campaign_setup_items` pro neuer Entity. Davor prüft `reviewCampaignPlan` den
  * gespeicherten Plan in der Transaktion gegen den aktuellen Stand des Profils (Namen, Grenzen); Fehler sperren.
- * SB- und SD-Kampagnen legt Phase 4 erst mit 4.9/4.10 an: Sie stehen als gescheiterte Kampagne
+ * SB-Kampagnen legt Phase 4 erst mit 4.10 an (SD seit 4.9): Sie stehen als gescheiterte Kampagne
  * (`AD_PRODUCT_NOT_SUPPORTED`) in der Übermittlung.
  */
 
