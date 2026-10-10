@@ -13,7 +13,7 @@ import InlineError from '../components/common/InlineError.vue';
 import PageHeader from '../components/common/PageHeader.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { errorMessageKey } from '../i18n';
-import { useSessionStore } from '../stores/session';
+import { useActiveOrgId, useSessionStore } from '../stores/session';
 import CatalogAssignments from '../tools/catalog/CatalogAssignments.vue';
 import CatalogBlocks from '../tools/catalog/CatalogBlocks.vue';
 import CatalogEdges from '../tools/catalog/CatalogEdges.vue';
@@ -140,6 +140,12 @@ function discard() {
   }
   saveErrorKey.value = null;
 }
+// Die Seite bleibt beim Wechsel der Organisation stehen: Der Entwurf der alten darf nicht in der neuen landen.
+watch(useActiveOrgId(), () => {
+  loaded.value = false;
+  saveErrorKey.value = null;
+  savedNotice.value = false;
+});
 function loadDefaults() {
   draft.value = clone(DEFAULT_STRUCTURE_CATALOG);
   savedNotice.value = false;

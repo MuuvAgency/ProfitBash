@@ -189,6 +189,60 @@ describe('Seite „Struktur-Katalog“', () => {
     expect((puts(requests, '/api/ads/tools/catalog')[0] as { version: number }).version).toBe(3);
   });
 
+  it('verwirft den Entwurf beim Wechsel der Organisation (sonst landete er in der anderen)', async () => {
+    let calls = 0;
+    const other = structuredClone(DEFAULT_STRUCTURE_CATALOG);
+    other.presets.find((preset) => preset.key === 'launch')!.name = 'Andere Org';
+    const { session } = await mountPage({
+      'GET /api/ads/tools/catalog': () =>
+        json(calls++ === 0 ? catalogResponse() : catalogResponse({ catalog: other })),
+    });
+    await type('[data-preset="launch"] [data-preset-name]', 'Neustart');
+    // Auch in der zweiten Organisation Admin, sonst gäbe es dort keinen Speichern-Knopf.
+    session.me = {
+      ...session.me!,
+      organizations: [
+        ...session.me!.organizations,
+        { ...session.me!.organizations[0]!, id: 'org-2' },
+      ],
+      activeOrganizationId: 'org-2',
+    };
+    await vi.waitFor(() =>
+      expect(
+        document.querySelector<HTMLInputElement>('[data-preset="launch"] [data-preset-name]')!
+          .value,
+      ).toBe('Andere Org'),
+    );
+    expect((await found<HTMLButtonElement>('[data-catalog-save]')).disabled).toBe(true);
+  });
+
+  it('verwirft den Entwurf auch beim Wechsel zurück zu einer Organisation mit Daten im Cache', async () => {
+    let calls = 0;
+    const other = structuredClone(DEFAULT_STRUCTURE_CATALOG);
+    other.presets.find((preset) => preset.key === 'launch')!.name = 'Andere Org';
+    const { session } = await mountPage({
+      'GET /api/ads/tools/catalog': () =>
+        json(calls++ === 0 ? catalogResponse() : catalogResponse({ catalog: other })),
+    });
+    const name = () =>
+      document.querySelector<HTMLInputElement>('[data-preset="launch"] [data-preset-name]')!.value;
+    const first = session.me!.activeOrganizationId;
+    // Auch in der zweiten Organisation Admin, sonst gäbe es dort keinen Speichern-Knopf.
+    session.me = {
+      ...session.me!,
+      organizations: [
+        ...session.me!.organizations,
+        { ...session.me!.organizations[0]!, id: 'org-2' },
+      ],
+      activeOrganizationId: 'org-2',
+    };
+    await vi.waitFor(() => expect(name()).toBe('Andere Org'));
+    await type('[data-preset="launch"] [data-preset-name]', 'Neustart');
+    session.me = { ...session.me!, activeOrganizationId: first };
+    await vi.waitFor(() => expect(name()).toBe('Launch'));
+    expect((await found<HTMLButtonElement>('[data-catalog-save]')).disabled).toBe(true);
+  });
+
   it('nennt bei Fehlern den Ort (Baustein, Feld) auf Deutsch', async () => {
     await mountPage();
     await tab('blocks');
