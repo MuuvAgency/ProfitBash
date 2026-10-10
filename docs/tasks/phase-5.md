@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a. Als Nächstes: 5.6b.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b. Als Nächstes: 5.7.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -426,7 +426,37 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     vorher gesehen); alle übrigen Tests liefen zuerst rot.
 
 ### 5.6b Regeln: Editor
-- [ ] Tab „Regeln“ auf `/ads/automations`: Liste mit Reihenfolge, Bearbeiten, Vorschau.
+- [x] Tab „Regeln“ auf `/ads/automations`: Liste mit Reihenfolge, Bearbeiten, Vorschau.
+- [x] Umsetzung (2026-10-10):
+  - **`AutomationsPage.vue`:** zweiter Tab, Pfeiltasten wie im Katalog (`moveTab`); der Tab „Regeln“ liegt in
+    `KeepAlive`, damit der ungespeicherte Entwurf den Wechsel des Tabs übersteht.
+  - **`automations/RulesTab.vue`:** nummerierte Liste (Name, Bedingungen → Aktion, Ebene, Client), je Regel Schalter
+    „Aktiv“, nach oben/unten, bearbeiten, entfernen; Entwurf wie im Katalog (Speichern der ganzen Liste mit der
+    gelesenen `version`, 409 → Hinweis und Neuladen, „Verwerfen“ lädt den Stand des Servers, Hinweis bei neuerem
+    Stand, Warnung vor dem Schließen des Fensters). Viewer lesen nur. Höchstens 50 Regeln.
+  - **`automations/RuleDialog.vue`:** Name, Ebene (Targets → Gebot, Kampagnen → Budget), Client oder alle, 1–5
+    Bedingungen (beim ACoS wahlweise in % des Ziels), Aktion mit Wert; Texte mit Komma, geprüft mit
+    `automationRuleSchema`; „Übernehmen“ ändert nur den Entwurf.
+  - **Vorschau** nur auf Knopfdruck, auch für den ungespeicherten Entwurf und für Viewer; Zähler je Regel und die
+    Zahl der geprüften Targets und Kampagnen, mit dem Hinweis auf die Vereinfachungen aus 5.6a. Jede Änderung der
+    Liste verwirft das Ergebnis.
+  - **Gelöschter Client:** Die Seite kennt nur Clients mit sichtbarem Profil (aus den Einstellungen); Regeln mit
+    einem anderen Client heißen „Client gelöscht oder nicht sichtbar“. Der Server lehnt Listen mit einem gelöschten
+    Client ab (`AUTOMATION_RULES_UNKNOWN_CLIENT`), der Hinweis sagt: entfernen oder neu zuordnen.
+  - **Review (ponytail-review):** Der Entwurf blieb beim Wechsel der Organisation stehen und wäre in der anderen
+    gespeichert worden (behoben, Test); `aria-label` an der Platznummer entfernt (die Liste ist ein `ol`). Der
+    Struktur-Katalog hat vermutlich denselben Fehler (eigene Aufgabe vorgeschlagen).
+  - Browser-Pane geprüft (Desktop dunkel, Handy hell, Dialog, Speichern, Neuladen, Vorschau, Konsole).
+  - **Nicht gebaut:** Ziehen mit der Maus (Pfeile reichen), „Startregeln wiederherstellen“, Rückfrage beim
+    Entfernen (erst „Regeln speichern“ schreibt), Warnung beim Verlassen der Seite innerhalb der App (wie im Katalog
+    nur beim Schließen des Fensters).
+  - **Nicht nach TDD im strengen Sinn:** Die Tests standen vor dem Code, liefen aber erst danach zum ersten Mal
+    (zwei schlugen an geschützten Leerzeichen fehl); nur der Test zum Wechsel der Organisation lief vorher rot.
+- **Entschieden (Dominik, 2026-10-10, zu Beginn der Session; für 5.7 und 5.8):**
+  - **Geschützte Begriffe** bleiben wie in 5.5: Der Boden gilt wie für jedes Target, Regeln mit „pausieren“ oder
+    „setzen“ lassen sie aus; keine strengere Behandlung.
+  - **Benachrichtigung „N neue Vorschläge“** nur im Modus `cart`, an den zuständigen Nutzer; im Schattenmodus keine.
+  - **Verworfene Vorschläge** bleiben verworfen, bis eine neue Datei mit Kennzahlen kommt.
 
 ### 5.7 Pipeline (`apps/worker`, `packages/db`)
 - [ ] Job `automation-run` je Profil über `runJob`: nach jedem Import mit Kennzahlen und täglich per Cron; ohne neue

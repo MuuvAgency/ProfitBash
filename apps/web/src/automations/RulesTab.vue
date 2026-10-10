@@ -136,6 +136,12 @@ function move(index: number, step: number) {
 
 const saveErrorKey = ref<string | null>(null);
 const savedNotice = ref(false);
+// Die Seite bleibt beim Wechsel der Organisation stehen: Der Entwurf der alten darf nicht in der neuen landen.
+watch(orgId, () => {
+  loaded.value = false;
+  editing.value = null;
+  saveErrorKey.value = null;
+});
 watch(serialized, () => (savedNotice.value = false));
 const save = useMutation({
   mutationFn: () => api.automations.saveRules({ rules: draft.value, version: baseVersion.value }),
@@ -247,10 +253,8 @@ const countText = (rule: AutomationRule) =>
           :data-rule-row="rule.id"
           class="flex flex-wrap items-center gap-x-space-md gap-y-space-xs border-b border-line py-space-sm last:border-b-0"
         >
-          <span
-            class="w-6 shrink-0 font-data text-body-sm text-ink-tertiary"
-            :aria-label="t('automations.rules.position', { n: index + 1 })"
-          >
+          <!-- Die Nummer liefert schon die Liste (ol). -->
+          <span class="w-6 shrink-0 font-data text-body-sm text-ink-tertiary" aria-hidden="true">
             {{ index + 1 }}
           </span>
           <div class="flex min-w-0 flex-1 basis-64 flex-col gap-space-xs">
