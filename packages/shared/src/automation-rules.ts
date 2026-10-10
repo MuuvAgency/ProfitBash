@@ -144,3 +144,19 @@ export type AutomationRulesResponse = z.infer<typeof automationRulesResponseSche
 export const saveAutomationRulesRequestSchema = z
   .strictObject({ rules: automationRulesSchema, version: z.int().min(0) })
   .meta({ id: 'SaveAutomationRulesRequest' });
+
+/** Vorschau für eine (auch ungespeicherte) Liste. */
+export const previewAutomationRulesRequestSchema = z
+  .strictObject({ rules: automationRulesSchema })
+  .meta({ id: 'PreviewAutomationRulesRequest' });
+
+export const automationRulesPreviewSchema = z
+  .object({
+    /** Je Regel in der Reihenfolge der Liste: Entities, für die sie heute als erste greifen würde. */
+    counts: z.array(z.object({ ruleId: z.uuid(), entities: z.int() })),
+    /** Aktive Targets bzw. Kampagnen mit Kennzahlen, gegen die geprüft wurde. */
+    targets: z.int(),
+    campaigns: z.int(),
+  })
+  .meta({ id: 'AutomationRulesPreview' });
+export type AutomationRulesPreview = z.infer<typeof automationRulesPreviewSchema>;

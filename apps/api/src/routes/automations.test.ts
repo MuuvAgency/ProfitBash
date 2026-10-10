@@ -237,4 +237,24 @@ describe('Regeln der Automatik (/api/ads/automations/rules)', () => {
     expect((await putRules(admin, [{ ...own, conditions: [] }], 1)).status).toBe(400);
     expect((await putRules(admin, [{ ...own, level: 'campaign' }], 1)).status).toBe(400);
   });
+
+  it('Vorschau: zählt je Regel, speichert nichts und braucht nur „view“', async () => {
+    const res = await call<{ counts: { ruleId: string; entities: number }[] }>(
+      'POST',
+      '/rules/preview',
+      viewer,
+      { rules: [own] },
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      counts: [{ ruleId: own.id, entities: 0 }],
+      targets: 0,
+      campaigns: 0,
+    });
+    expect(await ctx.testDb.db.select().from(automationRules)).toHaveLength(0);
+    expect(
+      (await call('POST', '/rules/preview', viewer, { rules: [{ ...own, name: '' }] })).status,
+    ).toBe(400);
+    expect((await call('POST', '/rules/preview', undefined, { rules: [] })).status).toBe(401);
+  });
 });

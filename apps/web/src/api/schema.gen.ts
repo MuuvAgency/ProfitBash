@@ -6343,6 +6343,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/automations/rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vorschau: für wie viele Entities würde jede Regel heute greifen
+         * @description Speichert nichts. Geprüft werden aktive Targets und Kampagnen der sichtbaren Profile mit ihrem Datenstand; das Ziel kommt von Profil bzw. Client (ohne Produktgruppen), Leitplanken bleiben außen vor.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PreviewAutomationRulesRequest"];
+                };
+            };
+            responses: {
+                /** @description Zähler je Regel. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationRulesPreview"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8791,6 +8861,18 @@ export interface components {
         SaveAutomationRulesRequest: {
             rules: components["schemas"]["AutomationRule"][];
             version: number;
+        };
+        AutomationRulesPreview: {
+            counts: {
+                /** Format: uuid */
+                ruleId: string;
+                entities: number;
+            }[];
+            targets: number;
+            campaigns: number;
+        };
+        PreviewAutomationRulesRequest: {
+            rules: components["schemas"]["AutomationRule"][];
         };
     };
     responses: never;
