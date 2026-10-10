@@ -10983,6 +10983,241 @@
           "overrides"
         ],
         "additionalProperties": false
+      },
+      "AutomationRulesResponse": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationRule"
+            },
+            "maxItems": 50
+          },
+          "version": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "rules",
+          "version",
+          "updatedAt"
+        ]
+      },
+      "AutomationRule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "target",
+              "campaign"
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "enum": [
+                    "impressions",
+                    "clicks",
+                    "spend",
+                    "sales",
+                    "orders",
+                    "acos",
+                    "cpc"
+                  ]
+                },
+                "comparator": {
+                  "type": "string",
+                  "enum": [
+                    "gt",
+                    "gte",
+                    "lt",
+                    "lte"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                },
+                "relativeToGoal": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "metric",
+                "comparator",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 5
+          },
+          "action": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "changePercent"
+                    ]
+                  },
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "bid",
+                      "budget"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^-?\\d{1,7}(\\.\\d{1,2})?$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "field",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "changeAbsolute"
+                    ]
+                  },
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "bid",
+                      "budget"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^-?\\d{1,7}(\\.\\d{1,2})?$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "field",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "set"
+                    ]
+                  },
+                  "field": {
+                    "type": "string",
+                    "enum": [
+                      "bid",
+                      "budget"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+                  }
+                },
+                "required": [
+                  "type",
+                  "field",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "pause"
+                    ]
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "level",
+          "conditions",
+          "action",
+          "clientId",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "SaveAutomationRulesRequest": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationRule"
+            },
+            "maxItems": 50
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "rules",
+          "version"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -17077,6 +17312,115 @@
           },
           "404": {
             "description": "Client nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/rules": {
+      "get": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Regeln der Organisation in ihrer Reihenfolge (erste passende gewinnt)",
+        "responses": {
+          "200": {
+            "description": "Regeln.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRulesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Regeln speichern (ganze Liste, Recht „write“)",
+        "description": "`version` ist die zuletzt gelesene; hat inzwischen jemand gespeichert, antwortet der Server mit 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveAutomationRulesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Regeln.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRulesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Inzwischen geändert.",
             "content": {
               "application/json": {
                 "schema": {

@@ -6226,6 +6226,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/automations/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Regeln der Organisation in ihrer Reihenfolge (erste passende gewinnt) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Regeln. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationRulesResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Regeln speichern (ganze Liste, Recht „write“)
+         * @description `version` ist die zuletzt gelesene; hat inzwischen jemand gespeichert, antwortet der Server mit 409.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SaveAutomationRulesRequest"];
+                };
+            };
+            responses: {
+                /** @description Regeln. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationRulesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Inzwischen geändert. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8625,6 +8742,55 @@ export interface components {
             /** Format: uuid */
             responsibleUserId: string | null;
             overrides: components["schemas"]["GuardrailOverrides"];
+        };
+        AutomationRulesResponse: {
+            rules: components["schemas"]["AutomationRule"][];
+            version: number;
+            updatedAt: string | null;
+        };
+        AutomationRule: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            level: "target" | "campaign";
+            conditions: {
+                /** @enum {string} */
+                metric: "impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc";
+                /** @enum {string} */
+                comparator: "gt" | "gte" | "lt" | "lte";
+                value: string;
+                relativeToGoal?: boolean;
+            }[];
+            action: {
+                /** @enum {string} */
+                type: "changePercent";
+                /** @enum {string} */
+                field: "bid" | "budget";
+                value: string;
+            } | {
+                /** @enum {string} */
+                type: "changeAbsolute";
+                /** @enum {string} */
+                field: "bid" | "budget";
+                value: string;
+            } | {
+                /** @enum {string} */
+                type: "set";
+                /** @enum {string} */
+                field: "bid" | "budget";
+                value: string;
+            } | {
+                /** @enum {string} */
+                type: "pause";
+            };
+            /** Format: uuid */
+            clientId: string | null;
+            enabled: boolean;
+        };
+        SaveAutomationRulesRequest: {
+            rules: components["schemas"]["AutomationRule"][];
+            version: number;
         };
     };
     responses: never;

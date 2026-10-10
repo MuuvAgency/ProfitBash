@@ -1,7 +1,9 @@
 import { schema } from '@profitbash/db';
 import { seedAdChangeFixture, type AdChangeFixture } from '@profitbash/db/testing';
 import {
+  DEFAULT_AUTOMATION_RULES,
   DEFAULT_GUARDRAILS,
+  type AutomationRulesResponse,
   type AutomationSettings,
   type ErrorResponse,
 } from '@profitbash/shared';
@@ -20,6 +22,7 @@ const {
   amazonAdsProfiles,
   auditEvents,
   automationDefaults,
+  automationRules,
   clientAutomationSettings,
   clients,
   orgEntitlements,
@@ -100,6 +103,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await ctx.testDb.db.delete(clientAutomationSettings);
   await ctx.testDb.db.delete(automationDefaults);
+  await ctx.testDb.db.delete(automationRules);
   await hide(false);
 });
 
@@ -196,5 +200,41 @@ describe('Einstellungen der Automatik (/api/ads/automations/settings)', () => {
         .insert(orgEntitlements)
         .values({ organizationId: ctx.seeded.organizationId, feature: 'automations' });
     }
+  });
+});
+
+describe('Regeln der Automatik (/api/ads/automations/rules)', () => {
+  const rules = (cookie?: string) => call<AutomationRulesResponse>('GET', '/rules', cookie);
+  const putRules = (cookie: string | undefined, list: unknown, version = 0) =>
+    call<AutomationRulesResponse>('PUT', '/rules', cookie, { rules: list, version });
+  const own = { ...DEFAULT_AUTOMATION_RULES[0]!, name: 'Eigene Regel' };
+
+  it('liefert die Startregeln; Editoren speichern, Viewer lesen nur', async () => {
+    const initial = await rules(viewer);
+    expect(initial.status).toBe(200);
+    expect(initial.body).toEqual({ rules: DEFAULT_AUTOMATION_RULES, version: 0, updatedAt: null });
+
+    const saved = await putRules(editor, [{ ...own, clientId: client }]);
+    expect(saved.status).toBe(200);
+    expect(saved.body).toMatchObject({ version: 1, rules: [{ name: 'Eigene Regel' }] });
+    expect(typeof saved.body.updatedAt).toBe('string');
+    expect((await putRules(viewer, [], 1)).status).toBe(403);
+    expect((await rules()).status).toBe(401);
+    // Die andere Organisation sieht ihre eigenen (Start-)Regeln.
+    expect((await rules(foreign)).body.version).toBe(0);
+  });
+
+  it('meldet veraltete Versionen, fremde Clients und ungültige Regeln', async () => {
+    await putRules(admin, [own]);
+    const stale = await putRules(editor, [], 0);
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe('AUTOMATION_RULES_VERSION_CONFLICT');
+
+    const fromOutside = await putRules(foreign, [{ ...own, clientId: client }]);
+    expect(fromOutside.status).toBe(400);
+    expect(fromOutside.body.error.code).toBe('AUTOMATION_RULES_UNKNOWN_CLIENT');
+
+    expect((await putRules(admin, [{ ...own, conditions: [] }], 1)).status).toBe(400);
+    expect((await putRules(admin, [{ ...own, level: 'campaign' }], 1)).status).toBe(400);
   });
 });
