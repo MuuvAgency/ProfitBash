@@ -33,6 +33,8 @@ export interface NotificationHub {
   start(): Promise<void>;
   /** Meldet einen Client an; liefert die Abmeldung. */
   subscribe(subscriber: NotificationSubscriber): () => void;
+  /** Verbundene Clients (Log und Tests: hängengebliebene Abonnenten fallen so auf). */
+  subscriberCount(): number;
   stop(): Promise<void>;
 }
 
@@ -96,6 +98,7 @@ export function createNotificationHub(options: {
       subscribers.add(subscriber);
       return () => subscribers.delete(subscriber);
     },
+    subscriberCount: () => subscribers.size,
     async stop() {
       for (const subscriber of subscribers) subscriber.close();
       subscribers.clear();

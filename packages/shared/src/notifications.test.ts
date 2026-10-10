@@ -62,8 +62,9 @@ describe('notificationListQuerySchema', () => {
 describe('markNotificationsReadRequestSchema', () => {
   it('nimmt entweder IDs oder „alle“', () => {
     expect(
-      markNotificationsReadRequestSchema.safeParse({ ids: ['0b7e1a6c-3c2a-4a7e-9a52-4b8d8b0d2f11'] })
-        .success,
+      markNotificationsReadRequestSchema.safeParse({
+        ids: ['0b7e1a6c-3c2a-4a7e-9a52-4b8d8b0d2f11'],
+      }).success,
     ).toBe(true);
     expect(markNotificationsReadRequestSchema.safeParse({ all: true }).success).toBe(true);
     expect(markNotificationsReadRequestSchema.safeParse({}).success).toBe(false);

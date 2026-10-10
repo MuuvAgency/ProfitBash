@@ -28,6 +28,9 @@ import {
 import { AccessDeniedError, canSeeProfile, getOrgRole } from './access';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import { createNotification } from './notifications';
+
+/** Länge des Fehlertexts in der Benachrichtigung (der volle steht im Verlauf der Uploads). */
+const NOTIFICATION_ERROR_MAX = 300;
 import type { Db } from './client';
 import { amazonAdsCampaigns, amazonAdsProfiles, fileImportContents, fileImports } from './schema';
 
@@ -397,7 +400,8 @@ async function closeFileImport(db: DbOrTx, input: CloseInput & { jobRunId?: stri
     severity: failed ? 'error' : 'success',
     params: {
       fileName: closed.fileName,
-      ...(failed && input.error !== null && { error: input.error }),
+      ...(failed &&
+        input.error !== null && { error: input.error.slice(0, NOTIFICATION_ERROR_MAX) }),
     },
     link: '/admin/connections',
     dedupeKey: `file_import:${closed.id}`,

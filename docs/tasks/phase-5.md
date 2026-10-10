@@ -210,9 +210,17 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     wären). `NotificationHub` (`notification-hub.ts`) hält eine eigene `LISTEN`-Verbindung auf `DATABASE_URL_DIRECT` und
     prüft je Ereignis für jeden Abonnenten der Organisation die Sichtbarkeit; beim Herunterfahren schließt er die
     offenen Kanäle. Ohne Hub antwortet der Kanal mit 503.
-  - **Offen für 5.2b:** Der Client erkennt Doppelte an `seq` (erst abonnieren, dann nachholen) und lädt bei `resync`
-    Liste und Zähler neu. Eine Nummer, die vor einer kleineren committet, kann bei der Wiederaufnahme fehlen (seltene
-    Überholung paralleler Transaktionen); die Liste beim Öffnen der Glocke gleicht das aus.
+  - **Nach dem Review (2026-10-10):** Der SSE-Callback räumt in `finally` auf (Abonnent, Heartbeat), auch wenn das
+    Nachholen scheitert (Hono ruft `onAbort` nach einem Fehler nicht mehr); Warten über ein Promise statt einer Schleife;
+    `subscriberCount()` am Hub; der Fehlertext in den Parametern ist auf 300 Zeichen gekürzt.
+  - **Vertrag für 5.2b (Client):** Doppelte an `seq` erkennen (erst abonnieren, dann nachholen) und nach `seq` sortieren
+    (die Zustellung läuft je Ereignis parallel); bei `resync` Liste und Zähler neu laden. Der Kanal gilt für die
+    Organisation beim Verbinden: nach Wechsel der Organisation und beim Abmelden die `EventSource` schließen bzw. neu
+    öffnen. Eine Nummer, die vor einer kleineren committet, kann bei der Wiederaufnahme fehlen (seltene Überholung
+    paralleler Transaktionen); Zähler per REST und die Liste beim Öffnen der Glocke gleichen das aus.
+  - **Offen (Review, bewusst nicht gebaut):** Ein offener Kanal prüft die Session nicht erneut (nach Abmelden in einem
+    anderen Tab liefert er weiter, Sichtbarkeit wird aber je Ereignis geprüft); kein Test für `resync` nach einer
+    Unterbrechung des LISTEN und für den Fehlerpfad beim Nachholen (bräuchte eine fehlschlagende Datenbank).
   - **Offen für später:** SSE hinter dem Proxy von Railway prüfen (siehe unten); Benachrichtigungen neuer Quellen
     (Vorschläge 5.7, Caps 5.9b, Prüfungen 5.10) über `createNotification` mit eigenem `kind`.
 

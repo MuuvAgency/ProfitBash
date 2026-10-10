@@ -81,9 +81,7 @@ export async function notifyExpiringConsents(db: Db, input: { now: Date }): Prom
       email: connections.externalAccountEmail,
     })
     .from(connections)
-    .where(
-      and(gte(connections.consentedAt, earliest), lte(connections.consentedAt, latest)),
-    );
+    .where(and(gte(connections.consentedAt, earliest), lte(connections.consentedAt, latest)));
   let created = 0;
   for (const row of rows) {
     const expiresAt = refreshTokenExpiresAt(row.consentedAt)!;

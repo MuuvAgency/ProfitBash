@@ -1,10 +1,6 @@
 import { createNotification, schema, type CreateNotificationInput } from '@profitbash/db';
 import { seedAdChangeFixture, type AdChangeFixture } from '@profitbash/db/testing';
-import type {
-  ErrorResponse,
-  Notification,
-  NotificationListResponse,
-} from '@profitbash/shared';
+import type { ErrorResponse, Notification, NotificationListResponse } from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
@@ -258,6 +254,13 @@ describe('GET /api/notifications/stream', () => {
       { days: 10 },
     ]);
     expect(events.some((event) => event.event === 'ping')).toBe(true);
+  });
+
+  it('meldet den Abonnenten ab, sobald der Client trennt', async () => {
+    const before = hub.subscriberCount();
+    const res = await openStream(editor);
+    await readEvents(res, (list) => list.some((event) => event.event === 'ready'));
+    await expect.poll(() => hub.subscriberCount()).toBe(before);
   });
 
   it('beendet offene Kanäle, wenn der Hub stoppt (Herunterfahren)', async () => {
