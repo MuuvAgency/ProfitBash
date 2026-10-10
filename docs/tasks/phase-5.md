@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b. Als Nächstes: 5.7.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7. Als Nächstes: 5.8.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -459,14 +459,66 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **Verworfene Vorschläge** bleiben verworfen, bis eine neue Datei mit Kennzahlen kommt.
 
 ### 5.7 Pipeline (`apps/worker`, `packages/db`)
-- [ ] Job `automation-run` je Profil über `runJob`: nach jedem Import mit Kennzahlen und täglich per Cron; ohne neue
+- [x] Job `automation-run` je Profil über `runJob`: nach jedem Import mit Kennzahlen und täglich per Cron; ohne neue
       Kennzahlen und ohne geänderte Regeln, Ziele oder Einstellungen tut er nichts.
-- [ ] Ablauf: Datenstand → Regeln → Optimizer → Leitplanken → Lauf und Vorschläge speichern (Regel bzw. Optimizer-Schritt,
+- [x] Ablauf: Datenstand → Regeln → Optimizer → Leitplanken → Lauf und Vorschläge speichern (Regel bzw. Optimizer-Schritt,
       vorher/nachher, Begründung, begrenzt durch). Modus `cart`: Warenkorb des zuständigen Nutzers (siehe oben),
       `ad_changes.origin` und `AD_CHANGE_ORIGINS` um `automation` und `budget_cap` erweitern, eigener Schutz gegen doppelte
       offene Automatik-Zeilen. Benachrichtigung „N neue Vorschläge“.
-- [ ] ADR 006: Automatik ohne API (Zeitraumsummen, Datenstand als Takt, Vorschläge statt Writes, Warenkorb-Zuordnung,
+- [x] ADR 006: Automatik ohne API (Zeitraumsummen, Datenstand als Takt, Vorschläge statt Writes, Warenkorb-Zuordnung,
       Weg zur API).
+- [x] Umsetzung (2026-10-10, Stand für 5.8 und 5.9b):
+  - **Engine** `packages/engine/src/pipeline.ts`: `decideTarget` (erste passende Regel, sonst Optimizer, danach
+    Leitplanken; „pausieren“ und „setzen“ nicht für geschützte Begriffe; nichts für inaktive Entities und
+    vCPM-Kampagnen) und `decideCampaign` (nur Regeln: Budget mit `applyBudgetGuardrail`, pausieren). Ergebnis: Vorschlag
+    (`field` `bid` | `budget` | `state`, vorher/nachher, Herkunft, Regel, `limitedBy`, gewünschter Wert) oder der Grund
+    ohne Vorschlag (`inactive`, `vcpm`, `noGoal`, `noBase`, `insufficientData`, `unchanged`, `protectedTerm`, `noRule`).
+  - **Tabellen** (Migration `0041_automation_runs`): `automation_runs` (Profil, Modus, Zuständiger, Datenstand,
+    `fingerprint`, Zähler, Hinweise) und `automation_proposals` (Entity, Feld, vorher/nachher, Herkunft, Regel mit
+    Name zum Zeitpunkt des Laufs, `limited_by`, `detail` mit Kennzahlen und Ziel, Status `open` | `staged` |
+    `dismissed` | `superseded`, `ad_change_id`, `resolved_by`/`resolved_at` für 5.8). `ad_changes.origin` und
+    `AD_CHANGE_ORIGINS` um `automation` und `budget_cap` erweitert; Index `ad_changes_automation_pending_uq` (je
+    Entity und Feld höchstens eine offene Automatik-Zeile).
+  - **Zugriffe** `packages/db/src/automation-runs.ts` (Systemzugriff für den Job): `planAutomationRun` (Profil nicht
+    entfernt oder ausgeblendet, Modus, Zuständiger mit Schreibrecht, sonst `shadow`; wirksame Leitplanken
+    `{...Organisation, ...Client}` in EUR; EZB-Kurs; Regeln; Ziele von Client, Profil und Produktgruppen des Profils
+    als `GoalSetting[]`; geschützte Begriffe; Datenstand; `fingerprint`), `loadAutomationRunEntities` (Kampagnen,
+    Ad Groups mit Produktgruppen über die ASINs ihrer Anzeigen, Targets mit Kennzahlen des Datenstands;
+    händisch gesperrte Entities; Ausgangswert und Wert zu Beginn der 7 Tage aus `ad_changes`), `saveAutomationRun`
+    (eine Transaktion: Verworfenes des Datenstands auslassen, eigene offene Warenkorb-Zeilen ersetzen, ältere
+    Vorschläge ablösen, Lauf und Vorschläge schreiben, Audit `automation_run.create`, Benachrichtigungen),
+    `listAutomationRunProfiles`.
+  - **Job** `apps/worker/src/jobs/automation-run.ts`: `runAutomation` (ohne fälligen Lauf `null`, kein `job_runs`),
+    `computeAutomationProposals` (rechnet die Leitplanken mit dem Kurs in die Währung des Profils um, Ziel je Target
+    über die Produktgruppen der Ad Group, Grenzen über `amazonAdsValueLimit`), `dispatchAutomationRuns`. Queues
+    `automation-run` (je Profil, nach jedem Import mit `entityMetrics`) und `automation-run-all` (07:30 Berlin). Der
+    Job erscheint im Sync-Status („Automatik-Lauf“).
+  - **Benachrichtigungen:** `automation_proposals` (nur Modus `cart`, an den Zuständigen, Link zum Warenkorb) und
+    `automation_responsible_missing` (an die Admins, wenn der Zuständige fehlt oder nicht mehr schreiben darf).
+  - **Abweichung von „Basis für Leitplanken“ (ADR 006, Punkt 7):** Angewendete Änderungen zählen nur 7 Tage lang als
+    Ausgangswert, übermittelte ohne Frist; danach gilt der Wert der Entity (der nächste Import bringt den Stand der
+    Konsole). Die Festlegung oben nennt keine Frist; ohne sie überschriebe eine Monate alte Änderung den importierten Stand.
+  - **Vereinfacht bzw. nicht gebaut:**
+    - Kampagnen nehmen das Ziel von Profil bzw. Client (Produkte mehrerer Gruppen); Targets ohne Ad Group (SB) haben
+      keine Produktgruppe und kein Standardgebot.
+    - Entities werden über die Amazon-ID den Kennzahlen zugeordnet, ohne Ad-Typ (wie die Vorschau in 5.6a).
+    - Eine von Hand gelegte offene Änderung sperrt die ganze Entity, egal welches Feld und in wessen Warenkorb;
+      auch im Schattenmodus.
+    - Regeln ohne Mindestdaten: Sie tragen ihre Schwellen selbst (`hasMinimumData` gilt nur für den Optimizer).
+    - Der Hinweis `olderPeriod` steht am Lauf; eine Benachrichtigung dazu gibt es nicht (Anzeige in 5.8).
+    - Die Seite „Änderungen“ zeigt die Herkunft `automation` noch nicht an (5.8).
+    - Kein Aufräumen alter Läufe und Vorschläge (mit 5.12).
+    - Die Vorschau der Regeln (5.6a) rechnet weiter vereinfacht; sie nutzt den Lauf nicht.
+  - **Nicht nach TDD im strengen Sinn:** Engine- und Datenbanktests entstanden direkt nach dem Code (erste Ausführung
+    mit je einem Fehlschlag aus falschen Erwartungen); die Tests des Jobs und des Auslösers liefen vorher rot.
+  - **Nicht im Browser geprüft:** Der Lauf hat keine eigene Oberfläche (5.8); in der Dev-DB gibt es keine Kennzahlen.
+    Die Dev-DB ist auf `0041_automation_runs` zu migrieren (`pnpm db:migrate`).
+  - **Für 5.8:** Liste der Läufe aus `automation_runs` (Zähler in `counts`: `targets`, `campaigns`, `proposals`,
+    `staged`, `dismissed` und je Grund), Vorschläge aus `automation_proposals`; „in meinen Warenkorb“ legt eine
+    `ad_changes`-Zeile mit Herkunft `automation` für den Nutzer an und setzt `staged`; „verwerfen“ setzt `dismissed`
+    und löscht eine offene Warenkorb-Zeile. Ein `staged`-Vorschlag ohne `ad_change_id` gilt als verworfen.
+  - **Für 5.9b:** Offene Zeilen mit Herkunft `budget_cap` sperren heute die Entity für den Lauf wie händische; der
+    Index erlaubt je Kampagne und Feld nur eine Automatik-Zeile. Der Enforcer legt den Vorrang fest.
 
 ### 5.8 Automationen: Läufe und Vorschläge
 - [ ] Tabs **Läufe** (je Profil, Datenstand, Anzahl Vorschläge, Status) und **Vorschläge** (Grid: Entity, vorher, nachher,

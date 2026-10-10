@@ -7,7 +7,7 @@ später ergänzt um Profitabilität (SP-API). Fokus jetzt: **nur Amazon Ads**.
 **Vor jeder Aufgabe lesen:**
 1. `docs/plan.md` – Roadmap, Navigation, Feature-Keys, Architektur-Leitplanken
 2. `docs/tasks/phase-N.md` – die aktuelle Phase (Häkchen zeigen den Stand)
-3. `docs/decisions/` – getroffene Entscheidungen (ADRs, u. a. 001 Stack, 002 Mandanten-Modell). Nicht stillschweigend davon abweichen.
+3. `docs/decisions/` – getroffene Entscheidungen (ADRs, u. a. 001 Stack, 002 Mandanten-Modell, 006 Automatik ohne API). Nicht stillschweigend davon abweichen.
 
 ## Struktur
 ```
