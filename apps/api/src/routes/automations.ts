@@ -1,14 +1,19 @@
 import { createRoute, z, type OpenAPIHono } from '@hono/zod-openapi';
 import {
   AutomationError,
+  getAutomationRules,
   getAutomationSettings,
+  saveAutomationRules,
+  type StoredAutomationRules,
   saveGuardrailDefaults,
   setClientAutomation,
 } from '@profitbash/db';
 import {
+  automationRulesResponseSchema,
   automationSettingsSchema,
   errorResponseSchema,
   guardrailsSchema,
+  saveAutomationRulesRequestSchema,
   setClientAutomationRequestSchema,
 } from '@profitbash/shared';
 import type { AppDeps, AppEnv } from '../context';
@@ -69,10 +74,37 @@ const clientRoute = createRoute({
   },
 });
 
+const rulesResponse = { description: 'Regeln.', content: json(automationRulesResponseSchema) };
+
+const rulesRoute = createRoute({
+  method: 'get',
+  path: '/ads/automations/rules',
+  tags: ['Automationen'],
+  summary: 'Regeln der Organisation in ihrer Reihenfolge (erste passende gewinnt)',
+  responses: { 200: rulesResponse, 401: errors[401], 403: errors[403] },
+});
+
+const saveRulesRoute = createRoute({
+  method: 'put',
+  path: '/ads/automations/rules',
+  tags: ['Automationen'],
+  summary: 'Regeln speichern (ganze Liste, Recht „write“)',
+  description:
+    '`version` ist die zuletzt gelesene; hat inzwischen jemand gespeichert, antwortet der Server mit 409.',
+  request: { body: { content: json(saveAutomationRulesRequestSchema), required: true } },
+  responses: {
+    200: rulesResponse,
+    ...errors,
+    409: { description: 'Inzwischen geändert.', content: json(errorResponseSchema) },
+  },
+});
+
 const STATUS_BY_CODE = {
   FORBIDDEN: [403, 'AUTOMATION_DEFAULTS_FORBIDDEN'],
   NOT_FOUND: [404, 'CLIENT_NOT_FOUND'],
   INVALID_RESPONSIBLE: [400, 'AUTOMATION_INVALID_RESPONSIBLE'],
+  VERSION_CONFLICT: [409, 'AUTOMATION_RULES_VERSION_CONFLICT'],
+  UNKNOWN_CLIENT: [400, 'AUTOMATION_RULES_UNKNOWN_CLIENT'],
 } as const;
 
 export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
@@ -122,5 +154,19 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
       }),
     );
     return c.json(await view(actor(c)), 200);
+  });
+
+  const serializeRules = (stored: StoredAutomationRules) => ({
+    ...stored,
+    updatedAt: stored.updatedAt?.toISOString() ?? null,
+  });
+
+  app.openapi({ ...rulesRoute, middleware: guard('view') }, async (c) =>
+    c.json(serializeRules(await run(() => getAutomationRules(db, actor(c)))), 200),
+  );
+
+  app.openapi({ ...saveRulesRoute, middleware: guard('write') }, async (c) => {
+    const saved = await run(() => saveAutomationRules(db, { ...actor(c), ...c.req.valid('json') }));
+    return c.json(serializeRules(saved), 200);
   });
 }
