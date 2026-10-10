@@ -10,6 +10,7 @@ import {
 import { replaceEntityPeriodMetrics, type EntityPeriodMetric } from './entity-period-metrics';
 import { eq } from 'drizzle-orm';
 import {
+  amazonAdsCampaigns,
   amazonAdsEntityPeriodMetrics,
   amazonAdsProfiles,
   amazonAdsTargets,
@@ -243,6 +244,10 @@ describe('previewAutomationRules', () => {
       .where(eq(amazonAdsTargets.id, f.keyword));
     expect(await preview([noOrders])).toMatchObject({ counts: [{ entities: 0 }], targets: 1 });
     await testDb.db.update(amazonAdsTargets).set({ state: 'ENABLED' });
+    // vCPM-Gebote gelten je 1000 Impressions: Gebotsregeln lassen sie aus, Budgetregeln nicht.
+    await testDb.db.update(amazonAdsCampaigns).set({ extra: { costType: 'VCPM' } });
+    expect(await preview([noOrders, budget])).toMatchObject({ targets: 0, campaigns: 1 });
+    await testDb.db.update(amazonAdsCampaigns).set({ extra: {} });
     await testDb.db
       .update(amazonAdsProfiles)
       .set({ isHidden: true })
