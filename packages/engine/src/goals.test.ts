@@ -9,6 +9,8 @@ describe('goalValues', () => {
     expect(goalValues('acos', '30')).toEqual({ acos: '30', roas: '3.33' });
     expect(goalValues('roas', '3')).toEqual({ acos: '33.33', roas: '3' });
     expect(goalValues('roas', '2.5')).toEqual({ acos: '40', roas: '2.5' });
+    // Kaufmännisch gerundet wie die Vorschau im Dialog (100 / 32 = 3,125).
+    expect(goalValues('acos', '32').roas).toBe('3.13');
   });
 });
 
@@ -65,14 +67,13 @@ describe('calculateTargetAcos', () => {
     // (29.99 − 9.50 − 8.20) / 29.99 = 40.98 %
     expect(
       calculateTargetAcos({ price: '29.99', unitCost: '9.50', fees: '8.20', margin: '10' }),
-    ).toEqual({ breakEvenAcos: '40.98', targetAcos: '30.98', targetRoas: '3.23' });
+    ).toEqual({ breakEvenAcos: '40.98', targetAcos: '30.98' });
   });
 
   it('ohne Marge ist das Ziel der Break-even', () => {
     expect(calculateTargetAcos({ price: '20', unitCost: '5', fees: '5', margin: '0' })).toEqual({
       breakEvenAcos: '50',
       targetAcos: '50',
-      targetRoas: '2',
     });
   });
 
@@ -80,12 +81,10 @@ describe('calculateTargetAcos', () => {
     expect(calculateTargetAcos({ price: '10', unitCost: '6', fees: '5', margin: '0' })).toEqual({
       breakEvenAcos: '-10',
       targetAcos: null,
-      targetRoas: null,
     });
     expect(calculateTargetAcos({ price: '20', unitCost: '5', fees: '5', margin: '50' })).toEqual({
       breakEvenAcos: '50',
       targetAcos: null,
-      targetRoas: null,
     });
   });
 });

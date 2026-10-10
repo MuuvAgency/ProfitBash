@@ -5,6 +5,7 @@ import { Dec, formatDecimal, parseDecimal, type DecimalString } from './decimal'
  * Prozent, ROAS als Faktor; das eine folgt aus dem anderen (ROAS = 100 / ACoS). Ohne I/O.
  */
 
+// Wie `GOAL_METRICS`/`GOAL_SCOPES` in shared; die Engine importiert die Wurzel von shared nicht (kein DOM/Node im tsconfig).
 export type GoalMetric = 'acos' | 'roas';
 export type GoalScope = 'client' | 'profile' | 'productGroup';
 
@@ -16,12 +17,12 @@ export interface GoalSetting {
   value: DecimalString;
 }
 
-/** Stellen der umgerechneten Anzeige; der gesetzte Wert bleibt exakt. */
+/** Stellen der umgerechneten Anzeige (kaufmännisch gerundet wie im Web); der gesetzte Wert bleibt exakt. */
 const DERIVED_PLACES = 2;
 const HUNDRED = new Dec(100);
 
 const round = (value: InstanceType<typeof Dec>) =>
-  formatDecimal(value.toDecimalPlaces(DERIVED_PLACES, Dec.ROUND_HALF_EVEN));
+  formatDecimal(value.toDecimalPlaces(DERIVED_PLACES, Dec.ROUND_HALF_UP));
 
 function exactAcos(metric: GoalMetric, value: DecimalString) {
   const parsed = parseDecimal(value);
@@ -90,7 +91,6 @@ export interface TargetAcosInput {
 export function calculateTargetAcos(input: TargetAcosInput): {
   breakEvenAcos: DecimalString;
   targetAcos: DecimalString | null;
-  targetRoas: DecimalString | null;
 } {
   const price = parseDecimal(input.price);
   if (!price.gt(0)) throw new RangeError('Der Preis muss größer als 0 sein.');
@@ -100,10 +100,9 @@ export function calculateTargetAcos(input: TargetAcosInput): {
     .div(price)
     .times(HUNDRED);
   const target = breakEven.minus(parseDecimal(input.margin));
-  const roundedTarget = target.toDecimalPlaces(DERIVED_PLACES, Dec.ROUND_HALF_EVEN);
+  const roundedTarget = target.toDecimalPlaces(DERIVED_PLACES, Dec.ROUND_HALF_UP);
   return {
     breakEvenAcos: round(breakEven),
     targetAcos: roundedTarget.gt(0) ? formatDecimal(roundedTarget) : null,
-    targetRoas: roundedTarget.gt(0) ? round(HUNDRED.div(target)) : null,
   };
 }

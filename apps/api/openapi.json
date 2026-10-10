@@ -10757,18 +10757,11 @@
               "string",
               "null"
             ]
-          },
-          "targetRoas": {
-            "type": [
-              "string",
-              "null"
-            ]
           }
         },
         "required": [
           "breakEvenAcos",
-          "targetAcos",
-          "targetRoas"
+          "targetAcos"
         ]
       },
       "TargetAcosRequest": {

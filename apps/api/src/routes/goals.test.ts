@@ -181,12 +181,12 @@ describe('Rechner (/api/ads/goals/calculate)', () => {
       margin: '15',
     });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ breakEvenAcos: '40', targetAcos: '25', targetRoas: '4' });
+    expect(res.body).toEqual({ breakEvenAcos: '40', targetAcos: '25' });
   });
 
   it('meldet „kein Ziel“, wenn nichts bleibt, und lehnt ungültige Eingaben ab', async () => {
     const none = await calculate(admin, { price: '20', unitCost: '12', fees: '6', margin: '15' });
-    expect(none.body).toEqual({ breakEvenAcos: '10', targetAcos: null, targetRoas: null });
+    expect(none.body).toEqual({ breakEvenAcos: '10', targetAcos: null });
     for (const body of [
       { price: '0', unitCost: '1', fees: '1', margin: '5' },
       { price: '20', unitCost: '-1', fees: '1', margin: '5' },

@@ -13,7 +13,7 @@ export type GoalMetric = (typeof GOAL_METRICS)[number];
 export const GOAL_SCOPES = ['client', 'profile', 'productGroup'] as const;
 export type GoalScope = (typeof GOAL_SCOPES)[number];
 
-/** Grenzen eines Ziels: ACoS über 0 bis 100 %, ROAS 1 bis 100 (dasselbe Band umgerechnet). */
+/** Grenzen der Eingabe: ACoS über 0 bis 100 %, ROAS 1 bis 100. Ein ACoS unter 1 % ergibt einen ROAS über 100 (nur Anzeige). */
 export const GOAL_LIMITS: Record<GoalMetric, { min: number; minExclusive: boolean; max: number }> =
   {
     acos: { min: 0, minExclusive: true, max: 100 },
@@ -136,7 +136,6 @@ export const targetAcosResponseSchema = z
     breakEvenAcos: z.string(),
     /** `null`, wenn nach Kosten und Marge nichts für Werbung bleibt. */
     targetAcos: z.string().nullable(),
-    targetRoas: z.string().nullable(),
   })
   .meta({ id: 'TargetAcosResponse' });
 export type TargetAcosResponse = z.infer<typeof targetAcosResponseSchema>;

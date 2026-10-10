@@ -284,6 +284,13 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **OpenAPI:** `goalSchema.nullable()` machte die Komponente `Goal` selbst nullable; deshalb
     `z.union([goalSchema, z.null()])`.
   - Browser-Pane geprüft (1440 px und Handy, Rechner, Übernehmen, Speichern, Vererbung), Testdaten entfernt.
+  - **Review (zwei Reviewer auf demselben Diff):** Enter im Rechner speicherte das Ziel (jetzt: rechnet), abgeleitete
+    Werte kaufmännisch gerundet wie die Vorschau (100 / 32 = 3,13), `targetRoas` entfernt (ungenutzt), Rechner je
+    Dialog leer, `deleteGoal` ohne Schein-Objekt. Zurückgewiesen: Typen der Engine aus shared importieren (die Engine
+    hat kein DOM/Node im tsconfig, die Wurzel von shared braucht beides); eigener Test für das Skeleton.
+  - **Offen für Dominik (kein Blocker):** Wer nur eines von mehreren Profilen eines Clients sieht, darf das Ziel des
+    Clients setzen; es gilt dann auch für Profile, die er nicht sieht (so im Entwurf). Verliert ein Client sein
+    letztes sichtbares Profil, bleibt sein Ziel gespeichert, ist aber nicht mehr erreichbar.
 
 ### 5.4 Leitplanken und Automations-Einstellungen (`packages/shared`, `packages/db`, `apps/api`, `apps/web`)
 - [ ] Einstellungen je Organisation mit eigenen Startwerten, je Client überschreibbar (F-S6): höchste Gebotsänderung je
