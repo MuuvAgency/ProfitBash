@@ -34,6 +34,7 @@ export * from './product-groups';
 export * from './goals';
 export * from './automation';
 export * from './automation-rules';
+export * from './automation-runs';
 export * from './structure-catalog';
 export * from './campaign-setup';
 export * from './campaign-setup-processing';

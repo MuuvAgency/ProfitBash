@@ -1,8 +1,21 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { clients } from './app';
+import {
+  check,
+  date,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { adChanges } from './ad-changes';
+import { amazonAdsProfiles, clients } from './app';
 import { organizations, users } from './auth';
-import { createdAt, updatedAt } from './columns';
+import { createdAt, id, organizationId, updatedAt } from './columns';
 
 /**
  * Leitplanken der Organisation (`phase-5.md` 5.4): ein Dokument nach `guardrailsSchema` aus `@profitbash/shared`.
@@ -62,3 +75,108 @@ export const automationRules = pgTable('automation_rules', {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/**
+ * Läufe der Automatik je Profil (`phase-5.md` 5.7): worauf gerechnet wurde (Datenstand), in welchem Modus und mit
+ * welchem Ergebnis. Zugriffe nur über `automation-runs.ts`.
+ */
+export const automationRuns = pgTable(
+  'automation_runs',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: uuid('profile_id').notNull(),
+    jobRunId: uuid('job_run_id'),
+    /** `shadow` | `cart`: der wirksame Modus des Laufs (nach der Prüfung des zuständigen Nutzers). */
+    mode: text('mode').notNull(),
+    responsibleUserId: uuid('responsible_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    /** Datenstand: Zeitraum und Upload der Datei, auf der der Lauf gerechnet hat. */
+    periodStart: date('period_start', { mode: 'string' }).notNull(),
+    periodEnd: date('period_end', { mode: 'string' }).notNull(),
+    metricsImportedAt: timestamp('metrics_imported_at', {
+      withTimezone: true,
+      mode: 'date',
+    }).notNull(),
+    /** Hash über Datenstand, Regeln, Ziele und Einstellungen: Ohne Änderung daran gibt es keinen neuen Lauf. */
+    fingerprint: text('fingerprint').notNull(),
+    /** Zähler: geprüfte Targets und Kampagnen, Vorschläge, im Warenkorb, Gründe ohne Vorschlag. */
+    counts: jsonb('counts').$type<Record<string, number>>().notNull(),
+    /** Hinweise zum Lauf, z. B. `olderPeriod` (der Zeitraum endet vor dem des vorigen Laufs). */
+    warnings: jsonb('warnings').$type<string[]>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'automation_runs_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    check('automation_runs_mode_ck', sql`${t.mode} in ('shadow', 'cart')`),
+    index('automation_runs_profile_created_idx').on(t.profileId, t.createdAt.desc()),
+  ],
+);
+
+/**
+ * Vorschläge eines Laufs: gewünschte Änderung an einem Target (Gebot, Zustand) oder einer Kampagne (Budget,
+ * Zustand) mit Herkunft und Begründung. `open`: nur im Protokoll; `staged`: als Änderung im Warenkorb
+ * (`ad_change_id`, leer, wenn sie dort verworfen wurde); `dismissed`: verworfen; `superseded`: von einem neueren
+ * Lauf abgelöst. Entities ohne Fremdschlüssel wie in `ad_changes`.
+ */
+export const automationProposals = pgTable(
+  'automation_proposals',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: uuid('profile_id').notNull(),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => automationRuns.id, { onDelete: 'cascade' }),
+    /** `target` | `campaign`. */
+    entityType: text('entity_type').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    campaignId: uuid('campaign_id').notNull(),
+    adGroupId: uuid('ad_group_id'),
+    /** `bid` | `budget` | `state`. */
+    field: text('field').notNull(),
+    /** Zustand vorher/nachher (`state`) bzw. Betrag in der Währung des Profils. */
+    oldValue: text('old_value'),
+    newValue: text('new_value'),
+    oldAmount: numeric('old_amount', { mode: 'string' }),
+    newAmount: numeric('new_amount', { mode: 'string' }),
+    currencyCode: text('currency_code'),
+    /** `rule` | `optimizer`. */
+    source: text('source').notNull(),
+    /** Regel, die gegriffen hat, mit ihrem Namen zum Zeitpunkt des Laufs (Regeln sind änderbar). */
+    ruleId: uuid('rule_id'),
+    ruleName: text('rule_name'),
+    /** Leitplanken, die den Vorschlag begrenzt haben (`GuardrailReason`). */
+    limitedBy: jsonb('limited_by').$type<string[]>().notNull(),
+    /** Begründung: Kennzahlen des Zeitraums, Ziel, gewünschter Wert vor den Leitplanken. */
+    detail: jsonb('detail').$type<Record<string, unknown>>().notNull(),
+    status: text('status').notNull(),
+    adChangeId: uuid('ad_change_id').references(() => adChanges.id, { onDelete: 'set null' }),
+    /** Wer den Vorschlag übernommen oder verworfen hat (5.8). */
+    resolvedBy: uuid('resolved_by').references(() => users.id, { onDelete: 'set null' }),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'automation_proposals_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    check('automation_proposals_entity_type_ck', sql`${t.entityType} in ('target', 'campaign')`),
+    check('automation_proposals_field_ck', sql`${t.field} in ('bid', 'budget', 'state')`),
+    check('automation_proposals_source_ck', sql`${t.source} in ('rule', 'optimizer')`),
+    check(
+      'automation_proposals_status_ck',
+      sql`${t.status} in ('open', 'staged', 'dismissed', 'superseded')`,
+    ),
+    index('automation_proposals_run_idx').on(t.runId),
+    index('automation_proposals_profile_status_idx').on(t.profileId, t.status),
+    index('automation_proposals_ad_change_idx').on(t.adChangeId),
+  ],
+);

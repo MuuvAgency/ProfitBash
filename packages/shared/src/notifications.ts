@@ -12,6 +12,9 @@ export const NOTIFICATION_KINDS = [
   'submission_failed',
   'bulk_file_stale',
   'consent_expiring',
+  // Automatik (5.7): neue Vorschläge im Warenkorb; zuständiger Nutzer ohne Schreibrecht.
+  'automation_proposals',
+  'automation_responsible_missing',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
