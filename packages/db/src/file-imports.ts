@@ -27,6 +27,7 @@ import {
 } from 'drizzle-orm';
 import { AccessDeniedError, canSeeProfile, getOrgRole } from './access';
 import { recordAuditEvent, type DbOrTx } from './audit';
+import { createNotification } from './notifications';
 import type { Db } from './client';
 import { amazonAdsCampaigns, amazonAdsProfiles, fileImportContents, fileImports } from './schema';
 
@@ -378,8 +379,29 @@ async function closeFileImport(db: DbOrTx, input: CloseInput & { jobRunId?: stri
           : and(eq(fileImports.status, 'running'), eq(fileImports.jobRunId, input.jobRunId)),
       ),
     )
-    .returning({ id: fileImports.id });
+    .returning({
+      id: fileImports.id,
+      profileId: fileImports.profileId,
+      fileName: fileImports.fileName,
+      uploadedBy: fileImports.uploadedBy,
+    });
   if (!closed) return false;
+  // Benachrichtigung (5.2a, Dominik 2026-10-10): Erfolg an den Uploader, Fehler an ihn und die Org-Admins.
+  const failed = input.status === 'failed';
+  await createNotification(db, {
+    organizationId: input.organizationId,
+    profileId: closed.profileId,
+    audience: failed ? 'admins' : 'recipient',
+    recipientUserId: closed.uploadedBy,
+    kind: failed ? 'file_import_failed' : 'file_import_imported',
+    severity: failed ? 'error' : 'success',
+    params: {
+      fileName: closed.fileName,
+      ...(failed && input.error !== null && { error: input.error }),
+    },
+    link: '/admin/connections',
+    dedupeKey: `file_import:${closed.id}`,
+  });
   await db
     .delete(fileImportContents)
     .where(
@@ -399,7 +421,7 @@ export function finishFileImport(
   db: DbOrTx,
   input: CloseInput & { jobRunId: string },
 ): Promise<boolean> {
-  return closeFileImport(db, input);
+  return db.transaction((tx) => closeFileImport(tx, input));
 }
 
 /**
