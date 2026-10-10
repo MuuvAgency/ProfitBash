@@ -642,7 +642,10 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
           'Keine Anlage dieses Setups passt in die Bulk-Datei.',
         );
       }
-      return xlsxResponse(c, setup.file.content, 'profitbash-setup', setup.submission);
+      // Neues Portfolio (4.7) bzw. Anlagen eines Setups.
+      const prefix =
+        setup.submission.kind === 'portfolio' ? 'profitbash-portfolio' : 'profitbash-setup';
+      return xlsxResponse(c, setup.file.content, prefix, setup.submission);
     }
     try {
       // Was inzwischen nicht mehr in die Datei passt, scheitert jetzt; die Datei enthält nur den Rest.
