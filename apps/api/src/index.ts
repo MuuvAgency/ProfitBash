@@ -7,6 +7,7 @@ import { createApp } from './app';
 import { createAuth } from './auth';
 import { loadApiEnv } from './env';
 import { consoleLogger } from './logger';
+import { createNotificationHub } from './notification-hub';
 import { createServerApp } from './web';
 
 const env = loadApiEnv();
@@ -32,6 +33,14 @@ const background =
       })
     : await startJobQueue({ connectionString: env.DATABASE_URL_DIRECT, logger: consoleLogger });
 
+// Live-Kanal der Benachrichtigungen (5.2a): LISTEN braucht die direkte Verbindung.
+const notifications = createNotificationHub({
+  listenUrl: env.DATABASE_URL_DIRECT,
+  db,
+  logger: consoleLogger,
+});
+await notifications.start();
+
 const app = createApp({
   db,
   auth,
@@ -42,6 +51,7 @@ const app = createApp({
   keyring: env.keyring,
   oauthStateSecret: env.OAUTH_STATE_SECRET,
   jobs: background.jobs,
+  notifications,
 });
 
 // Produktion: dieselbe Origin liefert das gebaute Web (apps/web/dist, relativ zu apps/api/dist/index.js).
@@ -64,7 +74,9 @@ function shutdown(signal: NodeJS.Signals) {
   if (stopping) return;
   stopping = true;
   console.log(`${signal} empfangen, API fährt herunter …`);
-  // Erst keine neuen Anfragen, dann laufende Jobs abwarten, zuletzt die Datenbank schließen.
+  // Erst keine neuen Anfragen (offene SSE-Kanäle schließt der Hub), dann laufende Jobs abwarten, zuletzt die
+  // Datenbank schließen.
+  void notifications.stop().catch(() => {});
   httpServer.close(() => {
     background
       .stop()
