@@ -90,7 +90,11 @@ describe('connectNotificationStream', () => {
 
   it('tut ohne EventSource nichts (Abfrage beim Fokus übernimmt)', () => {
     const orgId = ref<string | null>('org-a');
-    const stop = connectNotificationStream({ orgId, onChange: vi.fn(), EventSourceImpl: undefined });
+    const stop = connectNotificationStream({
+      orgId,
+      onChange: vi.fn(),
+      EventSourceImpl: undefined,
+    });
     expect(() => stop()).not.toThrow();
   });
 

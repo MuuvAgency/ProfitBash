@@ -1,10 +1,5 @@
 import type { NotificationKind } from '@profitbash/shared';
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/vue-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onScopeDispose, type Ref } from 'vue';
 import { api } from '../api';
 import { useActiveOrgId } from '../stores/session';

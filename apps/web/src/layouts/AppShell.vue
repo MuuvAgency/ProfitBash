@@ -10,12 +10,16 @@ import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import QuickTools from '../components/shell/QuickTools.vue';
 import SidebarPanel from '../components/shell/SidebarPanel.vue';
 import { errorMessageKey } from '../i18n';
+import NotificationBell from '../notifications/NotificationBell.vue';
+import { useNotificationStream } from '../notifications/queries';
 import { useSessionStore } from '../stores/session';
 import { useSidebarState } from './useSidebarState';
 
 const { t } = useI18n();
 const session = useSessionStore();
 const { collapsed, toggle } = useSidebarState();
+// Live-Kanal der Benachrichtigungen für die ganze Sitzung (je aktiver Organisation, 5.2b).
+useNotificationStream();
 const mobileNavOpen = ref(false);
 const shortcutsOpen = ref(false);
 const retrying = ref(false);
@@ -85,7 +89,10 @@ async function retry() {
         @click="mobileNavOpen = true"
       />
       <RouterLink :to="{ name: 'home' }" class="text-ink"><BrandMark /></RouterLink>
-      <QuickTools variant="bar" collapsed />
+      <div class="flex items-center gap-space-xs">
+        <NotificationBell variant="bar" />
+        <QuickTools variant="bar" collapsed />
+      </div>
     </header>
     <Drawer
       v-model:visible="mobileNavOpen"

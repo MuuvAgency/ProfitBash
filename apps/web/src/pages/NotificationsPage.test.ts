@@ -85,6 +85,18 @@ describe('Seite „Benachrichtigungen“', () => {
     expect(document.querySelector('h1')?.textContent).toContain('Benachrichtigungen');
   });
 
+  it('bietet die Profile der Liste als Filter an, auch mit Daten aus dem Cache', async () => {
+    const { router } = await mountPage({ 'GET /api/settings': json({}) });
+    const profileLabel = () => document.querySelector('#notifications-filter-profile');
+    await vi.waitFor(() => expect(profileLabel()).not.toBeNull());
+    await router.push('/settings');
+    await flushPromises();
+    await router.push('/notifications');
+    await flushPromises();
+    await vi.waitFor(() => expect(items()).toHaveLength(2));
+    expect(profileLabel()).not.toBeNull();
+  });
+
   it('setzt einzelne und alle auf gelesen', async () => {
     const { requests } = await mountPage();
     await vi.waitFor(() => expect(items()).toHaveLength(2));
@@ -125,9 +137,7 @@ describe('Seite „Benachrichtigungen“', () => {
 
   it('zeigt einen leeren Zustand', async () => {
     await mountPage({ 'GET /api/notifications': json({ items: [], nextBefore: null }) });
-    await vi.waitFor(() =>
-      expect(document.body.textContent).toContain('Keine Benachrichtigungen'),
-    );
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Keine Benachrichtigungen'));
   });
 
   it('zeigt einen Fehler mit erneutem Versuch', async () => {

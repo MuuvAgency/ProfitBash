@@ -26,7 +26,9 @@ const { t } = useI18n();
 const filters = ref<NotificationFilters>({ unread: false, kind: null, profileId: null });
 const pages = useNotificationPages(filters);
 const unreadCount = useUnreadNotificationCount();
-const markRead = useMarkNotificationsRead();
+// Getrennt, damit „Alle gelesen“ nur beim eigenen Aufruf lädt.
+const markOne = useMarkNotificationsRead();
+const markAll = useMarkNotificationsRead();
 
 const items = computed(() => pages.data.value?.pages.flatMap((page) => page.items) ?? []);
 const filtered = computed(
@@ -39,11 +41,15 @@ const errorKey = computed(() => {
 
 /** Profile aus den geladenen Benachrichtigungen (gemerkt, damit der Filter sie nicht selbst ausblendet). */
 const seenProfiles = reactive(new Map<string, string>());
-watch(items, (list) => {
-  for (const item of list) {
-    if (item.profileId && item.profileName) seenProfiles.set(item.profileId, item.profileName);
-  }
-});
+watch(
+  items,
+  (list) => {
+    for (const item of list) {
+      if (item.profileId && item.profileName) seenProfiles.set(item.profileId, item.profileName);
+    }
+  },
+  { immediate: true },
+);
 const profileOptions = computed(() =>
   [...seenProfiles.entries()]
     .map(([value, label]) => ({ value, label }))
@@ -58,7 +64,7 @@ function setFilter<K extends keyof NotificationFilters>(key: K, value: Notificat
 }
 
 function read(id: string) {
-  markRead.mutate({ ids: [id] });
+  markOne.mutate({ ids: [id] });
 }
 </script>
 
@@ -71,14 +77,18 @@ function read(id: string) {
           icon="pi pi-check-square"
           variant="outlined"
           size="small"
-          :loading="markRead.isPending.value"
+          :loading="markAll.isPending.value"
           :disabled="(unreadCount.data.value ?? 0) === 0"
-          @click="markRead.mutate({ all: true })"
+          @click="markAll.mutate({ all: true })"
         />
       </template>
     </PageHeader>
 
-    <div class="flex flex-wrap items-end gap-space-md" role="group" :aria-label="t('notifications.filter.label')">
+    <div
+      class="flex flex-wrap items-end gap-space-md"
+      role="group"
+      :aria-label="t('notifications.filter.label')"
+    >
       <div class="flex flex-col gap-space-xs">
         <span id="notifications-filter-show" class="text-body-sm text-ink-secondary">
           {{ t('notifications.filter.show') }}
@@ -95,7 +105,9 @@ function read(id: string) {
             :aria-pressed="filters.unread === option"
             :class="[
               'rounded-control px-space-md py-space-xs text-body-sm outline-none focus-visible:ring-2 focus-visible:ring-violet',
-              filters.unread === option ? 'bg-tile-peak text-ink shadow-tile' : 'text-ink-secondary',
+              filters.unread === option
+                ? 'bg-tile-peak text-ink shadow-tile'
+                : 'text-ink-secondary',
             ]"
             @click="setFilter('unread', option)"
           >
