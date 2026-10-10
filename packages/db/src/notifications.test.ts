@@ -12,7 +12,14 @@ import {
   NOTIFICATION_CHANNEL,
   type CreateNotificationInput,
 } from './notifications';
-import { amazonAdsProfiles, auditEvents, members, notificationReads, notifications, users } from './schema';
+import {
+  amazonAdsProfiles,
+  auditEvents,
+  members,
+  notificationReads,
+  notifications,
+  users,
+} from './schema';
 import { createTestConnection, createTestOrganization, createTestProfile } from './test-fixtures';
 import { createTestDatabase, type TestDatabase } from './testing';
 
@@ -265,7 +272,12 @@ describe('listNotifications', () => {
 
   it('Nicht-Mitglied: Fehler', async () => {
     await expect(
-      listNotifications(testDb.db, { userId: ids.outsider, orgId: ids.org, unread: false, limit: 5 }),
+      listNotifications(testDb.db, {
+        userId: ids.outsider,
+        orgId: ids.org,
+        unread: false,
+        limit: 5,
+      }),
     ).rejects.toThrow();
   });
 });
@@ -292,7 +304,10 @@ describe('countUnreadNotifications und markNotificationsRead', () => {
     expect(await markNotificationsRead(testDb.db, { ...as(ids.admin), all: true })).toBe(3);
     expect(await countUnreadNotifications(testDb.db, as(ids.admin))).toBe(0);
     expect(
-      await testDb.db.select().from(notificationReads).where(eq(notificationReads.notificationId, b)),
+      await testDb.db
+        .select()
+        .from(notificationReads)
+        .where(eq(notificationReads.notificationId, b)),
     ).toHaveLength(1);
 
     const audits = await testDb.db.select().from(auditEvents);

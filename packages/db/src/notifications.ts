@@ -6,7 +6,20 @@ import {
   type NotificationKind,
   type NotificationSeverity,
 } from '@profitbash/shared';
-import { and, asc, desc, eq, exists, gt, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { AccessDeniedError, getOrgRole, visibleProfilesScope } from './access';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';

@@ -411,10 +411,7 @@ describe('claimNextFileImport und finishFileImport', () => {
     };
     await finish(ok.id, 'imported');
     await finish(bad.id, 'failed');
-    const rows = await testDb.db
-      .select()
-      .from(notifications)
-      .orderBy(notifications.seq);
+    const rows = await testDb.db.select().from(notifications).orderBy(notifications.seq);
     expect(rows).toEqual([
       expect.objectContaining({
         organizationId: ids.org,

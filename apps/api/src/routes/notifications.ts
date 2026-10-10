@@ -38,7 +38,8 @@ const listRoute = createRoute({
   method: 'get',
   path: '/notifications',
   tags: ['Benachrichtigungen'],
-  summary: 'Sichtbare Benachrichtigungen, neueste zuerst (Filter: ungelesen, Art, Profil; Seiten über `before`)',
+  summary:
+    'Sichtbare Benachrichtigungen, neueste zuerst (Filter: ungelesen, Art, Profil; Seiten über `before`)',
   request: { query: notificationListQuerySchema },
   responses: {
     200: { description: 'Benachrichtigungen.', content: json(notificationListResponseSchema) },
@@ -63,7 +64,8 @@ const readRoute = createRoute({
   path: '/notifications/read',
   tags: ['Benachrichtigungen'],
   summary: 'Benachrichtigungen für den angemeldeten Nutzer auf gelesen setzen (IDs oder alle)',
-  description: 'Unsichtbare oder unbekannte IDs werden übergangen; `updated` zählt die neu gelesenen.',
+  description:
+    'Unsichtbare oder unbekannte IDs werden übergangen; `updated` zählt die neu gelesenen.',
   request: { body: { content: json(markNotificationsReadRequestSchema), required: true } },
   responses: {
     200: { description: 'Ergebnis.', content: json(markNotificationsReadResponseSchema) },
@@ -126,6 +128,13 @@ export function registerNotificationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDe
     c.header('Cache-Control', 'no-cache, no-transform');
     return streamSSE(c, async (stream) => {
       let closed = false;
+      let finish = () => {};
+      const done = new Promise<void>((resolve) => {
+        finish = () => {
+          closed = true;
+          resolve();
+        };
+      });
       let queue = Promise.resolve();
       /** Schreibt nacheinander (Live-Ereignisse und Nachholen dürfen sich nicht verschränken). */
       const write = (message: Parameters<typeof stream.writeSSE>[0]) => {
@@ -143,31 +152,30 @@ export function registerNotificationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDe
         ...who,
         send: (notification) => void send(notification),
         resync: () => void write({ event: 'resync', data: '' }),
-        close: () => {
-          closed = true;
-        },
+        close: finish,
       });
       const heartbeat = setInterval(() => void write({ event: 'ping', data: '' }), hub.heartbeatMs);
-      stream.onAbort(() => {
-        closed = true;
+      stream.onAbort(finish);
+      // Aufräumen auf jedem Weg (Client geht, Hub stoppt, Fehler beim Nachholen): sonst blieben Abonnent und
+      // Heartbeat hängen, weil Hono nach einem Fehler im Callback `onAbort` nicht mehr aufruft.
+      try {
+        await write({ event: 'ready', data: '', retry: RETRY_MS });
+        if (Number.isSafeInteger(lastEventId) && lastEventId > 0) {
+          const missed = await listNotificationsAfter(db, {
+            ...who,
+            afterSeq: lastEventId,
+            limit: RESUME_LIMIT + 1,
+          });
+          for (const notification of missed.slice(0, RESUME_LIMIT)) await send(notification);
+          if (missed.length > RESUME_LIMIT) await write({ event: 'resync', data: '' });
+        }
+        // Offen halten, bis der Client geht oder der Hub stoppt.
+        await done;
+      } finally {
+        finish();
         clearInterval(heartbeat);
         unsubscribe();
-      });
-
-      await write({ event: 'ready', data: '', retry: RETRY_MS });
-      if (Number.isSafeInteger(lastEventId) && lastEventId > 0) {
-        const missed = await listNotificationsAfter(db, {
-          ...who,
-          afterSeq: lastEventId,
-          limit: RESUME_LIMIT + 1,
-        });
-        for (const notification of missed.slice(0, RESUME_LIMIT)) await send(notification);
-        if (missed.length > RESUME_LIMIT) await write({ event: 'resync', data: '' });
       }
-      // Offen halten, bis der Client geht oder der Hub stoppt.
-      while (!closed) await stream.sleep(200);
-      clearInterval(heartbeat);
-      unsubscribe();
     });
   });
 }

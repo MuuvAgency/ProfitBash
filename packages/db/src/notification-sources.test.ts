@@ -14,7 +14,10 @@ const daysAgo = (days: number) => new Date(now.getTime() - days * DAY);
 let testDb: TestDatabase;
 const ids = { org: '', connection: '', apiProfile: '', fileProfile: '', hidden: '', removed: '' };
 
-async function fileProfile(name: string, extra: Partial<typeof amazonAdsProfiles.$inferInsert> = {}) {
+async function fileProfile(
+  name: string,
+  extra: Partial<typeof amazonAdsProfiles.$inferInsert> = {},
+) {
   const [row] = await testDb.db
     .insert(amazonAdsProfiles)
     .values({

@@ -518,8 +518,16 @@ describe('finishAdChangeSubmission', () => {
 });
 
 describe('Benachrichtigung beim Abschluss einer Übermittlung (5.2a)', () => {
-  const finish = (submissionId: string, extra: Partial<Parameters<typeof finishAdChangeSubmission>[1]> = {}) =>
-    finishAdChangeSubmission(testDb.db, { organizationId: f.org, submissionId, now: NOW, ...extra });
+  const finish = (
+    submissionId: string,
+    extra: Partial<Parameters<typeof finishAdChangeSubmission>[1]> = {},
+  ) =>
+    finishAdChangeSubmission(testDb.db, {
+      organizationId: f.org,
+      submissionId,
+      now: NOW,
+      ...extra,
+    });
   const rows = () => testDb.db.select().from(notifications).orderBy(notifications.seq);
 
   it('meldet dem Auslöser eine erfolgreiche Übermittlung, einmal', async () => {
