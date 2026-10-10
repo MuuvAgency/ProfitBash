@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import {
   BID_STACK_STRATEGIES,
+  MAX_BID_ADJUSTMENT_PERCENT,
   MAX_BID_STACK_AUDIENCES,
   simulateBidStack,
   type BidStackResult,
 } from '@profitbash/engine';
 import { formatCurrency, formatNumber } from '@profitbash/shared';
 import Button from 'primevue/button';
-import { computed, ref, useId } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import PageHeader from '../components/common/PageHeader.vue';
 import { useSessionStore } from '../stores/session';
 import { simulatorStateFromQuery } from '../tools/bid-simulator/link';
-import { inputClass, labelClass } from '../tools/catalog/draft';
+import { inputClass, labelClass, moneyInput } from '../tools/catalog/draft';
 import ToolsTabs from '../tools/ToolsTabs.vue';
 
 /**
@@ -27,20 +28,51 @@ const route = useRoute();
 const session = useSessionStore();
 const locale = computed(() => session.preferences.locale);
 
-const initial = simulatorStateFromQuery(route.query);
-const bid = ref(initial.bid);
-const strategy = ref(initial.strategy);
-const top = ref(String(initial.top));
-const productPages = ref(String(initial.productPages));
-const restOfSearch = ref(String(initial.restOfSearch));
-const amazonBusiness = ref(initial.amazonBusiness === null ? '' : String(initial.amazonBusiness));
+const initial = ref(simulatorStateFromQuery(route.query));
+const bid = ref('');
+const strategy = ref(initial.value.strategy);
+const top = ref('');
+const productPages = ref('');
+const restOfSearch = ref('');
+const amazonBusiness = ref('');
 const audiences = ref<{ label: string; percentage: string }[]>([]);
+/** Werte aus der Query übernehmen (beim Öffnen und wenn die Seite mit anderer Query wiederverwendet wird). */
+function apply() {
+  const state = initial.value;
+  bid.value = state.bid;
+  strategy.value = state.strategy;
+  top.value = String(state.top);
+  productPages.value = String(state.productPages);
+  restOfSearch.value = String(state.restOfSearch);
+  amazonBusiness.value = state.amazonBusiness === null ? '' : String(state.amazonBusiness);
+  audiences.value = [];
+}
+apply();
+watch(
+  () => route.query,
+  (query) => {
+    initial.value = simulatorStateFromQuery(query);
+    apply();
+  },
+);
 
-const percent = (value: string) => (value.trim() === '' ? 0 : Number(value));
+/** Ganze Prozent 0–999 (die Engine prüft 0–900); leer = 0; andere Schreibweisen (1e2, 0x10) sind ungültig. */
+const percent = (value: string) => {
+  const text = value.trim();
+  if (text === '') return 0;
+  return /^\d{1,3}$/.test(text) ? Number(text) : Number.NaN;
+};
+const percentInvalid = (value: string) => {
+  const number = percent(value);
+  return !Number.isInteger(number) || number > MAX_BID_ADJUSTMENT_PERCENT;
+};
+const bidInvalid = computed(
+  () => !/^\d{1,7}(\.\d{1,2})?$/.test(moneyInput(bid.value)) || !/[1-9]/.test(bid.value),
+);
 const result = computed<BidStackResult | null>(() => {
   try {
     return simulateBidStack({
-      bid: bid.value.trim(),
+      bid: moneyInput(bid.value),
       strategy: strategy.value,
       placements: {
         top: percent(top.value),
@@ -60,13 +92,13 @@ const result = computed<BidStackResult | null>(() => {
 });
 
 const amount = (value: string) =>
-  initial.currency
-    ? formatCurrency(value, initial.currency, locale.value)
+  initial.value.currency
+    ? formatCurrency(value, initial.value.currency, locale.value)
     : formatNumber(value, locale.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const factor = (value: string) =>
-  `× ${formatNumber(value, locale.value, { maximumFractionDigits: 4 })}`;
+  `× ${formatNumber(value, locale.value, { maximumFractionDigits: 6 })}`;
 const rowKey = (row: BidStackResult['rows'][number]) =>
-  `${row.placement}|${row.amazonBusiness ? 'ab' : '-'}|${row.audience ?? '-'}`;
+  `${row.placement}|${row.amazonBusiness ? 'ab' : '-'}|${row.audienceIndex ?? '-'}`;
 
 function addAudience() {
   if (audiences.value.length < MAX_BID_STACK_AUDIENCES)
@@ -105,6 +137,7 @@ const placementFields = [
             v-model="bid"
             data-simulator-bid
             inputmode="decimal"
+            :aria-invalid="bidInvalid"
             :class="[inputClass, 'font-data tabular-nums']"
           />
         </div>
@@ -135,6 +168,7 @@ const placementFields = [
             :data-simulator-top="field.key === 'top' ? '' : undefined"
             :data-simulator-placement="field.key"
             inputmode="numeric"
+            :aria-invalid="percentInvalid(field.model.value)"
             :class="[inputClass, 'font-data tabular-nums']"
           />
         </div>
@@ -147,6 +181,7 @@ const placementFields = [
             v-model="amazonBusiness"
             data-simulator-ab
             inputmode="numeric"
+            :aria-invalid="percentInvalid(amazonBusiness)"
             :placeholder="t('bidSimulator.notSet')"
             :class="[inputClass, 'font-data tabular-nums']"
           />
@@ -182,6 +217,7 @@ const placementFields = [
               v-model="entry.percentage"
               :data-simulator-audience-percent="index"
               inputmode="numeric"
+              :aria-invalid="percentInvalid(entry.percentage)"
               :class="[inputClass, 'font-data tabular-nums']"
             />
           </div>
@@ -213,7 +249,12 @@ const placementFields = [
       <h2 class="text-label-eyebrow uppercase text-ink-tertiary">
         {{ t('bidSimulator.result') }}
       </h2>
-      <p v-if="!result" data-simulator-invalid role="alert" class="text-body-sm text-on-loss-wash">
+      <p
+        v-if="!result"
+        data-simulator-invalid
+        aria-live="polite"
+        class="text-body-sm text-on-loss-wash"
+      >
         {{ t('bidSimulator.invalid') }}
       </p>
       <template v-else>

@@ -43,6 +43,8 @@ export interface BidStackRow {
   amazonBusiness: boolean;
   /** Bezeichnung der Zielgruppe; `null`: ohne Zielgruppen-Anpassung. */
   audience: string | null;
+  /** Position der Zielgruppe in der Eingabe (Bezeichnungen können doppelt sein); `null`: ohne. */
+  audienceIndex: number | null;
   /** Produkt der Anpassungen (vor der Strategie). */
   factor: string;
   min: string;
@@ -86,8 +88,12 @@ export function simulateBidStack(input: BidStackInput): BidStackResult {
   }
   const business = input.amazonBusiness === null ? null : percent(input.amazonBusiness);
   const audiences = [
-    { label: null, factor: new Dec(1) },
-    ...input.audiences.map((entry) => ({ label: entry.label, factor: percent(entry.percentage) })),
+    { label: null, index: null, factor: new Dec(1) },
+    ...input.audiences.map((entry, index) => ({
+      label: entry.label,
+      index,
+      factor: percent(entry.percentage),
+    })),
   ];
   const [low, high] = STRATEGY_RANGE[input.strategy];
 
@@ -106,6 +112,7 @@ export function simulateBidStack(input: BidStackInput): BidStackResult {
           placement,
           amazonBusiness: withBusiness,
           audience: audience.label,
+          audienceIndex: audience.index,
           factor: factor.toFixed(),
           min: money(adjusted.mul(low)),
           max: money(max),

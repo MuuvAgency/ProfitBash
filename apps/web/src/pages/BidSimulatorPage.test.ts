@@ -66,7 +66,7 @@ describe('Seite „Gebots-Simulator“', () => {
     await click('[data-simulator-add-audience]');
     await type('[data-simulator-audience-label="0"]', 'Wiederkäufer');
     await type('[data-simulator-audience-percent="0"]', '100');
-    expect(rowText('top|ab|Wiederkäufer')).toContain('6,00');
+    expect(rowText('top|ab|0')).toContain('6,00');
     expect(rowText('productPages|ab|-')).toContain('2,00');
   });
 
@@ -75,5 +75,40 @@ describe('Seite „Gebots-Simulator“', () => {
     await type('[data-simulator-top]', '950');
     expect((await found('[data-simulator-invalid]')).textContent).toContain('900');
     expect(document.querySelector('[data-stack-row]')).toBeNull();
+  });
+
+  it('nimmt das Dezimalkomma und unterscheidet Zielgruppen mit gleichem Namen', async () => {
+    await mountPage('/ads/tools/bid-simulator?strategy=NONE&top=0');
+    await type('[data-simulator-bid]', '0,85');
+    expect(document.querySelector('[data-simulator-invalid]')).toBeNull();
+    await click('[data-simulator-add-audience]');
+    await click('[data-simulator-add-audience]');
+    await type('[data-simulator-audience-label="0"]', 'Gleich');
+    await type('[data-simulator-audience-label="1"]', 'Gleich');
+    await type('[data-simulator-audience-percent="1"]', '100');
+    const keys = [...document.querySelectorAll('[data-stack-row]')].map((row) =>
+      row.getAttribute('data-stack-row'),
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toHaveLength(9);
+    expect(rowText('top|-|1')).toContain('1,70');
+  });
+
+  it('lehnt Prozent in anderer Schreibweise ab und markiert das Feld', async () => {
+    await mountPage();
+    await type('[data-simulator-top]', '1e2');
+    await found('[data-simulator-invalid]');
+    expect(
+      (await found<HTMLInputElement>('[data-simulator-top]')).getAttribute('aria-invalid'),
+    ).toBe('true');
+  });
+
+  it('liest eine neue Query beim Wechsel innerhalb der Seite neu ein', async () => {
+    const { router } = await mountPage('/ads/tools/bid-simulator?name=A&top=50');
+    expect((await found('[data-simulator-source]')).textContent).toContain('A');
+    await router.push('/ads/tools/bid-simulator');
+    await flushPromises();
+    expect(document.querySelector('[data-simulator-source]')).toBeNull();
+    expect((await found<HTMLInputElement>('[data-simulator-top]')).value).toBe('0');
   });
 });
