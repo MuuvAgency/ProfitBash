@@ -54,6 +54,8 @@ describe('Seite „Gebots-Simulator“', () => {
     expect(rowText('top|-|-')).toContain('0,00 €');
     expect(rowText('top|-|-')).toContain('3,00 €');
     expect(rowText('productPages|-|-')).toContain('2,00 €');
+    expect(rowText('top|-|-')).toContain('Anfang der Suchergebnisse');
+    expect(rowText('top|-|-')).not.toContain('%');
     expect(plain((await found('[data-simulator-highest]')).textContent)).toContain('3,00 €');
   });
 

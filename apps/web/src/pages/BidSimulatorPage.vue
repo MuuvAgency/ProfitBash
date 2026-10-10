@@ -251,7 +251,7 @@ const placementFields = [
                 class="border-t border-line"
               >
                 <td class="py-space-xs pr-space-md text-ink">
-                  {{ t(`bidSimulator.placement.${row.placement}`) }}
+                  {{ t(`bidSimulator.placementName.${row.placement}`) }}
                 </td>
                 <td class="py-space-xs pr-space-md text-ink-secondary">
                   {{ row.amazonBusiness ? t('bidSimulator.yes') : '—' }}
