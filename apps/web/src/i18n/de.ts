@@ -1290,7 +1290,56 @@ export const de = {
     productGroups: 'Produktgruppen',
     setup: 'Kampagnen-Setup',
     portfolios: 'Portfolio',
+    bidSimulator: 'Gebots-Simulator',
     catalog: 'Struktur-Katalog',
+  },
+  bidSimulator: {
+    eyebrow: 'Tools',
+    title: 'Gebots-Simulator',
+    description:
+      'Zeigt, welches Gebot aus Basisgebot, Strategie und Anpassungen je Platzierung höchstens und mindestens entsteht (Sponsored Products). Die Anpassungen multiplizieren sich; die Strategie wirkt auf das angepasste Gebot.',
+    source:
+      'Werte der Kampagne „{name}“ aus dem Explorer. Das Basisgebot trägst du ein (es gilt je Keyword bzw. Ad Group).',
+    bid: 'Basisgebot',
+    strategy: 'Gebotsstrategie',
+    strategies: {
+      SALES_DOWN_ONLY: 'Dynamisch – nur senken',
+      SALES_UP_AND_DOWN: 'Dynamisch – erhöhen und senken',
+      NONE: 'Fest',
+      RULE_BASED: 'Regelbasiert',
+    },
+    strategyHint:
+      'Platzierungen und Amazon Business je 0 bis 900 %. „Erhöhen und senken“ ändert das Gebot auf allen Platzierungen um bis zu 100 % nach oben oder unten, „nur senken“ bis −100 %, „fest“ gar nicht (Amazon-Guide, Stand 10.10.2026).',
+    placement: {
+      top: 'Anfang der Suchergebnisse (%)',
+      productPages: 'Produktseiten (%)',
+      restOfSearch: 'Rest der Suche (%)',
+    },
+    amazonBusiness: 'Amazon Business (%)',
+    notSet: 'nicht gesetzt',
+    audiences: 'Zielgruppen-Anpassungen',
+    audiencesHint:
+      'Höchstens 10 je Kampagne, je 0 bis 900 %. Sie wirken zusätzlich auf das schon angepasste Gebot.',
+    audienceLabel: 'Zielgruppe',
+    audiencePercent: 'Anpassung (%)',
+    audienceFallback: 'Zielgruppe {number}',
+    addAudience: 'Zielgruppe hinzufügen',
+    removeAudience: 'Zielgruppe {number} entfernen',
+    result: 'Spanne je Platzierung',
+    highest: 'Höchstes mögliches Gebot:',
+    ruleBased:
+      'Regelbasierte Gebote beziffert Amazon nicht; die Spanne zeigt das Gebot ohne Änderung durch die Regel.',
+    invalid:
+      'Bitte ein Basisgebot größer 0 (z. B. 0.85) und Anpassungen als ganze Zahlen von 0 bis 900 eingeben.',
+    yes: 'ja',
+    column: {
+      placement: 'Platzierung',
+      amazonBusiness: 'Amazon Business',
+      audience: 'Zielgruppe',
+      factor: 'Faktor',
+      min: 'Mindestens',
+      max: 'Höchstens',
+    },
   },
   portfolios: {
     eyebrow: 'Tools',
@@ -1901,6 +1950,7 @@ export const de = {
       toolbar: 'Markierte Zeilen ändern',
       selected: '{count} markiert',
       action: {
+        simulate: 'Gebot simulieren',
         state: 'Status ändern',
         budget: 'Budget ändern',
         default_bid: 'Standardgebot ändern',

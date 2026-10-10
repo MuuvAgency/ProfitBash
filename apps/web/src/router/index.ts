@@ -110,6 +110,12 @@ const routes: RouteRecordRaw[] = [
         meta: { feature: 'tools', navItemId: 'tools', titleKey: 'portfolios.title' },
       },
       {
+        path: 'ads/tools/bid-simulator',
+        name: 'bid-simulator',
+        component: () => import('../pages/BidSimulatorPage.vue'),
+        meta: { feature: 'tools', navItemId: 'tools', titleKey: 'bidSimulator.title' },
+      },
+      {
         path: 'ads/tools/catalog',
         name: 'structure-catalog',
         component: () => import('../pages/CatalogPage.vue'),

@@ -663,6 +663,28 @@ describe('Explorer: markierte Zeilen', () => {
     });
   });
 
+  it('ruft für genau eine SP-Kampagne den Gebots-Simulator mit ihren Werten auf (4.8)', async () => {
+    stubFetch(routes());
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Nistkasten');
+    await selectAllRows();
+    await vi.waitFor(() => wrapper.get('[data-bulk-bar]'));
+    expect(wrapper.find('[data-bulk="simulate"]').exists()).toBe(false);
+    const sbRow = cell('SB Marke', 'name').closest('.ag-row')!.getAttribute('row-index');
+    document
+      .querySelector<HTMLInputElement>(
+        `.ag-row[row-index="${sbRow}"] .ag-selection-checkbox input`,
+      )!
+      .click();
+    await flushPromises();
+    const link = await vi.waitFor(() => wrapper.get('[data-bulk="simulate"]'));
+    const href = link.attributes('href')!;
+    expect(href).toContain('/ads/tools/bid-simulator?');
+    expect(href).toContain('strategy=SALES_DOWN_ONLY');
+    expect(href).toContain('top=25');
+    expect(href).toContain('currency=EUR');
+  });
+
   it('öffnet Gebotsstrategie und Platzierungen für genau eine SP-Kampagne', async () => {
     const { requests } = stubFetch(routes());
     const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
