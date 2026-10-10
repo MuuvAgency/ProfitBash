@@ -4,7 +4,7 @@ import { PARENT_NOT_CREATED } from './bulk-file';
 import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
 
 /**
- * Anlagen einer Setup-Übermittlung → Aufträge für `applySpCreates` (`docs/tasks/phase-4.md` 4.4, API-Weg), ohne I/O.
+ * Anlagen einer Setup-Übermittlung → Aufträge für `applyCreates` (`docs/tasks/phase-4.md` 4.4, API-Weg), ohne I/O.
  *
  * - `ref` jedes Auftrags ist die ID der Zeile; Eltern verweisen auf die Zeile ihrer Kampagne bzw. Ad Group.
  * - Gebotsanpassungen gehören bei SP v3 zur Kampagne (`dynamicBidding`): Sie gehen mit ihr raus und teilen ihr

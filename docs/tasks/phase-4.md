@@ -309,7 +309,7 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     Datei passt, scheitert mit Code, Kinder ohne Eltern mit `PARENT_NOT_CREATED`. Download und Abschluss über die
     vorhandenen Endpunkte `GET /api/ads/changes/submissions/{id}/bulk-file` (Dateiname `profitbash-setup-…`) und
     `POST …/close`; die API nennt `kind` je Übermittlung.
-  - **API-Weg** (`applySpCreates`, ADR 005): Kampagnen (mit Platzierungen in `dynamicBidding`) → Ad Groups → Anzeigen,
+  - **API-Weg** (`applyCreates`, ADR 005): Kampagnen (mit Platzierungen in `dynamicBidding`) → Ad Groups → Anzeigen,
     Keywords, Targets, Negatives; Eltern-IDs aus der Antwort, Kinder gescheiterter Eltern `PARENT_NOT_CREATED`,
     keine Wiederholung bei 5xx. Der Job `ad-changes-submit` erkennt `kind = setup` (`buildSetupOperations`):
     Drosselung lässt Zeilen offen, der nächste Lauf setzt mit den angelegten Eltern fort (`created`); Abbruch wie bei

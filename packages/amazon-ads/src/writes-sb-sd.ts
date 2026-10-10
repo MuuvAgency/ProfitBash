@@ -428,6 +428,15 @@ const SD_PRODUCT_ADS = sd('productAds', 'adId');
 const SD_NEGATIVE_TARGETS = sd('negativeTargets', 'targetId');
 const SD_NEGATIVE_TARGETS_CREATE = sd('negativeTargets', 'targetId', 'POST');
 
+/** Anlagen für Sponsored Display (`docs/tasks/phase-4.md` 4.9): `POST /sd/<entity>`, nie wiederholt. */
+export const SD_CREATE_ENDPOINTS = {
+  campaign: sd('campaigns', 'campaignId', 'POST'),
+  adGroup: sd('adGroups', 'adGroupId', 'POST'),
+  productAd: sd('productAds', 'adId', 'POST'),
+  target: sd('targets', 'targetId', 'POST'),
+  negativeTarget: SD_NEGATIVE_TARGETS_CREATE,
+} as const;
+
 const sdEntity = (endpoint: Endpoint, idKey: string) => ({
   endpoint,
   archive: archiveCall(endpoint),

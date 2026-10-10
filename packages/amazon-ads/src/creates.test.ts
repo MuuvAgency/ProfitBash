@@ -3,7 +3,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { RefreshTokenStore } from './access-token';
 import { createAmazonAdsClient } from './client';
-import { applySpCreates, type AmazonAdsCreateOperation } from './creates';
+import { applyCreates, type AmazonAdsCreateOperation } from './creates';
 import { AmazonAdsHttpError } from './errors';
 import { createRequestMeter } from './http';
 import { noopLogger } from './logger';
@@ -144,14 +144,14 @@ const create = (
   created?: ReadonlyMap<string, string>,
   meter = createRequestMeter(),
 ) =>
-  applySpCreates(
+  applyCreates(
     deps,
     connection,
     { amazonProfileId: PROFILE_ID, operations, ...(created && { created }) },
     { meter },
   );
 
-describe('applySpCreates: Reihenfolge und Eltern-IDs', () => {
+describe('applyCreates: Reihenfolge und Eltern-IDs', () => {
   it('legt Kampagne, Ad Group und Kinder nacheinander an und setzt die IDs aus der Antwort ein', async () => {
     const deps = setup();
     const campaigns = capture(
@@ -394,7 +394,7 @@ describe('applySpCreates: Reihenfolge und Eltern-IDs', () => {
   });
 });
 
-describe('applySpCreates: Teilfehler und Kaskade', () => {
+describe('applyCreates: Teilfehler und Kaskade', () => {
   it('lehnt Kinder einer gescheiterten oder unklaren Elternanlage ab, ohne sie zu senden', async () => {
     const deps = setup();
     capture(
@@ -481,7 +481,7 @@ describe('applySpCreates: Teilfehler und Kaskade', () => {
   });
 });
 
-describe('applySpCreates: Drosselung und Ausfälle', () => {
+describe('applyCreates: Drosselung und Ausfälle', () => {
   it('hört bei anhaltender Drosselung auf und setzt mit `created` fort, ohne Angelegtes erneut zu senden', async () => {
     const deps = setup();
     capture('/sp/campaigns', succeedAll('campaigns', 'campaignId', 1001n));
@@ -597,7 +597,7 @@ describe('applySpCreates: Drosselung und Ausfälle', () => {
   });
 });
 
-describe('applySpCreates: Eingaben', () => {
+describe('applyCreates: Eingaben', () => {
   it('lehnt ungültige Werte je Eintrag ab, ohne Amazon zu fragen, und sendet die übrigen', async () => {
     const deps = setup();
     const campaigns = capture('/sp/campaigns', succeedAll('campaigns', 'campaignId', 1001n));

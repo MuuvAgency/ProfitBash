@@ -3,6 +3,7 @@ import type { AdsEndpointDeps, RequestOptions } from './client';
 import { isPlainDecimal, jsonDecimal } from './json';
 import { PLACEMENT_PERCENTAGE_LIMIT } from './limits';
 import { requireId, type Endpoint, type Pending } from './write-endpoints';
+import { SD_CREATE_ENDPOINTS } from './writes-sb-sd';
 import {
   AmazonAdsWriteAbortedError,
   sendBatch,
@@ -19,7 +20,9 @@ import {
 
 /**
  * Neue Kampagnen-Strukturen für **Sponsored Products v3** über die API anlegen (`docs/tasks/phase-4.md` 4.4, ADR 005,
- * geprüft am 2026-10-09 gegen die OpenAPI-Spec `SponsoredProducts_prod_3p.json`). Eigenes, schmales Modell wie bei
+ * geprüft am 2026-10-09 gegen die OpenAPI-Spec `SponsoredProducts_prod_3p.json`), seit 4.9 auch für **Sponsored
+ * Display v3** (Entities mit Präfix `sd`, geprüft am 2026-10-10 gegen die SD-3.0-Spec: Listen ohne Hülle, IDs als
+ * JSON-Zahl, Zustände klein, Startdatum `YYYYMMDD`, Taktik `T00020`/`T00030`, Ziele nur mit `adGroupId`). Eigenes, schmales Modell wie bei
  * `applyChanges`: Eine Operation nennt ihre Eltern über `ref` (in derselben Eingabe oder schon angelegt), der Client
  * setzt die neuen IDs aus den Antworten von Amazon ein.
  *
@@ -96,11 +99,52 @@ export type AmazonAdsCreateOperation = { ref: string } & (
       matchType: 'NEGATIVE_EXACT' | 'NEGATIVE_PHRASE';
     }
   | { entity: 'negativeTarget'; campaignRef: string; adGroupRef: string; asin: string }
+  | {
+      entity: 'sdCampaign';
+      name: string;
+      state: AmazonAdsWriteState;
+      dailyBudget: string;
+      /** `YYYY-MM-DD`; die API nimmt `YYYYMMDD`. */
+      startDate: string;
+      /** `T00020` kontextbezogen, `T00030` Zielgruppen. */
+      tactic: 'T00020' | 'T00030';
+      /** vCPM nur freigeschaltet (F-S7); gehört zur Optimierung `reach`. */
+      costType: 'cpc' | 'vcpm';
+      amazonPortfolioId: string | null;
+    }
+  | {
+      entity: 'sdAdGroup';
+      campaignRef: string;
+      name: string;
+      defaultBid: string;
+      bidOptimization: 'clicks' | 'conversions' | 'reach';
+      state: AmazonAdsWriteState;
+    }
+  | {
+      entity: 'sdProductAd';
+      campaignRef: string;
+      adGroupRef: string;
+      sku: string | null;
+      asin: string | null;
+      state: AmazonAdsWriteState;
+    }
+  | {
+      entity: 'sdTarget';
+      campaignRef: string;
+      adGroupRef: string;
+      /** Kontext (ASIN, Kategorie) oder Zielgruppe der beworbenen Produkte mit Rückblick. */
+      expression:
+        | { type: 'asinSameAs' | 'asinCategorySameAs'; value: string }
+        | { type: 'views' | 'purchases'; lookbackDays: number };
+      bid: string | null;
+      state: AmazonAdsWriteState;
+    }
+  | { entity: 'sdNegativeTarget'; campaignRef: string; adGroupRef: string; asin: string }
 );
 
 export type AmazonAdsCreateEntity = AmazonAdsCreateOperation['entity'];
 
-export interface ApplySpCreatesInput {
+export interface ApplyCreatesInput {
   amazonProfileId: string;
   operations: readonly AmazonAdsCreateOperation[];
   /**
@@ -122,6 +166,11 @@ const ENDPOINTS: Record<AmazonAdsCreateEntity, Endpoint> = {
   target: spCreateEndpoint('targets', 'TargetingClause', 'targetId', 'targetingClauses'),
   negativeKeyword: SP_NEGATIVE_CREATE_ENDPOINTS.negativeKeyword,
   negativeTarget: SP_NEGATIVE_CREATE_ENDPOINTS.negativeTarget,
+  sdCampaign: SD_CREATE_ENDPOINTS.campaign,
+  sdAdGroup: SD_CREATE_ENDPOINTS.adGroup,
+  sdProductAd: SD_CREATE_ENDPOINTS.productAd,
+  sdTarget: SD_CREATE_ENDPOINTS.target,
+  sdNegativeTarget: SD_CREATE_ENDPOINTS.negativeTarget,
 };
 
 /** Reihenfolge der Aufrufe: Eltern vor Kindern. */
@@ -133,7 +182,19 @@ const ORDER: readonly AmazonAdsCreateEntity[] = [
   'target',
   'negativeKeyword',
   'negativeTarget',
+  'sdCampaign',
+  'sdAdGroup',
+  'sdProductAd',
+  'sdTarget',
+  'sdNegativeTarget',
 ];
+
+const isSd = (entity: AmazonAdsCreateEntity) => entity.startsWith('sd');
+/** Elternart je Anzeigentyp: SP-Kinder unter SP-Eltern, SD-Kinder unter SD-Eltern. */
+const parentEntity = (entity: AmazonAdsCreateEntity, level: 'campaign' | 'adGroup') =>
+  isSd(entity) ? (level === 'campaign' ? 'sdCampaign' : 'sdAdGroup') : level;
+const SD_LOOKBACK_DAYS: ReadonlySet<number> = new Set([7, 14, 30, 60, 90, 180, 365]);
+const SD_OPTIMIZATIONS: ReadonlySet<string> = new Set(['clicks', 'conversions', 'reach']);
 
 const OFF_AMAZON = { increaseReach: 'MAXIMIZE_REACH', limitSpend: 'MINIMIZE_SPEND' } as const;
 
@@ -281,21 +342,102 @@ function body(op: AmazonAdsCreateOperation): Record<string, unknown> {
       };
     case 'negativeTarget':
       return { expression: [{ type: 'ASIN_SAME_AS', value: asin(op.asin) }], state: 'ENABLED' };
+    case 'sdCampaign':
+      return {
+        name: text(op.name),
+        state: oneOf(STATES, op.state).toLowerCase(),
+        budgetType: 'daily',
+        budget: jsonDecimal(op.dailyBudget),
+        startDate: date(op.startDate).replaceAll('-', ''),
+        tactic: oneOf(new Set(['T00020', 'T00030']), op.tactic),
+        costType: oneOf(new Set(['cpc', 'vcpm']), op.costType),
+        // Portfolio-IDs sind in SD v3 `integer`.
+        ...(op.amazonPortfolioId !== null && {
+          portfolioId: jsonDecimal(requireId(op.amazonPortfolioId)),
+        }),
+      };
+    case 'sdAdGroup':
+      return {
+        name: text(op.name),
+        defaultBid: jsonDecimal(op.defaultBid),
+        bidOptimization: oneOf(SD_OPTIMIZATIONS, op.bidOptimization),
+        state: oneOf(STATES, op.state).toLowerCase(),
+      };
+    case 'sdProductAd':
+      if ((op.sku === null) === (op.asin === null)) {
+        throw new TypeError('Product Ad braucht genau eins von SKU und ASIN.');
+      }
+      return {
+        ...(op.sku !== null ? { sku: text(op.sku) } : { asin: asin(op.asin!) }),
+        state: oneOf(STATES, op.state).toLowerCase(),
+      };
+    case 'sdTarget': {
+      const { expression } = op;
+      let predicate: unknown;
+      if (expression.type === 'views' || expression.type === 'purchases') {
+        if (!SD_LOOKBACK_DAYS.has(expression.lookbackDays)) {
+          throw new TypeError('Rückblick einer Zielgruppe nicht 7, 14, 30, 60, 90, 180 oder 365.');
+        }
+        // Wer die beworbenen Produkte selbst angesehen bzw. gekauft hat (`exactProduct`).
+        predicate = {
+          type: expression.type,
+          value: [{ type: 'exactProduct' }, { type: 'lookback', value: String(expression.lookbackDays) }],
+        };
+      } else if (expression.type === 'asinSameAs') {
+        predicate = { type: 'asinSameAs', value: asin(expression.value) };
+      } else if (expression.type === 'asinCategorySameAs') {
+        predicate = { type: 'asinCategorySameAs', value: requireId(expression.value) };
+      } else {
+        throw new TypeError('Unbekannter Ausdruck.');
+      }
+      return {
+        expressionType: 'manual',
+        expression: [predicate],
+        state: oneOf(STATES, op.state).toLowerCase(),
+        ...optionalBid(op.bid),
+      };
+    }
+    case 'sdNegativeTarget':
+      return {
+        expressionType: 'manual',
+        expression: [{ type: 'asinSameAs', value: asin(op.asin) }],
+        state: 'enabled',
+      };
   }
+}
+
+/** Eltern-IDs im Eintrag: SP als Text, SD als JSON-Zahl; SD-Ziele nennen nur die Ad Group (Spec). */
+function parentFields(
+  entity: AmazonAdsCreateEntity,
+  campaignId: string | undefined,
+  adGroupId: string | undefined,
+): Record<string, unknown> {
+  if (!isSd(entity)) {
+    return {
+      ...(campaignId !== undefined && { campaignId }),
+      ...(adGroupId !== undefined && { adGroupId }),
+    };
+  }
+  const number = (value: string) => jsonDecimal(requireId(value));
+  const withCampaign = entity === 'sdAdGroup' || entity === 'sdProductAd';
+  return {
+    ...(withCampaign && campaignId !== undefined && { campaignId: number(campaignId) }),
+    ...(adGroupId !== undefined && { adGroupId: number(adGroupId) }),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Senden
 // ---------------------------------------------------------------------------
 
-const OPERATION = 'ads.applySpCreates';
+const OPERATION = 'ads.applyCreates';
 
 const PARENT_NOT_CREATED = 'Die übergeordnete Kampagne bzw. Ad Group wurde nicht angelegt.';
 
-export async function applySpCreates(
+export async function applyCreates(
   deps: AdsEndpointDeps,
   connection: ConnectionRef,
-  input: ApplySpCreatesInput,
+  input: ApplyCreatesInput,
   options: RequestOptions = {},
 ): Promise<ApplyChangesResult> {
   const { operations } = input;
@@ -319,7 +461,7 @@ export async function applySpCreates(
   });
 
   /** Eltern-ref passt: schon angelegt oder eine Operation der erwarteten Art in dieser Eingabe. */
-  const parentKnown = (ref: string, entity: 'campaign' | 'adGroup') => {
+  const parentKnown = (ref: string, entity: AmazonAdsCreateEntity) => {
     if (created.has(ref)) return true;
     const position = positions.get(ref);
     return position !== undefined && operations[position]!.entity === entity;
@@ -333,15 +475,23 @@ export async function applySpCreates(
       results[position] = { ref: op.ref, status: 'applied', amazonId: known };
       return;
     }
-    if (op.entity !== 'campaign') {
-      let parentsValid = parentKnown(op.campaignRef, 'campaign');
-      if (op.entity !== 'adGroup') {
-        parentsValid &&= parentKnown(op.adGroupRef, 'adGroup');
+    if (op.entity !== 'campaign' && op.entity !== 'sdCampaign') {
+      let parentsValid = parentKnown(op.campaignRef, parentEntity(op.entity, 'campaign'));
+      if (op.entity !== 'adGroup' && op.entity !== 'sdAdGroup') {
+        parentsValid &&= parentKnown(op.adGroupRef, parentEntity(op.entity, 'adGroup'));
         // Die Ad Group muss zur genannten Kampagne gehören (prüfbar, wenn sie in dieser Eingabe steht).
         const group = operations[positions.get(op.adGroupRef) ?? -1];
-        if (group?.entity === 'adGroup' && !created.has(op.adGroupRef)) {
+        if (
+          (group?.entity === 'adGroup' || group?.entity === 'sdAdGroup') &&
+          !created.has(op.adGroupRef)
+        ) {
           parentsValid &&= group.campaignRef === op.campaignRef;
         }
+      }
+      // SD: `reach` gehört zu vCPM, `clicks`/`conversions` zu CPC (Guide; prüfbar mit der Kampagne der Eingabe).
+      const campaign = operations[positions.get(op.campaignRef) ?? -1];
+      if (op.entity === 'sdAdGroup' && campaign?.entity === 'sdCampaign') {
+        parentsValid &&= (op.bidOptimization === 'reach') === (campaign.costType === 'vcpm');
       }
       if (!parentsValid) {
         fail(
@@ -378,8 +528,15 @@ export async function applySpCreates(
     operations.forEach((op, position) => {
       const fields = bodies.get(position);
       if (op.entity !== entity || fields === undefined) return;
-      const refs = op.entity === 'campaign' ? [] : [op.campaignRef];
-      if (op.entity !== 'campaign' && op.entity !== 'adGroup') refs.push(op.adGroupRef);
+      const refs = op.entity === 'campaign' || op.entity === 'sdCampaign' ? [] : [op.campaignRef];
+      if (
+        op.entity !== 'campaign' &&
+        op.entity !== 'sdCampaign' &&
+        op.entity !== 'adGroup' &&
+        op.entity !== 'sdAdGroup'
+      ) {
+        refs.push(op.adGroupRef);
+      }
       const found = refs.map(parent);
       if (found.includes('failed')) {
         fail(position, 'PARENT_NOT_CREATED', PARENT_NOT_CREATED);
@@ -390,11 +547,7 @@ export async function applySpCreates(
       group.push({
         position,
         ref: op.ref,
-        item: {
-          ...(campaignId !== undefined && { campaignId }),
-          ...(adGroupId !== undefined && { adGroupId }),
-          ...fields,
-        },
+        item: { ...parentFields(op.entity, campaignId, adGroupId), ...fields },
         amazonId: null,
       });
     });

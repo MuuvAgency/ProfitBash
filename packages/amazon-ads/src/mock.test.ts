@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { RefreshTokenStore } from './access-token';
 import type { AmazonAdsClient } from './client';
-import { applySpCreates, type AmazonAdsCreateOperation } from './creates';
+import { applyCreates, type AmazonAdsCreateOperation } from './creates';
 import { decodeGzipJson } from './download';
 import { noopLogger } from './logger';
 import {
@@ -633,11 +633,12 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
     });
     async function exportRows<T extends AmazonAdsExportType>(
       exportType: T,
+      adProduct = SP,
     ): Promise<AmazonAdsExportRows[T][]> {
       const { exportId } = await client.requestExport(connection, {
         amazonProfileId: DE,
         exportType,
-        adProduct: SP,
+        adProduct,
       });
       now += 60_000;
       const state = await client.getExport(connection, {
@@ -649,7 +650,7 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
       const file = await client.downloadFile(state.url ?? '');
       if (file.status !== 'ok') throw new Error('Datei fehlt');
       const rows = (await decodeGzipJson(file.body, { maxBytes: 10 * 1024 * 1024 })) as unknown[];
-      const schema = createExportRowSchema(exportType, { adProduct: SP, logger: () => {} });
+      const schema = createExportRowSchema(exportType, { adProduct, logger: () => {} });
       return rows.map((row) => schema.parse(row));
     }
     return { client, exportRows };
@@ -885,7 +886,7 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
   it('legt neue Strukturen an und liefert sie im nächsten Export mit (4.4)', async () => {
     const { client, exportRows } = setup();
 
-    const outcome = await applySpCreates(
+    const outcome = await applyCreates(
       { request: client.request, logger: noopLogger },
       connection,
       { amazonProfileId: DE, operations: STRUCTURE },
@@ -967,11 +968,105 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
     });
   });
 
+  it('legt Sponsored Display an und liefert es im nächsten Export mit (4.9)', async () => {
+    const { client, exportRows } = setup();
+    const SD_STRUCTURE: AmazonAdsCreateOperation[] = [
+      {
+        ref: 'c',
+        entity: 'sdCampaign',
+        name: 'SD | Mock | Neu',
+        state: 'ENABLED',
+        dailyBudget: '11.00',
+        startDate: '2099-11-01',
+        tactic: 'T00030',
+        costType: 'cpc',
+        amazonPortfolioId: null,
+      },
+      {
+        ref: 'g',
+        entity: 'sdAdGroup',
+        campaignRef: 'c',
+        name: 'SD Gruppe',
+        defaultBid: '0.55',
+        bidOptimization: 'conversions',
+        state: 'ENABLED',
+      },
+      {
+        ref: 'ad',
+        entity: 'sdProductAd',
+        campaignRef: 'c',
+        adGroupRef: 'g',
+        sku: 'NEU-SKU-1',
+        asin: null,
+        state: 'ENABLED',
+      },
+      {
+        ref: 'v',
+        entity: 'sdTarget',
+        campaignRef: 'c',
+        adGroupRef: 'g',
+        expression: { type: 'views', lookbackDays: 30 },
+        bid: '0.60',
+        state: 'ENABLED',
+      },
+      {
+        ref: 'cat',
+        entity: 'sdTarget',
+        campaignRef: 'c',
+        adGroupRef: 'g',
+        expression: { type: 'asinCategorySameAs', value: '12345678901' },
+        bid: null,
+        state: 'ENABLED',
+      },
+      { ref: 'n', entity: 'sdNegativeTarget', campaignRef: 'c', adGroupRef: 'g', asin: 'B0FREMD002' },
+    ];
+
+    const outcome = await applyCreates(
+      { request: client.request, logger: noopLogger },
+      connection,
+      { amazonProfileId: DE, operations: SD_STRUCTURE },
+    );
+    expect(outcome.results.map((r) => r.status)).toEqual(Array(SD_STRUCTURE.length).fill('applied'));
+    const id = Object.fromEntries(
+      outcome.results.map((r) => [r.ref, r.status === 'applied' ? r.amazonId! : '']),
+    );
+
+    expect((await exportRows('campaigns', 'SPONSORED_DISPLAY')).find((c) => c.amazonCampaignId === id.c)).toMatchObject({
+      adProduct: 'SPONSORED_DISPLAY',
+      name: 'SD | Mock | Neu',
+      budgetAmount: '11',
+      startDate: '2099-11-01',
+    });
+    expect((await exportRows('adGroups', 'SPONSORED_DISPLAY')).find((g) => g.amazonAdGroupId === id.g)).toMatchObject({
+      amazonCampaignId: id.c,
+      defaultBid: '0.55',
+    });
+    expect((await exportRows('ads', 'SPONSORED_DISPLAY')).find((a) => a.amazonAdId === id.ad)).toMatchObject({
+      amazonAdGroupId: id.g,
+      sku: 'NEU-SKU-1',
+    });
+    const targets = new Map(
+      (await exportRows('targets', 'SPONSORED_DISPLAY')).map((t) => [t.target.amazonTargetId, t] as const),
+    );
+    expect(targets.get(id.v!)).toMatchObject({
+      kind: 'target',
+      target: { targetType: 'audience', expression: { event: 'VIEWS', lookback: 30 }, bid: '0.6' },
+    });
+    expect(targets.get(id.cat!)).toMatchObject({
+      kind: 'target',
+      target: { targetType: 'category', expression: { productCategoryId: '12345678901' } },
+    });
+    expect(targets.get(id.n!)).toMatchObject({
+      kind: 'negative',
+      target: { level: 'ad_group', targetType: 'product', expression: { asin: 'B0FREMD002' } },
+    });
+  });
+
   it('prüft Grenzen und Produkt-IDs je Anlage und merkt sich Abgelehntes nicht (4.4)', async () => {
     const { client, exportRows } = setup();
     const before = (await exportRows('campaigns')).length;
 
-    const outcome = await applySpCreates(
+    const outcome = await applyCreates(
       { request: client.request, logger: noopLogger },
       connection,
       {
@@ -997,7 +1092,7 @@ describe('Mock-Anbieter: merkt sich Änderungen im laufenden Prozess (3.3)', () 
       Array(STRUCTURE.length).fill('failed'),
     );
 
-    const ok = await applySpCreates({ request: client.request, logger: noopLogger }, connection, {
+    const ok = await applyCreates({ request: client.request, logger: noopLogger }, connection, {
       amazonProfileId: DE,
       operations: [
         STRUCTURE[0]!,

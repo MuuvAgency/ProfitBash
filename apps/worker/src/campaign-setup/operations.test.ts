@@ -2,7 +2,7 @@ import type { CampaignSetupItemRow } from '@profitbash/db';
 import { describe, expect, it } from 'vitest';
 import { buildSetupOperations } from './operations';
 
-/** Anlagen einer Setup-Übermittlung → Aufträge für `applySpCreates` (`phase-4.md` 4.4, API-Weg). */
+/** Anlagen einer Setup-Übermittlung → Aufträge für `applyCreates` (`phase-4.md` 4.4, API-Weg). */
 
 const NAME = 'SP | EXACT | Flaschen';
 let counter = 0;

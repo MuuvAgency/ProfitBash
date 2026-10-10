@@ -266,7 +266,7 @@ async function sendChanges(
 }
 
 /**
- * Anlagen eines Setups (4.4): ein Aufruf von `applySpCreates` mit allen offenen Zeilen; Gebotsanpassungen teilen das
+ * Anlagen eines Setups (4.4): ein Aufruf von `applyCreates` mit allen offenen Zeilen; Gebotsanpassungen teilen das
  * Ergebnis ihrer Kampagne, das Startdatum ist heute in der Zeitzone des Profils.
  */
 async function sendSetup(
@@ -314,7 +314,7 @@ async function sendSetup(
     if (plan.operations.length > 0) {
       await run.extendLease();
       try {
-        const response = await deps.amazonAds.applySpCreates(
+        const response = await deps.amazonAds.applyCreates(
           connection,
           {
             amazonProfileId: submission.amazonProfileId,

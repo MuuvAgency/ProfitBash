@@ -136,7 +136,7 @@ nicht kennt (Amazon entscheidet).
 ### Anlagen über die API (Phase 4, 4.4)
 
 Neue Kampagnen-Strukturen (aus Preset und Produktgruppe, `docs/tasks/phase-4.md`) legt **nur für Sponsored Products**
-`applySpCreates` in `packages/amazon-ads/src/creates.ts` an: eigenes Modell `AmazonAdsCreateOperation`, Eltern über
+`applyCreates` in `packages/amazon-ads/src/creates.ts` an: eigenes Modell `AmazonAdsCreateOperation`, Eltern über
 `campaignRef`/`adGroupRef` (eine `ref` derselben Eingabe oder aus `created`, ref → Amazon-ID eines früheren Laufs).
 Geprüft am 2026-10-09 gegen die OpenAPI-Spec `SponsoredProducts_prod_3p.json`.
 
