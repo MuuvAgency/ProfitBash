@@ -41,9 +41,11 @@ Verfeinern der jeweiligen Phasen-Datei übernommen:
   Conquesting-Liste von Hand je Client (F-S9); Bulk-Erzeugung mit zentraler Locale-Abbildung (C.3); Gebots-Stack-Simulator (D).
 - **Phase 5** (`docs/tasks/phase-5.md`, Fragen entschieden am 2026-10-10: Kennzahlen als Zeitraumsummen aus der Bulk-Datei,
   Schattenmodus, dann Warenkorb, Caps je Profil und Monat, Ziele vorgezogen, Dayparting verschoben, Benachrichtigungen nur in
-  der App): Optimizer-Leitplanken (max. Änderung je Woche, Gebotsboden, Mindestdaten) als Defaults je Organisation, je Client
-  überschreibbar (F, F-S6); Schattenmodus je Client; Graduation- und Preset-Wechsel als Vorschläge im Warenkorb; Organic-
-  Benachrichtigungen erst nach zwei Wochen in Folge; Prüfungen aus E (Off-Amazon-Spend, Placements, Reserved Share of Voice).
+  der App): Optimizer-Leitplanken (max. Änderung je Woche, Gebotsboden, Mindestdaten) als
+  Defaults je Organisation, je Client überschreibbar (F, F-S6); Schattenmodus je Client; Graduation- und Preset-Wechsel als
+  Vorschläge (Annehmen über die Harvest-Merkliste bzw. das Preset der Produktgruppe, nie automatisch); Prüfungen aus E,
+  soweit die Bulk-Datei Daten liefert (vCPM bei SD, Platzierungen, Ausgaben ohne Bestellung). Organic-Benachrichtigungen
+  und Reserved Share of Voice bleiben offen (brauchen SQP bzw. Daten außerhalb der Bulk-Datei).
 - **Phase 6/7:** Rechner (Deal & Coupon, LTV; Target-ACoS kommt mit den Zielen in Phase 5), B2B-Inkrementalität, Preisverlauf im Organic-Tracker, SQP per SP-API,
   automatische Conquesting-Kriterien, Absatzprognose mit Bestand als Gebots-Leitplanke (G, A.2).
 - **Eigenständigkeit:** Schwellen, Kataloge und Bezeichnungen sind eigene, konfigurierbare Daten; keine Werte, Texte oder Tabellen
