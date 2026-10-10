@@ -21,6 +21,7 @@ import {
   amazonAdsProductAds,
   amazonAdsTargets,
   auditEvents,
+  notifications,
 } from './schema';
 import { createTestDatabase, type TestDatabase } from './testing';
 
@@ -98,6 +99,7 @@ beforeEach(async () => {
   await db.delete(adChanges);
   await db.delete(adChangeSubmissions);
   await db.delete(auditEvents);
+  await db.delete(notifications);
   // Stand der Entities zurücksetzen (die Tests ziehen ihn nach).
   await db.update(amazonAdsTargets).set({ state: 'ENABLED', removedAt: null });
   await db.update(amazonAdsTargets).set({ bid: '0.50' }).where(eq(amazonAdsTargets.id, f.keyword));
@@ -512,6 +514,64 @@ describe('finishAdChangeSubmission', () => {
       error: 'Kein Zugriff auf das Profil.',
       finishedAt: NOW,
     });
+  });
+});
+
+describe('Benachrichtigung beim Abschluss einer Übermittlung (5.2a)', () => {
+  const finish = (submissionId: string, extra: Partial<Parameters<typeof finishAdChangeSubmission>[1]> = {}) =>
+    finishAdChangeSubmission(testDb.db, { organizationId: f.org, submissionId, now: NOW, ...extra });
+  const rows = () => testDb.db.select().from(notifications).orderBy(notifications.seq);
+
+  it('meldet dem Auslöser eine erfolgreiche Übermittlung, einmal', async () => {
+    const { submissionId, changeIds } = await submit([update('target', f.keyword, 'bid', '0.75')]);
+    await claim();
+    await record(submissionId, [
+      { changeId: changeIds[0]!, outcome: 'applied', amazonEntityId: null },
+    ]);
+    await finish(submissionId);
+    await finish(submissionId);
+    expect(await rows()).toEqual([
+      expect.objectContaining({
+        organizationId: f.org,
+        profileId: f.profile,
+        audience: 'recipient',
+        recipientUserId: f.ada,
+        kind: 'submission_finished',
+        severity: 'success',
+        params: { applied: 1, failed: 0, channel: 'api' },
+        link: '/ads/changes',
+        dedupeKey: `submission:${submissionId}`,
+      }),
+    ]);
+  });
+
+  it('meldet nichts, solange Änderungen offen sind', async () => {
+    const { submissionId } = await submit([update('target', f.keyword, 'bid', '0.75')]);
+    await claim();
+    await finish(submissionId, { error: 'Amazon drosselt.' });
+    expect(await rows()).toEqual([]);
+  });
+
+  it('meldet Fehler dem Auslöser und den Admins (gescheitert oder mit fehlerhaften Änderungen)', async () => {
+    const { submissionId, changeIds } = await submit([
+      update('target', f.keyword, 'bid', '0.75'),
+      update('campaign', f.campaign, 'budget', '25'),
+    ]);
+    await claim();
+    await record(submissionId, [
+      { changeId: changeIds[0]!, outcome: 'applied', amazonEntityId: null },
+      { changeId: changeIds[1]!, outcome: 'failed', code: 'X', message: 'Budget zu hoch.' },
+    ]);
+    await finish(submissionId);
+    expect(await rows()).toEqual([
+      expect.objectContaining({
+        audience: 'admins',
+        recipientUserId: f.ada,
+        kind: 'submission_failed',
+        severity: 'error',
+        params: { applied: 1, failed: 1, channel: 'api' },
+      }),
+    ]);
   });
 });
 

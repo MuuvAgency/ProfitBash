@@ -25,6 +25,7 @@ import {
   amazonAdsProfiles,
   amazonAdsTargets,
   auditEvents,
+  notifications,
 } from './schema';
 import { createTestDatabase, type TestDatabase } from './testing';
 
@@ -676,6 +677,8 @@ describe('closeBulkFileSubmission', () => {
       .where(eq(adChangeSubmissions.id, submissionId));
     expect(submission).toMatchObject({ status: 'finished', finishedAt: NOW });
     expect(await auditActions()).toEqual(['ad_change_submission.close']);
+    // Wer selbst abschließt, braucht keine Benachrichtigung (5.2a).
+    expect(await testDb.db.select().from(notifications)).toEqual([]);
   });
 
   it('setzt beim Abschließen „vorher“ auf den Stand davor (zwei Übermittlungen an derselben Stelle)', async () => {

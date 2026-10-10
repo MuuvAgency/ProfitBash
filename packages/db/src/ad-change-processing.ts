@@ -36,6 +36,7 @@ import {
   campaignSetupItems,
 } from './schema';
 import { confirmCampaignSetupItems, releaseHarvestMarks } from './campaign-setup-processing';
+import { createNotification } from './notifications';
 
 /**
  * Verarbeitung der Übermittlungen (`docs/tasks/phase-3.md` 3.3). Systemzugriff des Jobs `ad-changes-submit` und
@@ -712,6 +713,8 @@ export async function closeAdChangeSubmission(
     now: Date;
     error?: string | undefined;
     failRemaining?: { code: string; message: string } | undefined;
+    /** Benachrichtigung beim Abschluss (5.2a); `false`, wenn der Nutzer selbst abschließt. Standard `true`. */
+    notify?: boolean;
   },
 ): Promise<AdChangeSubmissionClosed> {
   const stillSubmitted = and(
@@ -764,7 +767,54 @@ export async function closeAdChangeSubmission(
     .where(eq(adChangeSubmissions.id, input.submissionId));
   // Setup abgeschlossen: angelegte Harvest-Begriffe verlassen die Merkliste (`phase-4.md` 4.6, F7).
   if (open === 0) await releaseHarvestMarks(tx, { submissionId: input.submissionId });
+  if (open === 0 && input.notify !== false) {
+    await notifySubmissionClosed(tx, input.submissionId, status);
+  }
   return { status, open, failed };
+}
+
+/**
+ * Benachrichtigung zum Abschluss (5.2a, Dominik 2026-10-10): Erfolg an den Auslöser, Fehler (gescheitert oder
+ * einzelne Änderungen fehlerhaft) an ihn und die Org-Admins. Einmal je Übermittlung (Schlüssel).
+ */
+async function notifySubmissionClosed(
+  tx: DbOrTx,
+  submissionId: string,
+  status: AdChangeSubmissionStatus,
+): Promise<void> {
+  const [submission] = await tx
+    .select({
+      organizationId: adChangeSubmissions.organizationId,
+      profileId: adChangeSubmissions.profileId,
+      channel: adChangeSubmissions.channel,
+      createdBy: adChangeSubmissions.createdBy,
+    })
+    .from(adChangeSubmissions)
+    .where(eq(adChangeSubmissions.id, submissionId));
+  if (!submission) return;
+  const counts = { applied: 0, failed: 0 };
+  for (const table of [adChanges, campaignSetupItems]) {
+    const rows = await tx
+      .select({ status: table.status, count: sql<number>`count(*)::int` })
+      .from(table)
+      .where(eq(table.submissionId, submissionId))
+      .groupBy(table.status);
+    for (const row of rows) {
+      if (row.status === 'applied' || row.status === 'failed') counts[row.status] += row.count;
+    }
+  }
+  const failed = status === 'failed' || counts.failed > 0;
+  await createNotification(tx, {
+    organizationId: submission.organizationId,
+    profileId: submission.profileId,
+    audience: failed ? 'admins' : 'recipient',
+    recipientUserId: submission.createdBy,
+    kind: failed ? 'submission_failed' : 'submission_finished',
+    severity: failed ? 'error' : 'success',
+    params: { ...counts, channel: submission.channel },
+    link: '/ads/changes',
+    dedupeKey: `submission:${submissionId}`,
+  });
 }
 
 /**

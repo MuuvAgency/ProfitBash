@@ -650,7 +650,7 @@ export async function submitCampaignSetupDraft(
       });
       // Nichts anlegbar (nur SB/SD): sofort abgeschlossen, sonst hinge sie ohne Datei bzw. Job offen.
       if (specs.every((spec) => !spec.supported)) {
-        await closeAdChangeSubmission(tx, { submissionId: submission!.id, now });
+        await closeAdChangeSubmission(tx, { submissionId: submission!.id, now, notify: false });
       }
       const [summary] = await loadAdChangeSubmissionSummaries(
         tx,

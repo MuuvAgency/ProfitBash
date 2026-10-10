@@ -20,6 +20,7 @@ import {
   fileImportContents,
   fileImports,
   members,
+  notifications,
   users,
 } from './schema';
 import { createTestConnection, createTestOrganization, createTestProfile } from './test-fixtures';
@@ -111,6 +112,7 @@ afterAll(() => testDb?.close());
 beforeEach(async () => {
   await testDb.db.delete(fileImports);
   await testDb.db.delete(auditEvents);
+  await testDb.db.delete(notifications);
 });
 
 describe('createFileImport', () => {
@@ -388,6 +390,67 @@ describe('claimNextFileImport und finishFileImport', () => {
       finishedAt: now,
     });
     expect(await testDb.db.select().from(fileImportContents)).toEqual([]);
+  });
+
+  it('benachrichtigt den Uploader (Erfolg) bzw. ihn und die Admins (Fehler), je Datei einmal (5.2a)', async () => {
+    const ok = await upload({ fileName: 'gut.csv' });
+    const bad = await upload({ fileName: 'schlecht.csv' });
+    const now = new Date('2026-09-29T10:00:00Z');
+    const finish = async (id: string, status: 'imported' | 'failed') => {
+      const runId = crypto.randomUUID();
+      await claimAt(now, runId);
+      await finishFileImport(testDb.db, {
+        organizationId: ids.org,
+        id,
+        jobRunId: runId,
+        status,
+        error: status === 'failed' ? 'Spalte „Datum“ fehlt.' : null,
+        counters: { rows: 3 },
+        now,
+      });
+    };
+    await finish(ok.id, 'imported');
+    await finish(bad.id, 'failed');
+    const rows = await testDb.db
+      .select()
+      .from(notifications)
+      .orderBy(notifications.seq);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        organizationId: ids.org,
+        profileId: ids.profile,
+        audience: 'recipient',
+        recipientUserId: ids.admin,
+        kind: 'file_import_imported',
+        severity: 'success',
+        params: { fileName: 'gut.csv' },
+        link: '/admin/connections',
+        dedupeKey: `file_import:${ok.id}`,
+      }),
+      expect.objectContaining({
+        audience: 'admins',
+        recipientUserId: ids.admin,
+        kind: 'file_import_failed',
+        severity: 'error',
+        params: { fileName: 'schlecht.csv', error: 'Spalte „Datum“ fehlt.' },
+        dedupeKey: `file_import:${bad.id}`,
+      }),
+    ]);
+  });
+
+  it('benachrichtigt auch, wenn eine Datei aufgegeben wird (Inhalt fehlt)', async () => {
+    const broken = await upload({ fileName: 'ohne-inhalt.csv' });
+    await testDb.db
+      .delete(fileImportContents)
+      .where(eq(fileImportContents.fileImportId, broken.id));
+    await claimAt(new Date('2026-09-29T10:00:00Z'));
+    const rows = await testDb.db.select().from(notifications);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        kind: 'file_import_failed',
+        params: { fileName: 'ohne-inhalt.csv', error: 'Der Inhalt der Datei fehlt.' },
+      }),
+    ]);
   });
 
   it('überschreibt beim Abschließen nie das Ergebnis eines neueren Laufs', async () => {

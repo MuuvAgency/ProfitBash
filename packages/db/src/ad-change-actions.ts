@@ -715,7 +715,7 @@ export async function closeBulkFileSubmission(
       // Die Amazon-ID eines neuen Negatives kennt erst der nächste Import.
       for (const row of open) await applyAdChangeToEntity(tx, row, null);
     }
-    await closeAdChangeSubmission(tx, { submissionId: submission.id, now });
+    await closeAdChangeSubmission(tx, { submissionId: submission.id, now, notify: false });
     await recordAuditEvent(tx, {
       organizationId: submission.organizationId,
       actorUserId: input.userId,
