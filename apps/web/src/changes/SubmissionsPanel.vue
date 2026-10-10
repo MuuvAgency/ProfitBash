@@ -275,6 +275,11 @@ function setupSummary(item: SetupItemData): string {
       const expression = payload.expression as { type?: string; value?: string } | undefined;
       return `${t(`changes.setupExpression.${expression?.type ?? 'asin'}`)} ${expression?.value ?? ''}`;
     }
+    case 'audience_target':
+      // SD-Zielgruppe (4.9): wer die beworbenen Produkte angesehen bzw. gekauft hat.
+      return t(`changes.setupAudience.${text('audience') ?? 'views'}`, {
+        days: formatNumber(String(payload.lookbackDays), locale.value),
+      });
     case 'negative_product_target':
       return text('asin') ?? '';
     case 'portfolio': {

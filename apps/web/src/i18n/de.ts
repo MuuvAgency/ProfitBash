@@ -962,6 +962,7 @@ export const de = {
       product_ad: 'Anzeige',
       keyword: 'Keyword',
       product_target: 'Produkt-Target',
+      audience_target: 'Zielgruppe',
       negative_keyword: 'Negatives Keyword',
       negative_product_target: 'Negative ASIN',
       source_negative: 'Negativ in der Quelle',
@@ -982,6 +983,10 @@ export const de = {
       negativePhrase: 'negativ Wortgruppe',
     },
     setupExpression: { asin: 'ASIN', asinExpanded: 'ähnlich wie', category: 'Kategorie' },
+    setupAudience: {
+      views: 'Ansichten der Produkte, {days} Tage',
+      purchases: 'Käufe der Produkte, {days} Tage',
+    },
     setupPlacement: {
       PLACEMENT_TOP: 'Anfang der Suchergebnisse',
       PLACEMENT_PRODUCT_PAGE: 'Produktseiten',
@@ -1134,6 +1139,7 @@ export const de = {
       TARGET_TYPE_NOT_SUPPORTED: 'Diese Art von Target lässt sich so nicht ändern.',
       BULK_FILE_PARENT_ARCHIVED: 'Die Kampagne bzw. Ad Group wird in derselben Datei archiviert.',
       PARENT_NOT_CREATED: 'Die Kampagne bzw. Ad Group dieser Anlage wird nicht angelegt.',
+      SD_NOT_SUPPORTED: 'Sponsored Display kennt diese Anlage nicht.',
     },
     followUp: {
       retry: 'Erneut versucht: {status}',
@@ -1534,7 +1540,7 @@ export const de = {
       'Übermittelt: {items} Anlagen. Die Bulk-Datei lädst du auf der Seite „Änderungen“ herunter.',
     submittedApi: 'Übermittelt: {items} Anlagen gehen über die API raus.',
     unsupported:
-      '{count} Kampagne (Sponsored Brands/Display) wird noch nicht angelegt. | {count} Kampagnen (Sponsored Brands/Display) werden noch nicht angelegt.',
+      '{count} Kampagne (Sponsored Brands) wird noch nicht angelegt. | {count} Kampagnen (Sponsored Brands) werden noch nicht angelegt.',
     toChanges: 'Zu den Änderungen',
     submitFailed: 'Übermitteln hat nicht geklappt.',
     rejected: 'Übermitteln gesperrt: Die Prüfung hat Fehler gefunden.',
@@ -1583,7 +1589,9 @@ export const de = {
       adGroupNameInvalid: '{campaign}: Der Name der Ad Group ist ungültig ({issue}).',
       duplicateTarget: '{campaign}: „{target}“ steht doppelt in der Ad Group.',
       offAmazonOnlyUs: '{campaign}: Off-Amazon lässt sich nur in den USA einstellen.',
-      adProductLater: '{campaign}: Sponsored Brands und Display legt das Setup noch nicht an.',
+      adProductLater: '{campaign}: Sponsored Brands legt das Setup noch nicht an.',
+      expandedNotAvailable:
+        '{campaign}: „ähnlich wie“ ({target}) gibt es nur bei Sponsored Products.',
       harvestMarkMissing: 'Ein gewählter Begriff steht nicht mehr auf der Merkliste.',
       portfolioMissing:
         'Das Portfolio des Entwurfs gibt es im Profil nicht mehr; bitte ein anderes oder keines wählen.',
@@ -1674,6 +1682,8 @@ export const de = {
       autoOnlySp: '{key}: Automatisch nur bei Sponsored Products',
       lookbackOnlyAudience: '{key}: Rückblick nur bei Zielgruppen',
       audienceNeedsLookback: '{key}: Zielgruppen brauchen einen Rückblick',
+      lookbackNotAllowed: '{key}: Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage',
+      expandedOnlySp: '{key}: „ähnlich wie“ nur bei Sponsored Products',
       audienceKind:
         '{key}: Art der Zielgruppe (Ansichten oder Käufe) nur und immer bei Zielgruppen',
       duplicateEdge: 'Kante {from} → {to} gibt es zweimal',
@@ -1685,6 +1695,7 @@ export const de = {
       presetDuplicateBlock: '{preset}: Baustein {block} zweimal',
       presetTopWithoutPlacements: '{preset}: {block} hat keine Platzierungen',
       presetLookbackWithoutAudience: '{preset}: {block} hat keinen Rückblick',
+      presetLookbackNotAllowed: '{preset}: {block} Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage',
       oneDefault: 'Genau ein Preset muss der Standard sein',
       namingNoPlaceholder: 'Das Namensschema braucht mindestens einen Platzhalter',
       namingUnknownPlaceholder: 'Unbekannter Platzhalter {name} im Namensschema',
