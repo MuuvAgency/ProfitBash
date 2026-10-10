@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1–4.6. Nächster Schritt: 4.7.
+> Datei). Fertig: 4.1–4.7. Nächster Schritt: 4.8.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -445,7 +445,43 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     fremder Währung (Profil hat die Währung gewechselt) wird nicht als Gebot genommen; die Spalte zeigt ihn trotzdem.
 
 ### 4.7 Portfolio anlegen
-- [ ] Blatt „Portfolios“ der Bulk-Datei (`Create`), Dialog unter `/ads/tools/portfolios`, Zuordnung beim Setup (F9).
+- [x] Blatt „Portfolios“ der Bulk-Datei (`Create`), Dialog unter `/ads/tools/portfolios`, Zuordnung beim Setup (F9).
+- [x] Umsetzung (Stand für 4.8 und später):
+  - **Quelle (2026-10-10):** Guide „Use portfolios with bulksheets“ (`…/bulksheets/bulksheets-portfolios`): Product
+    „Portfolios“, Entity „Portfolio“, Operation „Create“ (kein „Archive“), Portfolio ID leer, Name Pflicht. Budget
+    optional; dann Betrag, Währung des Marktplatzes, Policy `dateRange` | `monthlyRecurring` (bzw. `noCap`) und
+    Startdatum `yyyyMMdd` Pflicht, Ende optional und später nicht mehr änderbar. Kampagnen lassen sich nur
+    bestehenden Portfolios zuordnen (ID aus einer später heruntergeladenen Datei). Das „Config“-Blatt der echten Datei
+    nennt für Portfolios nichts.
+  - **Bulk-Datei:** `buildPortfolioBulkSheet` (`packages/amazon-ads/src/bulk-file.ts`, Blatt „Portfolios“, Spalten
+    wie die echte Datei); ungültige Werte, Ende vor Start und doppelte Namen fallen mit Grund weg. Rundlauf mit dem
+    Import-Leser (`bulk-export-roundtrip.test.ts`); der Leser kennt jetzt auch die Schreibweise des Guides
+    (`monthlyRecurring` …). `buildSetupBulkFile` schreibt Portfolio-Zeilen ins Blatt „Portfolios“ (Datei mit einem
+    oder zwei Blättern), Dateiname `profitbash-portfolio-…`.
+  - **Datenmodell** (Migration `0033_portfolio_create`): Ein neues Portfolio ist eine eigene Übermittlung der Art
+    `portfolio` (nur Bulk-Datei) mit einer Zeile `portfolio` in `campaign_setup_items` (ohne Entwurf; `draft_id` ist
+    nur dafür leer). So gelten Seite „Änderungen“, Zähler, Download, „hochgeladen/verworfen“ und die Bestätigung
+    wie bei Setups. Der nächste Bulk-Import ordnet die echte ID über den Namen zu (ohne Groß/Klein). Budget in der
+    Währung des Profils. Name je Profil eindeutig (bestehende und noch nicht importierte, `PORTFOLIO_NAME_TAKEN`;
+    Annahme: höchstens 128 Zeichen, Amazon nennt keine Grenze im Guide).
+  - **Zuordnung beim Setup (F9):** Entwurf mit `portfolioId` (ein bestehendes Portfolio des Profils für alle neuen
+    Kampagnen, `PORTFOLIO_MISMATCH` sonst). Beim Übermitteln tragen die Kampagnen dessen Amazon-ID (Bulk-Datei
+    „Portfolio ID“, API `portfolioId`); fehlt es inzwischen, sperrt `portfolioMissing`. Noch nicht importierte
+    Portfolios sind im Assistenten nicht wählbar (Hinweis mit ihren Namen).
+  - **API** (Feature `tools`): `GET /api/ads/tools/portfolios?profileId=` (`view`; Portfolios mit Budget und Zahl
+    der Kampagnen, dazu `pending`), `POST /api/ads/tools/portfolios` (`write`; 201 mit der Übermittlung).
+    Über die API legt ProfitBash keine Portfolios an (F9; Zeilen dort `PORTFOLIO_BULK_FILE_ONLY`).
+  - **Seite** `/ads/tools/portfolios` (Reiter „Portfolio“): Profil, Liste (Name, Budget, Kampagnen, Zustand),
+    „Angelegt, noch nicht importiert“ mit Verweis auf die Übermittlung, Formular (Name, optional Budget monatlich
+    oder im Zeitraum, Start, Ende) nur mit `write`. Seite „Änderungen“: Art „Portfolio“, Zeile mit Name und Budget,
+    eigener Hinweis zur Zuordnung nach dem nächsten Import.
+  - Geprüft im Browser-Pane (Demo-Daten, 2026-10-10): Liste mit Budgets und Zahl der Kampagnen, Anlage mit Budget im
+    Zeitraum, Datei geprüft (Blatt „Portfolios“, Werte wie im Guide), Detail auf der Seite „Änderungen“, Auswahl im
+    Assistenten mit Hinweis auf das noch nicht importierte, Handy, Konsole ohne Fehler. Dabei behoben: Zustand
+    übersetzt, Dateiname, Zeitraum mit Ende. Testdaten gelöscht.
+  - **Offen bzw. bewusst so:** Portfolios ändern (Budget, Name) und Kampagnen bestehender Setups nachträglich
+    zuordnen gibt es nicht (nicht Teil von F9). Ein Portfolio je Entwurf, nicht je Kampagne. Erster echter Upload
+    einer Portfolio-Datei steht aus.
 
 ### 4.8 Gebots-Stack-Simulator (`packages/engine`, `apps/web`)
 - [ ] **Vorher gegen die aktuelle Amazon-Doku prüfen**, wie Strategie, Platzierung, Zielgruppen- und B2B-Anpassung
