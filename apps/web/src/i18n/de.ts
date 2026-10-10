@@ -1590,6 +1590,9 @@ export const de = {
       duplicateTarget: '{campaign}: „{target}“ steht doppelt in der Ad Group.',
       offAmazonOnlyUs: '{campaign}: Off-Amazon lässt sich nur in den USA einstellen.',
       adProductLater: '{campaign}: Sponsored Brands legt das Setup noch nicht an.',
+      keywordNotSd: '{campaign}: Sponsored Display kennt keine Keywords.',
+      vcpmNotUnlocked: '{campaign}: vCPM ist für diesen Baustein nicht freigeschaltet.',
+      offAmazonNotUnlocked: '{campaign}: Off-Amazon ist für diesen Baustein nicht freigeschaltet.',
       expandedNotAvailable:
         '{campaign}: „ähnlich wie“ ({target}) gibt es nur bei Sponsored Products.',
       harvestMarkMissing: 'Ein gewählter Begriff steht nicht mehr auf der Merkliste.',
@@ -1680,6 +1683,7 @@ export const de = {
       optimizationOnlySd: '{key}: Optimierung nur bei Sponsored Display',
       audienceOnlySd: '{key}: Zielgruppen nur bei Sponsored Display',
       autoOnlySp: '{key}: Automatisch nur bei Sponsored Products',
+      keywordNotSd: '{key}: Sponsored Display kennt keine Keywords',
       lookbackOnlyAudience: '{key}: Rückblick nur bei Zielgruppen',
       audienceNeedsLookback: '{key}: Zielgruppen brauchen einen Rückblick',
       lookbackNotAllowed: '{key}: Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage',

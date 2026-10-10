@@ -7137,7 +7137,8 @@ export interface components {
                     type: "audience";
                     /** @enum {string} */
                     audience: "views" | "purchases";
-                    lookbackDays: number;
+                    /** @enum {number} */
+                    lookbackDays: 7;
                     bid: string;
                 })[];
                 negatives: ({
@@ -7421,7 +7422,8 @@ export interface components {
                     type: "audience";
                     /** @enum {string} */
                     audience: "views" | "purchases";
-                    lookbackDays: number;
+                    /** @enum {number} */
+                    lookbackDays: 7;
                     bid: string;
                 })[];
                 negatives: ({
@@ -7541,7 +7543,8 @@ export interface components {
                     type: "audience";
                     /** @enum {string} */
                     audience: "views" | "purchases";
-                    lookbackDays: number;
+                    /** @enum {number} */
+                    lookbackDays: 7;
                     bid: string;
                 })[];
                 negatives: ({

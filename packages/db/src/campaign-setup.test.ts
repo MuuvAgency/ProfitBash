@@ -571,6 +571,37 @@ describe('submitCampaignSetupDraft', () => {
     });
   });
 
+  it('sperrt vCPM, das der Entwurf nicht freigeschaltet hat (F-S7, 4.9)', async () => {
+    const sd = campaign('SD | RT-VIEW | Flaschen', {
+      block: 'SD-RT-VIEWS',
+      adProduct: 'SD',
+      targeting: 'audience',
+      biddingStrategy: null,
+      placements: null,
+      sdOptimization: 'clicks',
+      costType: 'vcpm',
+      targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '5.00' }],
+      negatives: [],
+    });
+    const locked = await save({ campaigns: [sd] });
+    expect(await submit(locked.id, 1)).toMatchObject({
+      status: 'rejected',
+      issues: [{ code: 'vcpmNotUnlocked', campaign: 'SD | RT-VIEW | Flaschen' }],
+    });
+    const unlocked = await save({
+      campaigns: [{ ...sd, name: 'SD | RT-VIEW | Flaschen 2', adGroup: { ...sd.adGroup, name: 'X' } }],
+      inputs: {
+        keywords: [],
+        brandTerms: [],
+        productTargets: [],
+        categories: [],
+        harvest: [],
+        unlocks: { 'SD-RT-VIEWS': { vcpm: true } },
+      },
+    });
+    expect((await submit(unlocked.id, 1))?.status).toBe('submitted');
+  });
+
   it('schließt eine Übermittlung ohne anlegbare Kampagne sofort ab', async () => {
     const created = await save({
       campaigns: [

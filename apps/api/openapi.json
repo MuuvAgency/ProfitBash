@@ -7495,7 +7495,10 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "integer"
+                            "type": "number",
+                            "enum": [
+                              7
+                            ]
                           },
                           "bid": {
                             "type": "string",
@@ -8682,7 +8685,10 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "integer"
+                            "type": "number",
+                            "enum": [
+                              7
+                            ]
                           },
                           "bid": {
                             "type": "string",
@@ -9251,7 +9257,10 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "integer"
+                            "type": "number",
+                            "enum": [
+                              7
+                            ]
                           },
                           "bid": {
                             "type": "string",

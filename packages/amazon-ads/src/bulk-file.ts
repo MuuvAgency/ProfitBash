@@ -448,6 +448,7 @@ const SD_BID_OPTIMIZATIONS = {
   conversions: 'Optimize for conversions',
   reach: 'Optimize for viewable impressions',
 } as const;
+// Wie `SD_LOOKBACK_DAYS` in `@profitbash/shared` (SD-v3-Spec); dieses Paket hängt nicht von `shared` ab.
 const SD_LOOKBACK_DAYS: ReadonlySet<number> = new Set([7, 14, 30, 60, 90, 180, 365]);
 const OFF_AMAZON = {
   increaseReach: 'Increase reach',

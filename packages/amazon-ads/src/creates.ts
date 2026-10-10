@@ -193,6 +193,7 @@ const isSd = (entity: AmazonAdsCreateEntity) => entity.startsWith('sd');
 /** Elternart je Anzeigentyp: SP-Kinder unter SP-Eltern, SD-Kinder unter SD-Eltern. */
 const parentEntity = (entity: AmazonAdsCreateEntity, level: 'campaign' | 'adGroup') =>
   isSd(entity) ? (level === 'campaign' ? 'sdCampaign' : 'sdAdGroup') : level;
+// Wie `SD_LOOKBACK_DAYS` in `@profitbash/shared` (SD-v3-Spec); dieses Paket hängt nicht von `shared` ab.
 const SD_LOOKBACK_DAYS: ReadonlySet<number> = new Set([7, 14, 30, 60, 90, 180, 365]);
 const SD_OPTIMIZATIONS: ReadonlySet<string> = new Set(['clicks', 'conversions', 'reach']);
 

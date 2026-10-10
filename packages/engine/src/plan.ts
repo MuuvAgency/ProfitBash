@@ -409,7 +409,11 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
           : skip('skippedNoProductTargets');
       }
       case 'audience': {
-        const lookbackDays = entry.lookbackDays ?? block.lookbackDays ?? 30;
+        // Der Katalog lässt nur Rückblicke zu, die Amazon kennt (`SD_LOOKBACK_DAYS`, geprüft im Schema).
+        const lookbackDays = (entry.lookbackDays ?? block.lookbackDays ?? 30) as Extract<
+          PlannedTarget,
+          { type: 'audience' }
+        >['lookbackDays'];
         return [
           {
             target: `${lookbackDays}D`,

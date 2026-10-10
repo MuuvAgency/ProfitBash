@@ -170,6 +170,11 @@ describe('Prüfung eines geänderten Katalogs', () => {
     const expanded = clone();
     expanded.blocks.find((block) => block.key === 'SD-PAT')!.productMatch = 'expanded';
     expect(found(expanded)).toContainEqual({ issue: 'expandedOnlySp', key: 'SD-PAT' });
+    // Sponsored Display kennt keine Keywords.
+    const keyword = clone();
+    const sdPat = keyword.blocks.find((block) => block.key === 'SD-PAT')!;
+    Object.assign(sdPat, { targeting: 'keyword', productMatch: null, matchType: 'exact' });
+    expect(found(keyword)).toContainEqual({ issue: 'keywordNotSd', key: 'SD-PAT' });
     const kind = clone();
     kind.blocks.find((block) => block.key === 'SD-RT-VIEWS')!.audience = null;
     kind.blocks[0]!.audience = 'views';

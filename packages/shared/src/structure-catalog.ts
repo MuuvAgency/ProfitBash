@@ -206,6 +206,7 @@ export const structureCatalogSchema = z
       if (block.targeting === 'audience' && block.adProduct !== 'SD')
         add('audienceOnlySd', { key });
       if (block.targeting === 'auto' && block.adProduct !== 'SP') add('autoOnlySp', { key });
+      if (block.targeting === 'keyword' && block.adProduct === 'SD') add('keywordNotSd', { key });
       if (block.lookbackDays !== null && block.targeting !== 'audience') {
         add('lookbackOnlyAudience', { key });
       }
