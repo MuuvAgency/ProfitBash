@@ -129,6 +129,18 @@ describe('Seite „Automationen“: Vorschläge', () => {
     expect(second).toContain('Aktiv → Pausiert');
     expect(second).toContain('Optimizer');
     expect(second).not.toContain('Begrenzt durch');
+    expect(first).not.toContain('bisher Standardgebot');
+  });
+
+  it('nennt es, wenn das Target bisher mit dem Standardgebot der Ad Group bietet', async () => {
+    await mountTab('proposals', {
+      'GET /api/ads/automations/proposals': json({
+        proposals: [proposal({ detail: { clicks: 20, hasOwnBid: false } })],
+        total: 1,
+      }),
+    });
+    await vi.waitFor(() => expect($(`[data-proposal-row="${P1}"]`)).not.toBeNull());
+    expect(text(row(P1))).toContain('(bisher Standardgebot)');
   });
 
   it('legt einen einzelnen und markierte Vorschläge in den eigenen Warenkorb und meldet das Ergebnis', async () => {
