@@ -470,22 +470,14 @@ describe('submitCampaignSetupDraft', () => {
       campaignState: 'PAUSED',
       campaigns: [
         campaign('SP | EXACT | Flaschen'),
-        // Sponsored Brands legt das Setup erst mit 4.10 an (SD seit 4.9).
-        campaign('SB | HEADER | Flaschen', {
-          adProduct: 'SB',
-          biddingStrategy: null,
-          placements: null,
-          negatives: [],
-        }),
       ],
     });
     const result = await submit(created.id, 1);
     expect(result).toMatchObject({
       status: 'submitted',
-      items: 7,
-      unsupported: 1,
-      // Hinweise sperren nicht.
-      issues: [{ severity: 'info', code: 'adProductLater', campaign: 'SB | HEADER | Flaschen' }],
+      items: 6,
+      unsupported: 0,
+      issues: [],
     });
     if (result?.status !== 'submitted') throw new Error('nicht übermittelt');
     expect(result.submission).toMatchObject({
@@ -508,7 +500,6 @@ describe('submitCampaignSetupDraft', () => {
       ['product_ad', 'submitted', null],
       ['keyword', 'submitted', null],
       ['negative_keyword', 'submitted', null],
-      ['campaign', 'failed', 'AD_PRODUCT_NOT_SUPPORTED'],
     ]);
     expect(items[0]!.payload).toMatchObject({ entity: 'campaign', state: 'PAUSED' });
     expect(items[2]).toMatchObject({
@@ -524,15 +515,15 @@ describe('submitCampaignSetupDraft', () => {
     expect(listed).toMatchObject({
       id: result.submission.id,
       kind: 'setup',
-      changes: 7,
-      counts: { submitted: 6, applied: 0, failed: 1, dismissed: 0 },
+      changes: 6,
+      counts: { submitted: 6, applied: 0, failed: 0, dismissed: 0 },
     });
 
     const [event] = await testDb.db
       .select()
       .from(auditEvents)
       .where(eq(auditEvents.action, 'ad_change_submission.create'));
-    expect(event!.target).toMatchObject({ kind: 'setup', draftId: created.id, items: 7 });
+    expect(event!.target).toMatchObject({ kind: 'setup', draftId: created.id, items: 6 });
   });
 
   it('prüft mit reviewCampaignPlan gegen den aktuellen Stand und übermittelt bei Fehlern nichts', async () => {
@@ -606,24 +597,24 @@ describe('submitCampaignSetupDraft', () => {
     expect((await submit(unlocked.id, 1))?.status).toBe('submitted');
   });
 
-  it('schließt eine Übermittlung ohne anlegbare Kampagne sofort ab', async () => {
+  it('sperrt Sponsored Brands ohne Werbemittel (4.10)', async () => {
     const created = await save({
       campaigns: [
-        // Sponsored Brands legt das Setup erst mit 4.10 an (SD seit 4.9).
         campaign('SB | HEADER | Flaschen', {
           adProduct: 'SB',
           biddingStrategy: null,
           placements: null,
+          sbAdFormat: 'collection',
           negatives: [],
         }),
       ],
     });
     const result = await submit(created.id, 1);
-    expect(result).toMatchObject({
-      status: 'submitted',
-      items: 1,
-      unsupported: 1,
-      submission: { status: 'finished', counts: { failed: 1 } },
+    expect(result?.status).toBe('rejected');
+    expect(result?.status === 'rejected' && result.issues).toContainEqual({
+      severity: 'error',
+      code: 'sbCreativeMissing',
+      campaign: 'SB | HEADER | Flaschen',
     });
   });
 

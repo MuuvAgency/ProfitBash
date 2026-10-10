@@ -196,7 +196,8 @@ const PLACEMENTS: Record<string, string> = {
  * Ordnet offene Anlagen von Setup-Übermittlungen per Bulk-Datei den Entities zu, die der Import inzwischen kennt
  * (in dessen Transaktion): Kampagne über den Namen im Profil (ohne Groß/Klein, nicht entfernt), Ad Group über den
  * Namen in der Kampagne, darunter Anzeige (SKU bzw. ASIN), Keyword (Text und Match-Typ), Produkt-Target (ASIN bzw.
- * „ähnlich wie“), Kategorie, SD-Zielgruppe (Ereignis und Rückblick, 4.9) und Negatives (Text bzw. ASIN). Gebotsanpassungen gelten als angelegt, wenn die Kampagne
+ * „ähnlich wie“), Kategorie, SD-Zielgruppe (Ereignis und Rückblick, 4.9), SB-Anzeige (Name, 4.10) und Negatives (Text
+ * bzw. ASIN). Gebotsanpassungen gelten als angelegt, wenn die Kampagne
  * den Prozentsatz zeigt. Bestätigte Zeilen tragen danach die echte Amazon-ID; der Rest bleibt offen. Liefert die
  * Zahl der bestätigten Zeilen und die betroffenen Übermittlungen.
  */
@@ -496,6 +497,21 @@ async function findChild(
           .limit(1),
       );
     }
+    case 'sb_ad':
+      // SB-Anzeige (4.10): über ihren Namen in der Ad Group (Bulk-Import und Export legen ihn in `extra.name` ab).
+      return first(
+        tx
+          .select({ id: amazonAdsProductAds.amazonAdId })
+          .from(amazonAdsProductAds)
+          .where(
+            and(
+              eq(amazonAdsProductAds.adGroupId, adGroupId),
+              sql`lower(${amazonAdsProductAds.extra}->>'name') = ${lower(payload.name)}`,
+              isNull(amazonAdsProductAds.removedAt),
+            ),
+          )
+          .limit(1),
+      );
     case 'audience_target':
       // SD-Zielgruppe (4.9): Ereignis und Rückblick, wie Bulk-Import und Export sie ablegen.
       return first(

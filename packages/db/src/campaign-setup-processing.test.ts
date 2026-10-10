@@ -473,6 +473,118 @@ describe('Sponsored Display (4.9)', () => {
   });
 });
 
+describe('Sponsored Brands (4.10)', () => {
+  const SB_NAME = 'SB | HEADER | Flaschen';
+  const sbPlan: PlannedCampaign = {
+    ...plan,
+    block: 'SB-HEADER-KW',
+    adProduct: 'SB',
+    name: SB_NAME,
+    biddingStrategy: null,
+    placements: null,
+    sbAdFormat: 'collection',
+    adGroup: { name: SB_NAME, defaultBid: '0.90' },
+    ads: [
+      { asin: 'B0TEST0001', sku: null },
+      { asin: 'B0TEST0002', sku: null },
+      { asin: 'B0TEST0003', sku: null },
+    ],
+    targets: [{ type: 'keyword', text: 'trinkflasche', matchType: 'exact', bid: '0.90' }],
+    negatives: [],
+  };
+  const creative = {
+    brandEntityId: 'ENTITY1',
+    brandName: 'Waldkauz',
+    logoAssetId: null,
+    videoAssetId: null,
+    adTitle: null,
+  };
+
+  it('sperrt SB ohne Werbemittel und legt sie mit Werbemitteln an; der Import bestätigt die Anzeige über ihren Namen', async () => {
+    await expect(
+      submitted('bulk_file', f.profile, SB_NAME, { campaigns: [sbPlan] }),
+    ).rejects.toThrow('nicht übermittelt');
+
+    const id = await submitted('bulk_file', f.profile, SB_NAME, {
+      campaigns: [sbPlan],
+      inputs: {
+        keywords: [],
+        brandTerms: [],
+        productTargets: [],
+        categories: [],
+        harvest: [],
+        unlocks: {},
+        creative,
+      },
+    });
+    expect((await items(id)).map((row) => [row.entityType, row.status])).toEqual([
+      ['campaign', 'submitted'],
+      ['ad_group', 'submitted'],
+      ['sb_ad', 'submitted'],
+      ['keyword', 'submitted'],
+    ]);
+
+    const { db } = testDb;
+    const SB = 'SPONSORED_BRANDS';
+    const [campaign] = await db
+      .insert(amazonAdsCampaigns)
+      .values({
+        organizationId: f.org,
+        profileId: f.profile,
+        amazonCampaignId: '4401',
+        adProduct: SB,
+        name: SB_NAME,
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsCampaigns.id });
+    const [adGroup] = await db
+      .insert(amazonAdsAdGroups)
+      .values({
+        organizationId: f.org,
+        profileId: f.profile,
+        campaignId: campaign!.id,
+        amazonAdGroupId: '5501',
+        adProduct: SB,
+        name: SB_NAME,
+        state: 'ENABLED',
+      })
+      .returning({ id: amazonAdsAdGroups.id });
+    const parents = {
+      organizationId: f.org,
+      profileId: f.profile,
+      campaignId: campaign!.id,
+      adGroupId: adGroup!.id,
+      adProduct: SB,
+      state: 'ENABLED',
+    };
+    await db.insert(amazonAdsProductAds).values({
+      ...parents,
+      amazonAdId: '6601',
+      asin: null,
+      extra: { adType: 'MANUAL_COLLECTION', name: SB_NAME.toLowerCase() },
+    });
+    await db.insert(amazonAdsTargets).values({
+      ...parents,
+      amazonTargetId: '7701',
+      targetType: 'keyword',
+      keywordText: 'trinkflasche',
+      matchType: 'EXACT',
+    });
+    const result = await confirmBulkFileAdChanges(db, {
+      organizationId: f.org,
+      profileId: f.profile,
+      now: new Date(),
+    });
+    expect(result).toEqual({ confirmed: 4, finished: 1 });
+    expect((await items(id)).map((row) => row.amazonEntityId)).toEqual([
+      '4401',
+      '5501',
+      '6601',
+      '7701',
+    ]);
+  });
+});
+
 describe('closeBulkFileSubmission für Setups', () => {
   it('schließt offene Anlagen als angewendet bzw. verworfen ab', async () => {
     const applied = await submitted();
