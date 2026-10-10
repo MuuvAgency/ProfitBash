@@ -6314,6 +6314,7 @@
               "placement",
               "ad_group",
               "product_ad",
+              "sb_ad",
               "keyword",
               "product_target",
               "audience_target",
@@ -7331,6 +7332,13 @@
                   ],
                   "additionalProperties": false
                 },
+                "sbAdFormat": {
+                  "type": "string",
+                  "enum": [
+                    "collection",
+                    "video"
+                  ]
+                },
                 "adGroup": {
                   "type": "object",
                   "properties": {
@@ -7992,6 +8000,9 @@
                   "additionalProperties": false
                 },
                 "default": {}
+              },
+              "creative": {
+                "$ref": "#/components/schemas/SbCreative"
               }
             },
             "additionalProperties": false
@@ -8017,6 +8028,84 @@
           "inputs"
         ],
         "additionalProperties": false
+      },
+      "SbCreative": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "brandEntityId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Za-z0-9]{1,64}$",
+            "default": null
+          },
+          "brandName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "logoAssetId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^amzn1\\.assetlibrary\\.[A-Za-z0-9.:_-]{1,200}$",
+            "default": null
+          },
+          "videoAssetId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^amzn1\\.assetlibrary\\.[A-Za-z0-9.:_-]{1,200}$",
+            "default": null
+          },
+          "adTitle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "default": null
+          }
+        },
+        "default": null,
+        "required": [
+          "brandName"
+        ],
+        "additionalProperties": false
+      },
+      "SetupBrandList": {
+        "type": "object",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "brandEntityId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "brandEntityId",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "brands"
+        ]
       },
       "SetupHarvestList": {
         "type": "object",
@@ -8449,6 +8538,9 @@
                   "additionalProperties": false
                 },
                 "default": {}
+              },
+              "creative": {
+                "$ref": "#/components/schemas/SbCreative"
               }
             },
             "additionalProperties": false
@@ -8560,6 +8652,13 @@
                     "restOfSearch"
                   ],
                   "additionalProperties": false
+                },
+                "sbAdFormat": {
+                  "type": "string",
+                  "enum": [
+                    "collection",
+                    "video"
+                  ]
                 },
                 "adGroup": {
                   "type": "object",
@@ -9061,6 +9160,9 @@
                   "additionalProperties": false
                 },
                 "default": {}
+              },
+              "creative": {
+                "$ref": "#/components/schemas/SbCreative"
               }
             },
             "additionalProperties": false
@@ -9172,6 +9274,13 @@
                     "restOfSearch"
                   ],
                   "additionalProperties": false
+                },
+                "sbAdFormat": {
+                  "type": "string",
+                  "enum": [
+                    "collection",
+                    "video"
+                  ]
                 },
                 "adGroup": {
                   "type": "object",
@@ -10042,6 +10151,18 @@
                   "enum": [
                     "views",
                     "purchases",
+                    null
+                  ],
+                  "default": null
+                },
+                "sbAdFormat": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "collection",
+                    "video",
                     null
                   ],
                   "default": null
@@ -14682,6 +14803,77 @@
           },
           "409": {
             "description": "Entwurf inzwischen geändert, schon übermittelt bzw. kein Kurs vorhanden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/tools/setup/brands": {
+      "get": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Marken eines Profils für Sponsored Brands (4.10), aus dem Blatt „Brand Assets Data“ des Bulk-Imports",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Marken.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupBrandList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entwurf, Profil oder Produktgruppe nicht gefunden.",
             "content": {
               "application/json": {
                 "schema": {

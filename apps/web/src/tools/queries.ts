@@ -141,6 +141,18 @@ export function useSetupDrafts() {
 }
 
 /** Harvest-Merkliste eines Profils als Eingang des Setups (4.6). */
+/** Marken eines Profils für Sponsored Brands (4.10), aus dem letzten Bulk-Import. */
+export function useSetupBrands(profileId: Ref<string | null>) {
+  const orgId = useActiveOrgId();
+  const { canView } = useToolRights();
+  return useQuery({
+    queryKey: computed(() => ['setup-brands', orgId.value, profileId.value] as const),
+    queryFn: () => api.tools.setup.brands(profileId.value!),
+    enabled: computed(() => canView.value && orgId.value !== null && profileId.value !== null),
+    staleTime: 60_000,
+  });
+}
+
 export function useSetupHarvest(profileId: Ref<string | null>) {
   const orgId = useActiveOrgId();
   const { canView } = useToolRights();

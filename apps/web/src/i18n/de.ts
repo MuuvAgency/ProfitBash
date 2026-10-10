@@ -960,6 +960,7 @@ export const de = {
       placement: 'Gebotsanpassung',
       ad_group: 'Ad Group',
       product_ad: 'Anzeige',
+      sb_ad: 'Marken-Anzeige',
       keyword: 'Keyword',
       product_target: 'Produkt-Target',
       audience_target: 'Zielgruppe',
@@ -983,6 +984,7 @@ export const de = {
       negativePhrase: 'negativ Wortgruppe',
     },
     setupExpression: { asin: 'ASIN', asinExpanded: 'ähnlich wie', category: 'Kategorie' },
+    setupSbFormat: { collection: 'Kollektion', video: 'Video' },
     setupAudience: {
       views: 'Ansichten der Produkte, {days} Tage',
       purchases: 'Käufe der Produkte, {days} Tage',
@@ -1140,6 +1142,7 @@ export const de = {
       BULK_FILE_PARENT_ARCHIVED: 'Die Kampagne bzw. Ad Group wird in derselben Datei archiviert.',
       PARENT_NOT_CREATED: 'Die Kampagne bzw. Ad Group dieser Anlage wird nicht angelegt.',
       SD_NOT_SUPPORTED: 'Sponsored Display kennt diese Anlage nicht.',
+      SB_BULK_FILE_ONLY: 'Sponsored Brands legt ProfitBash nur per Bulk-Datei an.',
     },
     followUp: {
       retry: 'Erneut versucht: {status}',
@@ -1479,6 +1482,25 @@ export const de = {
     productTargets: 'Fremde Produkte als Ziel (ASIN je Zeile)',
     singleProducts: 'Fremde Produkte mit eigener Kampagne (ASIN je Zeile)',
     categories: 'Kategorien (je Zeile „ID;Name“)',
+    creative: {
+      title: 'Werbemittel für Sponsored Brands',
+      hint: 'Gilt für alle SB-Kampagnen dieses Entwurfs. Asset-IDs kopierst du aus der Asset-Bibliothek der Werbekonsole (z. B. amzn1.assetlibrary.asset1.…). Sponsored Brands geht nur per Bulk-Datei raus.',
+      brand: 'Marke',
+      noBrand: 'Keine Marke (Vendoren)',
+      noBrands:
+        'Noch keine Marken: Importiere eine Bulk-Datei mit dem Blatt „Brand Assets Data“.',
+      brandsFailed: 'Die Marken konnten nicht geladen werden.',
+      brandName: 'Markenname (höchstens 30 Zeichen)',
+      logoAssetId: 'Logo (Asset-ID, optional)',
+      adTitle: 'Titel der Kollektion (optional, höchstens 32 Zeichen)',
+      videoAssetId: 'Video (Asset-ID)',
+      invalid: {
+        brandName: 'Markenname fehlt oder ist länger als 30 Zeichen.',
+        logoAssetId: 'Keine Asset-ID der Asset-Bibliothek (beginnt mit „amzn1.assetlibrary.“).',
+        videoAssetId: 'Keine Asset-ID der Asset-Bibliothek (beginnt mit „amzn1.assetlibrary.“).',
+        adTitle: 'Der Titel ist länger als 32 Zeichen.',
+      },
+    },
     unlocks: 'Freischalten (je Baustein)',
     unlockHint:
       'vCPM und Off-Amazon sind gesperrt (kein Geld verbrennen). Nur bewusst freischalten; es gilt für alle Kampagnen des Bausteins.',
@@ -1540,7 +1562,7 @@ export const de = {
       'Übermittelt: {items} Anlagen. Die Bulk-Datei lädst du auf der Seite „Änderungen“ herunter.',
     submittedApi: 'Übermittelt: {items} Anlagen gehen über die API raus.',
     unsupported:
-      '{count} Kampagne (Sponsored Brands) wird noch nicht angelegt. | {count} Kampagnen (Sponsored Brands) werden noch nicht angelegt.',
+      '{count} Kampagne (Sponsored Brands ohne Werbemittel) wird nicht angelegt. | {count} Kampagnen (Sponsored Brands ohne Werbemittel) werden nicht angelegt.',
     toChanges: 'Zu den Änderungen',
     submitFailed: 'Übermitteln hat nicht geklappt.',
     rejected: 'Übermitteln gesperrt: Die Prüfung hat Fehler gefunden.',
@@ -1590,6 +1612,15 @@ export const de = {
       duplicateTarget: '{campaign}: „{target}“ steht doppelt in der Ad Group.',
       offAmazonOnlyUs: '{campaign}: Off-Amazon lässt sich nur in den USA einstellen.',
       adProductLater: '{campaign}: Sponsored Brands legt das Setup noch nicht an.',
+      sbCreativeMissing:
+        '{campaign}: Sponsored Brands braucht Werbemittel (Marke, Logo, Video) im Abschnitt „Werbemittel“.',
+      sbBrandEntityMissing: 'Sponsored Brands: Seller brauchen eine Marke (aus dem letzten Bulk-Import).',
+      sbFormatMissing: '{campaign}: Der Baustein nennt kein Anzeigenformat.',
+      sbCollectionAsins:
+        '{campaign}: Eine Kollektion braucht 3 bis 10 Produkte; die Produktgruppe hat {count}.',
+      sbVideoMissing: '{campaign}: Das Video braucht eine Video-ID aus der Asset-Bibliothek.',
+      sbVideoOneProduct: '{campaign}: Ein Video bewirbt genau ein Produkt.',
+      sbVideoNotAvailable: '{campaign}: Video-Anzeigen gibt es nur in den USA, in UK und DE.',
       keywordNotSd: '{campaign}: Sponsored Display kennt keine Keywords.',
       vcpmNotUnlocked: '{campaign}: vCPM ist für diesen Baustein nicht freigeschaltet.',
       offAmazonNotUnlocked: '{campaign}: Off-Amazon ist für diesen Baustein nicht freigeschaltet.',
@@ -1684,6 +1715,8 @@ export const de = {
       audienceOnlySd: '{key}: Zielgruppen nur bei Sponsored Display',
       autoOnlySp: '{key}: Automatisch nur bei Sponsored Products',
       keywordNotSd: '{key}: Sponsored Display kennt keine Keywords',
+      sbNeedsFormat: '{key}: Sponsored Brands braucht ein Anzeigenformat',
+      formatOnlySb: '{key}: Anzeigenformat nur bei Sponsored Brands',
       lookbackOnlyAudience: '{key}: Rückblick nur bei Zielgruppen',
       audienceNeedsLookback: '{key}: Zielgruppen brauchen einen Rückblick',
       lookbackNotAllowed: '{key}: Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage',

@@ -53,6 +53,7 @@ export type PortfolioListData = Schemas['PortfolioList'];
 export type CreatePortfolioInput = Schemas['CreatePortfolioRequest'];
 export type CreatePortfolioData = Schemas['CreatePortfolioResponse'];
 export type SetupHarvestListData = Schemas['SetupHarvestList'];
+export type SetupBrandListData = Schemas['SetupBrandList'];
 export type SetupHarvestMarkData = SetupHarvestListData['marks'][number];
 export type AssignTagsInput = Schemas['AssignTagsRequest'];
 export type AssignTagsData = Schemas['AssignTagsResponse'];
@@ -350,6 +351,8 @@ export function createApi(options: ApiOptions = {}) {
         list: (): Promise<SetupDraftListData> => unwrap(client.GET('/api/ads/tools/setup/drafts')),
         harvest: (profileId: string): Promise<SetupHarvestListData> =>
           unwrap(client.GET('/api/ads/tools/setup/harvest', { params: { query: { profileId } } })),
+        brands: (profileId: string): Promise<SetupBrandListData> =>
+          unwrap(client.GET('/api/ads/tools/setup/brands', { params: { query: { profileId } } })),
         get: (id: string): Promise<SetupDraftData> =>
           unwrap(client.GET('/api/ads/tools/setup/drafts/{id}', { params: { path: { id } } })),
         create: (draft: SaveSetupDraftInput): Promise<SetupDraftData> =>

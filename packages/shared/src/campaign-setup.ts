@@ -488,6 +488,14 @@ export const setupHarvestListResponseSchema = z
   .meta({ id: 'SetupHarvestList' });
 export type SetupHarvestListResponse = z.infer<typeof setupHarvestListResponseSchema>;
 
+/** Marken eines Profils für Sponsored Brands (4.10), aus dem Blatt „Brand Assets Data“ des Bulk-Imports. */
+export const setupBrandListResponseSchema = z
+  .object({
+    brands: z.array(z.object({ brandEntityId: z.string(), name: z.string().nullable() })),
+  })
+  .meta({ id: 'SetupBrandList' });
+export type SetupBrandListResponse = z.infer<typeof setupBrandListResponseSchema>;
+
 // ---------------------------------------------------------------------------
 // Portfolios (4.7, F9)
 // ---------------------------------------------------------------------------

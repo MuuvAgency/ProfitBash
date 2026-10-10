@@ -9,6 +9,7 @@ import {
   HARVEST_MARK_LIST_LIMIT,
   listCampaignSetupDrafts,
   listHarvestMarks,
+  listProfileBrands,
   listSubmissionConnections,
   loadHarvestMarkSources,
   loadCampaignSetupPlanSource,
@@ -33,6 +34,7 @@ import {
   planCampaignSetupRequestSchema,
   planCampaignSetupResponseSchema,
   saveCampaignSetupDraftSchema,
+  setupBrandListResponseSchema,
   setupHarvestListResponseSchema,
   submitCampaignSetupDraftRequestSchema,
   submitCampaignSetupResponseSchema,
@@ -94,6 +96,18 @@ const harvestRoute = createRoute({
   request: { query: z.object({ profileId: z.uuid() }) },
   responses: {
     200: { description: 'Merkliste.', content: json(setupHarvestListResponseSchema) },
+    ...errors,
+  },
+});
+
+const brandsRoute = createRoute({
+  method: 'get',
+  path: '/ads/tools/setup/brands',
+  tags: TAGS,
+  summary: 'Marken eines Profils für Sponsored Brands (4.10), aus dem Blatt „Brand Assets Data“ des Bulk-Imports',
+  request: { query: z.object({ profileId: z.uuid() }) },
+  responses: {
+    200: { description: 'Marken.', content: json(setupBrandListResponseSchema) },
     ...errors,
   },
 });
@@ -308,6 +322,13 @@ export function registerCampaignSetupRoutes(app: OpenAPIHono<AppEnv>, deps: AppD
       },
       200,
     );
+  });
+
+  app.openapi({ ...brandsRoute, middleware: guard('view') }, async (c) => {
+    const { profileId } = c.req.valid('query');
+    await run(() => assertCampaignSetupProfile(db, { ...actor(c), profileId }));
+    const brands = await run(() => listProfileBrands(db, { ...actor(c), profileId }));
+    return c.json({ brands: brands ?? [] }, 200);
   });
 
   app.openapi({ ...harvestRoute, middleware: guard('view') }, async (c) => {
