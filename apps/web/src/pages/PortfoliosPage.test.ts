@@ -141,7 +141,7 @@ describe('Seite „Portfolio“', () => {
     await click('[data-portfolio-budget-toggle]');
     await type('[data-portfolio-amount]', '500.00');
     await choose('[data-portfolio-policy]', 'monthlyRecurring');
-    await type('[data-portfolio-start]', '2026-11-01');
+    await type('[data-portfolio-start]', '2099-11-01');
     await click('[data-portfolio-create]');
     expect(body(requests, 'POST', '/api/ads/tools/portfolios')).toEqual({
       profileId: P1,
@@ -149,7 +149,7 @@ describe('Seite „Portfolio“', () => {
       budget: {
         amount: '500.00',
         policy: 'monthlyRecurring',
-        startDate: '2026-11-01',
+        startDate: '2099-11-01',
         endDate: null,
       },
     });
@@ -157,6 +157,41 @@ describe('Seite „Portfolio“', () => {
     expect(done.querySelector('a')?.getAttribute('href')).toBe(
       `/ads/changes?tab=submissions&submission=${S1}`,
     );
+  });
+
+  it('zeigt unbekannte Budget-Arten lesbar und erlaubt kein Startdatum vor heute', async () => {
+    await mountPage({
+      'GET /api/ads/tools/portfolios': json({
+        portfolios: [
+          {
+            id: PF1,
+            amazonPortfolioId: '7001',
+            name: 'Sync',
+            state: 'ENABLED',
+            budgetAmount: '0',
+            budgetCurrencyCode: 'EUR',
+            budgetPolicy: 'noCap',
+            budgetStartDate: null,
+            budgetEndDate: null,
+            campaigns: 0,
+          },
+        ],
+        pending: [],
+      }),
+    });
+    await choose('[data-portfolio-profile]', P1);
+    expect((await found(`[data-portfolio="${PF1}"]`)).textContent).toContain('ohne Obergrenze');
+    await click('[data-portfolio-budget-toggle]');
+    expect((await found<HTMLInputElement>('[data-portfolio-start]')).min).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
+  });
+
+  it('nennt einen Fehler der Profil-Liste als solchen', async () => {
+    await mountPage({
+      'GET /api/ads/tools/product-groups': json({ error: { code: 'X', message: 'x' } }, 500),
+    });
+    expect((await found('[data-portfolio-profiles-error]')).textContent).toContain('Profile');
   });
 
   it('meldet einen vergebenen Namen verständlich', async () => {

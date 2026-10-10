@@ -45,9 +45,13 @@ function budgetText(entry: {
   budgetStartDate: string | null;
   budgetEndDate: string | null;
 }): string {
-  if (entry.budgetAmount === null || entry.budgetPolicy === null || entry.budgetPolicy === 'NO_CAP')
+  // Der Sync liefert `budget.policy` unverändert (z. B. `noCap`), der Import `NO_CAP`.
+  const key = entry.budgetPolicy?.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase() ?? null;
+  if (entry.budgetAmount === null || key === null || key === 'NO_CAP')
     return t('portfolios.list.noBudget');
-  const policy = t(`portfolios.policy.${entry.budgetPolicy}`);
+  const policy = te(`portfolios.policy.${key}`)
+    ? t(`portfolios.policy.${key}`)
+    : entry.budgetPolicy;
   const period = entry.budgetStartDate
     ? entry.budgetEndDate
       ? t('portfolios.periodRange', {
@@ -83,11 +87,13 @@ watch(profileId, () => {
 
 const MONEY = /^\d{1,7}(\.\d{1,2})?$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** Frühestes Startdatum: heute (Browser; der Server prüft in der Zeitzone des Profils). */
+const today = new Date().toLocaleDateString('sv-SE');
 const valid = computed(() => {
   if (name.value.trim() === '') return false;
   if (!withBudget.value) return true;
   if (!MONEY.test(budgetAmount.value) || !/[1-9]/.test(budgetAmount.value)) return false;
-  if (!DAY.test(startDate.value)) return false;
+  if (!DAY.test(startDate.value) || startDate.value < today) return false;
   return endDate.value === '' || (DAY.test(endDate.value) && endDate.value >= startDate.value);
 });
 const touched = ref(false);
@@ -135,7 +141,8 @@ async function submit() {
 
     <InlineError
       v-if="groups.isError.value"
-      :message="t('portfolios.loadFailed')"
+      data-portfolio-profiles-error
+      :message="t('portfolios.profilesFailed')"
       retryable
       :retrying="groups.isFetching.value"
       @retry="groups.refetch()"
@@ -308,6 +315,7 @@ async function submit() {
                 v-model="startDate"
                 data-portfolio-start
                 type="date"
+                :min="today"
                 :class="inputClass"
               />
             </div>
@@ -318,6 +326,7 @@ async function submit() {
                 v-model="endDate"
                 data-portfolio-end
                 type="date"
+                :min="startDate || today"
                 :class="inputClass"
               />
             </div>

@@ -1,7 +1,8 @@
-import type {
-  CampaignSetupItemPayload,
-  CreatePortfolioRequest,
-  PortfolioBudget,
+import {
+  todayInTimezone,
+  type CampaignSetupItemPayload,
+  type CreatePortfolioRequest,
+  type PortfolioBudget,
 } from '@profitbash/shared';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { canSeeProfile, visibleProfilesScope } from './access';
@@ -24,7 +25,7 @@ import {
  * Zugriffe über den Access-Layer (ADR 002); das Recht (`write` bzw. `view` im Feature `tools`) prüft die API.
  */
 
-export type PortfolioErrorCode = 'NOT_FOUND' | 'NAME_TAKEN';
+export type PortfolioErrorCode = 'NOT_FOUND' | 'NAME_TAKEN' | 'START_IN_PAST';
 
 export class PortfolioError extends Error {
   constructor(
@@ -144,40 +145,62 @@ const notFound = () => new PortfolioError('NOT_FOUND', 'Profil nicht gefunden.')
 
 /**
  * Legt ein Portfolio an: eine Übermittlung der Art `portfolio` per Bulk-Datei mit einer Zeile; Budget in der
- * Währung des Profils. Der Name darf im Profil weder bestehen noch schon angelegt werden (ohne Groß/Klein,
- * `NAME_TAKEN`). Audit `ad_change_submission.create` mit `kind: 'portfolio'`. `NOT_FOUND` für unsichtbare Profile,
+ * Währung des Profils, frühestens ab heute in der Zeitzone des Profils (`START_IN_PAST`). Der Name darf im Profil
+ * weder bestehen noch in einer noch nicht hochgeladenen Datei stehen (ohne Groß/Klein, `NAME_TAKEN`). Audit `ad_change_submission.create` mit `kind: 'portfolio'`. `NOT_FOUND` für unsichtbare Profile,
  * `null` für Nicht-Mitglieder.
  */
 export async function createPortfolioRequest(
   db: Db,
-  input: Actor & { request: CreatePortfolioRequest },
+  input: Actor & { request: CreatePortfolioRequest; now?: Date },
 ): Promise<{ submission: AdChangeSubmissionSummary } | null> {
   const scope = await visibleProfilesScope(db, input);
   if (scope === null) return null;
   const { request } = input;
   return db.transaction(async (tx) => {
     const [profile] = await tx
-      .select({ id: amazonAdsProfiles.id, currencyCode: amazonAdsProfiles.currencyCode })
+      .select({
+        id: amazonAdsProfiles.id,
+        currencyCode: amazonAdsProfiles.currencyCode,
+        timezone: amazonAdsProfiles.timezone,
+      })
       .from(amazonAdsProfiles)
       .where(
         and(eq(amazonAdsProfiles.id, request.profileId), inArray(amazonAdsProfiles.id, scope.ids)),
       )
       .for('share');
     if (!profile) throw notFound();
+    // Ein Budget, das schon begonnen hätte, nimmt Amazon nicht an (wie das Startdatum von Kampagnen).
+    const today = todayInTimezone(profile.timezone, input.now ?? new Date());
+    if (request.budget !== null && request.budget.startDate < today) {
+      throw new PortfolioError('START_IN_PAST', 'Das Budget darf frühestens heute beginnen.');
+    }
     // Gleichzeitige Anlagen im Profil sehen einander (Name).
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`portfolio:${profile.id}`}))`);
-    const lower = request.name.toLowerCase();
+    // Groß/Klein beidseitig in Postgres vergleichen (gleiche Regeln für alle Schriften).
     const [existing] = await tx
       .select({ id: pf.id })
       .from(pf)
       .where(
-        and(eq(pf.profileId, profile.id), isNull(pf.removedAt), sql`lower(${pf.name}) = ${lower}`),
+        and(
+          eq(pf.profileId, profile.id),
+          isNull(pf.removedAt),
+          sql`lower(${pf.name}) = lower(${request.name})`,
+        ),
       )
       .limit(1);
+    // Nur Portfolios, deren Datei noch nicht hochgeladen ist, sperren den Namen. „Hochgeladen“ ohne Bestätigung
+    // durch den Import kann ein gescheiterter Upload sein; dann soll derselbe Name neu angelegt werden können.
     const [pending] = await tx
       .select({ id: i.id })
       .from(i)
-      .where(and(pendingItems(profile.id), sql`lower(${i.campaignRef}) = ${lower}`))
+      .where(
+        and(
+          eq(i.profileId, profile.id),
+          eq(i.entityType, 'portfolio'),
+          eq(i.status, 'submitted'),
+          sql`lower(${i.campaignRef}) = lower(${request.name})`,
+        ),
+      )
       .limit(1);
     if (existing || pending) {
       throw new PortfolioError(

@@ -1300,6 +1300,7 @@ export const de = {
     profile: 'Profil',
     chooseProfile: 'Profil wählen',
     loadFailed: 'Die Portfolios ließen sich nicht laden.',
+    profilesFailed: 'Die Profile ließen sich nicht laden.',
     empty: 'Dieses Profil hat noch keine Portfolios.',
     list: {
       title: 'Portfolios',
@@ -1350,6 +1351,9 @@ export const de = {
       manage: 'Portfolios verwalten',
       pending:
         'Noch nicht wählbar (wartet auf Upload bzw. Import): {names}. Nach dem nächsten Import erscheinen sie hier.',
+      loadFailed: 'Die Portfolios ließen sich nicht laden.',
+      missing:
+        'Das gewählte Portfolio gibt es im Profil nicht mehr; bitte ein anderes oder keines wählen.',
     },
     harvest: {
       title: 'Von der Merkliste',
@@ -2102,6 +2106,7 @@ export const de = {
     PORTFOLIO_NAME_TAKEN:
       'Ein Portfolio mit diesem Namen gibt es im Profil schon oder es wird gerade angelegt.',
     PORTFOLIO_NOT_FOUND: 'Das Profil wurde nicht gefunden.',
+    PORTFOLIO_START_IN_PAST: 'Das Budget darf frühestens heute beginnen (Zeitzone des Profils).',
     CAMPAIGN_SETUP_UNKNOWN_PRESET: 'Dieses Preset gibt es im Struktur-Katalog nicht (mehr).',
     CAMPAIGN_SETUP_PROFILE_HAS_NO_CONNECTION:
       'Dieses Profil hat keine Verbindung zu Amazon. Übermittle es als Bulk-Datei.',

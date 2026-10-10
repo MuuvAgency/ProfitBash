@@ -445,6 +445,8 @@ describe('Änderungen: Übermittlungen', () => {
     );
     // Folgeschritte (erneut versuchen, Revert) gibt es für Setups nicht; der Hinweis erklärt die Zuordnung.
     expect(panel.find('[data-followup-channel]').exists()).toBe(false);
+    // Offene Anlagen stehen in der Datei: Download wie bei Änderungen.
+    expect(panel.find('[data-download]').exists()).toBe(true);
     expect(panel.text()).toContain('über ihren Namen');
   });
 
@@ -501,6 +503,8 @@ describe('Änderungen: Übermittlungen', () => {
     expect(row.text()).toContain('monatlich');
     expect(row.text()).toContain('01.11.2026 bis 31.01.2027');
     expect(panel.text()).toContain('nach dem nächsten Import');
+    expect(panel.find('[data-download]').exists()).toBe(true);
+    expect(panel.find('[data-followup-channel]').exists()).toBe(false);
   });
 
   it('listet die Übermittlungen der Organisation und öffnet eine mit dem Ergebnis je Änderung', async () => {

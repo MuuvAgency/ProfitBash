@@ -288,7 +288,7 @@ export async function confirmCampaignSetupItems(
         .where(
           and(
             eq(amazonAdsPortfolios.profileId, input.profileId),
-            sql`lower(${amazonAdsPortfolios.name}) = ${lower(payload.name)}`,
+            sql`lower(${amazonAdsPortfolios.name}) = lower(${payload.name.trim()})`,
             isNull(amazonAdsPortfolios.removedAt),
           ),
         )

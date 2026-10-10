@@ -61,7 +61,7 @@ const createPortfolioRoute = createRoute({
 function toApiError(error: unknown): unknown {
   if (!(error instanceof PortfolioError)) return error;
   return new ApiError(
-    error.code === 'NOT_FOUND' ? 404 : 409,
+    error.code === 'NOT_FOUND' ? 404 : error.code === 'START_IN_PAST' ? 400 : 409,
     `PORTFOLIO_${error.code}`,
     error.message,
   );

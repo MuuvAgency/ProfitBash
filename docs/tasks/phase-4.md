@@ -479,6 +479,18 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     Zeitraum, Datei geprüft (Blatt „Portfolios“, Werte wie im Guide), Detail auf der Seite „Änderungen“, Auswahl im
     Assistenten mit Hinweis auf das noch nicht importierte, Handy, Konsole ohne Fehler. Dabei behoben: Zustand
     übersetzt, Dateiname, Zeitraum mit Ende. Testdaten gelöscht.
+  - **Review-Befunde (eingearbeitet):** Auf der Seite „Änderungen“ fehlte der Download-Knopf für Übermittlungen ohne
+    Änderungen, also für Setups (seit 4.5) und Portfolios: Er zählt jetzt auch offene Anlagen (Test für beide); die
+    Auswahl des Wegs für Folgeschritte gibt es nur noch bei Änderungen. Ein Budget darf frühestens heute beginnen
+    (Zeitzone des Profils, `PORTFOLIO_START_IN_PAST`; das Formular setzt `min`). Den Namen sperren nur Portfolios,
+    deren Datei noch nicht hochgeladen ist (ein „hochgeladen“ ohne Bestätigung durch den Import kann ein gescheiterter
+    Upload sein). Namen werden beidseitig in Postgres ohne Groß/Klein verglichen. Unbekannte Budget-Arten (der Sync
+    liefert z. B. `noCap`) erscheinen lesbar. Assistent: Fehler der Portfolio-Liste mit „Erneut versuchen“ und Hinweis,
+    wenn das Portfolio eines Entwurfs nicht mehr besteht. Eigener Fehlertext, wenn die Profil-Liste nicht lädt.
+    **Bewusst nicht:** Payloads der Anlagen im Web als Union typisieren (die API liefert sie offen typisiert, die
+    Anzeige prüft je Art); Mindestbudget eines Portfolios (der Guide nennt keines, Amazon lehnt beim Upload ab).
+    Nach den Befunden im Browser-Pane erneut geprüft: Download-Knopf und „hochgeladen/verworfen“ bei einer
+    Portfolio-Übermittlung, keine Auswahl für Folgeschritte.
   - **Offen bzw. bewusst so:** Portfolios ändern (Budget, Name) und Kampagnen bestehender Setups nachträglich
     zuordnen gibt es nicht (nicht Teil von F9). Ein Portfolio je Entwurf, nicht je Kampagne. Erster echter Upload
     einer Portfolio-Datei steht aus.

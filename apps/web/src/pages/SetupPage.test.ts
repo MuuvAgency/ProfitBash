@@ -573,4 +573,27 @@ describe('Seite „Kampagnen-Setup“', () => {
       portfolioId: PF1,
     });
   });
+
+  it('meldet einen Fehler der Portfolio-Liste und ein nicht mehr vorhandenes Portfolio (4.7)', async () => {
+    await mountPage({
+      'GET /api/ads/tools/portfolios': json({ error: { code: 'X', message: 'x' } }, 500),
+      [`GET /api/ads/tools/setup/drafts/${D1}`]: json({
+        ...draft,
+        portfolioId: '00000000-0000-4000-8000-0000000000b8',
+      }),
+    });
+    await click(`[data-draft="${D1}"] [data-draft-open]`);
+    await found('[data-setup-portfolio-error]');
+  });
+
+  it('weist auf ein gewähltes Portfolio hin, das es nicht mehr gibt (4.7)', async () => {
+    await mountPage({
+      [`GET /api/ads/tools/setup/drafts/${D1}`]: json({
+        ...draft,
+        portfolioId: '00000000-0000-4000-8000-0000000000b8',
+      }),
+    });
+    await click(`[data-draft="${D1}"] [data-draft-open]`);
+    expect((await found('[data-setup-portfolio-missing]')).textContent).toContain('nicht mehr');
+  });
 });
