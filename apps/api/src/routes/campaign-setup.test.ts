@@ -331,6 +331,8 @@ describe('Rechte, fremde Organisation und ausgeblendete Profile je Endpunkt', ()
       (await call<CampaignSetupDraftListResponse>('GET', '/drafts', foreign)).body.drafts,
     ).toEqual([]);
     expect((await call('PUT', `/drafts/${saved.id}`, foreign, body)).status).toBe(404);
+    // Anlegen in einem fremden Profil (4.11).
+    expect((await call('POST', '/drafts', foreign, body.draft)).status).toBe(404);
     expect(
       (await call('POST', `/drafts/${saved.id}/discard`, foreign, { version: 1 })).status,
     ).toBe(404);
@@ -354,6 +356,7 @@ describe('Rechte, fremde Organisation und ausgeblendete Profile je Endpunkt', ()
     ).toEqual([]);
     expect((await call('GET', `/drafts/${saved.id}`, admin)).status).toBe(404);
     expect((await call('PUT', `/drafts/${saved.id}`, admin, body)).status).toBe(404);
+    expect((await call('POST', '/drafts', admin, body.draft)).status).toBe(404);
     expect((await call('POST', `/drafts/${saved.id}/discard`, admin, { version: 1 })).status).toBe(
       404,
     );

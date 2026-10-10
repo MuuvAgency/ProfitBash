@@ -679,6 +679,9 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
      mit Hinweis weg.
   4. Deutsche Schreibweisen des Blatts „Brand Assets Data“ und der neuen SB-Spalten (ungeprüft, nur englische Datei).
   5. Startdatum = Tag des Downloads (Upload am selben Tag in der Zeitzone des Profils).
+  6. Gebots-Simulator mit echten Platzierungsdaten (4.8), sobald Platzierungsberichte vorliegen.
+  Code-Folgepunkte ohne Termin: Verweis aus der Suchbegriff-Analyse ins Setup (4.6); Kampagnennamen zählen ohne
+  Rücksicht auf den Anzeigentyp (4.4).
 
 ## Offen vor dem Bau (nicht von Dominik zu entscheiden)
 

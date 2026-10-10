@@ -646,6 +646,7 @@ describe('buildCampaignPlan: alle Presets und Bausteine (4.11)', () => {
           { asin: 'B0FLASCHE3', sku: 'FL-1000', isHero: false },
         ],
       },
+      productTargets: [{ asin: 'B0FREMD001' }, { asin: 'B0FREMD002', single: true }],
       conquestAsins: ['B0KONKUR01'],
       ...overrides,
     });
@@ -658,17 +659,17 @@ describe('buildCampaignPlan: alle Presets und Bausteine (4.11)', () => {
   };
 
   it.each(DEFAULT_STRUCTURE_CATALOG.presets.map((entry) => entry.key))(
-    'plant das Preset „%s“ ohne Fehler, jeder Baustein mit Kampagne oder Grund',
+    'plant das Preset „%s“ ohne Fehler, jeden Baustein mit Kampagne',
     (key) => {
       const plan = buildCampaignPlan(full({ preset: preset(key) }));
       expect(plan.hints.filter((hint) => hint.severity === 'error')).toEqual([]);
       for (const campaign of plan.campaigns) {
         expect(plannedCampaignSchema.safeParse(campaign).success, campaign.name).toBe(true);
       }
+      // Mit vollständigen Eingaben fällt kein Baustein weg.
+      expect(plan.hints.filter((hint) => hint.code.startsWith('skipped'))).toEqual([]);
       for (const entry of preset(key).blocks) {
-        const planned = byBlock(plan.campaigns, entry.block).length > 0;
-        const skipped = plan.hints.some((hint) => 'block' in hint && hint.block === entry.block);
-        expect(planned || skipped, entry.block).toBe(true);
+        expect(byBlock(plan.campaigns, entry.block).length, entry.block).toBeGreaterThan(0);
       }
       const items = planSetupItems(plan.campaigns, { campaignState: 'ENABLED', creative });
       expect(items.filter((item) => !item.supported)).toEqual([]);
