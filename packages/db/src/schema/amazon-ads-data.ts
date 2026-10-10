@@ -504,6 +504,62 @@ export const amazonAdsSearchTermPeriodMetrics = pgTable(
 );
 
 /**
+ * Summen je Entity über den Zeitraum einer Bulk-Datei (`phase-5.md` 5.1, F1): Die Kampagnen-Blätter tragen je
+ * Zeile Kennzahlen über den gewählten Download-Zeitraum, keine Tageswerte. Ebenen: Kampagne, Ad Group, Target
+ * (Keyword, Produkt-Targeting, Zielgruppe), Product Ad und Platzierung (Zeilen „Bidding Adjustment“, Kennzahlen je
+ * Platzierung; `amazon_entity_id` ist dann die Platzierung in API-Schreibweise). Ohne Fremdschlüssel auf die
+ * Entities (wie die Suchbegriff-Summen): Die Zeilen stammen aus derselben Datei wie die Entities.
+ * `sales`/`purchases`/`units` sind die Werte der Spalten ohne Zusatz; SD liefert daneben „(Views & Clicks)“.
+ */
+export const amazonAdsEntityPeriodMetrics = pgTable(
+  'amazon_ads_entity_period_metrics',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: profileId(),
+    adProduct: adProduct(),
+    /** `campaign` | `adGroup` | `target` | `productAd` | `placement`. */
+    level: text('level').notNull(),
+    periodStart: date('period_start', { mode: 'string' }).notNull(),
+    periodEnd: date('period_end', { mode: 'string' }).notNull(),
+    amazonCampaignId: text('amazon_campaign_id').notNull(),
+    amazonEntityId: text('amazon_entity_id').notNull(),
+    /** Währung des Profils (die Blätter tragen keine). */
+    currencyCode: text('currency_code').notNull(),
+    impressions: count('impressions').notNull(),
+    clicks: count('clicks').notNull(),
+    cost: money('cost').notNull(),
+    sales: money('sales').notNull(),
+    purchases: count('purchases').notNull(),
+    units: count('units').notNull(),
+    viewableImpressions: count('viewable_impressions'),
+    salesViewsClicks: money('sales_views_clicks'),
+    purchasesViewsClicks: count('purchases_views_clicks'),
+    unitsViewsClicks: count('units_views_clicks'),
+    importedAt: timestamp('imported_at', { withTimezone: true, mode: 'date' }).notNull(),
+    fileImportId: uuid('file_import_id').references(() => fileImports.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    profileFk('amazon_ads_entity_period_metrics', t.profileId, t.organizationId),
+    check('amazon_ads_entity_period_metrics_period_ck', sql`${t.periodStart} <= ${t.periodEnd}`),
+    check(
+      'amazon_ads_entity_period_metrics_level_ck',
+      sql`${t.level} in ('campaign', 'adGroup', 'target', 'productAd', 'placement')`,
+    ),
+    unique('amazon_ads_entity_period_metrics_key_uq').on(
+      t.profileId,
+      t.adProduct,
+      t.periodStart,
+      t.periodEnd,
+      t.level,
+      t.amazonCampaignId,
+      t.amazonEntityId,
+    ),
+    index('amazon_ads_entity_period_metrics_imported_idx').on(t.profileId, t.importedAt),
+  ],
+);
+
+/**
  * „Daten bis“ je Profil und Ad-Typ (1.8, je Ad-Typ seit 1.9): Ende des zuletzt importierten
  * Kampagnen-Reports, rückt nur vor. Bewusst nicht `max(date)` der Kennzahlen (ein pausiertes Profil
  * hätte sonst ein altes Datum). Angezeigt wird das Minimum über die Ad-Typen des Syncs
