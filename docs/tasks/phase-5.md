@@ -156,6 +156,21 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     Kennzahlen der Zeile (`invalidEntityMetricRows`). Zähler `entityMetrics`, `entityMetricsWithoutPeriod` (im Verlauf der
     Uploads angezeigt).
   - **Nicht gebaut:** die Oberfläche für „Daten bis“ bzw. veraltete Daten (kommt mit 5.2a, Quelle `file_imports`).
+  - **Nach dem Review (2026-10-10):** Eine Kopfzeile mit nur einem Teil der Kennzahlen-Spalten wird geloggt
+    (`bulk_import.metric_sheet_incomplete` mit den fehlenden Spalten), statt still wie „Leistungsdaten abgewählt“ zu
+    wirken; Kennzahlen einer fremd wirkenden Datei werden geloggt verworfen (`entity_metrics_skipped_unmatched`), Zeilen
+    ohne auflösbare Kampagne gezählt (`entity_metrics_unresolved`), ungültige Kennzahlen-Zeilen mit eigenem Log-Budget und
+    Summe. Index `…_latest_idx` für den Datenstand je Entity.
+  - **Offen für 5.4 ff.:**
+    - Der Datenstand folgt dem Upload (`imported_at`), nicht dem jüngsten Zeitraum: Wird nachträglich eine ältere Datei
+      hochgeladen, rechnet die Automatik darauf. 5.7 warnt, wenn der neue Zeitraum vor dem bisherigen endet.
+    - Entities, die in einer neueren vollständigen Datei fehlen (archiviert, herausgefiltert), behalten die Summen der
+      älteren Datei als Datenstand. Wer liest, vergleicht `period_end` mit `findProfileMetricsState`.
+    - Unbekannte Platzierungstexte landen unverändert als Entity-ID (`SITE_AMAZON_BUSINESS` ist ungeprüft); beim ersten
+      echten Upload prüfen.
+    - Die Tabelle wächst je Wochendatei; Aufräumen alter Zeiträume (z. B. je Profil nur die neuesten Dateien) mit 5.12.
+    - Deutsche Zusätze der SD-Spalten („(Aufrufe und Klicks)“, „Sichtbare Impressions“) und die Kennzahlen-Spalten der
+      SB-Blätter sind ungeprüft; fehlen sie, meldet der Import das (siehe oben).
 
 ### 5.2a Benachrichtigungen: Daten, Versand, Quellen (`packages/db`, `apps/api`, `apps/worker`)
 - [ ] Tabellen: Benachrichtigung (Organisation, optional Profil, Art, Schwere, i18n-Parameter, Link, Erzeugt, Schlüssel

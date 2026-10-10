@@ -556,6 +556,16 @@ export const amazonAdsEntityPeriodMetrics = pgTable(
       t.amazonEntityId,
     ),
     index('amazon_ads_entity_period_metrics_imported_idx').on(t.profileId, t.importedAt),
+    // Datenstand je Entity (`listLatestEntityPeriodMetrics`, DISTINCT ON je Kampagne und Entity).
+    index('amazon_ads_entity_period_metrics_latest_idx').on(
+      t.profileId,
+      t.level,
+      t.amazonCampaignId,
+      t.amazonEntityId,
+      t.adProduct,
+      t.importedAt.desc(),
+      t.periodEnd.desc(),
+    ),
   ],
 );
 

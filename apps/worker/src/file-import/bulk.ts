@@ -117,7 +117,13 @@ export const importBulkFile: FileImporter = async (input) => {
 
   const collector = new BulkCollector(input.logger, currencyCode);
   for (const sheet of sheets) {
-    readSheet(sheet.name, sheet.kind, (row) => collector.add(row), workbook.forEachRow);
+    readSheet(
+      sheet.name,
+      sheet.kind,
+      (row) => collector.add(row),
+      workbook.forEachRow,
+      input.logger,
+    );
   }
 
   const searchTerms = new SearchTermCollector(input.logger);
@@ -232,7 +238,14 @@ export const importBulkFile: FileImporter = async (input) => {
         });
         entityMetrics += written.rows;
       }
-    } else if (!unmatched && metricRowCount > 0) {
+    } else if (unmatched && metricRowCount > 0) {
+      // Wie bei den Suchbegriffen: Eine fremd wirkende Datei ersetzt keine Summen.
+      input.logger({
+        level: 'warn',
+        msg: 'bulk_import.entity_metrics_skipped_unmatched',
+        rows: metricRowCount,
+      });
+    } else if (metricRowCount > 0) {
       input.logger({
         level: 'warn',
         msg: 'bulk_import.entity_metrics_without_period',
@@ -431,6 +444,7 @@ function readSheet(
     sheet: string,
     callback: (cells: string[], row: number, info: RowInfo) => void,
   ) => void,
+  logger: Logger,
 ): void {
   let columns: Map<BulkColumn, number> | null = null;
   let metricColumns: Map<MetricColumn, number> | null = null;
@@ -438,7 +452,18 @@ function readSheet(
     if (cells.every((cell) => cell.trim() === '')) return;
     if (columns === null) {
       columns = mapHeader(cells);
-      metricColumns = kind === 'portfolios' ? null : mapMetricHeader(cells);
+      if (kind !== 'portfolios') {
+        const metrics = mapMetricHeader(cells);
+        metricColumns = metrics.columns;
+        if (metrics.missing.length > 0) {
+          logger({
+            level: 'warn',
+            msg: 'bulk_import.metric_sheet_incomplete',
+            sheet,
+            missingColumns: metrics.missing,
+          });
+        }
+      }
       const required = kind === 'portfolios' ? PORTFOLIO_SHEET_COLUMNS : CAMPAIGN_SHEET_COLUMNS;
       const missing = required.find((column) => !columns!.has(column));
       if (missing) {
@@ -642,6 +667,7 @@ class BulkCollector {
   /** Zeilen mit Kennzahlen; die Kampagne fehlt bei SB/SD-Zeilen ohne Kampagnen-ID (Auflösung in `metricRows`). */
   private readonly metrics: PendingMetric[] = [];
   invalidMetricRows = 0;
+  private loggedInvalidMetrics = 0;
 
   constructor(
     private readonly logger: Logger,
@@ -666,7 +692,13 @@ class BulkCollector {
         return;
       }
       this.addEntity(kind, row.kind, adProduct, cells, position);
-      this.addMetrics(kind, adProduct, cells, row);
+      // Eigener Fehlerpfad: Eine nicht lesbare Kennzahl verwirft nur die Kennzahlen, nicht die Entity.
+      try {
+        this.addMetrics(kind, adProduct, cells, row);
+      } catch (error) {
+        if (!(error instanceof InvalidCell)) throw error;
+        this.invalidMetric(position);
+      }
     } catch (error) {
       if (!(error instanceof InvalidCell)) throw error;
       this.invalid(position, error.column, error.reason);
@@ -951,19 +983,18 @@ class BulkCollector {
     const values = parseMetricCells(row.cells, row.metricColumns);
     if (values === null) return;
     if (values === 'invalid') {
-      this.invalidMetricRows += 1;
-      if (this.loggedInvalid < MAX_INVALID_ROW_LOGS) {
-        this.loggedInvalid += 1;
-        this.logger({
-          level: 'warn',
-          msg: 'bulk_import.invalid_metric_row',
-          sheet: row.sheet,
-          row: row.row,
-        });
-      }
+      this.invalidMetric({ sheet: row.sheet, row: row.row });
       return;
     }
     this.metrics.push({ adProduct, ...target, values });
+  }
+
+  private invalidMetric(position: RowPosition): void {
+    this.invalidMetricRows += 1;
+    if (this.loggedInvalidMetrics < MAX_INVALID_ROW_LOGS) {
+      this.loggedInvalidMetrics += 1;
+      this.logger({ level: 'warn', msg: 'bulk_import.invalid_metric_row', ...position });
+    }
   }
 
   /**
@@ -980,10 +1011,14 @@ class BulkCollector {
       ),
     ]);
     const result = new Map<string, Map<string, EntityPeriodMetric>>();
+    let unresolved = 0;
     for (const metric of this.metrics) {
       const amazonCampaignId =
         metric.amazonCampaignId ?? campaignOf.get(`${metric.level}\u0000${metric.amazonEntityId}`);
-      if (amazonCampaignId === undefined) continue;
+      if (amazonCampaignId === undefined) {
+        unresolved += 1;
+        continue;
+      }
       const rows = result.get(metric.adProduct) ?? new Map<string, EntityPeriodMetric>();
       result.set(metric.adProduct, rows);
       const key = `${metric.level}\u0000${amazonCampaignId}\u0000${metric.amazonEntityId}`;
@@ -993,6 +1028,20 @@ class BulkCollector {
         amazonCampaignId,
         amazonEntityId: metric.amazonEntityId,
         ...metric.values,
+      });
+    }
+    if (unresolved > 0) {
+      this.logger({
+        level: 'warn',
+        msg: 'bulk_import.entity_metrics_unresolved',
+        rows: unresolved,
+      });
+    }
+    if (this.invalidMetricRows > 0) {
+      this.logger({
+        level: 'warn',
+        msg: 'bulk_import.invalid_metric_rows',
+        count: this.invalidMetricRows,
       });
     }
     return new Map([...result].map(([adProduct, rows]) => [adProduct, [...rows.values()]]));

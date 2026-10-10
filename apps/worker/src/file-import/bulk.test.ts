@@ -2111,6 +2111,78 @@ describe('Kennzahlen der Kampagnen-Blätter (5.1)', () => {
     expect(await stored()).toEqual([]);
   });
 
+  it('meldet eine Kopfzeile, der einzelne Kennzahlen-Spalten fehlen, statt sie still zu übergehen', async () => {
+    const header = DE_METRICS_HEADER.filter((column) => column !== 'Einheiten');
+    const file = buildXlsx([sheet('Sponsored Products-Kampagnen', header, withMetrics())]);
+    const counters = await run(file, { fileName: SEPTEMBER });
+    expect(counters).not.toHaveProperty('entityMetrics');
+    expect(logs).toContainEqual(
+      expect.objectContaining({
+        msg: 'bulk_import.metric_sheet_incomplete',
+        sheet: 'Sponsored Products-Kampagnen',
+        missingColumns: ['Einheiten'],
+      }),
+    );
+  });
+
+  it('zählt eine Zeile mit nur teilweise gefüllten Kennzahlen als ungültig', async () => {
+    const rows = withMetrics();
+    rows[3] = { ...rows[3]!, Bestellungen: null };
+    const file = buildXlsx([sheet('Sponsored Products-Kampagnen', DE_METRICS_HEADER, rows)]);
+    expect(await run(file, { fileName: SEPTEMBER })).toMatchObject({
+      adGroups: 1,
+      entityMetrics: 4,
+      invalidEntityMetricRows: 1,
+    });
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.invalid_metric_rows', count: 1 }),
+    );
+  });
+
+  it('schreibt bei einer fremd wirkenden Datei keine Kennzahlen und loggt das', async () => {
+    await run(buildXlsx([sheet('Sponsored Products-Kampagnen', DE_SP_HEADER, DE_SP_ROWS)]));
+    const foreign = '399999999999999';
+    const rows = withMetrics().map((row) =>
+      row['Kampagnen-ID'] === C1 ? { ...row, 'Kampagnen-ID': foreign } : row,
+    );
+    const file = buildXlsx([sheet('Sponsored Products-Kampagnen', DE_METRICS_HEADER, rows)]);
+    expect(await run(file, { fileName: SEPTEMBER })).not.toHaveProperty('entityMetrics');
+    expect(await stored()).toEqual([]);
+    expect(logs).toContainEqual(
+      expect.objectContaining({ msg: 'bulk_import.entity_metrics_skipped_unmatched' }),
+    );
+  });
+
+  it('ersetzt bei einer Teilmenge nur die Kampagnen der Datei', async () => {
+    const other = {
+      ...DE_SP_ROWS[0]!,
+      'Kampagnen-ID': C2,
+      Kampagnenname: 'Zweite',
+      ...m(5, 1, 1, 0, 0),
+    };
+    await run(
+      buildXlsx([
+        sheet('Sponsored Products-Kampagnen', DE_METRICS_HEADER, [...withMetrics(), other]),
+      ]),
+      { fileName: SEPTEMBER, complete: true },
+    );
+    await run(
+      buildXlsx([
+        sheet('Sponsored Products-Kampagnen', DE_METRICS_HEADER, [
+          { ...DE_SP_ROWS[0]!, ...m(1, 1, 1, 0, 0) },
+        ]),
+      ]),
+      { fileName: SEPTEMBER },
+    );
+    const campaigns = (await stored()).filter((r) => r.level === 'campaign');
+    expect(campaigns.map((r) => [r.amazonEntityId, r.impressions])).toEqual([
+      [C1, 1],
+      [C2, 5],
+    ]);
+    // Die Ad Group von C1 fehlt in der Teilmenge und ist mit ihrer Kampagne ersetzt.
+    expect((await stored()).some((r) => r.level === 'adGroup')).toBe(false);
+  });
+
   it('überspringt eine ungültige Kennzahl, ohne die Entity zu verwerfen', async () => {
     const rows = withMetrics();
     rows[0] = { ...rows[0]!, Klicks: 'viele' };
