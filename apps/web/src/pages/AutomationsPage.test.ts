@@ -116,6 +116,10 @@ describe('Seite „Automationen“: Einstellungen', () => {
         { ...defaults, maxBidChangePercent: 10, maxBidEur: null, minSpendEur: '12.5' },
       ],
     ]);
+    // Die Bestätigung verschwindet mit der nächsten Eingabe.
+    expect(document.body.textContent).toContain('Gespeichert.');
+    await type(field('defaults', 'minClicks'), '20');
+    expect(document.body.textContent).not.toContain('Gespeichert.');
   });
 
   it('sperrt das Speichern bei ungültigen Werten und markiert das Feld', async () => {

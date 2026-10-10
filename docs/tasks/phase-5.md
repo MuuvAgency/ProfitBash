@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3. Als Nächstes: 5.4.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4. Als Nächstes: 5.5.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -293,16 +293,58 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     Profil, bleibt sein Ziel gespeichert, ist aber nicht mehr erreichbar.
 
 ### 5.4 Leitplanken und Automations-Einstellungen (`packages/shared`, `packages/db`, `apps/api`, `apps/web`)
-- [ ] Einstellungen je Organisation mit eigenen Startwerten, je Client überschreibbar (F-S6): höchste Gebotsänderung je
+- [x] Einstellungen je Organisation mit eigenen Startwerten, je Client überschreibbar (F-S6): höchste Gebotsänderung je
       7 Tage (%), Gebotsboden (% des CPC und absolut), höchstes Gebot, Mindestdaten für einen Vorschlag (Klicks,
       Ausgaben), höchste Budgetsenkung je Lauf (%), Modus je Client `off` | `shadow` | `cart` (Start `shadow`, F3),
       zuständiger Nutzer für `cart`.
-- [ ] zod-Schemas in `packages/shared`, Speicherung mit Audit; Defaults der Organisation nur Admins, Werte je Client
+- [x] zod-Schemas in `packages/shared`, Speicherung mit Audit; Defaults der Organisation nur Admins, Werte je Client
       Admins und Editoren.
-- [ ] Engine: Leitplanken als reine Funktionen für Gebote und Budgets (Basis siehe oben) → begrenzter Wert und Grund;
+- [x] Engine: Leitplanken als reine Funktionen für Gebote und Budgets (Basis siehe oben) → begrenzter Wert und Grund;
       Tests je Leitplanke, auch zusammen mit den Grenzen von Amazon (`limitFor`).
-- [ ] Seitengerüst `/ads/automations` mit dem Tab „Einstellungen“ (weitere Tabs folgen in 5.6b, 5.8, 5.10).
+- [x] Seitengerüst `/ads/automations` mit dem Tab „Einstellungen“ (weitere Tabs folgen in 5.6b, 5.8, 5.10).
 
+- [x] Umsetzung (2026-10-10, Stand für 5.5 und später):
+  - **Engine** `packages/engine/src/guardrails.ts`: `applyBidGuardrails` (Vorschlag, Ausgangsgebot `base`, Gebot zu
+    Beginn der 7 Tage `windowStart`, CPC, Leitplanken, Amazons Grenze → `{ value, limitedBy[] }`), Reihenfolge:
+    Wochenrahmen (± % von `windowStart`), dann bei Senkungen der Boden (der höhere aus CPC-Anteil und absolutem Wert),
+    bei Erhöhungen das Höchstgebot, runden auf zwei Stellen zur Basis hin, zuletzt Amazons Grenzen. **Eine Leitplanke
+    hält einen Vorschlag auf, dreht aber nie einen bestehenden Wert zurück** (liegt die Basis schon außerhalb, ist das
+    Ergebnis die Basis, also kein Vorschlag); nur Amazons Grenzen gelten auch gegen die Basis. `applyBudgetGuardrail`
+    (Senkung je Lauf höchstens x % der Basis, Erhöhungen begrenzt nur Amazon). `hasMinimumData`: genug Klicks **oder**
+    genug Ausgaben; eine Schwelle von 0 schaltet ihr Kriterium ab, beide 0 heißt kein Minimum. Beträge in der Währung
+    des Profils: **5.7 rechnet die EUR-Werte vorher um** (`convertAmount`) und liefert `windowStart` aus `ad_changes`.
+  - **Shared** `packages/shared/src/automation.ts`: `guardrailsSchema` (Prozente und Klicks als ganze Zahlen, Beträge
+    als Decimal-Strings in EUR, Boden und Höchstgebot `null` = keiner), `DEFAULT_GUARDRAILS`, `AUTOMATION_MODES`,
+    `guardrailOverridesSchema` (fehlender Schlüssel = erbt), Schemas der API.
+  - **Tabellen** (Migration `0039_automation_settings`): `automation_defaults` (ein Dokument je Organisation, ohne
+    Zeile die Startwerte) und `client_automation_settings` (Modus, `responsible_user_id`, `overrides`; ohne Zeile
+    `shadow`, nichts überschrieben).
+  - **Zugriffe** `packages/db/src/automation.ts`: `getAutomationSettings` (Startwerte, sichtbare Clients, Mitglieder
+    mit Schreibrecht), `saveGuardrailDefaults` (nur Org-Admins, Audit `automation_defaults.update`),
+    `setClientAutomation` (Client mit mindestens einem sichtbaren Profil; im Modus `cart` ohne Angabe ist zuständig,
+    wer speichert; zuständig nur Admins und Editoren der Organisation; Audit `client_automation.update`); ohne
+    Änderung wird nichts geschrieben. `loadGuardrailDefaults` ohne Rechteprüfung für den Lauf.
+  - **API** `routes/automations.ts` hinter `requireFeature('automations', …)`: `GET /ads/automations/settings`
+    (`view`), `PUT …/settings/defaults` (`write`, dazu Admin: sonst 403 `AUTOMATION_DEFAULTS_FORBIDDEN`),
+    `PUT …/settings/clients/{clientId}` (`write`; 404 `CLIENT_NOT_FOUND`, 400 `AUTOMATION_INVALID_RESPONSIBLE`). Jede
+    Änderung antwortet mit dem neuen Stand.
+  - **Seite** `AutomationsPage.vue` mit Tab-Gerüst (ein Tab „Einstellungen“): Formular der Organisation (für
+    Nicht-Admins gesperrt), Liste der Clients mit Modus, Zuständigem und Zahl der überschriebenen Werte, Dialog je
+    Client (leere Felder erben, der Wert der Organisation steht als Platzhalter). `automations/GuardrailFields.vue`
+    und `guardrail-form.ts` (Feldtexte ↔ Werte, geprüft mit den Schemas aus shared).
+  - Browser-Pane geprüft (1440 px dunkel, Handy hell, Dialog, Speichern beider Formulare, Konsole), Testdaten entfernt.
+  - **Review (ponytail-review):** Schwelle 0 bei den Mindestdaten hob das Minimum ganz auf (jetzt: Kriterium aus),
+    Speichern ohne Änderung schrieb Audit-Events, Budgets wurden nicht gerundet, „Gespeichert.“ blieb nach neuen
+    Eingaben stehen.
+  - **Offen für 5.5/5.7:**
+    - Wirksame Leitplanken eines Profils (`{ ...Organisation, ...Client }`, Profil ohne Client: nur Organisation,
+      Modus `shadow`) und die Umrechnung EUR → Profilwährung baut der Lauf.
+    - Der zuständige Nutzer kann sein Schreibrecht verlieren (Rolle geändert, Mitgliedschaft entfernt; gelöschte
+      Nutzer leeren die Spalte): Der Lauf prüft das und fällt auf `shadow` zurück, mit Benachrichtigung.
+    - Ein Client kann einen Wert der Organisation nicht auf „keiner“ setzen (Boden, Höchstgebot): leer heißt erben.
+      Das Schema erlaubt `null`, die Oberfläche bietet es noch nicht an.
+    - Gebote und Budgets werden auf zwei Stellen gerundet (`shortcut:` in `guardrails.ts`; JPY bräuchte null).
+    - Kein Schutz gegen gleichzeitiges Speichern der Startwerte (letzter gewinnt, `shortcut:` in `automation.ts`).
 - **Entschieden (Dominik, 2026-10-10, zu Beginn von 5.4):**
   - **Startwerte „Mittel“:** Gebot höchstens ±25 % je 7 Tage, Boden 50 % des CPC, Höchstgebot 3,00 €, Vorschlag ab
     15 Klicks oder 10 € Ausgaben, Budget höchstens −20 % je Lauf; kein absoluter Boden (es gilt Amazons Mindestgebot).
