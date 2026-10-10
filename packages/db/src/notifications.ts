@@ -120,7 +120,7 @@ function selectNotifications(db: Db, userId: string) {
     );
 }
 
-type Row = Awaited<ReturnType<ReturnType<typeof selectNotifications>>>[number];
+type Row = Awaited<ReturnType<typeof selectNotifications>>[number];
 
 function toNotification(row: Row): Notification {
   return {
