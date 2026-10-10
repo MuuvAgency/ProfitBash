@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1–4.9. Nächster Schritt: 4.10.
+> Datei). Fertig: 4.1–4.10. Nächster Schritt: 4.11.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -584,7 +584,7 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     später). Kein Off-Amazon für SD (Einstellung von SP).
 
 ### 4.10 Setup für Sponsored Brands (F1)
-- [ ] Bausteine `SB-HEADER-KW`, `SB-VIDEO-KW`, `SB-PAT` im Blatt „SB Multi Ad Group Campaigns“: Kampagne, Ad Group, Anzeige
+- [x] Bausteine `SB-HEADER-KW`, `SB-VIDEO-KW`, `SB-PAT` im Blatt „SB Multi Ad Group Campaigns“: Kampagne, Ad Group, Anzeige
       je Format, Keywords bzw. Targets. Marke, Überschrift, Landing Page und Asset-IDs (Logo, Bilder, Video) gibt Dominik
       von Hand ein; die Marken (`Brand Entity ID`) liest der Bulk-Import aus dem Blatt „Brand Assets Data“. Offen: woher die
       Asset-IDs kommen (das Blatt nennt sie nicht). Vorher den Guide
@@ -603,6 +603,45 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
   und Product Targeting wie bei SP (Bid, `category="…"` bzw. `asin="…"`). Grenzen: Kampagnenname 128, Marke 30,
   Überschrift 50 (Japan 35). Das Blatt „Brand Assets Data“ der echten Datei hat nur `Brand Entity ID` und `Brand Name`
   (keine Asset-IDs); das Blatt „SB Multi Ad Group Campaigns“ hat zusätzlich `Ad Title`, `Product Exclusions`, `Sites`.
+- [x] Umsetzung (Stand für 4.11 und später):
+  - **Katalog:** neues Feld `sbAdFormat` (`collection` | `video`, nur und immer bei SB: `sbNeedsFormat`,
+    `formatOnlySb`); Startwerte `SB-HEADER-KW` und `SB-PAT` Kollektion, `SB-VIDEO-KW` Video. Kein Start-Preset nutzt
+    `SB-HEADER-KW` (Funnel-Hub hat das Video). Das Format ist wie die Targeting-Art fest (in der Oberfläche nicht
+    änderbar).
+  - **Werbemittel je Entwurf** (`inputs.creative`, `sbCreativeSchema`): Marke (`brandEntityId` aus dem Import oder
+    keine bei Vendoren), Markenname (30 Zeichen), Logo- und Video-Asset-ID (`amzn1.assetlibrary.…`), Titel der
+    Kollektion (32 Zeichen). Der Assistent zeigt den Abschnitt nur bei SB-Bausteinen im Preset, die Video-ID nur bei
+    einem Video-Baustein; die Marke füllt den Markennamen vor; falsche Werte sind markiert und sperren das Speichern.
+  - **Prüfung** (`reviewCampaignPlan` mit `creative`): ohne Werbemittel `sbCreativeMissing`, Seller ohne Marke
+    `sbBrandEntityMissing`, Kollektion mit 3–10 Produkten (`sbCollectionAsins`), Video mit Video-ID, genau einem
+    Produkt und nur in US/UK/DE (`sbVideoMissing`, `sbVideoOneProduct`, `sbVideoNotAvailable`), vCPM bei SB gesperrt
+    (`sbVcpmNotAvailable`: Das Blatt hat keine Spalte „Cost Type“; die Freischaltung wird für SB nicht mehr
+    angeboten). `adProductLater` entfällt.
+  - **Anlagen** (`planSetupItems`): Kampagne mit `brandEntityId`, Ad Group, **eine** Anzeige `sb_ad` (Format, Name =
+    Kampagnenname, Marke, Assets, alle ASINs der Kollektion bzw. das eine des Videos), Keywords, Produkt-Targets,
+    Negatives. Migration `0035_sb_setup` (Tabelle `amazon_ads_brands`, Entity `sb_ad`).
+  - **Bulk-Datei** (`sbCreateRow`, Blatt „SB Multi Ad Group Campaigns“): Kampagne mit `Budget Type` Daily, `Bid
+    Optimization` true (Amazon passt die Platzierungen an; keine eigenen Platzierungs-Zeilen), Brand Entity ID bei
+    Sellern; Ad Group ohne Standardgebot; „Manual Collection ad“ mit Landing Page `Product list`, Brand Name,
+    optional Logo und Ad Title, Creative ASINs „A, B, C“; „Video ad“ mit Landing Page `Detail Page` auf
+    `https://www.<Marktplatz>/dp/<ASIN>` (Domain je Land im Worker), Video Asset IDs. Placement, Product Ad und
+    „ähnlich wie“ werden übersprungen bzw. sind ungültig. Die Setup-Datei schreibt die Blätter Portfolios, SP, SB, SD.
+  - **API-Weg:** SB-Kampagnen scheitern mit `SB_BULK_FILE_ONLY`, ihre Kinder mit `PARENT_NOT_CREATED` (entschieden).
+  - **Bulk-Import:** liest das Blatt „Brand Assets Data“ (`replaceProfileBrands`: neue anlegen, Namen nachziehen,
+    fehlende als entfernt) und SB-Anzeigen je Format als Product Ads mit `extra.adType` (`MANUAL_COLLECTION`,
+    `VIDEO` …), `extra.name` und `extra.asins` (wie der Export); vorher waren sie übergangen. Die Bestätigung ordnet
+    `sb_ad` über den Anzeigennamen in der Ad Group zu. Rundlauf mit dem Import-Leser für SB-Anlagen.
+  - **API:** `GET /api/ads/tools/setup/brands?profileId=` (Feature `tools`, `view`; 404 für fremde und
+    ausgeblendete Profile). Seite „Änderungen“: Zeile „Marken-Anzeige“ mit Format, Marke und ASINs.
+  - Geprüft im Browser-Pane (Demo-Daten mit einer eingefügten Marke, 2026-10-10): Funnel-Hub mit SB-Video, Marke aus
+    der Liste (Name vorbelegt), falsche Logo-ID markiert, Video-ID eingetragen, als Bulk-Datei übermittelt (39
+    Anlagen), Detail mit „Marken-Anzeige“, Datei geladen (Blätter SP, SB, SD; SB-Zeilen wie im Guide), Handy ohne
+    Überlauf. Dabei behoben: „vCPM für Video“ wurde angeboten, obwohl das SB-Blatt keine Kostenart kennt; der Hinweis
+    „braucht Werbemittel“ blieb nach dem Eintragen stehen. Testdaten gelöscht.
+  - **Offen bzw. bewusst so:** Erster echter Upload einer SB-Anlage steht aus (Schreibweise der Entities „Manual
+    Collection ad“/„Video ad“, `Bid Optimization` als `true`, Landing Page des Videos). Deutsche Namen des Blatts
+    „Brand Assets Data“ und der SB-Spalten sind ungeprüft. Kein Store Spotlight, keine Auto Collection, keine eigene
+    Landing Page (Store) und kein Logo-Zuschnitt. Ein Satz Werbemittel je Entwurf (nicht je Kampagne).
 
 ### 4.11 Abschluss
 - [ ] Definition of Done prüfen, Browser-Pane, offene Punkte festhalten.

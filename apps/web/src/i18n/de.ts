@@ -1621,6 +1621,8 @@ export const de = {
       sbVideoMissing: '{campaign}: Das Video braucht eine Video-ID aus der Asset-Bibliothek.',
       sbVideoOneProduct: '{campaign}: Ein Video bewirbt genau ein Produkt.',
       sbVideoNotAvailable: '{campaign}: Video-Anzeigen gibt es nur in den USA, in UK und DE.',
+      sbVcpmNotAvailable:
+        '{campaign}: vCPM lässt sich bei Sponsored Brands per Bulk-Datei nicht einstellen.',
       keywordNotSd: '{campaign}: Sponsored Display kennt keine Keywords.',
       vcpmNotUnlocked: '{campaign}: vCPM ist für diesen Baustein nicht freigeschaltet.',
       offAmazonNotUnlocked: '{campaign}: Off-Amazon ist für diesen Baustein nicht freigeschaltet.',
