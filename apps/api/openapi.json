@@ -11277,6 +11277,287 @@
           "rules"
         ],
         "additionalProperties": false
+      },
+      "AutomationRunsResponse": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationRun"
+            }
+          }
+        },
+        "required": [
+          "runs"
+        ]
+      },
+      "AutomationRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "shadow",
+              "cart"
+            ]
+          },
+          "periodStart": {
+            "type": "string"
+          },
+          "periodEnd": {
+            "type": "string"
+          },
+          "metricsImportedAt": {
+            "type": "string"
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "accountName",
+          "mode",
+          "periodStart",
+          "periodEnd",
+          "metricsImportedAt",
+          "counts",
+          "warnings",
+          "createdAt"
+        ]
+      },
+      "AutomationProposalsResponse": {
+        "type": "object",
+        "properties": {
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationProposal"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "proposals",
+          "total"
+        ]
+      },
+      "AutomationProposal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "target",
+              "campaign"
+            ]
+          },
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "campaignName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adGroupName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "targetType": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "keywordText": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "matchType": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "expression": {}
+                },
+                "required": [
+                  "targetType",
+                  "keywordText",
+                  "matchType"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "bid",
+              "budget",
+              "state"
+            ]
+          },
+          "before": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "after": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "optimizer"
+            ]
+          },
+          "ruleName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limitedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "staged",
+              "dismissed"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "profileId",
+          "accountName",
+          "entityType",
+          "entityId",
+          "campaignName",
+          "adGroupName",
+          "target",
+          "field",
+          "before",
+          "after",
+          "currencyCode",
+          "source",
+          "ruleName",
+          "limitedBy",
+          "detail",
+          "status",
+          "createdAt"
+        ]
+      },
+      "AutomationProposalActionResponse": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "changed",
+          "skipped"
+        ]
+      },
+      "AutomationProposalIdsRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -17518,6 +17799,232 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AutomationRulesPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/runs": {
+      "get": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Die letzten Läufe der Automatik in den sichtbaren Profilen, neueste zuerst",
+        "responses": {
+          "200": {
+            "description": "Läufe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationRunsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/proposals": {
+      "get": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Vorschläge der Automatik in einem Status (offen, im Warenkorb, verworfen)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "staged",
+                "dismissed"
+              ],
+              "default": "open"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vorschläge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationProposalsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/proposals/stage": {
+      "post": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Offene Vorschläge in den eigenen Warenkorb legen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationProposalIdsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationProposalActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/proposals/dismiss": {
+      "post": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Vorschläge verwerfen, auch im Warenkorb liegende (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationProposalIdsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationProposalActionResponse"
                 }
               }
             }

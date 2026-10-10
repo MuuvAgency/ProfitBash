@@ -1,9 +1,16 @@
-import { schema } from '@profitbash/db';
+import {
+  planAutomationRun,
+  replaceEntityPeriodMetrics,
+  saveAutomationRun,
+  schema,
+} from '@profitbash/db';
 import { seedAdChangeFixture, type AdChangeFixture } from '@profitbash/db/testing';
 import {
   DEFAULT_AUTOMATION_RULES,
   DEFAULT_GUARDRAILS,
+  type AutomationProposalsResponse,
   type AutomationRulesResponse,
+  type AutomationRunsResponse,
   type AutomationSettings,
   type ErrorResponse,
 } from '@profitbash/shared';
@@ -19,8 +26,12 @@ import {
 } from '../testing';
 
 const {
+  adChanges,
+  amazonAdsEntityPeriodMetrics,
   amazonAdsProfiles,
   auditEvents,
+  automationProposals,
+  automationRuns,
   automationDefaults,
   automationRules,
   clientAutomationSettings,
@@ -256,5 +267,143 @@ describe('Regeln der Automatik (/api/ads/automations/rules)', () => {
       (await call('POST', '/rules/preview', viewer, { rules: [{ ...own, name: '' }] })).status,
     ).toBe(400);
     expect((await call('POST', '/rules/preview', undefined, { rules: [] })).status).toBe(401);
+  });
+});
+
+describe('Läufe und Vorschläge (/api/ads/automations/runs, /proposals)', () => {
+  const NOW = new Date('2026-10-10T08:00:00Z');
+  const proposals = (cookie?: string, status = 'open') =>
+    call<AutomationProposalsResponse>('GET', `/proposals?status=${status}`, cookie);
+  const act = (action: 'stage' | 'dismiss', cookie: string | undefined, ids: string[]) =>
+    call<{ changed: number; skipped: number }>('POST', `/proposals/${action}`, cookie, { ids });
+
+  beforeEach(async () => {
+    const { db } = ctx.testDb;
+    await db.delete(automationProposals);
+    await db.delete(automationRuns);
+    await db.delete(adChanges);
+    await db.delete(amazonAdsEntityPeriodMetrics);
+    const scope = { organizationId: f.org, profileId: f.profile };
+    await replaceEntityPeriodMetrics(db, {
+      ...scope,
+      adProduct: 'SPONSORED_PRODUCTS',
+      period: { startDate: '2026-09-08', endDate: '2026-10-07' },
+      currencyCode: 'EUR',
+      rows: [
+        {
+          level: 'target',
+          amazonCampaignId: '1001',
+          amazonEntityId: '3001',
+          impressions: 4000,
+          clicks: 40,
+          cost: '12.00',
+          sales: '0',
+          purchases: 0,
+          units: 0,
+        },
+      ],
+      replace: 'period',
+      now: NOW,
+    });
+    const plan = await planAutomationRun(db, scope);
+    if (plan.skip !== null) throw new Error(plan.skip);
+    await saveAutomationRun(db, {
+      ...scope,
+      plan,
+      jobRunId: null,
+      counts: { targets: 1, campaigns: 0 },
+      proposals: [
+        {
+          entityType: 'target',
+          entityId: f.keyword,
+          campaignId: f.campaign,
+          adGroupId: f.adGroup,
+          field: 'bid',
+          before: '0.50',
+          after: '0.40',
+          source: 'rule',
+          ruleId: DEFAULT_AUTOMATION_RULES[0]!.id,
+          limitedBy: [],
+          detail: { clicks: 40, orders: 0, spend: '12.00', sales: '0', goalAcos: null },
+        },
+      ],
+    });
+  });
+
+  it('liefert Läufe und Vorschläge der sichtbaren Profile, auch für Viewer', async () => {
+    const runs = await call<AutomationRunsResponse>('GET', '/runs', viewer);
+    expect(runs.status).toBe(200);
+    expect(runs.body.runs).toMatchObject([
+      {
+        profileId: f.profile,
+        accountName: 'Nordwind DE',
+        mode: 'shadow',
+        periodStart: '2026-09-08',
+        periodEnd: '2026-10-07',
+        metricsImportedAt: NOW.toISOString(),
+        counts: { targets: 1, proposals: 1 },
+        warnings: [],
+      },
+    ]);
+    const list = await proposals(viewer);
+    expect(list.status).toBe(200);
+    expect(list.body).toMatchObject({
+      total: 1,
+      proposals: [
+        {
+          entityType: 'target',
+          campaignName: 'Kampagne 1001',
+          adGroupName: 'AG 2001',
+          target: { keywordText: 'kw 3001' },
+          field: 'bid',
+          before: '0.50',
+          after: '0.40',
+          currencyCode: 'EUR',
+          source: 'rule',
+          ruleName: 'Viele Klicks ohne Bestellung',
+          limitedBy: [],
+          detail: { clicks: 40, spend: '12.00' },
+          status: 'open',
+        },
+      ],
+    });
+    expect((await proposals(viewer, 'staged')).body.proposals).toEqual([]);
+    expect((await proposals(viewer, 'unbekannt')).status).toBe(400);
+  });
+
+  it('zeigt fremden Organisationen und bei ausgeblendetem Profil nichts; ohne Anmeldung 401', async () => {
+    expect((await call<AutomationRunsResponse>('GET', '/runs', foreign)).body.runs).toEqual([]);
+    expect((await proposals(foreign)).body).toEqual({ proposals: [], total: 0 });
+    await hide(true);
+    expect((await call<AutomationRunsResponse>('GET', '/runs', editor)).body.runs).toEqual([]);
+    expect((await proposals(editor)).body.total).toBe(0);
+    expect((await call('GET', '/runs')).status).toBe(401);
+    expect((await proposals()).status).toBe(401);
+  });
+
+  it('Editoren übernehmen in den eigenen Warenkorb und verwerfen; Viewer und Fremde nicht', async () => {
+    const { id } = (await proposals(editor)).body.proposals[0]!;
+    expect((await act('stage', viewer, [id])).status).toBe(403);
+    expect((await act('stage', undefined, [id])).status).toBe(401);
+    expect((await act('stage', foreign, [id])).body).toEqual({ changed: 0, skipped: 1 });
+    expect((await act('stage', editor, [])).status).toBe(400);
+
+    await ctx.testDb.db.delete(auditEvents);
+    expect((await act('stage', editor, [id])).body).toEqual({ changed: 1, skipped: 0 });
+    expect(await ctx.testDb.db.select().from(adChanges)).toMatchObject([
+      { origin: 'automation', createdBy: editorId, status: 'pending', newAmount: '0.40' },
+    ]);
+    expect((await proposals(editor, 'staged')).body.total).toBe(1);
+
+    expect((await act('dismiss', viewer, [id])).status).toBe(403);
+    expect((await act('dismiss', foreign, [id])).body).toEqual({ changed: 0, skipped: 1 });
+    expect((await act('dismiss', admin, [id])).body).toEqual({ changed: 1, skipped: 0 });
+    expect(await ctx.testDb.db.select().from(adChanges)).toEqual([]);
+    expect((await proposals(editor, 'dismissed')).body.total).toBe(1);
+    expect(
+      (await ctx.testDb.db.select({ action: auditEvents.action }).from(auditEvents)).map(
+        (event) => event.action,
+      ),
+    ).toEqual(['automation_proposals.stage', 'automation_proposals.dismiss']);
   });
 });

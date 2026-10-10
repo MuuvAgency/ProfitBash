@@ -6413,6 +6413,259 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/automations/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Die letzten Läufe der Automatik in den sichtbaren Profilen, neueste zuerst */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Läufe. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationRunsResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/automations/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vorschläge der Automatik in einem Status (offen, im Warenkorb, verworfen) */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "open" | "staged" | "dismissed";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Vorschläge. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationProposalsResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/automations/proposals/stage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Offene Vorschläge in den eigenen Warenkorb legen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AutomationProposalIdsRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationProposalActionResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/automations/proposals/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vorschläge verwerfen, auch im Warenkorb liegende (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AutomationProposalIdsRequest"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomationProposalActionResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8873,6 +9126,73 @@ export interface components {
         };
         PreviewAutomationRulesRequest: {
             rules: components["schemas"]["AutomationRule"][];
+        };
+        AutomationRunsResponse: {
+            runs: components["schemas"]["AutomationRun"][];
+        };
+        AutomationRun: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            profileId: string;
+            accountName: string;
+            /** @enum {string} */
+            mode: "shadow" | "cart";
+            periodStart: string;
+            periodEnd: string;
+            metricsImportedAt: string;
+            counts: {
+                [key: string]: number;
+            };
+            warnings: string[];
+            createdAt: string;
+        };
+        AutomationProposalsResponse: {
+            proposals: components["schemas"]["AutomationProposal"][];
+            total: number;
+        };
+        AutomationProposal: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            runId: string;
+            /** Format: uuid */
+            profileId: string;
+            accountName: string;
+            /** @enum {string} */
+            entityType: "target" | "campaign";
+            /** Format: uuid */
+            entityId: string;
+            campaignName: string | null;
+            adGroupName: string | null;
+            target: {
+                targetType: string | null;
+                keywordText: string | null;
+                matchType: string | null;
+                expression?: unknown;
+            } | null;
+            /** @enum {string} */
+            field: "bid" | "budget" | "state";
+            before: string | null;
+            after: string;
+            currencyCode: string | null;
+            /** @enum {string} */
+            source: "rule" | "optimizer";
+            ruleName: string | null;
+            limitedBy: string[];
+            detail: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status: "open" | "staged" | "dismissed";
+            createdAt: string;
+        };
+        AutomationProposalActionResponse: {
+            changed: number;
+            skipped: number;
+        };
+        AutomationProposalIdsRequest: {
+            ids: string[];
         };
     };
     responses: never;

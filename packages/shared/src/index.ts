@@ -27,3 +27,4 @@ export * from './notifications';
 export * from './goals';
 export * from './automation';
 export * from './automation-rules';
+export * from './automation-runs';

@@ -1,17 +1,26 @@
 import { createRoute, z, type OpenAPIHono } from '@hono/zod-openapi';
 import {
   AutomationError,
+  dismissAutomationProposals,
   getAutomationRules,
   getAutomationSettings,
+  listAutomationProposals,
+  listAutomationRuns,
   previewAutomationRules,
   saveAutomationRules,
+  stageAutomationProposals,
   type StoredAutomationRules,
   saveGuardrailDefaults,
   setClientAutomation,
 } from '@profitbash/db';
 import {
+  automationProposalActionResponseSchema,
+  automationProposalIdsRequestSchema,
+  automationProposalsQuerySchema,
+  automationProposalsResponseSchema,
   automationRulesPreviewSchema,
   automationRulesResponseSchema,
+  automationRunsResponseSchema,
   automationSettingsSchema,
   errorResponseSchema,
   guardrailsSchema,
@@ -117,6 +126,51 @@ const previewRulesRoute = createRoute({
   },
 });
 
+const runsRoute = createRoute({
+  method: 'get',
+  path: '/ads/automations/runs',
+  tags: ['Automationen'],
+  summary: 'Die letzten Läufe der Automatik in den sichtbaren Profilen, neueste zuerst',
+  responses: {
+    200: { description: 'Läufe.', content: json(automationRunsResponseSchema) },
+    401: errors[401],
+    403: errors[403],
+  },
+});
+
+const proposalsRoute = createRoute({
+  method: 'get',
+  path: '/ads/automations/proposals',
+  tags: ['Automationen'],
+  summary: 'Vorschläge der Automatik in einem Status (offen, im Warenkorb, verworfen)',
+  request: { query: automationProposalsQuerySchema },
+  responses: {
+    200: { description: 'Vorschläge.', content: json(automationProposalsResponseSchema) },
+    ...errors,
+  },
+});
+
+const proposalAction = (action: 'stage' | 'dismiss', summary: string) =>
+  createRoute({
+    method: 'post',
+    path: `/ads/automations/proposals/${action}`,
+    tags: ['Automationen'],
+    summary,
+    request: { body: { content: json(automationProposalIdsRequestSchema), required: true } },
+    responses: {
+      200: { description: 'Ergebnis.', content: json(automationProposalActionResponseSchema) },
+      ...errors,
+    },
+  });
+const stageProposalsRoute = proposalAction(
+  'stage',
+  'Offene Vorschläge in den eigenen Warenkorb legen (Recht „write“)',
+);
+const dismissProposalsRoute = proposalAction(
+  'dismiss',
+  'Vorschläge verwerfen, auch im Warenkorb liegende (Recht „write“)',
+);
+
 const STATUS_BY_CODE = {
   FORBIDDEN: [403, 'AUTOMATION_DEFAULTS_FORBIDDEN'],
   NOT_FOUND: [404, 'CLIENT_NOT_FOUND'],
@@ -191,6 +245,54 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
   app.openapi({ ...previewRulesRoute, middleware: guard('view') }, async (c) =>
     c.json(
       await run(() => previewAutomationRules(db, { ...actor(c), ...c.req.valid('json') })),
+      200,
+    ),
+  );
+
+  app.openapi({ ...runsRoute, middleware: guard('view') }, async (c) => {
+    const runs = await run(() => listAutomationRuns(db, actor(c)));
+    return c.json(
+      {
+        runs: runs.map((row) => ({
+          ...row,
+          mode: row.mode as 'shadow' | 'cart',
+          metricsImportedAt: row.metricsImportedAt.toISOString(),
+          createdAt: row.createdAt.toISOString(),
+        })),
+      },
+      200,
+    );
+  });
+
+  app.openapi({ ...proposalsRoute, middleware: guard('view') }, async (c) => {
+    const { proposals, total } = await run(() =>
+      listAutomationProposals(db, { ...actor(c), ...c.req.valid('query') }),
+    );
+    return c.json(
+      {
+        total,
+        proposals: proposals.map((row) => ({
+          ...row,
+          entityType: row.entityType as 'target' | 'campaign',
+          field: row.field as 'bid' | 'budget' | 'state',
+          source: row.source as 'rule' | 'optimizer',
+          createdAt: row.createdAt.toISOString(),
+        })),
+      },
+      200,
+    );
+  });
+
+  app.openapi({ ...stageProposalsRoute, middleware: guard('write') }, async (c) =>
+    c.json(
+      await run(() => stageAutomationProposals(db, { ...actor(c), ...c.req.valid('json') })),
+      200,
+    ),
+  );
+
+  app.openapi({ ...dismissProposalsRoute, middleware: guard('write') }, async (c) =>
+    c.json(
+      await run(() => dismissAutomationProposals(db, { ...actor(c), ...c.req.valid('json') })),
       200,
     ),
   );
