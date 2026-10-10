@@ -288,9 +288,9 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     Werte kaufmännisch gerundet wie die Vorschau (100 / 32 = 3,13), `targetRoas` entfernt (ungenutzt), Rechner je
     Dialog leer, `deleteGoal` ohne Schein-Objekt. Zurückgewiesen: Typen der Engine aus shared importieren (die Engine
     hat kein DOM/Node im tsconfig, die Wurzel von shared braucht beides); eigener Test für das Skeleton.
-  - **Offen für Dominik (kein Blocker):** Wer nur eines von mehreren Profilen eines Clients sieht, darf das Ziel des
-    Clients setzen; es gilt dann auch für Profile, die er nicht sieht (so im Entwurf). Verliert ein Client sein
-    letztes sichtbares Profil, bleibt sein Ziel gespeichert, ist aber nicht mehr erreichbar.
+  - **Entschieden (Dominik, 2026-10-10):** Wer nur eines von mehreren Profilen eines Clients sieht, darf das Ziel des
+    Clients setzen; es gilt dann auch für Profile, die er nicht sieht. Verliert ein Client sein letztes sichtbares
+    Profil, bleibt sein Ziel gespeichert, ist aber nicht mehr erreichbar.
 
 ### 5.4 Leitplanken und Automations-Einstellungen (`packages/shared`, `packages/db`, `apps/api`, `apps/web`)
 - [ ] Einstellungen je Organisation mit eigenen Startwerten, je Client überschreibbar (F-S6): höchste Gebotsänderung je
@@ -302,6 +302,15 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
 - [ ] Engine: Leitplanken als reine Funktionen für Gebote und Budgets (Basis siehe oben) → begrenzter Wert und Grund;
       Tests je Leitplanke, auch zusammen mit den Grenzen von Amazon (`limitFor`).
 - [ ] Seitengerüst `/ads/automations` mit dem Tab „Einstellungen“ (weitere Tabs folgen in 5.6b, 5.8, 5.10).
+
+- **Entschieden (Dominik, 2026-10-10, zu Beginn von 5.4):**
+  - **Startwerte „Mittel“:** Gebot höchstens ±25 % je 7 Tage, Boden 50 % des CPC, Höchstgebot 3,00 €, Vorschlag ab
+    15 Klicks oder 10 € Ausgaben, Budget höchstens −20 % je Lauf; kein absoluter Boden (es gilt Amazons Mindestgebot).
+  - **Absolute Werte in EUR** (absoluter Boden, Höchstgebot, Mindest-Ausgaben); der Lauf (5.7) rechnet mit dem
+    EZB-Tageskurs in die Währung des Profils um.
+  - **Werte eines Clients** (Leitplanken, Modus; ebenso das Ziel aus 5.3) ändert, wer `write` hat und mindestens ein
+    Profil des Clients sieht. Der offene Punkt aus 5.3 ist damit erledigt.
+  - **Review:** nur noch `ponytail:ponytail-review` (`CLAUDE.md` angepasst).
 
 ### 5.5 Optimizer (`packages/engine`, ohne I/O)
 - [ ] Gebotsvorschlag je Target (SP zuerst, SB und SD danach, vCPM-Gebote ausgenommen, `plan.md` §5) aus Zeitraumsummen
