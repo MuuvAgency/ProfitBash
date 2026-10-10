@@ -26,6 +26,7 @@ const {
   amazonAdsBrands,
   amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
+  amazonAdsEntityPeriodMetrics,
   amazonAdsNegativeTargets,
   amazonAdsPortfolios,
   amazonAdsProductAds,
@@ -96,6 +97,7 @@ beforeEach(async () => {
   for (const table of [
     adChanges,
     adChangeSubmissions,
+    amazonAdsEntityPeriodMetrics,
     amazonAdsSearchTermPeriodMetrics,
     amazonAdsProductAds,
     amazonAdsNegativeTargets,
@@ -1908,6 +1910,214 @@ describe('Suchbegriff-Blätter der Bulk-Datei (2b.1)', () => {
     ]);
     await expect(run(file, { fileName: SEPTEMBER })).rejects.toThrow(FileImportRejectedError);
     expect(await searchTerms()).toEqual([]);
+  });
+});
+
+describe('Kennzahlen der Kampagnen-Blätter (5.1)', () => {
+  const DE_METRICS_HEADER = [...DE_SP_HEADER, 'Verkäufe', 'Bestellungen', 'Einheiten', 'ACOS'];
+  const m = (
+    impressions: number,
+    clicks: number,
+    spend: number,
+    sales: number,
+    orders: number,
+  ) => ({
+    Impressions: impressions,
+    Klicks: clicks,
+    Ausgaben: spend,
+    Verkäufe: sales,
+    Bestellungen: orders,
+    Einheiten: orders,
+    ACOS: 0.5,
+  });
+  const withMetrics = (): Array<Record<string, TestCell>> => [
+    { ...DE_SP_ROWS[0]!, ...m(1000, 12, 9.870000000000001, 40, 2) },
+    { ...DE_SP_ROWS[1]!, ...m(600, 8, 7.5, 30, 1) },
+    DE_SP_ROWS[2]!,
+    { ...DE_SP_ROWS[3]!, ...m(1000, 12, 9.87, 40, 2) },
+    { ...DE_SP_ROWS[4]!, ...m(1000, 12, 9.87, 40, 2) },
+    { ...DE_SP_ROWS[5]!, ...m(900, 11, 9, 40, 2) },
+    { ...DE_SP_ROWS[6]!, ...m(0, 0, 0, 0, 0) },
+  ];
+  const stored = () =>
+    db
+      .select({
+        adProduct: amazonAdsEntityPeriodMetrics.adProduct,
+        level: amazonAdsEntityPeriodMetrics.level,
+        amazonCampaignId: amazonAdsEntityPeriodMetrics.amazonCampaignId,
+        amazonEntityId: amazonAdsEntityPeriodMetrics.amazonEntityId,
+        periodStart: amazonAdsEntityPeriodMetrics.periodStart,
+        periodEnd: amazonAdsEntityPeriodMetrics.periodEnd,
+        impressions: amazonAdsEntityPeriodMetrics.impressions,
+        clicks: amazonAdsEntityPeriodMetrics.clicks,
+        cost: amazonAdsEntityPeriodMetrics.cost,
+        sales: amazonAdsEntityPeriodMetrics.sales,
+        purchases: amazonAdsEntityPeriodMetrics.purchases,
+        units: amazonAdsEntityPeriodMetrics.units,
+        viewableImpressions: amazonAdsEntityPeriodMetrics.viewableImpressions,
+        salesViewsClicks: amazonAdsEntityPeriodMetrics.salesViewsClicks,
+        purchasesViewsClicks: amazonAdsEntityPeriodMetrics.purchasesViewsClicks,
+        unitsViewsClicks: amazonAdsEntityPeriodMetrics.unitsViewsClicks,
+        fileImportId: amazonAdsEntityPeriodMetrics.fileImportId,
+      })
+      .from(amazonAdsEntityPeriodMetrics)
+      .orderBy(
+        asc(amazonAdsEntityPeriodMetrics.level),
+        asc(amazonAdsEntityPeriodMetrics.amazonEntityId),
+      );
+
+  it('übernimmt Summen je Kampagne, Platzierung, Ad Group, Anzeige und Target; Negatives nicht', async () => {
+    const file = buildXlsx([
+      sheet('Sponsored Products-Kampagnen', DE_METRICS_HEADER, withMetrics()),
+    ]);
+    const counters = await run(file, { fileName: SEPTEMBER });
+    expect(counters).toMatchObject({ entityMetrics: 5 });
+    const rows = await stored();
+    expect(rows.map((r) => [r.level, r.amazonEntityId])).toEqual([
+      ['adGroup', AG1],
+      ['campaign', C1],
+      ['placement', 'PLACEMENT_TOP'],
+      ['productAd', AD1],
+      ['target', KW1],
+    ]);
+    expect(rows.find((r) => r.level === 'campaign')).toEqual({
+      adProduct: SP,
+      level: 'campaign',
+      amazonCampaignId: C1,
+      amazonEntityId: C1,
+      periodStart: '2026-09-01',
+      periodEnd: '2026-09-30',
+      impressions: 1000,
+      clicks: 12,
+      cost: '9.87',
+      sales: '40',
+      purchases: 2,
+      units: 2,
+      viewableImpressions: null,
+      salesViewsClicks: null,
+      purchasesViewsClicks: null,
+      unitsViewsClicks: null,
+      fileImportId: null,
+    });
+    expect(rows.find((r) => r.level === 'placement')).toMatchObject({
+      amazonCampaignId: C1,
+      clicks: 8,
+      cost: '7.5',
+    });
+  });
+
+  it('liest die SD-Spalten mit Views getrennt und ordnet Zeilen ohne Kampagnen-ID über die Ad Group zu', async () => {
+    const header = [
+      'Product',
+      'Entity',
+      'Operation',
+      'Campaign ID',
+      'Ad Group ID',
+      'Ad ID',
+      'Campaign Name',
+      'Ad Group Name',
+      'State',
+      'Tactic',
+      'Budget Type',
+      'Budget',
+      'SKU',
+      'Cost Type',
+      'Impressions',
+      'Clicks',
+      'Spend',
+      'Sales',
+      'Orders',
+      'Units',
+      'Viewable Impressions',
+      'Sales (Views & Clicks)',
+      'Orders (Views & Clicks)',
+      'Units (Views & Clicks)',
+    ];
+    const metrics = {
+      Impressions: 500,
+      Clicks: 5,
+      Spend: 3,
+      Sales: 20,
+      Orders: 1,
+      Units: 1,
+      'Viewable Impressions': 400,
+      'Sales (Views & Clicks)': 55.5,
+      'Orders (Views & Clicks)': 3,
+      'Units (Views & Clicks)': 4,
+    };
+    const file = buildXlsx([
+      sheet('Sponsored Display Campaigns', header, [
+        {
+          Product: 'Sponsored Display',
+          Entity: 'Campaign',
+          'Campaign ID': C2,
+          'Campaign Name': 'Waldkauz SD',
+          State: 'enabled',
+          Tactic: 'T00020',
+          'Budget Type': 'daily',
+          Budget: 10,
+          'Cost Type': 'cpc',
+          ...metrics,
+        },
+        {
+          Product: 'Sponsored Display',
+          Entity: 'Ad Group',
+          'Campaign ID': C2,
+          'Ad Group ID': AG2,
+          'Ad Group Name': 'Kategorie',
+          State: 'enabled',
+          ...metrics,
+        },
+        {
+          Product: 'Sponsored Display',
+          Entity: 'Product Ad',
+          'Ad Group ID': AG2,
+          'Ad ID': '500000000000009',
+          SKU: 'WK-SD-09',
+          State: 'enabled',
+          ...metrics,
+        },
+      ]),
+    ]);
+    expect(await run(file, { fileName: SEPTEMBER })).toMatchObject({ entityMetrics: 3 });
+    const rows = await stored();
+    expect(rows.find((r) => r.level === 'productAd')).toMatchObject({
+      adProduct: SD,
+      amazonCampaignId: C2,
+      amazonEntityId: '500000000000009',
+      sales: '20',
+      purchases: 1,
+      viewableImpressions: 400,
+      salesViewsClicks: '55.5',
+      purchasesViewsClicks: 3,
+      unitsViewsClicks: 4,
+    });
+  });
+
+  it('schreibt ohne Zeitraum keine Kennzahlen und zählt die Zeilen', async () => {
+    const file = buildXlsx([
+      sheet('Sponsored Products-Kampagnen', DE_METRICS_HEADER, withMetrics()),
+    ]);
+    const counters = await run(file, { fileName: 'kunde-oktober.xlsx' });
+    expect(counters).toMatchObject({ entityMetricsWithoutPeriod: 5 });
+    expect(counters).not.toHaveProperty('entityMetrics');
+    expect(await stored()).toEqual([]);
+  });
+
+  it('übernimmt nichts aus einer Datei ohne vollständige Kennzahlen-Spalten (Leistungsdaten abgewählt)', async () => {
+    const file = buildXlsx([sheet('Sponsored Products-Kampagnen', DE_SP_HEADER, DE_SP_ROWS)]);
+    const counters = await run(file, { fileName: SEPTEMBER });
+    expect(counters).not.toHaveProperty('entityMetrics');
+    expect(await stored()).toEqual([]);
+  });
+
+  it('überspringt eine ungültige Kennzahl, ohne die Entity zu verwerfen', async () => {
+    const rows = withMetrics();
+    rows[0] = { ...rows[0]!, Klicks: 'viele' };
+    const file = buildXlsx([sheet('Sponsored Products-Kampagnen', DE_METRICS_HEADER, rows)]);
+    const counters = await run(file, { fileName: SEPTEMBER });
+    expect(counters).toMatchObject({ campaigns: 1, entityMetrics: 4, invalidEntityMetricRows: 1 });
+    expect((await stored()).some((r) => r.level === 'campaign')).toBe(false);
   });
 });
 

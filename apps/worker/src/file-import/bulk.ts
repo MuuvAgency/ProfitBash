@@ -5,6 +5,7 @@ import {
   findAdGroupCampaignIds,
   markEntitiesRemoved,
   findProfileCurrency,
+  replaceEntityPeriodMetrics,
   replaceSearchTermPeriodMetrics,
   upsertAdGroups,
   upsertCampaigns,
@@ -16,6 +17,8 @@ import {
   type AdGroupRecord,
   type CampaignRecord,
   type DbOrTx,
+  type EntityPeriodLevel,
+  type EntityPeriodMetric,
   type EntityUpsertCounts,
   type EntityWriteScope,
   type NegativeTargetRecord,
@@ -56,6 +59,12 @@ import {
   type EntityKind,
   type ValueMap,
 } from './bulk-columns';
+import {
+  mapMetricHeader,
+  parseMetricCells,
+  type MetricColumn,
+  type MetricValues,
+} from './bulk-metrics';
 import { isSearchTermSheet, SearchTermCollector, searchTermSheetKind } from './bulk-search-terms';
 
 /**
@@ -64,7 +73,9 @@ import { isSearchTermSheet, SearchTermCollector, searchTermSheetKind } from './b
  * Transaktion in Hierarchie-Reihenfolge: Portfolios → Kampagnen → Ad Groups → Targets, Negatives,
  * Product Ads. Gleiche Amazon-IDs und Schreibweisen wie der Export: Ein späterer API-Sync setzt nahtlos fort.
  *
- * - Kennzahlen der Entity-Blätter (Summen über den gewählten Zeitraum) werden nicht übernommen.
+ * - Kennzahlen der Entity-Blätter (Summen über den gewählten Zeitraum) werden je Kampagne, Ad Group, Target,
+ *   Anzeige und Platzierung als Zeitraumsummen gespeichert (`phase-5.md` 5.1, `bulk-metrics.ts`), mit demselben
+ *   Zeitraum wie die Suchbegriffe; ohne Zeitraum bleiben sie weg (`entityMetricsWithoutPeriod`).
  * - Die Suchbegriff-Blätter (SP, SB) werden als Summen je Download-Zeitraum gespeichert (`phase-2b.md` 2b.1,
  *   `bulk-search-terms.ts`), in derselben Transaktion wie die Entities. Der Zeitraum steht im Dateinamen;
  *   fehlt er dort (Datei umbenannt), gilt der beim Upload von Hand angegebene (2b.2c). Fehlen beide, bleiben
@@ -205,6 +216,30 @@ export const importBulkFile: FileImporter = async (input) => {
       });
     }
 
+    const metricRows = collector.metricRows(records);
+    const metricRowCount = [...metricRows.values()].reduce((n, rows) => n + rows.length, 0);
+    let entityMetrics = 0;
+    if (!unmatched && period) {
+      for (const [adProduct, rows] of metricRows) {
+        const written = await replaceEntityPeriodMetrics(tx, {
+          ...scope,
+          adProduct,
+          period,
+          currencyCode,
+          rows,
+          replace: input.complete ? 'period' : { amazonCampaignIds: fileCampaignIds },
+          fileImportId: input.fileImportId,
+        });
+        entityMetrics += written.rows;
+      }
+    } else if (!unmatched && metricRowCount > 0) {
+      input.logger({
+        level: 'warn',
+        msg: 'bulk_import.entity_metrics_without_period',
+        rows: metricRowCount,
+      });
+    }
+
     if (brands !== null && !unmatched) await replaceProfileBrands(tx, scope, brands);
     const counts: EntityUpsertCounts[] = [
       await upsertPortfolios(tx, scope, records.portfolios),
@@ -251,6 +286,13 @@ export const importBulkFile: FileImporter = async (input) => {
         !period &&
         searchTerms.rowCount > 0 && { searchTermsWithoutPeriod: searchTerms.rowCount }),
       ...(searchTerms.invalidRows > 0 && { invalidSearchTermRows: searchTerms.invalidRows }),
+      ...(entityMetrics > 0 && { entityMetrics }),
+      ...(!unmatched &&
+        !period &&
+        metricRowCount > 0 && { entityMetricsWithoutPeriod: metricRowCount }),
+      ...(collector.invalidMetricRows > 0 && {
+        invalidEntityMetricRows: collector.invalidMetricRows,
+      }),
     };
   });
 };
@@ -376,6 +418,8 @@ interface SheetRow extends RowPosition {
   cells: string[];
   info: RowInfo;
   columns: ReadonlyMap<BulkColumn, number>;
+  /** Spalten der Kennzahlen; `null`, wenn das Blatt keine (vollständigen) trägt. */
+  metricColumns: ReadonlyMap<MetricColumn, number> | null;
 }
 
 /** Kopfzeile ist die erste nicht leere Zeile; leere Zeilen danach werden übergangen. */
@@ -389,10 +433,12 @@ function readSheet(
   ) => void,
 ): void {
   let columns: Map<BulkColumn, number> | null = null;
+  let metricColumns: Map<MetricColumn, number> | null = null;
   forEachRow(sheet, (cells, row, info) => {
     if (cells.every((cell) => cell.trim() === '')) return;
     if (columns === null) {
       columns = mapHeader(cells);
+      metricColumns = kind === 'portfolios' ? null : mapMetricHeader(cells);
       const required = kind === 'portfolios' ? PORTFOLIO_SHEET_COLUMNS : CAMPAIGN_SHEET_COLUMNS;
       const missing = required.find((column) => !columns!.has(column));
       if (missing) {
@@ -402,7 +448,7 @@ function readSheet(
       }
       return;
     }
-    onRow({ sheet, row, kind, cells, info, columns });
+    onRow({ sheet, row, kind, cells, info, columns, metricColumns });
   });
 }
 
@@ -516,6 +562,66 @@ export interface BulkRecords {
 
 const BASE = { amazonUpdatedAt: null, extra: {} } as const;
 
+interface PendingMetric {
+  adProduct: string;
+  level: EntityPeriodLevel;
+  amazonCampaignId: string | null;
+  amazonEntityId: string;
+  values: MetricValues;
+}
+
+/** Ebene und IDs der Kennzahlen einer Zeile; `null` für Entities ohne eigene Kennzahlen (Negatives u. a.). */
+function metricTarget(
+  kind: EntityKind,
+  cells: Cells,
+): Pick<PendingMetric, 'level' | 'amazonCampaignId' | 'amazonEntityId'> | null {
+  switch (kind) {
+    case 'campaign': {
+      const id = cells.requiredId('campaignId');
+      return { level: 'campaign', amazonCampaignId: id, amazonEntityId: id };
+    }
+    case 'adGroup':
+      return {
+        level: 'adGroup',
+        amazonCampaignId: cells.requiredId('campaignId'),
+        amazonEntityId: cells.requiredId('adGroupId'),
+      };
+    case 'productAd':
+    case 'sbAd':
+      return {
+        level: 'productAd',
+        amazonCampaignId: cells.id('campaignId'),
+        amazonEntityId: cells.requiredId('adId'),
+      };
+    case 'keyword':
+      return {
+        level: 'target',
+        amazonCampaignId: cells.id('campaignId'),
+        amazonEntityId: cells.requiredId('keywordId'),
+      };
+    case 'productTargeting':
+    case 'audienceTargeting':
+    case 'contextualTargeting':
+      return {
+        level: 'target',
+        amazonCampaignId: cells.id('campaignId'),
+        amazonEntityId: cells.requiredId(
+          cells.text('productTargetingId') !== '' || !cells.has('targetingId')
+            ? 'productTargetingId'
+            : 'targetingId',
+        ),
+      };
+    case 'biddingAdjustment':
+      return {
+        level: 'placement',
+        amazonCampaignId: cells.requiredId('campaignId'),
+        amazonEntityId: cells.requiredValue('placement', PLACEMENTS),
+      };
+    default:
+      return null;
+  }
+}
+
 class BulkCollector {
   invalidRows = 0;
   /**
@@ -533,6 +639,9 @@ class BulkCollector {
   private readonly negatives: Array<Pending<NegativeTargetRecord>> = [];
   private readonly productAds: Array<Pending<ProductAdRecord>> = [];
   private readonly adjustments = new Map<string, Map<string, PlacementAdjustment>>();
+  /** Zeilen mit Kennzahlen; die Kampagne fehlt bei SB/SD-Zeilen ohne Kampagnen-ID (Auflösung in `metricRows`). */
+  private readonly metrics: PendingMetric[] = [];
+  invalidMetricRows = 0;
 
   constructor(
     private readonly logger: Logger,
@@ -557,6 +666,7 @@ class BulkCollector {
         return;
       }
       this.addEntity(kind, row.kind, adProduct, cells, position);
+      this.addMetrics(kind, adProduct, cells, row);
     } catch (error) {
       if (!(error instanceof InvalidCell)) throw error;
       this.invalid(position, error.column, error.reason);
@@ -830,6 +940,64 @@ class BulkCollector {
    * Schließt das Lesen ab: Gebotsanpassungen an die Kampagnen, fehlende Kampagnen über die Ad Groups der
    * Datei, sonst über vorhandene (`findCampaigns`). Lehnt Dateien ohne gültige Entity ab.
    */
+  /**
+   * Kennzahlen der Zeile, wenn das Blatt welche trägt und die Entity eine Ebene hat (Negatives nicht). Eine
+   * ungültige Kennzahl verwirft nur die Kennzahlen, nicht die Entity (gezählt in `invalidMetricRows`).
+   */
+  private addMetrics(kind: EntityKind, adProduct: string, cells: Cells, row: SheetRow): void {
+    if (row.metricColumns === null) return;
+    const target = metricTarget(kind, cells);
+    if (target === null) return;
+    const values = parseMetricCells(row.cells, row.metricColumns);
+    if (values === null) return;
+    if (values === 'invalid') {
+      this.invalidMetricRows += 1;
+      if (this.loggedInvalid < MAX_INVALID_ROW_LOGS) {
+        this.loggedInvalid += 1;
+        this.logger({
+          level: 'warn',
+          msg: 'bulk_import.invalid_metric_row',
+          sheet: row.sheet,
+          row: row.row,
+        });
+      }
+      return;
+    }
+    this.metrics.push({ adProduct, ...target, values });
+  }
+
+  /**
+   * Kennzahlen je Ad-Typ mit aufgelöster Kampagne (über Target bzw. Anzeige der fertigen Datensätze); je Ebene,
+   * Kampagne und Entity zählt die erste Zeile.
+   */
+  metricRows(records: BulkRecords): Map<string, EntityPeriodMetric[]> {
+    const campaignOf = new Map<string, string>([
+      ...records.targets.map(
+        (t) => [`target\u0000${t.amazonTargetId}`, t.amazonCampaignId] as const,
+      ),
+      ...records.productAds.map(
+        (a) => [`productAd\u0000${a.amazonAdId}`, a.amazonCampaignId] as const,
+      ),
+    ]);
+    const result = new Map<string, Map<string, EntityPeriodMetric>>();
+    for (const metric of this.metrics) {
+      const amazonCampaignId =
+        metric.amazonCampaignId ?? campaignOf.get(`${metric.level}\u0000${metric.amazonEntityId}`);
+      if (amazonCampaignId === undefined) continue;
+      const rows = result.get(metric.adProduct) ?? new Map<string, EntityPeriodMetric>();
+      result.set(metric.adProduct, rows);
+      const key = `${metric.level}\u0000${amazonCampaignId}\u0000${metric.amazonEntityId}`;
+      if (rows.has(key)) continue;
+      rows.set(key, {
+        level: metric.level,
+        amazonCampaignId,
+        amazonEntityId: metric.amazonEntityId,
+        ...metric.values,
+      });
+    }
+    return new Map([...result].map(([adProduct, rows]) => [adProduct, [...rows.values()]]));
+  }
+
   async finish(
     findCampaigns: (amazonAdGroupIds: string[]) => Promise<Map<string, string>>,
   ): Promise<BulkRecords> {

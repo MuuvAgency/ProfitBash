@@ -61,7 +61,7 @@ export type BulkColumn =
 
 /**
  * Aliasse je Spalte (Englisch laut Bulksheets-Doku, Deutsch laut echter Datei). Kennzahlen (Impressions,
- * Klicks, Ausgaben …) fehlen bewusst: Sie sind Summen über den Zeitraum der Datei, keine Tageswerte.
+ * Klicks, Ausgaben …) stehen nicht hier, sondern in `bulk-metrics.ts` (Zeitraumsummen, `phase-5.md` 5.1).
  */
 const COLUMN_ALIASES: Record<BulkColumn, readonly string[]> = {
   entity: ['Entity', 'Entität'],

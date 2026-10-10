@@ -415,6 +415,10 @@ export const de = {
       searchTermsWithoutPeriod:
         'Suchbegriff ohne Zeitraum (Dateiname geändert) | Suchbegriffe ohne Zeitraum (Dateiname geändert)',
       invalidSearchTermRows: 'ungültige Suchbegriff-Zeile | ungültige Suchbegriff-Zeilen',
+      entityMetrics: 'Kennzahlen-Zeile | Kennzahlen-Zeilen',
+      entityMetricsWithoutPeriod:
+        'Kennzahlen-Zeile ohne Zeitraum (Dateiname geändert) | Kennzahlen-Zeilen ohne Zeitraum (Dateiname geändert)',
+      invalidEntityMetricRows: 'ungültige Kennzahlen-Zeile | ungültige Kennzahlen-Zeilen',
       updated: 'geändert | geändert',
       fetched: 'Kurs geladen | Kurse geladen',
       currencies: 'Währung | Währungen',

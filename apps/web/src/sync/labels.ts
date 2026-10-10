@@ -38,6 +38,10 @@ const COUNTER_ORDER = [
   'searchTermsWithoutPeriod',
   'invalidRows',
   'invalidSearchTermRows',
+  // Kennzahlen der Kampagnen-Blätter (5.1): Summen je Download-Zeitraum.
+  'entityMetrics',
+  'entityMetricsWithoutPeriod',
+  'invalidEntityMetricRows',
   // Wechselkurse (2.2): geladen, davon neu, geändert, unverändert.
   'fetched',
   'currencies',

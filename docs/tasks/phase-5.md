@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Als Nächstes: 5.1.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1. Als Nächstes: 5.2a.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -125,20 +125,37 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   sieht ProfitBash erst als neuen Stand beim nächsten Import (ohne Datum).
 
 ### 5.1 Kennzahlen aus der Bulk-Datei (`packages/db`, `apps/worker`)
-- [ ] Tabelle für Zeitraumsummen je Ebene (Kampagne, Ad Group, Target, Product Ad, **Platzierung**): Profil, Ad-Typ,
+- [x] Tabelle für Zeitraumsummen je Ebene (Kampagne, Ad Group, Target, Product Ad, **Platzierung**): Profil, Ad-Typ,
       Ebene, Kampagne, Amazon-ID (bei Platzierungen die Platzierung), Zeitraum, Kennzahlen (Impressions, Klicks, Ausgaben,
       Umsatz, Bestellungen, Einheiten; SD zusätzlich sichtbare Impressions und „Views & Clicks“ getrennt), Datei-Import.
       Ersetzt wird **je Profil, Ad-Typ und Zeitraum** wie bei den Suchbegriffen (`replaceSearchTermPeriodMetrics`): ganze
       Datei → der Zeitraum, Teil-Export → nur die Kampagnen der Datei; andere Zeiträume bleiben stehen.
-- [ ] Importer: Kennzahlen-Spalten der Blätter SP, SB (beide) und SD lesen, Deutsch und Englisch; abgeleitete Spalten (CTR,
+- [x] Importer: Kennzahlen-Spalten der Blätter SP, SB (beide) und SD lesen, Deutsch und Englisch; abgeleitete Spalten (CTR,
       ACoS, CPC, ROAS) nicht übernehmen. Datei ohne Zeitraum (umbenannt, keiner angegeben) → keine Kennzahlen, Zähler wie
       `searchTermsWithoutPeriod`; Datei ohne Leistungsdaten schreibt nichts. Kommentar zu `COLUMN_ALIASES` anpassen.
-- [ ] Lesefunktionen: Datenstand je Entity (neueste Datei mit dieser Entity) und je Profil (zuletzt hochgeladene Datei mit
+- [x] Lesefunktionen: Datenstand je Entity (neueste Datei mit dieser Entity) und je Profil (zuletzt hochgeladene Datei mit
       Kennzahlen, Auslöser des Laufs); Rückgabe mit Zeitraum und Herkunft (`file`, später `daily`).
 - **Befund (2026-10-10, echte Datei, nur Struktur gezählt):** Alle Zeilen der SP-Blätter tragen Kennzahlen, auch
   „Bidding Adjustment“ (je Platzierung, die Summe ist nicht immer die der Kampagne); Ad Groups und Targets summieren sich
   zur Kampagne. Attribution laut Doku nicht in den Spaltennamen; **Annahme:** Standards der Konsole (SP 7 Tage bei
   Sellern, 14 bei Vendoren; SB und SD 14 Tage), in `plan.md` §5 festhalten.
+- [x] Umsetzung (2026-10-10, Stand für 5.2 und später):
+  - **Tabelle** `amazon_ads_entity_period_metrics` (Migration `0036_entity_period_metrics`): Ebene `campaign` | `adGroup` |
+    `target` | `productAd` | `placement`, Kampagne und Entity als Amazon-ID (Platzierung in API-Schreibweise, z. B.
+    `PLACEMENT_TOP`), Zeitraum, Kennzahlen, SD-Spalten mit Views getrennt (`*_views_clicks`, `viewable_impressions`). Keine
+    Fremdschlüssel auf die Entities (wie die Suchbegriff-Summen).
+  - **`packages/db/src/entity-period-metrics.ts`:** `replaceEntityPeriodMetrics` (wie `replaceSearchTermPeriodMetrics`),
+    `listLatestEntityPeriodMetrics` (Datenstand je Entity: je Ad-Typ, Kampagne und Entity die zuletzt hochgeladene Datei,
+    die sie enthält), `findProfileMetricsState` (zuletzt hochgeladene Datei mit Kennzahlen, Auslöser des Laufs in 5.7),
+    `listEntityPeriodMetrics` (ein Zeitraum). Systemzugriff, an Organisation und Profil gebunden.
+  - **Importer** (`apps/worker/src/file-import/bulk-metrics.ts`, eingebunden in `bulk.ts`): Kennzahlen nur, wenn das Blatt alle
+    Pflichtspalten hat (Impressions, Klicks, Ausgaben, Verkäufe, Bestellungen, Einheiten); Zeilen mit leeren Kennzahlen
+    schreiben nichts, Nullen schon (sonst gälte für die Entity der Stand einer älteren Datei). Negatives haben keine Ebene.
+    Die SD-Spalten „(Views & Clicks)“ werden am Zusatz erkannt, weil `normalizeHeader` Klammerzusätze abschneidet. SB/SD-Zeilen
+    ohne Kampagnen-ID bekommen die Kampagne über Target bzw. Anzeige der Datei. Eine ungültige Kennzahl verwirft nur die
+    Kennzahlen der Zeile (`invalidEntityMetricRows`). Zähler `entityMetrics`, `entityMetricsWithoutPeriod` (im Verlauf der
+    Uploads angezeigt).
+  - **Nicht gebaut:** die Oberfläche für „Daten bis“ bzw. veraltete Daten (kommt mit 5.2a, Quelle `file_imports`).
 
 ### 5.2a Benachrichtigungen: Daten, Versand, Quellen (`packages/db`, `apps/api`, `apps/worker`)
 - [ ] Tabellen: Benachrichtigung (Organisation, optional Profil, Art, Schwere, i18n-Parameter, Link, Erzeugt, Schlüssel
