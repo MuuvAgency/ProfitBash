@@ -1,9 +1,10 @@
 import {
+  buildBulkSheet,
   buildPortfolioBulkSheet,
-  buildSpBulkSheet,
   type BulkFileChange,
   type BulkFileCreate,
   type BulkFilePortfolioCreate,
+  type BulkFileSheetKind,
 } from '@profitbash/amazon-ads';
 import type { CampaignSetupItemRow } from '@profitbash/db';
 import { writeXlsx } from '@profitbash/sheets';
@@ -12,7 +13,8 @@ import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
 
 /**
  * Bulk-Datei einer Setup-Übermittlung (`docs/tasks/phase-4.md` 4.4): je offener Anlage eine `Create`-Zeile im
- * Blatt „Sponsored Products Campaigns“, Kampagne und Ad Group unter ihrem Namen als vorläufige Text-ID. Die Datei
+ * Blatt „Sponsored Products Campaigns“ bzw. seit 4.9 „Sponsored Display Campaigns“ (Blatt nach dem Anzeigentyp der
+ * Kampagne), Kampagne und Ad Group unter ihrem Namen als vorläufige Text-ID. Die Datei
  * entsteht bei jedem Download neu und enthält nur, was noch nicht angelegt ist: Kinder schon angelegter Eltern nennen
  * deren echte ID (ein erneuter Upload legt nichts doppelt an); ist die ID noch nicht zugeordnet, warten sie auf den
  * nächsten Import (`waiting`). Das Startdatum ist der Tag des Downloads in der Zeitzone des Profils (Amazon lehnt
@@ -54,8 +56,8 @@ function toCreate(
 ): BulkFileCreate {
   const payload = row.payload;
   switch (payload.entity) {
-    case 'campaign':
-      return {
+    case 'campaign': {
+      const common = {
         type: 'create',
         entity: 'campaign',
         campaignId: row.campaignRef,
@@ -64,10 +66,25 @@ function toCreate(
         state: payload.state,
         dailyBudget: payload.dailyBudget,
         startDate: context.startDate,
-        // Nur SP-Kampagnen kommen hierher; ohne Strategie gilt Amazons Standard „nur senken“.
-        biddingStrategy: payload.biddingStrategy ?? 'SALES_DOWN_ONLY',
         // Bestehendes Portfolio des Entwurfs (4.7, F9).
         amazonPortfolioId: payload.amazonPortfolioId ?? null,
+      } as const;
+      if (payload.adProduct === 'SD') {
+        // Sponsored Display (4.9): Taktik und Kostenart statt Gebotsstrategie, kein Off-Amazon (Einstellung von SP).
+        return {
+          ...common,
+          biddingStrategy: null,
+          offAmazon: null,
+          sd: {
+            tactic: payload.sdTactic ?? 'contextual',
+            costType: payload.costType ?? 'cpc',
+          },
+        };
+      }
+      return {
+        ...common,
+        // Ohne Strategie gilt Amazons Standard „nur senken“.
+        biddingStrategy: payload.biddingStrategy ?? 'SALES_DOWN_ONLY',
         offAmazon:
           context.countryCode === 'US'
             ? payload.offAmazon
@@ -75,6 +92,7 @@ function toCreate(
               : 'limitSpend'
             : null,
       };
+    }
     case 'placement':
       return {
         type: 'create',
@@ -91,6 +109,7 @@ function toCreate(
         name: payload.name,
         defaultBid: payload.defaultBid,
         state: 'ENABLED',
+        ...(payload.bidOptimization !== undefined && { bidOptimization: payload.bidOptimization }),
       };
     case 'product_ad':
       return {
@@ -117,6 +136,16 @@ function toCreate(
         entity: 'productTarget',
         ...parents,
         expression: payload.expression,
+        bid: payload.bid,
+        state: 'ENABLED',
+      };
+    case 'audience_target':
+      return {
+        type: 'create',
+        entity: 'audienceTarget',
+        ...parents,
+        audience: payload.audience,
+        lookbackDays: payload.lookbackDays,
         bid: payload.bid,
         state: 'ENABLED',
       };
@@ -167,6 +196,14 @@ export function buildSetupBulkFile(
    */
   const parents = new Map<string, string | 'waiting'>();
   const changes: BulkFileChange[] = [];
+  /** Blatt je Zeile: Anzeigentyp ihrer Kampagne (Negatives in der Quelle gehören zu SP-Kampagnen, 4.6). */
+  const sheetOf = new Map<string, BulkFileSheetKind>();
+  const kindByCampaign = new Map<string, BulkFileSheetKind>();
+  for (const row of items) {
+    if (row.payload.entity === 'campaign') {
+      kindByCampaign.set(campaignKey(row), row.payload.adProduct === 'SD' ? 'sd' : 'sp');
+    }
+  }
   // Neue Portfolios (4.7): eigenes Blatt, ohne Eltern.
   const portfolios: BulkFilePortfolioCreate[] = [];
 
@@ -215,9 +252,11 @@ export function buildSetupBulkFile(
           : { ...create, sku: row.payload.sku, asin: null };
     }
     const change: BulkFileChange = { ref: row.id, ...create };
+    const kind = source ? 'sp' : (kindByCampaign.get(campaignKey(row)) ?? 'sp');
+    sheetOf.set(row.id, kind);
     // Jede Zeile einzeln prüfen: So steht fest, ob ein Elternteil in der Datei landet (Dubletten prüft der
     // Durchlauf unten; doppelte Kampagnen schließt schon die Prüfung beim Übermitteln aus).
-    const single = buildSpBulkSheet([change]).skipped[0];
+    const single = buildBulkSheet(kind, [change]).skipped[0];
     if (single) {
       skipped.push({ itemId: row.id, ...BULK_FILE_SKIPS[single.reason] });
       continue;
@@ -245,7 +284,16 @@ export function buildSetupBulkFile(
   changes.length = 0;
   changes.push(...kept);
 
-  const sheets = [buildPortfolioBulkSheet(portfolios), buildSpBulkSheet(changes)];
+  // Reihenfolge der Werbekonsole: Portfolios, Sponsored Products, Sponsored Display.
+  const sheets = [
+    buildPortfolioBulkSheet(portfolios),
+    ...(['sp', 'sd'] as const).map((kind) =>
+      buildBulkSheet(
+        kind,
+        changes.filter((change) => sheetOf.get(change.ref) === kind),
+      ),
+    ),
+  ];
   for (const sheet of sheets) {
     for (const { ref, reason } of sheet.skipped)
       skipped.push({ itemId: ref, ...BULK_FILE_SKIPS[reason] });
