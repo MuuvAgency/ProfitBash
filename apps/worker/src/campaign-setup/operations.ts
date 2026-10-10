@@ -16,6 +16,9 @@ import { HARVEST_TARGET_NOT_CREATED, setupTermKey } from './terms';
  *   `created`. Sie gehen erst raus, wenn ein Ziel mit demselben Begriff angelegt ist (`deferred`, solange es offen
  *   ist; ohne Ziel `HARVEST_TARGET_NOT_CREATED`).
  * - Off-Amazon wie in der Bulk-Datei: nur in den USA einstellbar, dort ohne Freischaltung „Ausgaben begrenzen“.
+ * - Sponsored Display (4.9): Kampagne mit Taktik und Kostenart, Ad Group mit Gebotsoptimierung, Anzeigen, Ziele
+ *   (Kontext bzw. Zielgruppe) und negative ASINs als SD-Anlagen; was SD nicht kennt („ähnlich wie“, Keywords),
+ *   scheitert mit `SD_NOT_SUPPORTED`.
  */
 
 export interface SetupOperations {
@@ -27,6 +30,12 @@ export interface SetupOperations {
   /** Negatives in der Quelle, deren neues Ziel noch offen ist: gehen nach dessen Anlage raus (zweiter Aufruf). */
   deferred: string[];
 }
+
+export const SD_NOT_SUPPORTED = {
+  code: 'SD_NOT_SUPPORTED',
+  message: 'Sponsored Display kennt diese Anlage nicht.',
+} as const;
+const SD_TACTICS = { contextual: 'T00020', audience: 'T00030' } as const;
 
 const MATCH_TYPES = { exact: 'EXACT', phrase: 'PHRASE', broad: 'BROAD' } as const;
 const EXPRESSIONS = {
@@ -124,6 +133,21 @@ export function buildSetupOperations(
       continue;
     }
 
+    if (payload.entity === 'campaign' && payload.adProduct === 'SD') {
+      result.operations.push({
+        ref: row.id,
+        entity: 'sdCampaign',
+        name: payload.name,
+        state: payload.state,
+        dailyBudget: payload.dailyBudget,
+        startDate: context.startDate,
+        tactic: SD_TACTICS[payload.sdTactic ?? 'contextual'],
+        costType: payload.costType ?? 'cpc',
+        amazonPortfolioId: payload.amazonPortfolioId ?? null,
+      });
+      continue;
+    }
+
     if (payload.entity === 'campaign') {
       const placements = items.filter(
         (other) => other.payload.entity === 'placement' && campaignKey(other) === campaignKey(row),
@@ -166,6 +190,19 @@ export function buildSetupOperations(
     }
     // Gebotsanpassungen gehen mit der Kampagne; ist sie schon angelegt, gibt es hier nichts mehr zu senden.
     if (payload.entity === 'placement') continue;
+    const sd = campaign.payload.entity === 'campaign' && campaign.payload.adProduct === 'SD';
+    if (sd && payload.entity === 'ad_group') {
+      result.operations.push({
+        ref: row.id,
+        entity: 'sdAdGroup',
+        campaignRef: campaign.id,
+        name: payload.name,
+        defaultBid: payload.defaultBid,
+        bidOptimization: payload.bidOptimization ?? 'clicks',
+        state: 'ENABLED',
+      });
+      continue;
+    }
     if (payload.entity === 'ad_group') {
       result.operations.push({
         ref: row.id,
@@ -183,6 +220,12 @@ export function buildSetupOperations(
       continue;
     }
     const parents = { campaignRef: campaign.id, adGroupRef: adGroup.id };
+    if (sd) {
+      const operation = sdChild(row, parents, context);
+      if (operation) result.operations.push(operation);
+      else result.rejected.push({ itemId: row.id, ...SD_NOT_SUPPORTED });
+      continue;
+    }
     switch (payload.entity) {
       case 'product_ad':
         result.operations.push({
@@ -237,7 +280,57 @@ export function buildSetupOperations(
           asin: payload.asin,
         });
         break;
+      case 'audience_target':
+        // Zielgruppen gibt es nur bei Sponsored Display.
+        result.rejected.push({ itemId: row.id, ...SD_NOT_SUPPORTED });
+        break;
     }
   }
   return result;
+}
+
+/** Kind einer SD-Kampagne (4.9); `null`, wenn Sponsored Display die Anlage nicht kennt. */
+function sdChild(
+  row: CampaignSetupItemRow,
+  parents: { campaignRef: string; adGroupRef: string },
+  context: { accountType: string },
+): AmazonAdsCreateOperation | null {
+  const payload = row.payload;
+  switch (payload.entity) {
+    case 'product_ad':
+      return {
+        ref: row.id,
+        entity: 'sdProductAd',
+        ...parents,
+        ...(context.accountType === 'vendor'
+          ? { sku: null, asin: payload.asin }
+          : { sku: payload.sku, asin: null }),
+        state: 'ENABLED',
+      };
+    case 'audience_target':
+      return {
+        ref: row.id,
+        entity: 'sdTarget',
+        ...parents,
+        expression: { type: payload.audience, lookbackDays: payload.lookbackDays },
+        bid: payload.bid,
+        state: 'ENABLED',
+      };
+    case 'product_target': {
+      const { type, value } = payload.expression;
+      if (type === 'asinExpanded') return null;
+      return {
+        ref: row.id,
+        entity: 'sdTarget',
+        ...parents,
+        expression: { type: type === 'asin' ? 'asinSameAs' : 'asinCategorySameAs', value },
+        bid: payload.bid,
+        state: 'ENABLED',
+      };
+    }
+    case 'negative_product_target':
+      return { ref: row.id, entity: 'sdNegativeTarget', ...parents, asin: payload.asin };
+    default:
+      return null;
+  }
 }
