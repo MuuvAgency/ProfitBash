@@ -4,7 +4,9 @@ import { connectNotificationStream, NOTIFICATION_STREAM_URL } from './live';
 
 /** Fake-EventSource: zeichnet auf und lässt Tests Ereignisse auslösen. */
 class FakeEventSource {
+  static readonly CLOSED = 2;
   static instances: FakeEventSource[] = [];
+  readyState = 1;
   readonly listeners = new Map<string, Array<(event: MessageEvent) => void>>();
   closed = false;
   onerror: (() => void) | null = null;
@@ -19,6 +21,7 @@ class FakeEventSource {
   }
   close() {
     this.closed = true;
+    this.readyState = 2;
   }
   emit(type: string, data = '', lastEventId = '') {
     for (const listener of this.listeners.get(type) ?? []) {
@@ -80,12 +83,46 @@ describe('connectNotificationStream', () => {
     stop();
   });
 
-  it('lädt nach einer Wiederverbindung neu (Zähler und Liste könnten veraltet sein)', () => {
+  it('lädt bei jeder (Wieder-)Verbindung neu (dazwischen könnte etwas gekommen sein)', () => {
     const { sources, onChange } = setup();
     sources[0]!.emit('ready');
-    expect(onChange).not.toHaveBeenCalled();
-    sources[0]!.emit('ready');
     expect(onChange).toHaveBeenCalledTimes(1);
+    sources[0]!.emit('ready');
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('öffnet nach einem endgültigen Abbruch (HTTP-Fehler) mit wachsender Pause neu', async () => {
+    vi.useFakeTimers();
+    try {
+      const { sources, orgId } = setup();
+      // Netzwerkfehler: der Browser verbindet selbst neu, nichts zu tun.
+      sources[0]!.emit('error');
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(sources).toHaveLength(1);
+      // Endgültig zu (z. B. 502 beim Deploy): nach 5 s neu, beim nächsten Mal nach 10 s.
+      sources[0]!.readyState = 2;
+      sources[0]!.emit('error');
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(sources).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(sources).toHaveLength(2);
+      sources[1]!.readyState = 2;
+      sources[1]!.emit('error');
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(sources).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(sources).toHaveLength(3);
+      // Nach erfolgreicher Verbindung wieder kurz; abgemeldet: kein Neuversuch.
+      sources[2]!.emit('ready');
+      sources[2]!.readyState = 2;
+      sources[2]!.emit('error');
+      orgId.value = null;
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(sources).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('tut ohne EventSource nichts (Abfrage beim Fokus übernimmt)', () => {

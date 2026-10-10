@@ -74,7 +74,7 @@ describe('Glocke', () => {
     expect(document.body.textContent).toContain('datei-2.xlsx ist importiert.');
     expect(requests.find((r) => r.path === '/api/notifications')?.search).toContain('limit=5');
     const allRead = [...document.querySelectorAll('button')].find(
-      (b) => b.textContent?.trim() === 'Alle gelesen',
+      (b) => b.textContent?.trim() === 'Alle als gelesen markieren',
     );
     allRead!.click();
     await flushPromises();

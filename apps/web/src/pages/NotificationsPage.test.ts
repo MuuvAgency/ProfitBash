@@ -97,12 +97,26 @@ describe('Seite „Benachrichtigungen“', () => {
     expect(profileLabel()).not.toBeNull();
   });
 
+  it('setzt Filter und gemerkte Profile beim Wechsel der Organisation zurück', async () => {
+    const { session } = await mountPage();
+    const profileLabel = () => document.querySelector('#notifications-filter-profile');
+    await vi.waitFor(() => expect(profileLabel()).not.toBeNull());
+    button('Ungelesen')!.click();
+    await flushPromises();
+    session.me = { ...session.me!, activeOrganizationId: '00000000-0000-4000-8000-0000000000ff' };
+    await flushPromises();
+    expect(button('Alle')!.getAttribute('aria-pressed')).toBe('true');
+    await vi.waitFor(() => expect(items()).toHaveLength(2));
+    // Die Profile kommen aus der Liste der neuen Organisation (hier dieselbe Antwort), nicht aus der alten.
+    expect(profileLabel()).not.toBeNull();
+  });
+
   it('setzt einzelne und alle auf gelesen', async () => {
     const { requests } = await mountPage();
     await vi.waitFor(() => expect(items()).toHaveLength(2));
     button('Als gelesen markieren')!.click();
     await flushPromises();
-    button('Alle gelesen')!.click();
+    button('Alle als gelesen markieren')!.click();
     await flushPromises();
     const posts = requests.filter((r) => r.method === 'POST');
     expect(posts.map((r) => r.body)).toEqual([{ ids: [item(4).id] }, { all: true }]);

@@ -58,7 +58,12 @@ const toggleLabel = computed(() =>
       >
         <BrandMark :compact="collapsed" />
       </RouterLink>
-      <NotificationBell :collapsed="collapsed" :class="collapsed ? '' : 'ml-auto'" />
+      <!-- In der mobilen Schublade nicht: Die Kopfzeile hat ihre eigene Glocke. -->
+      <NotificationBell
+        v-if="!closable"
+        :collapsed="collapsed"
+        :class="collapsed ? '' : 'ml-auto'"
+      />
       <button
         v-if="collapsible"
         v-tooltip.right="collapsed ? toggleLabel : undefined"

@@ -242,7 +242,13 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **Browser-Pane (2026-10-10):** Live-Zustellung gegen die Dev-DB (Einträge per SQL mit `pg_notify`), Glocke, Popover,
     gelesen setzen, „Öffnen“, 1440 px, Tablet dunkel, Handy hell; Konsole ohne Fehler nach der Anmeldung. Testdaten
     wieder gelöscht.
-  - **Offen:** Der Profilfilter kennt nur Profile aus schon geladenen Seiten; bei sehr vielen Benachrichtigungen
+  - **Nach dem Review (2026-10-10):** Der Kanal öffnet sich nach einem endgültigen Abbruch (Antwort ohne 200, z. B.
+    beim Deploy) selbst neu (5 s, verdoppelt bis 60 s), jede (Wieder-)Verbindung lädt Zähler und Liste neu; Filter und
+    gemerkte Profile werden beim Wechsel der Organisation zurückgesetzt; in der mobilen Schublade keine zweite Glocke;
+    Fehler beim Markieren werden angezeigt; „Alle als gelesen markieren“ bleibt bedienbar, wenn der Zähler fehlt;
+    ohne aktive Organisation kein endloses Skeleton; Überschriften h2 (Seite) bzw. h3 (Popover).
+  - **Offen:** Kein Test, dass Art- und Profilfilter in der Anfrage landen (Select im Test ohne Styles schwer
+    bedienbar), und keiner für die Verdrahtung der `EventSource` in der Shell (jsdom hat keine). Der Profilfilter kennt nur Profile aus schon geladenen Seiten; bei sehr vielen Benachrichtigungen
     ggf. die sichtbaren Profile über einen eigenen Endpunkt laden.
 
 ### 5.3 Ziele (`/ads/goals`, vorgezogen aus Phase 6, F4)

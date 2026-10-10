@@ -6,7 +6,7 @@ import { i18n } from '../i18n';
  * Fehlt ein Parameter (ältere Zeilen, neue Arten), bleibt der Text lesbar.
  */
 export function notificationTexts(notification: Notification): { title: string; text: string } {
-  const { t } = i18n.global;
+  const { t, te } = i18n.global;
   const { kind, params, profileName } = notification;
   const key = `notifications.kind.${kind}`;
   const str = (name: string) => {
@@ -18,7 +18,8 @@ export function notificationTexts(notification: Notification): { title: string; 
     return Number.isFinite(value) ? value : 0;
   };
   const channel = str('channel');
-  const where = [profileName, channel ? t(`changes.channel.${channel}`) : null]
+  const channelKey = `changes.channel.${channel}`;
+  const where = [profileName, channel && te(channelKey) ? t(channelKey) : null]
     .filter(Boolean)
     .join(', ');
   const named: Record<string, string | number> = {

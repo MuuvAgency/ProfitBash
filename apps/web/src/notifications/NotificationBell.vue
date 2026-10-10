@@ -12,12 +12,11 @@ import {
   useMarkNotificationsRead,
   useRecentNotifications,
   useUnreadNotificationCount,
-  RECENT_NOTIFICATIONS,
 } from './queries';
 
 /**
  * Glocke mit Zähler (`phase-5.md` 5.2b): oben in der Sidebar und in der mobilen Kopfzeile. Das Popover zeigt die
- * neuesten Benachrichtigungen, „Alle gelesen“ und den Weg zur Seite. Fehlt der Zähler (Fehler), bleibt die Glocke
+ * neuesten Benachrichtigungen, „Alle als gelesen markieren“ und den Weg zur Seite. Fehlt der Zähler (Fehler), bleibt die Glocke
  * ohne Zahl bedienbar.
  */
 defineProps<{ variant?: 'panel' | 'bar'; collapsed?: boolean }>();
@@ -30,7 +29,7 @@ const open = ref(false);
 const requested = ref(false);
 const countQuery = useUnreadNotificationCount();
 const recent = useRecentNotifications(requested);
-// Getrennt, damit „Alle gelesen“ nur beim eigenen Aufruf lädt.
+// Getrennt, damit „Alle als gelesen markieren“ nur beim eigenen Aufruf lädt.
 const markOne = useMarkNotificationsRead();
 const markAll = useMarkNotificationsRead();
 
@@ -70,7 +69,7 @@ const items = computed(() => recent.data.value?.items ?? []);
       <span
         v-if="count > 0"
         aria-hidden="true"
-        class="absolute -top-0.5 -right-1 min-w-4.5 rounded-full bg-violet px-1 text-center font-mono text-[0.6875rem] leading-4.5 font-bold text-on-violet tabular-nums"
+        class="absolute -top-0.5 -right-1 min-w-4.5 rounded-full bg-violet px-1 text-center font-mono text-label-eyebrow leading-4.5 font-bold text-on-violet tabular-nums"
         >{{ badge }}</span
       >
     </button>
@@ -87,11 +86,15 @@ const items = computed(() => recent.data.value?.items ?? []);
             :label="t('notifications.markAllRead')"
             variant="text"
             size="small"
-            :disabled="count === 0"
+            :disabled="countQuery.isSuccess.value && count === 0"
             :loading="markAll.isPending.value"
             @click="markAll.mutate({ all: true })"
           />
         </div>
+        <InlineError
+          v-if="markOne.isError.value || markAll.isError.value"
+          :message="t('notifications.markFailed')"
+        />
         <InlineError
           v-if="recent.isError.value"
           :message="t('notifications.loadFailed')"
@@ -113,7 +116,7 @@ const items = computed(() => recent.data.value?.items ?? []);
         </p>
         <div v-else class="flex max-h-[60dvh] flex-col gap-space-xs overflow-y-auto">
           <NotificationItem
-            v-for="notification in items.slice(0, RECENT_NOTIFICATIONS)"
+            v-for="notification in items"
             :key="notification.id"
             :notification="notification"
             compact

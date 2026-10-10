@@ -17,6 +17,7 @@ import {
   type NotificationFilters,
 } from '../notifications/queries';
 import { ApiError } from '../api';
+import { useActiveOrgId } from '../stores/session';
 
 /**
  * Seite „Benachrichtigungen“ (`phase-5.md` 5.2b): alle sichtbaren Benachrichtigungen, neueste zuerst, mit Filtern
@@ -26,9 +27,17 @@ const { t } = useI18n();
 const filters = ref<NotificationFilters>({ unread: false, kind: null, profileId: null });
 const pages = useNotificationPages(filters);
 const unreadCount = useUnreadNotificationCount();
-// Getrennt, damit „Alle gelesen“ nur beim eigenen Aufruf lädt.
+// Getrennt, damit „Alle als gelesen markieren“ nur beim eigenen Aufruf lädt.
 const markOne = useMarkNotificationsRead();
 const markAll = useMarkNotificationsRead();
+const orgId = useActiveOrgId();
+const markFailed = computed(() => markOne.isError.value || markAll.isError.value);
+/** Ohne ungelesene aus; ist der Zähler unbekannt (Fehler), entscheidet die geladene Liste. */
+const nothingUnread = computed(() =>
+  unreadCount.isSuccess.value
+    ? unreadCount.data.value === 0
+    : !items.value.some((item) => item.readAt === null),
+);
 
 const items = computed(() => pages.data.value?.pages.flatMap((page) => page.items) ?? []);
 const filtered = computed(
@@ -59,6 +68,12 @@ const kindOptions = computed(() =>
   NOTIFICATION_KINDS.map((kind) => ({ value: kind, label: t(`notifications.kind.${kind}.label`) })),
 );
 
+// Anderer Mandant: Filter und gemerkte Profile gehören zur alten Organisation.
+watch(orgId, () => {
+  seenProfiles.clear();
+  filters.value = { unread: false, kind: null, profileId: null };
+});
+
 function setFilter<K extends keyof NotificationFilters>(key: K, value: NotificationFilters[K]) {
   filters.value = { ...filters.value, [key]: value };
 }
@@ -78,7 +93,7 @@ function read(id: string) {
           variant="outlined"
           size="small"
           :loading="markAll.isPending.value"
-          :disabled="(unreadCount.data.value ?? 0) === 0"
+          :disabled="nothingUnread"
           @click="markAll.mutate({ all: true })"
         />
       </template>
@@ -116,9 +131,9 @@ function read(id: string) {
         </div>
       </div>
       <div class="flex w-full flex-col gap-space-xs sm:w-60">
-        <label id="notifications-filter-kind" class="text-body-sm text-ink-secondary">
+        <span id="notifications-filter-kind" class="text-body-sm text-ink-secondary">
           {{ t('notifications.filter.kind') }}
-        </label>
+        </span>
         <Select
           :model-value="filters.kind"
           :options="kindOptions"
@@ -133,9 +148,9 @@ function read(id: string) {
         />
       </div>
       <div v-if="profileOptions.length > 0" class="flex w-full flex-col gap-space-xs sm:w-60">
-        <label id="notifications-filter-profile" class="text-body-sm text-ink-secondary">
+        <span id="notifications-filter-profile" class="text-body-sm text-ink-secondary">
           {{ t('notifications.filter.profile') }}
-        </label>
+        </span>
         <Select
           :model-value="filters.profileId"
           :options="profileOptions"
@@ -151,6 +166,7 @@ function read(id: string) {
       </div>
     </div>
 
+    <InlineError v-if="markFailed" :message="t('notifications.markFailed')" />
     <InlineError
       v-if="errorKey && items.length === 0"
       :message="t('notifications.loadFailed') + ' ' + t(errorKey)"
@@ -159,7 +175,7 @@ function read(id: string) {
       @retry="pages.refetch()"
     />
     <div
-      v-else-if="pages.isPending.value"
+      v-else-if="pages.isPending.value && orgId !== null"
       class="flex flex-col gap-space-sm"
       role="status"
       aria-busy="true"
