@@ -367,4 +367,99 @@ describe('Setup über die API gegen den Mock-Anbieter (4.4)', () => {
       .where(eq(amazonAdsNegativeTargets.adGroupId, adGroup!.id));
     expect(negative).toMatchObject({ keywordText: 'glas', matchType: 'PHRASE' });
   }, 30_000);
+
+  it('legt eine Sponsored-Display-Kampagne an, die der nächste Sync liefert (4.9)', async () => {
+    const { db } = testDb;
+    const name = 'SD | RT-VIEW | Neue Flaschen';
+    const [{ accountType } = { accountType: 'seller' }] = await db
+      .select({ accountType: amazonAdsProfiles.accountType })
+      .from(amazonAdsProfiles)
+      .where(eq(amazonAdsProfiles.id, profileId));
+    const draft = (await saveCampaignSetupDraft(db, {
+      ...actor(),
+      draft: {
+        profileId,
+        productGroupId: null,
+        presetKey: 'muuv-standard',
+        name: 'Neue Flaschen SD',
+        campaignState: 'ENABLED',
+        inputs: {
+          keywords: [],
+          brandTerms: [],
+          productTargets: [],
+          categories: [],
+          harvest: [],
+          unlocks: {},
+        },
+        sourceNegatives: [],
+        portfolioId: null,
+        campaigns: [
+          {
+            block: 'SD-RT-VIEWS',
+            adProduct: 'SD',
+            targeting: 'audience',
+            name,
+            state: 'ENABLED',
+            currencyCode: 'EUR',
+            dailyBudget: '10.00',
+            biddingStrategy: null,
+            sdOptimization: 'conversions',
+            costType: 'cpc',
+            offAmazon: false,
+            placements: null,
+            adGroup: { name, defaultBid: '0.55' },
+            ads: [{ asin: 'B0NEUFLAS1', sku: accountType === 'vendor' ? null : 'NEU-FL-1' }],
+            targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '0.60' }],
+            negatives: [],
+          },
+        ],
+      },
+    }))!;
+    const submitted = await submitCampaignSetupDraft(db, {
+      ...actor(),
+      draftId: draft.id,
+      version: 1,
+      channel: 'api',
+      enqueue: async () => undefined,
+      limitFor: () => null,
+    });
+    if (submitted?.status !== 'submitted') throw new Error('nicht übermittelt');
+
+    await submitConnectionAdChanges(deps, job(), run());
+    const items = await db
+      .select()
+      .from(campaignSetupItems)
+      .where(eq(campaignSetupItems.submissionId, submitted.submission.id))
+      .orderBy(campaignSetupItems.position);
+    expect(items.map((item) => [item.entityType, item.status])).toEqual([
+      ['campaign', 'applied'],
+      ['ad_group', 'applied'],
+      ['product_ad', 'applied'],
+      ['audience_target', 'applied'],
+    ]);
+
+    await syncEntities();
+    const [campaign] = await db
+      .select()
+      .from(amazonAdsCampaigns)
+      .where(and(eq(amazonAdsCampaigns.profileId, profileId), eq(amazonAdsCampaigns.name, name)));
+    expect(campaign).toMatchObject({
+      amazonCampaignId: items[0]!.amazonEntityId,
+      adProduct: 'SPONSORED_DISPLAY',
+      state: 'ENABLED',
+    });
+    const [adGroup] = await db
+      .select()
+      .from(amazonAdsAdGroups)
+      .where(eq(amazonAdsAdGroups.campaignId, campaign!.id));
+    expect(adGroup!.amazonAdGroupId).toBe(items[1]!.amazonEntityId);
+    const [audience] = await db
+      .select()
+      .from(amazonAdsTargets)
+      .where(eq(amazonAdsTargets.adGroupId, adGroup!.id));
+    expect(audience).toMatchObject({
+      amazonTargetId: items[3]!.amazonEntityId,
+      targetType: 'audience',
+    });
+  }, 30_000);
 });

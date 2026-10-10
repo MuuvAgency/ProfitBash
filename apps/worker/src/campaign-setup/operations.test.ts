@@ -279,4 +279,129 @@ describe('buildSetupOperations', () => {
     );
     expect(result.operations[0]).toMatchObject({ entity: 'campaign', amazonPortfolioId: '7001' });
   });
+
+  it('bildet Sponsored Display auf die SD-Anlagen ab (4.9)', () => {
+    const SD = 'SD | RT-VIEW | Flaschen';
+    const sd = { campaignRef: SD, adGroupRef: SD };
+    const campaign = item(
+      {
+        ...campaignPayload,
+        adProduct: 'SD',
+        name: SD,
+        biddingStrategy: null,
+        amazonPortfolioId: '7001',
+        sdTactic: 'audience',
+        costType: 'cpc',
+      },
+      { campaignRef: SD, adGroupRef: null },
+    );
+    const adGroup = item(
+      { entity: 'ad_group', name: SD, defaultBid: '0.55', bidOptimization: 'conversions' },
+      sd,
+    );
+    const result = buildSetupOperations(
+      [
+        campaign,
+        adGroup,
+        item({ entity: 'product_ad', asin: 'B0TEST0001', sku: 'SKU-1' }, sd),
+        item({ entity: 'audience_target', audience: 'views', lookbackDays: 30, bid: '0.60' }, sd),
+        item(
+          { entity: 'product_target', expression: { type: 'asin', value: 'B0FREMD001' }, bid: '0.50' },
+          sd,
+        ),
+        item(
+          { entity: 'product_target', expression: { type: 'category', value: '12345' }, bid: '0.40' },
+          sd,
+        ),
+        item({ entity: 'negative_product_target', asin: 'B0FREMD002' }, sd),
+      ],
+      { ...context, countryCode: 'US' },
+    );
+    expect(result.rejected).toEqual([]);
+    const parents = { campaignRef: campaign.id, adGroupRef: adGroup.id };
+    expect(result.operations.map(({ ref: _ref, ...op }) => op)).toEqual([
+      {
+        entity: 'sdCampaign',
+        name: SD,
+        state: 'PAUSED',
+        dailyBudget: '25.00',
+        startDate: '2026-10-09',
+        tactic: 'T00030',
+        costType: 'cpc',
+        amazonPortfolioId: '7001',
+      },
+      {
+        entity: 'sdAdGroup',
+        campaignRef: campaign.id,
+        name: SD,
+        defaultBid: '0.55',
+        bidOptimization: 'conversions',
+        state: 'ENABLED',
+      },
+      { entity: 'sdProductAd', ...parents, sku: 'SKU-1', asin: null, state: 'ENABLED' },
+      {
+        entity: 'sdTarget',
+        ...parents,
+        expression: { type: 'views', lookbackDays: 30 },
+        bid: '0.60',
+        state: 'ENABLED',
+      },
+      {
+        entity: 'sdTarget',
+        ...parents,
+        expression: { type: 'asinSameAs', value: 'B0FREMD001' },
+        bid: '0.50',
+        state: 'ENABLED',
+      },
+      {
+        entity: 'sdTarget',
+        ...parents,
+        expression: { type: 'asinCategorySameAs', value: '12345' },
+        bid: '0.40',
+        state: 'ENABLED',
+      },
+      { entity: 'sdNegativeTarget', ...parents, asin: 'B0FREMD002' },
+    ]);
+  });
+
+  it('lehnt bei Display ab, was die API nicht kennt („ähnlich wie“, Keywords)', () => {
+    const SD = 'SD | PAT | Flaschen';
+    const sd = { campaignRef: SD, adGroupRef: SD };
+    const expanded = item(
+      { entity: 'product_target', expression: { type: 'asinExpanded', value: 'B0FREMD001' }, bid: '0.50' },
+      sd,
+    );
+    const keyword = item({ entity: 'keyword', text: 'flasche', matchType: 'exact', bid: '0.50' }, sd);
+    const result = buildSetupOperations(
+      [
+        item(
+          { ...campaignPayload, adProduct: 'SD', name: SD, biddingStrategy: null, sdTactic: 'contextual', costType: 'cpc' },
+          { campaignRef: SD, adGroupRef: null },
+        ),
+        item({ entity: 'ad_group', name: SD, defaultBid: '0.50', bidOptimization: 'clicks' }, sd),
+        expanded,
+        keyword,
+      ],
+      context,
+    );
+    expect(result.rejected).toEqual([
+      expect.objectContaining({ itemId: expanded.id, code: 'SD_NOT_SUPPORTED' }),
+      expect.objectContaining({ itemId: keyword.id, code: 'SD_NOT_SUPPORTED' }),
+    ]);
+  });
+
+  it('lässt eine Zielgruppe unter einer SP-Kampagne scheitern statt sie liegen zu lassen', () => {
+    const audience = item({ entity: 'audience_target', audience: 'views', lookbackDays: 30, bid: '0.60' });
+    const result = buildSetupOperations(
+      [
+        item(campaignPayload),
+        item({ entity: 'ad_group', name: NAME, defaultBid: '0.85' }),
+        audience,
+      ],
+      context,
+    );
+    expect(result.rejected).toEqual([
+      expect.objectContaining({ itemId: audience.id, code: 'SD_NOT_SUPPORTED' }),
+    ]);
+  });
 });
