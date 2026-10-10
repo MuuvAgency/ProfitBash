@@ -1315,6 +1315,11 @@ export const de = {
       productPages: 'Produktseiten (%)',
       restOfSearch: 'Rest der Suche (%)',
     },
+    placementName: {
+      top: 'Anfang der Suchergebnisse',
+      productPages: 'Produktseiten',
+      restOfSearch: 'Rest der Suche',
+    },
     amazonBusiness: 'Amazon Business (%)',
     notSet: 'nicht gesetzt',
     audiences: 'Zielgruppen-Anpassungen',
