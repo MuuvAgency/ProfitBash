@@ -49,7 +49,9 @@ export const DEFAULT_GUARDRAILS: Guardrails = {
 };
 
 /** Überschriebene Werte eines Clients: fehlt ein Schlüssel, gilt der Wert der Organisation. */
-export const guardrailOverridesSchema = guardrailsSchema.partial().meta({ id: 'GuardrailOverrides' });
+export const guardrailOverridesSchema = guardrailsSchema
+  .partial()
+  .meta({ id: 'GuardrailOverrides' });
 export type GuardrailOverrides = z.infer<typeof guardrailOverridesSchema>;
 
 export const setClientAutomationRequestSchema = z

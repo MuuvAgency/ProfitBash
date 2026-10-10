@@ -126,7 +126,7 @@ export const de = {
       tags: 'Kampagnen und Targets mit eigenen Tags gruppieren.',
       tools: 'Produktgruppen, Kampagnen-Setup nach eigenem Schema und Portfolios.',
       budgets: 'Budget-Obergrenzen mit Pacing und automatischer Einhaltung.',
-      automations: 'Regeln, Gebotsoptimierung und Dayparting als tägliche Pipeline.',
+      automations: 'Regeln und Gebotsoptimierung als Pipeline mit Leitplanken.',
       goals: 'Ziel-ACoS und -ROAS je Client, Profil und Produktgruppe, mit Rechner.',
       pnl: 'Gewinn- und Verlustrechnung je Client aus Umsatz, Kosten und Werbung.',
       sales: 'Umsatzentwicklung, Wochentage und Bestellzeiten.',
@@ -1236,6 +1236,76 @@ export const de = {
       protectedTerm: 'Geschützter Begriff des Clients (nur mit Bestätigung).',
       noCurrentValue: 'Es gibt keinen Wert, auf den sich rechnen ließe.',
       resultOutOfRange: 'Das Ergebnis wäre kein gültiger Betrag über 0.',
+    },
+  },
+  automations: {
+    title: 'Automationen & Regeln',
+    description:
+      'Die Automatik macht Vorschläge für Gebote und Budgets. Leitplanken begrenzen jeden Vorschlag; an Amazon geht nichts ohne dich.',
+    loadFailed: 'Die Einstellungen konnten nicht geladen werden.',
+    tabs: { settings: 'Einstellungen' },
+    defaults: {
+      title: 'Leitplanken der Organisation',
+      text: 'Gelten für alle Clients und für Profile ohne Client, solange ein Client nichts anderes festlegt. Beträge in EUR; für andere Währungen rechnet der Lauf mit dem Tageskurs um.',
+      adminOnly: ' Nur Admins ändern die Leitplanken der Organisation.',
+      saved: 'Gespeichert.',
+    },
+    clients: {
+      title: 'Clients',
+      text: 'Modus und eigene Leitplanken je Client. Profile ohne Client laufen im Schattenmodus mit den Leitplanken der Organisation.',
+      empty:
+        'Noch kein Client mit Profil. Ordne unter „Clients & Connections“ ein Profil einem Client zu.',
+      overrides: 'nichts überschrieben | {n} Wert überschrieben | {n} Werte überschrieben',
+    },
+    client: {
+      action: 'Einstellungen für „{name}“ bearbeiten',
+      title: 'Automatik für „{name}“',
+      mode: 'Modus',
+      responsible: 'Zuständig (bekommt die Vorschläge in den Warenkorb)',
+      responsibleSelf: 'Ich (wer speichert)',
+      overridesHint:
+        'Eigene Leitplanken des Clients. Leere Felder übernehmen den Wert der Organisation (grau).',
+    },
+    mode: {
+      off: { label: 'Aus', hint: 'Kein Lauf, keine Vorschläge.' },
+      shadow: {
+        label: 'Schattenmodus',
+        hint: 'Rechnet und protokolliert Vorschläge, legt aber nichts in den Warenkorb.',
+      },
+      cart: {
+        label: 'Vorschläge in den Warenkorb',
+        hint: 'Vorschläge landen als ausstehende Änderungen im Warenkorb; übermittelt wird von Hand.',
+      },
+    },
+    guardrail: {
+      maxBidChangePercent: {
+        label: 'Höchste Gebotsänderung je 7 Tage in %',
+        hint: '1 bis 100, in beide Richtungen; zählt alle Änderungen über ProfitBash.',
+      },
+      bidFloorCpcPercent: {
+        label: 'Gebotsboden in % des CPC',
+        hint: '0 bis 100. Darunter senkt kein Vorschlag; 0 = kein Boden aus dem CPC.',
+      },
+      bidFloorEur: {
+        label: 'Gebotsboden absolut in EUR',
+        hint: 'Optional. Ohne absoluten Boden gilt das Mindestgebot von Amazon.',
+      },
+      maxBidEur: {
+        label: 'Höchstes Gebot in EUR',
+        hint: 'Optional, größer als 0. Ohne Höchstgebot gilt die Grenze von Amazon.',
+      },
+      minClicks: {
+        label: 'Mindestdaten: Klicks',
+        hint: 'Ganze Zahl. Ein Vorschlag braucht so viele Klicks oder die Ausgaben daneben.',
+      },
+      minSpendEur: {
+        label: 'Mindestdaten: Ausgaben in EUR',
+        hint: 'Betrag mit höchstens zwei Nachkommastellen.',
+      },
+      maxBudgetDecreasePercent: {
+        label: 'Höchste Budgetsenkung je Lauf in %',
+        hint: '1 bis 100.',
+      },
     },
   },
   goals: {
@@ -2357,6 +2427,8 @@ export const de = {
     TAG_NAME_TAKEN: 'Ein Tag mit diesem Namen gibt es schon.',
     TAG_NOT_FOUND: 'Dieses Tag gibt es nicht (mehr).',
     GOAL_NOT_FOUND: 'Dieses Ziel oder sein Objekt gibt es nicht (mehr).',
+    AUTOMATION_DEFAULTS_FORBIDDEN: 'Nur Admins ändern die Leitplanken der Organisation.',
+    AUTOMATION_INVALID_RESPONSIBLE: 'Zuständig kann nur ein Mitglied mit Schreibrecht sein.',
     TAG_LIMIT_REACHED: 'Die Organisation hat schon die Höchstzahl an Tags.',
     INVALID_EMAIL_OR_PASSWORD: 'E-Mail-Adresse oder Passwort ist falsch.',
     FORBIDDEN: 'Dafür fehlen dir die Rechte.',
