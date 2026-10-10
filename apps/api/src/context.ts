@@ -6,6 +6,7 @@ import type { RequestIdVariables } from 'hono/request-id';
 import type { AmazonAdsDeps } from './amazon';
 import type { Auth } from './auth';
 import type { Logger } from './logger';
+import type { NotificationHub } from './notification-hub';
 
 /** Abhängigkeiten der App. Werden beim Start (bzw. im Test) übergeben, nie global importiert. */
 export interface AppDeps {
@@ -23,6 +24,8 @@ export interface AppDeps {
   /** HMAC-Secret für den OAuth-`state` (`OAUTH_STATE_SECRET`). */
   oauthStateSecret: string;
   jobs: JobQueue;
+  /** Live-Kanal der Benachrichtigungen (5.2a); ohne ihn antwortet `/notifications/stream` mit 503. */
+  notifications?: NotificationHub;
   /** Zeit bis `/api/health` eine nicht antwortende DB als Fehler meldet (Standard 3 s). */
   healthTimeoutMs?: number;
 }

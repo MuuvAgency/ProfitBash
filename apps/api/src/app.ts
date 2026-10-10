@@ -16,6 +16,7 @@ import { registerHealthRoutes } from './routes/health';
 import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMemberRoutes } from './routes/members';
 import { registerMeRoutes } from './routes/me';
+import { registerNotificationRoutes } from './routes/notifications';
 import { registerCampaignSetupRoutes } from './routes/campaign-setup';
 import { registerPortfolioRoutes } from './routes/portfolios';
 import { registerProductGroupRoutes } from './routes/product-groups';
@@ -111,6 +112,7 @@ export function createApp(options: CreateAppOptions) {
   registerCampaignSetupRoutes(app, deps);
   registerPortfolioRoutes(app, deps);
   registerStructureCatalogRoutes(app, deps);
+  registerNotificationRoutes(app, deps);
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',
