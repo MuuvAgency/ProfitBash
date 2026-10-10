@@ -1,5 +1,6 @@
 import {
   buildBulkSheet,
+  buildPortfolioBulkSheet,
   buildSpBulkSheet,
   type BulkFileChange,
   type BulkFileSheetKind,
@@ -8,6 +9,7 @@ import { openXlsx, writeXlsx } from '@profitbash/sheets';
 import { describe, expect, it } from 'vitest';
 import {
   BIDDING_STRATEGIES,
+  BUDGET_POLICIES,
   classifySheet,
   entityKind,
   isSbMultiAdGroupSheet,
@@ -565,5 +567,40 @@ describe('Bulk-Datei für Anlagen: Rundlauf mit dem Leser des Bulk-Imports', () 
       expression: { productCategoryId: '5524098011' },
     });
     expect(mapValue(MATCH_TYPES, cell(7, 'matchType'))).toEqual({ value: 'EXACT', known: true });
+  });
+});
+
+describe('Bulk-Datei für Portfolios: Rundlauf mit dem Leser des Bulk-Imports (4.7)', () => {
+  it('liest Name und Budget einer neuen Portfolio-Zeile zurück', () => {
+    const sheet = buildPortfolioBulkSheet([
+      {
+        ref: 'p',
+        name: 'Garten',
+        budget: {
+          amount: '500.00',
+          currencyCode: 'EUR',
+          policy: 'monthlyRecurring',
+          startDate: '2026-11-01',
+          endDate: '2027-01-31',
+        },
+      },
+    ]);
+    const workbook = openXlsx(writeXlsx([{ name: sheet.sheetName, rows: sheet.rows }]));
+    expect(workbook.sheets.map((entry) => classifySheet(entry.name))).toEqual(['portfolios']);
+    const rows: string[][] = [];
+    workbook.forEachRow(sheet.sheetName, (cells) => rows.push(cells));
+    const columns = mapHeader(rows[0]!);
+    const cell = (column: BulkColumn) => rows[1]![columns.get(column)!] ?? '';
+    expect(entityKind(cell('entity'))).toBe('portfolio');
+    expect(cell('portfolioName')).toBe('Garten');
+    expect(cell('portfolioId')).toBe('');
+    expect(parseBulkAmount(cell('budgetAmount'))).toBe('500');
+    expect(cell('budgetCurrencyCode')).toBe('EUR');
+    expect(mapValue(BUDGET_POLICIES, cell('budgetPolicy'))).toEqual({
+      value: 'MONTHLY_RECURRING',
+      known: true,
+    });
+    expect(parseBulkDate(cell('budgetStartDate'))).toBe('2026-11-01');
+    expect(parseBulkDate(cell('budgetEndDate'))).toBe('2027-01-31');
   });
 });

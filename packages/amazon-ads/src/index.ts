@@ -146,7 +146,10 @@ export {
 } from './writes';
 export {
   buildBulkSheet,
+  buildPortfolioBulkSheet,
   buildSpBulkSheet,
+  PORTFOLIO_BULK_COLUMNS,
+  PORTFOLIO_BULK_SHEET_NAME,
   SB_BULK_COLUMNS,
   SB_BULK_SHEET_NAME,
   SB_MULTI_AD_GROUP_BULK_COLUMNS,
@@ -159,6 +162,8 @@ export {
   type BulkFileCell,
   type BulkFileChange,
   type BulkFileCreate,
+  type BulkFilePortfolioBudgetPolicy,
+  type BulkFilePortfolioCreate,
   type BulkFileSdTargeting,
   type BulkFileSheetKind,
   type BulkFileSkipReason,
