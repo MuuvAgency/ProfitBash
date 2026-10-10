@@ -195,7 +195,40 @@ describe('reviewCampaignPlan', () => {
       // Off-Amazon lässt sich nur in den USA einstellen (Bulk-Guide); sonst gilt Amazons Standard.
       { severity: 'info', code: 'offAmazonOnlyUs', campaign: 'B' },
       { severity: 'error', code: 'offAmazonNotAvailable', campaign: 'C' },
-      { severity: 'info', code: 'adProductLater', campaign: 'C' },
+    ]);
+  });
+
+  it('legt Sponsored Display an, Sponsored Brands erst mit 4.10', () => {
+    const sd = {
+      adProduct: 'SD' as const,
+      targeting: 'product' as const,
+      biddingStrategy: null,
+      placements: null,
+      sdOptimization: 'clicks' as const,
+    };
+    const issues = reviewCampaignPlan(
+      input({
+        profile: { countryCode: 'DE', currencyCode: 'EUR', accountType: 'seller' },
+        campaigns: [
+          campaign({ name: 'SB', adProduct: 'SB', biddingStrategy: null, placements: null }),
+          campaign({
+            name: 'SD',
+            ...sd,
+            ads: [{ asin: 'B0FLASCHE9', sku: null }],
+            targets: [
+              { type: 'product', asin: 'B0FREMD001', match: 'exact', bid: '0.50' },
+              // „Ähnlich wie“ gibt es nur bei Sponsored Products.
+              { type: 'product', asin: 'B0FREMD002', match: 'expanded', bid: '0.50' },
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(issues).toEqual([
+      { severity: 'info', code: 'adProductLater', campaign: 'SB' },
+      // Auch Display bewirbt bei Sellern über die SKU (Guide „Product ad“).
+      { severity: 'error', code: 'missingSku', asin: 'B0FLASCHE9' },
+      { severity: 'error', code: 'expandedNotAvailable', campaign: 'SD', target: 'B0FREMD002' },
     ]);
   });
 

@@ -56,6 +56,17 @@ describe('plannedCampaignSchema', () => {
   });
 });
 
+describe('plannedTargetSchema (Sponsored Display, 4.9)', () => {
+  it('nimmt Zielgruppen nur mit Rückblicken an, die Amazon kennt', () => {
+    const audience = (lookbackDays: number) => ({
+      ...campaign,
+      targets: [{ type: 'audience', audience: 'views', lookbackDays, bid: '0.50' }],
+    });
+    expect(plannedCampaignSchema.safeParse(audience(30)).success).toBe(true);
+    expect(plannedCampaignSchema.safeParse(audience(45)).success).toBe(false);
+  });
+});
+
 describe('saveCampaignSetupDraftSchema', () => {
   const inputs = setupInputsSchema.parse({});
 

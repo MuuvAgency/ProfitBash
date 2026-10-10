@@ -154,33 +154,49 @@ describe('planSetupItems', () => {
     });
   });
 
-  it('nimmt SB und SD nur als Kampagne auf, die (noch) nicht angelegt wird', () => {
+  it('nimmt SB nur als Kampagne auf, die (noch) nicht angelegt wird', () => {
     const items = planSetupItems(
       [
         {
           ...sp,
-          adProduct: 'SD',
-          targeting: 'audience',
-          name: 'SD | RT-VIEW | Flaschen',
+          adProduct: 'SB',
+          name: 'SB | HEADER | Flaschen',
           biddingStrategy: null,
           placements: null,
-          sdOptimization: 'clicks',
-          targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '0.60' }],
-          negatives: [],
         },
       ],
       { campaignState: 'ENABLED' },
     );
+    expect(items.map((item) => [item.entityType, item.supported])).toEqual([['campaign', false]]);
+  });
+
+  const sdAudience: PlannedCampaign = {
+    ...sp,
+    block: 'SD-RT-VIEWS',
+    adProduct: 'SD',
+    targeting: 'audience',
+    name: 'SD | RT-VIEW | Flaschen',
+    biddingStrategy: null,
+    placements: null,
+    sdOptimization: 'conversions',
+    adGroup: { name: 'SD | RT-VIEW | Flaschen', defaultBid: '0.55' },
+    targets: [{ type: 'audience', audience: 'views', lookbackDays: 30, bid: '0.60' }],
+    negatives: [],
+  };
+
+  it('legt Sponsored Display mit Taktik, Kostenart und Gebotsoptimierung an (4.9)', () => {
+    const items = planSetupItems([sdAudience], { campaignState: 'ENABLED' });
+    const refs = { campaignRef: sdAudience.name, adGroupRef: sdAudience.adGroup.name };
     expect(items).toEqual([
       {
         entityType: 'campaign',
-        campaignRef: 'SD | RT-VIEW | Flaschen',
+        campaignRef: sdAudience.name,
         adGroupRef: null,
-        supported: false,
+        supported: true,
         payload: {
           entity: 'campaign',
           adProduct: 'SD',
-          name: 'SD | RT-VIEW | Flaschen',
+          name: sdAudience.name,
           targetingType: 'manual',
           state: 'ENABLED',
           dailyBudget: '25.00',
@@ -188,9 +204,58 @@ describe('planSetupItems', () => {
           biddingStrategy: null,
           offAmazon: false,
           amazonPortfolioId: null,
+          sdTactic: 'audience',
+          costType: 'cpc',
         },
       },
+      {
+        entityType: 'ad_group',
+        ...refs,
+        supported: true,
+        payload: {
+          entity: 'ad_group',
+          name: sdAudience.adGroup.name,
+          defaultBid: '0.55',
+          bidOptimization: 'conversions',
+        },
+      },
+      {
+        entityType: 'product_ad',
+        ...refs,
+        supported: true,
+        payload: { entity: 'product_ad', asin: 'B0FLASCHE1', sku: 'FL-750' },
+      },
+      {
+        entityType: 'audience_target',
+        ...refs,
+        supported: true,
+        payload: { entity: 'audience_target', audience: 'views', lookbackDays: 30, bid: '0.60' },
+      },
     ]);
+  });
+
+  it('setzt bei Display-Kontext die kontextbezogene Taktik und bei vCPM die Optimierung auf Reichweite', () => {
+    const items = planSetupItems(
+      [
+        {
+          ...sdAudience,
+          block: 'SD-CAT',
+          targeting: 'category',
+          name: 'SD | CAT | Flaschen',
+          costType: 'vcpm',
+          sdOptimization: 'clicks',
+          targets: [{ type: 'category', categoryId: '12345', name: 'Flaschen', bid: '0.40' }],
+        },
+      ],
+      { campaignState: 'ENABLED' },
+    );
+    expect(items[0]!.payload).toMatchObject({ sdTactic: 'contextual', costType: 'vcpm' });
+    expect(items[1]!.payload).toMatchObject({ entity: 'ad_group', bidOptimization: 'reach' });
+    expect(items[3]!.payload).toEqual({
+      entity: 'product_target',
+      expression: { type: 'category', value: '12345' },
+      bid: '0.40',
+    });
   });
 
   it('hängt gewählte Negatives in der Quelle mit den echten IDs an (4.6, F7)', () => {

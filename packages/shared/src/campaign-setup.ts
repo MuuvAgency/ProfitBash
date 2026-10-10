@@ -8,6 +8,7 @@ import {
   BLOCK_TARGETINGS,
   CATALOG_AD_PRODUCTS,
   MAX_PLACEMENT_PERCENT,
+  SD_LOOKBACK_DAYS,
 } from './structure-catalog';
 
 /**
@@ -41,6 +42,8 @@ export const CAMPAIGN_SETUP_ITEM_ENTITIES = [
   'product_ad',
   'keyword',
   'product_target',
+  /** Zielgruppe von Sponsored Display (4.9). */
+  'audience_target',
   'negative_keyword',
   'negative_product_target',
   /** Negativ in der Quelle eines Harvest-Begriffs (bestehende Kampagne und Ad Group, F7, 4.6). */
@@ -80,7 +83,10 @@ export const plannedTargetSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('audience'),
     audience: z.enum(BLOCK_AUDIENCES),
-    lookbackDays: z.number().int().min(1).max(365),
+    lookbackDays: z
+      .number()
+      .int()
+      .refine((days) => (SD_LOOKBACK_DAYS as readonly number[]).includes(days)),
     bid: money,
   }),
 ]);
@@ -236,9 +242,18 @@ export type CampaignSetupItemPayload =
       offAmazon: boolean;
       /** Bestehendes Portfolio des Entwurfs (4.7); fehlt bei Zeilen vor 4.7. */
       amazonPortfolioId?: string | null;
+      /** Nur Sponsored Display (4.9): Taktik und Kostenart (CPC, vCPM nur freigeschaltet nach F-S7). */
+      sdTactic?: 'contextual' | 'audience';
+      costType?: 'cpc' | 'vcpm';
     }
   | { entity: 'placement'; placement: CampaignSetupPlacement; percentage: number }
-  | { entity: 'ad_group'; name: string; defaultBid: string }
+  | {
+      entity: 'ad_group';
+      name: string;
+      defaultBid: string;
+      /** Nur Sponsored Display (4.9): Gebotsoptimierung; `reach` nur mit vCPM. */
+      bidOptimization?: 'clicks' | 'conversions' | 'reach';
+    }
   | { entity: 'product_ad'; asin: string; sku: string | null }
   | {
       entity: 'keyword';
@@ -249,6 +264,13 @@ export type CampaignSetupItemPayload =
   | {
       entity: 'product_target';
       expression: { type: 'asin' | 'asinExpanded' | 'category'; value: string };
+      bid: string;
+    }
+  | {
+      /** Sponsored Display (4.9): wer die beworbenen Produkte angesehen bzw. gekauft hat. */
+      entity: 'audience_target';
+      audience: (typeof BLOCK_AUDIENCES)[number];
+      lookbackDays: number;
       bid: string;
     }
   | { entity: 'negative_keyword'; text: string; matchType: 'negativeExact' | 'negativePhrase' }
