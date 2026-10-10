@@ -253,6 +253,13 @@
       "when": 1791634762071,
       "tag": "0035_sb_setup",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791639340413,
+      "tag": "0036_entity_period_metrics",
+      "breakpoints": true
     }
   ]
 }
