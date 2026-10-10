@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4. Als Nächstes: 5.5.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5. Als Nächstes: 5.6a.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -355,12 +355,33 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **Review:** nur noch `ponytail:ponytail-review` (`CLAUDE.md` angepasst).
 
 ### 5.5 Optimizer (`packages/engine`, ohne I/O)
-- [ ] Gebotsvorschlag je Target (SP zuerst, SB und SD danach, vCPM-Gebote ausgenommen, `plan.md` §5) aus Zeitraumsummen
+- [x] Gebotsvorschlag je Target (SP zuerst, SB und SD danach, vCPM-Gebote ausgenommen, `plan.md` §5) aus Zeitraumsummen
       und wirksamem Ziel: Wert je Klick, bei wenigen Klicks geglättet gegen die Ebene darüber (Ad Group, dann Kampagne);
       Zielgebot = Wert je Klick × Ziel-ACoS; dann Leitplanken. Eigene Formel und Startwerte, in der Umsetzungsnotiz.
-- [ ] Targets ohne eigenes Gebot und Auto-Targets: Vorschlag als eigenes Gebot am Target.
-- [ ] Ausnahmen: geschützte Begriffe (Phase 2b) nicht unter den Boden senken, archivierte und pausierte Entities nie.
-- [ ] Tests mit synthetischen Summen: zu wenig Daten, über/unter Ziel, keine Bestellung, Boden, Obergrenze, Währung.
+- [x] Targets ohne eigenes Gebot und Auto-Targets: Vorschlag als eigenes Gebot am Target.
+- [x] Ausnahmen: geschützte Begriffe (Phase 2b) nicht unter den Boden senken, archivierte und pausierte Entities nie.
+- [x] Tests mit synthetischen Summen: zu wenig Daten, über/unter Ziel, keine Bestellung, Boden, Obergrenze, Währung.
+- [x] Umsetzung (2026-10-10, Stand für 5.6a und 5.7):
+  - **`packages/engine/src/optimizer.ts`, `suggestBid`:** je Target ein Vorschlag (`kind: 'suggestion'` mit `bid`,
+    `base`, `hasOwnBid`, `valuePerClick`, `targetBid`, `limitedBy`) oder `kind: 'none'` mit Grund (`inactive`, `vcpm`,
+    `noGoal`, `noBase`, `insufficientData`, `unchanged`).
+  - **Eigene Formel:** Wert je Klick = (Umsatz + k × Wert je Klick der Ebene darüber) / (Klicks + k); die Ad Group
+    wird ebenso gegen die Kampagne geglättet, die Kampagne zählt roh. Zielgebot = Wert je Klick × Ziel-ACoS, danach
+    `applyBidGuardrails` (CPC = Ausgaben / Klicks des Targets). **Startwert k = 12 Klicks**
+    (`OPTIMIZER_PRIOR_CLICKS`, je Aufruf überschreibbar; noch keine Einstellung in der Oberfläche). Ohne Bestellung
+    sinkt der Wert je Klick mit jedem Klick, statt auf null zu fallen; Wochenrahmen und Boden bremsen.
+  - **Ohne eigenes Gebot** (auch Auto-Targets): Ausgangsgebot ist das Standardgebot der Ad Group, der Vorschlag setzt
+    ein eigenes Gebot am Target (`hasOwnBid: false`). Ohne beides kein Vorschlag (`noBase`).
+  - **Ausnahmen:** Target, Ad Group und Kampagne müssen `ENABLED` sein; Kampagnen mit `costType` vCPM bleiben außen vor.
+    **Geschützte Begriffe:** Der Boden gilt für jedes Target, der Optimizer senkt also keinen Begriff darunter; eine
+    eigene Behandlung geschützter Begriffe gibt es nicht. Regeln mit „pausieren“ oder „setzen“ (5.6a) müssen
+    geschützte Begriffe selbst ausnehmen. **Frage an Dominik (kein Blocker):** Sollen geschützte Begriffe strenger
+    behandelt werden (z. B. nie senken)?
+  - **Für 5.7 (Aufrufer):** `base` und `windowStart` aus `ad_changes`, Leitplanken in die Währung des Profils
+    umrechnen, `limit` über `amazonAdsValueLimit`, Ziel über `effectiveGoal` (Lesefunktion „Ziele eines Profils als
+    `GoalSetting[]`“ fehlt weiter). Bei SD den Umsatz aus Klicks nehmen, nicht „Views & Clicks“. Reihenfolge SP, dann
+    SB und SD ist Sache des Laufs; die Funktion ist für alle gleich. Bei `unchanged` geht verloren, welche Leitplanke
+    festgehalten hat; braucht 5.8 das, `limitedBy` dort mitgeben.
 
 ### 5.6a Regeln: Modell, Engine, API
 - [ ] Regel = Name, Ebene (Target; Kampagne für Budgets), Bedingungen (Kennzahl im Zeitraum, Vergleich, Wert, auch

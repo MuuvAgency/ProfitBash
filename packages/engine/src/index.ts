@@ -76,3 +76,4 @@ export {
 } from './bid-stack';
 export * from './goals';
 export * from './guardrails';
+export * from './optimizer';
