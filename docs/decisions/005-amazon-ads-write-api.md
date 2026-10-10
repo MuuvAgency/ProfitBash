@@ -2,7 +2,8 @@
 
 - **Status:** angenommen
 - **Datum:** 2026-10-08 (Start von Phase 3, Doku-Stand vom selben Tag), am 2026-10-09 um Sponsored Brands und
-  Sponsored Display ergänzt (3.2c), am selben Tag um Anlagen über die API (4.4)
+  Sponsored Display ergänzt (3.2c), am selben Tag um Anlagen über die API (4.4), am 2026-10-10 um Anlagen für
+  Sponsored Display (4.9)
 - **Beteiligte:** Dominik
 - **Bezug:** ADR 004 hatte das Schreiben offen gelassen („beim Start von Phase 3 als eigene Entscheidung prüfen“).
 
@@ -214,6 +215,29 @@ Offen für den ersten echten Lauf (1.10):
 - wie streng die Drosselung bei großen Strukturen ist (bis zu 1000 Einträge je Aufruf) und ob `throttledError` je
   Eintrag vorkommt;
 - ob Keywords und Targets in Auto-Kampagnen sauber je Eintrag abgelehnt werden (der Client prüft das nicht).
+
+### Anlagen für Sponsored Display (Phase 4, 4.9; geprüft am 2026-10-10 gegen die Spec `sponsored-display/3-0`)
+
+- `applyCreates` (vorher `applySpCreates`) nimmt neben den SP-Entities `sdCampaign`, `sdAdGroup`, `sdProductAd`,
+  `sdTarget` und `sdNegativeTarget`. Reihenfolge, Eltern-refs, Kaskade, Drosselung und „nie wiederholen“ wie bei SP;
+  SD-Kinder brauchen SD-Eltern (eine SP-Ad-Group unter einer SD-Kampagne ist `INVALID_VALUE`).
+- `POST /sd/campaigns` | `adGroups` | `productAds` | `targets` | `negativeTargets`, `application/json`, Liste ohne
+  Hülle, Antwort als Liste `{ code, description, <id> }` in der Reihenfolge der Anfrage (wie die SD-Updates aus 3.2c),
+  100 je Aufruf.
+- Kampagne: `name`, `state` klein, `budgetType: daily`, `budget`, `startDate` als `YYYYMMDD`, `tactic` (`T00020`
+  kontextbezogen, `T00030` Zielgruppen), `costType` (`cpc`; `vcpm` nur freigeschaltet, F-S7), `portfolioId` als
+  Zahl. Ad Group: `campaignId`, `name`, `defaultBid`, `bidOptimization` (`clicks` | `conversions`; `reach` nur mit
+  vCPM, geprüft gegen die Kampagne derselben Eingabe), `state`. Product Ad: `campaignId`, `adGroupId`, `sku`
+  (Seller) bzw. `asin` (Vendor). Ziele und Negatives nennen laut Spec nur die `adGroupId`, `expressionType: manual`.
+- Ausdrücke: Kontext `asinSameAs` bzw. `asinCategorySameAs`; Zielgruppe `views` bzw. `purchases` mit
+  `[{ type: exactProduct }, { type: lookback, value: "30" }]` (wer die beworbenen Produkte selbst angesehen bzw.
+  gekauft hat); Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage (Spec). Negatives: `asinSameAs`.
+- Der Mock nimmt SD-Anlagen an (Gebote und Budgets gegen die Grenzen) und liefert sie im nächsten Export; SD-Updates
+  bleiben dort `MOCK_NOT_SUPPORTED`.
+
+Offen für den ersten echten Lauf: ob `exactProduct` für Ansichten so angenommen wird (die Spec nennt es, das
+Beispiel des Bulk-Guides zeigt `similar-product`); ob die Kampagne mit `T00030` und nur Zielgruppen ohne weitere
+Angaben (`creativeType`) angelegt wird; ob die Antwort die neue ID als Zahl oder Text liefert (beides wird gelesen).
 
 ## Begründung
 

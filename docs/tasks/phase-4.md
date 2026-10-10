@@ -6,7 +6,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: in Arbeit (2026-10-09).** Die Fragen F1–F12 sind entschieden (2026-10-09, die Nummern gelten nur in dieser
-> Datei). Fertig: 4.1–4.8. Nächster Schritt: 4.9.
+> Datei). Fertig: 4.1–4.9. Nächster Schritt: 4.10.
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Alles, was Phase 4 bei Amazon anlegt, geht deshalb wie in
 > Phase 3 als **Bulk-Datei** raus (Upload in der Werbekonsole von Hand) und wird über den API-Weg nur gegen den Mock gebaut.
@@ -537,9 +537,51 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     sie werden von Hand eingetragen.
 
 ### 4.9 Setup für Sponsored Display (F1)
-- [ ] Bausteine `SD-CAT`, `SD-PAT`, `SD-RT-VIEWS`, `SD-RT-PURCHASE` anlegen: Kampagne (Taktik, **nur CPC**, vCPM gesperrt nach
+- [x] Bausteine `SD-CAT`, `SD-PAT`, `SD-RT-VIEWS`, `SD-RT-PURCHASE` anlegen: Kampagne (Taktik, **nur CPC**, vCPM gesperrt nach
       F-S7), Ad Group mit Gebotsoptimierung, Product Ad, kontextbezogene bzw. Zielgruppen-Targets mit Look-Back; Blatt
       „Sponsored Display Campaigns“ mit `Create`, Rundlauf-Test; API-Weg gegen den Mock.
+- [x] Umsetzung (Stand für 4.10 und später):
+  - **Entschieden (Dominik, 2026-10-10):** Der Rückblick der Zielgruppen kommt aus Baustein bzw. Preset (Katalog), nicht
+    je Entwurf. Bisher kein echter Upload einer Setup- oder Portfolio-Datei (ProfitBash ist noch nicht live).
+  - **Quellen (2026-10-10):** Guide „How to create Sponsored Display campaigns with bulksheets“
+    (`…/bulksheets/sd/sd-examples/create-sd-campaign`), SD-3.0-Spec (`CreateCampaign`, `CreateAdGroup`,
+    `CreateTargetingClause`, `TargetingPredicateNested`), Kopfzeile des SD-Blatts der echten Datei. Das „Config“-Blatt
+    der echten Datei nennt **nur Sponsored Products** (84 Zeilen, keine SD-Pflichtspalten).
+  - **Guide:** Kampagne `Create` mit Text-ID = Name, Start `yyyyMMdd`, `State`, `Tactic` als ID (`T00020` kontextbezogen,
+    `T00030` Zielgruppen), `Budget Type` = `daily`, `Budget`, `Cost Type` (`CPC`; `vCPM` gehört zu „Optimize for viewable
+    impressions“); Ad Group mit `Ad Group Default Bid` und `Bid Optimization` („Optimize for page visits“ bzw. „…
+    conversions“); Product Ad mit SKU (Seller) bzw. ASIN (Vendor); `Contextual Targeting` (`asin="…"`,
+    `category="…"`), `Audience Targeting` (`views=(exact-product lookback=30)`, `purchases=(…)`), `Negative Product
+    Targeting`. Eine Kampagne hat nur eine Taktik.
+  - **Rückblick:** Amazon nimmt laut Spec nur **7, 14, 30, 60, 90, 180, 365** Tage. Der Katalog prüft das
+    (`lookbackNotAllowed`, `presetLookbackNotAllowed`), ebenso das Schema geplanter Ziele. „Ähnlich wie“
+    (`asin-expanded`) gibt es nur bei SP (`expandedOnlySp` im Katalog, `expandedNotAvailable` beim Übermitteln).
+  - **Engine:** `planSetupItems` legt SD wie SP an (keine Platzierungen): Kampagne mit `sdTactic` und `costType`, Ad
+    Group mit `bidOptimization` (`reach` bei freigeschaltetem vCPM), Zielgruppen als neue Entity `audience_target`
+    (Migration `0034_sd_setup`, nur der Check der Entity). `reviewCampaignPlan`: `adProductLater` nur noch für SB,
+    SKU-Pflicht bei Sellern auch für SD.
+  - **Bulk-Datei:** `buildBulkSheet('sd', …)` schreibt `Create`-Zeilen (`sdCreateRow`); SD-Kampagnen ohne `sd` bzw.
+    mit Gebotsstrategie, Ad Groups ohne Optimierung, „ähnlich wie“ und unbekannte Rückblicke sind `invalidValue`;
+    Platzierungen und Keywords `notSupportedInBulkFile`. Die echte Datei eines Sellers hat nur „ASIN (Informational
+    only)“: Die Spalte **„ASIN“** erscheint nur, wenn eine Vendor-Anzeige sie belegt (Annahme nach dem Guide).
+    `buildSetupBulkFile` legt die Zeilen nach dem Anzeigentyp der Kampagne ins SP- bzw. SD-Blatt (Portfolios, SP, SD).
+    Rundlauf mit dem Import-Leser (Taktik, Budget-Typ, Kostenart, Ausdrücke).
+  - **Bestätigung:** Zielgruppen über Ereignis und Rückblick (`expression.event`, `expression.lookback`), alles andere
+    wie bei SP über Namen, SKU, ASIN und Kategorie.
+  - **API-Weg** (ADR 005, „Anlagen für Sponsored Display“): `applyCreates` (umbenannt aus `applySpCreates`) mit den
+    Entities `sd…`; `buildSetupOperations` bildet SD-Zeilen darauf ab, was SD nicht kennt, scheitert mit
+    `SD_NOT_SUPPORTED`. Der Mock nimmt SD-Anlagen an und liefert sie im nächsten Export (Ende-zu-Ende in
+    `ad-changes-flow.test.ts`).
+  - **Oberfläche:** Seite „Änderungen“ zeigt Zielgruppen („Ansichten der Produkte, 30 Tage“), Texte für die neuen
+    Befunde; der Hinweis „noch nicht“ nennt nur noch Sponsored Brands.
+  - Geprüft im Browser-Pane (Demo-Daten, 2026-10-10): Preset Funnel-Hub mit zwei SD-Retargeting-Kampagnen geplant,
+    als Bulk-Datei übermittelt (37 Anlagen, nur SB „noch nicht“), Detail auf der Seite „Änderungen“, Datei geladen
+    (Blätter SP und SD, Werte wie im Guide), Handy ohne Überlauf, Konsole ohne Fehler der App. Testdaten gelöscht.
+  - **Offen bzw. bewusst so:** Erster echter Upload einer SD-Anlage steht aus (ob `Ad Group` mit `Bid Optimization`
+    beim Create angenommen wird und `exact-product` für Ansichten so passt; der Guide zeigt als Beispiel
+    `similar-product`). Vendor-Anzeigen von SD in der Spalte „ASIN“ sind eine Annahme. Kontextbezogene SD-Ziele ohne
+    Verfeinerungen (Preis, Sterne); keine Zielgruppen fremder Produkte (Ideen-Dokument C.2a nennt sie, F-S9 kommt
+    später). Kein Off-Amazon für SD (Einstellung von SP).
 
 ### 4.10 Setup für Sponsored Brands (F1)
 - [ ] Bausteine `SB-HEADER-KW`, `SB-VIDEO-KW`, `SB-PAT` im Blatt „SB Multi Ad Group Campaigns“: Kampagne, Ad Group, Anzeige
