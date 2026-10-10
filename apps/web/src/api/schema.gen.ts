@@ -6880,7 +6880,7 @@ export interface components {
             id: string;
             position: number;
             /** @enum {string} */
-            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "negative_keyword" | "negative_product_target" | "source_negative" | "portfolio";
+            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "audience_target" | "negative_keyword" | "negative_product_target" | "source_negative" | "portfolio";
             campaignRef: string;
             adGroupRef: string | null;
             payload: {

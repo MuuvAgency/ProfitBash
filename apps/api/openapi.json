@@ -6316,6 +6316,7 @@
               "product_ad",
               "keyword",
               "product_target",
+              "audience_target",
               "negative_keyword",
               "negative_product_target",
               "source_negative",
@@ -7494,9 +7495,7 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 365
+                            "type": "integer"
                           },
                           "bid": {
                             "type": "string",
@@ -8683,9 +8682,7 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 365
+                            "type": "integer"
                           },
                           "bid": {
                             "type": "string",
@@ -9254,9 +9251,7 @@
                             ]
                           },
                           "lookbackDays": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 365
+                            "type": "integer"
                           },
                           "bid": {
                             "type": "string",
