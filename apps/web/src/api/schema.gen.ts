@@ -5168,6 +5168,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/tools/portfolios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Portfolios eines Profils mit Zahl der Kampagnen, dazu angelegte, noch nicht importierte */
+        get: {
+            parameters: {
+                query: {
+                    profileId: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Portfolios. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PortfolioList"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Portfolio anlegen (Bulk-Datei, Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreatePortfolioRequest"];
+                };
+            };
+            responses: {
+                /** @description Übermittlung angelegt. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CreatePortfolioResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Name im Profil schon vergeben bzw. in Anlage. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/tools/catalog": {
         parameters: {
             query?: never;
@@ -6501,7 +6644,7 @@ export interface components {
             /** @enum {string} */
             channel: "api" | "bulk_file";
             /** @enum {string} */
-            kind: "changes" | "setup";
+            kind: "changes" | "setup" | "portfolio";
             /** @enum {string} */
             status: "pending" | "running" | "finished" | "failed";
             error: string | null;
@@ -6737,7 +6880,7 @@ export interface components {
             id: string;
             position: number;
             /** @enum {string} */
-            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "negative_keyword" | "negative_product_target" | "source_negative";
+            entityType: "campaign" | "placement" | "ad_group" | "product_ad" | "keyword" | "product_target" | "negative_keyword" | "negative_product_target" | "source_negative" | "portfolio";
             campaignRef: string;
             adGroupRef: string | null;
             payload: {
@@ -7132,6 +7275,8 @@ export interface components {
                 /** Format: uuid */
                 profileId: string;
                 /** Format: uuid */
+                portfolioId: string | null;
+                /** Format: uuid */
                 productGroupId: string | null;
                 presetKey: string;
                 name: string;
@@ -7161,6 +7306,8 @@ export interface components {
             id: string;
             /** Format: uuid */
             profileId: string;
+            /** Format: uuid */
+            portfolioId: string | null;
             /** Format: uuid */
             productGroupId: string | null;
             presetKey: string;
@@ -7413,6 +7560,11 @@ export interface components {
             }[];
             /** @default [] */
             sourceNegatives: components["schemas"]["SourceNegative"][];
+            /**
+             * Format: uuid
+             * @default null
+             */
+            portfolioId: string | null;
         };
         SubmitCampaignSetupResponse: {
             /** @enum {string} */
@@ -7425,6 +7577,57 @@ export interface components {
             /** @enum {string} */
             status: "rejected";
             issues: components["schemas"]["SetupIssue"][];
+        };
+        PortfolioList: {
+            portfolios: {
+                /** Format: uuid */
+                id: string;
+                amazonPortfolioId: string;
+                name: string | null;
+                state: string | null;
+                budgetAmount: string | null;
+                budgetCurrencyCode: string | null;
+                budgetPolicy: string | null;
+                budgetStartDate: string | null;
+                budgetEndDate: string | null;
+                campaigns: number;
+            }[];
+            pending: {
+                /** Format: uuid */
+                itemId: string;
+                /** Format: uuid */
+                submissionId: string;
+                name: string;
+                /** @enum {string} */
+                status: "submitted" | "applied";
+                budget: {
+                    amount: string;
+                    currencyCode: string;
+                    /** @enum {string} */
+                    policy: "dateRange" | "monthlyRecurring";
+                    startDate: string;
+                    endDate: string | null;
+                } | null;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
+        CreatePortfolioResponse: {
+            submission: components["schemas"]["AdChangeSubmission"];
+        };
+        CreatePortfolioRequest: {
+            /** Format: uuid */
+            profileId: string;
+            name: string;
+            budget: {
+                amount: string;
+                /** @enum {string} */
+                policy: "dateRange" | "monthlyRecurring";
+                /** Format: date */
+                startDate: string;
+                /** Format: date */
+                endDate: string | null;
+            } | null;
         };
         StructureCatalogResponse: {
             catalog: components["schemas"]["StructureCatalog"];

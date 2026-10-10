@@ -606,7 +606,7 @@ export function registerAdChangeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
           followUp,
         })),
         setupItems:
-          found.submission.kind === 'setup'
+          found.submission.kind !== 'changes'
             ? (await loadCampaignSetupItems(db, found.submission.id)).map(
                 ({ submissionId: _submission, ...item }) => ({
                   ...item,

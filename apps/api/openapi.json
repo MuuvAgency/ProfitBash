@@ -5217,7 +5217,8 @@
             "type": "string",
             "enum": [
               "changes",
-              "setup"
+              "setup",
+              "portfolio"
             ]
           },
           "status": {
@@ -6317,7 +6318,8 @@
               "product_target",
               "negative_keyword",
               "negative_product_target",
-              "source_negative"
+              "source_negative",
+              "portfolio"
             ]
           },
           "campaignRef": {
@@ -8079,6 +8081,13 @@
                   "type": "string",
                   "format": "uuid"
                 },
+                "portfolioId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
                 "productGroupId": {
                   "type": [
                     "string",
@@ -8159,6 +8168,7 @@
               "required": [
                 "id",
                 "profileId",
+                "portfolioId",
                 "productGroupId",
                 "presetKey",
                 "name",
@@ -8190,6 +8200,13 @@
           },
           "profileId": {
             "type": "string",
+            "format": "uuid"
+          },
+          "portfolioId": {
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uuid"
           },
           "productGroupId": {
@@ -8783,6 +8800,7 @@
         "required": [
           "id",
           "profileId",
+          "portfolioId",
           "productGroupId",
           "presetKey",
           "name",
@@ -9352,6 +9370,14 @@
             },
             "maxItems": 1000,
             "default": []
+          },
+          "portfolioId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "default": null
           }
         },
         "required": [
@@ -9422,6 +9448,228 @@
             ]
           }
         ]
+      },
+      "PortfolioList": {
+        "type": "object",
+        "properties": {
+          "portfolios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "amazonPortfolioId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetAmount": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetCurrencyCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetPolicy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetStartDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetEndDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "campaigns": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "amazonPortfolioId",
+                "name",
+                "state",
+                "budgetAmount",
+                "budgetCurrencyCode",
+                "budgetPolicy",
+                "budgetStartDate",
+                "budgetEndDate",
+                "campaigns"
+              ]
+            }
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "submissionId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "submitted",
+                    "applied"
+                  ]
+                },
+                "budget": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "amount": {
+                      "type": "string"
+                    },
+                    "currencyCode": {
+                      "type": "string"
+                    },
+                    "policy": {
+                      "type": "string",
+                      "enum": [
+                        "dateRange",
+                        "monthlyRecurring"
+                      ]
+                    },
+                    "startDate": {
+                      "type": "string"
+                    },
+                    "endDate": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "amount",
+                    "currencyCode",
+                    "policy",
+                    "startDate",
+                    "endDate"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "itemId",
+                "submissionId",
+                "name",
+                "status",
+                "budget",
+                "createdAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "portfolios",
+          "pending"
+        ]
+      },
+      "CreatePortfolioResponse": {
+        "type": "object",
+        "properties": {
+          "submission": {
+            "$ref": "#/components/schemas/AdChangeSubmission"
+          }
+        },
+        "required": [
+          "submission"
+        ]
+      },
+      "CreatePortfolioRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "budget": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "amount": {
+                "type": "string",
+                "pattern": "^\\d{1,7}(\\.\\d{1,2})?$"
+              },
+              "policy": {
+                "type": "string",
+                "enum": [
+                  "dateRange",
+                  "monthlyRecurring"
+                ]
+              },
+              "startDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "endDate": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              }
+            },
+            "required": [
+              "amount",
+              "policy",
+              "startDate",
+              "endDate"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "profileId",
+          "name",
+          "budget"
+        ],
+        "additionalProperties": false
       },
       "StructureCatalogResponse": {
         "type": "object",
@@ -14905,6 +15153,155 @@
           },
           "409": {
             "description": "Entwurf inzwischen geändert, schon übermittelt bzw. kein Kurs vorhanden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/tools/portfolios": {
+      "get": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Portfolios eines Profils mit Zahl der Kampagnen, dazu angelegte, noch nicht importierte",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portfolios.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Portfolio anlegen (Bulk-Datei, Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePortfolioRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Übermittlung angelegt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePortfolioResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name im Profil schon vergeben bzw. in Anlage.",
             "content": {
               "application/json": {
                 "schema": {

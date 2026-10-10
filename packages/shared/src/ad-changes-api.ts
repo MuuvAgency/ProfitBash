@@ -441,3 +441,9 @@ export const submitCampaignSetupResponseSchema = z
   ])
   .meta({ id: 'SubmitCampaignSetupResponse' });
 export type SubmitCampaignSetupResponse = z.infer<typeof submitCampaignSetupResponseSchema>;
+
+/** Portfolio angelegt (4.7): die Übermittlung per Bulk-Datei (Seite „Änderungen“). */
+export const createPortfolioResponseSchema = z
+  .object({ submission: adChangeSubmissionSchema })
+  .meta({ id: 'CreatePortfolioResponse' });
+export type CreatePortfolioResponse = z.infer<typeof createPortfolioResponseSchema>;

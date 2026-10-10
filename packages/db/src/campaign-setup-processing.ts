@@ -88,7 +88,8 @@ export async function getCampaignSetupSubmissionItems(
     db,
     and(
       eq(adChangeSubmissions.id, input.submissionId),
-      eq(adChangeSubmissions.kind, 'setup'),
+      // Anlagen eines Setups oder ein neues Portfolio (4.7).
+      inArray(adChangeSubmissions.kind, ['setup', 'portfolio']),
       inArray(adChangeSubmissions.profileId, scope.ids),
     ),
   );

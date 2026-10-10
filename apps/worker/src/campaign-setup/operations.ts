@@ -83,6 +83,16 @@ export function buildSetupOperations(
     }
     if (row.status !== 'submitted') continue;
 
+    if (payload.entity === 'portfolio') {
+      // Portfolios legt ProfitBash nur per Bulk-Datei an (4.7, F9); hierher kommen sie nicht.
+      result.rejected.push({
+        itemId: row.id,
+        code: 'PORTFOLIO_BULK_FILE_ONLY',
+        message: 'Portfolios werden nur per Bulk-Datei angelegt.',
+      });
+      continue;
+    }
+
     if (payload.entity === 'source_negative') {
       // Erst wenn das neue Ziel des Begriffs angelegt ist; ohne Ziel bliebe die Quelle ohne Ersatz.
       const term = setupTermKey(row)!;
@@ -138,7 +148,7 @@ export function buildSetupOperations(
             ? [{ placement: other.payload.placement, percentage: String(other.payload.percentage) }]
             : [],
         ),
-        amazonPortfolioId: null,
+        amazonPortfolioId: payload.amazonPortfolioId ?? null,
         offAmazon:
           context.countryCode === 'US'
             ? payload.offAmazon

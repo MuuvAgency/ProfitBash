@@ -271,4 +271,12 @@ describe('buildSetupOperations', () => {
       ]);
     });
   });
+
+  it('legt neue Kampagnen im Portfolio des Entwurfs an (4.7)', () => {
+    const result = buildSetupOperations(
+      [item({ ...campaignPayload, amazonPortfolioId: '7001' })],
+      context,
+    );
+    expect(result.operations[0]).toMatchObject({ entity: 'campaign', amazonPortfolioId: '7001' });
+  });
 });
