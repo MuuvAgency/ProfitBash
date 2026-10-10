@@ -286,6 +286,7 @@ describe('Setup über die API gegen den Mock-Anbieter (4.4)', () => {
           unlocks: {},
         },
         sourceNegatives: [],
+        portfolioId: null,
         campaigns: [
           {
             block: 'SP-KW-EXACT',

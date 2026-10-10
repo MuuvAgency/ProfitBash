@@ -20,6 +20,7 @@ import {
   adChangeSubmissions,
   amazonAdsAdGroups,
   amazonAdsCampaigns,
+  amazonAdsPortfolios,
   amazonAdsProfiles,
   amazonAdsTargetDailyMetrics,
   amazonAdsTargets,
@@ -54,6 +55,7 @@ export type CampaignSetupErrorCode =
   | 'NOT_DRAFT'
   | 'PROFILE_CHANGED'
   | 'PRODUCT_GROUP_MISMATCH'
+  | 'PORTFOLIO_MISMATCH'
   | 'UNKNOWN_PRESET'
   | 'PROFILE_HAS_NO_CONNECTION';
 
@@ -92,6 +94,7 @@ export interface CampaignSetupDraftRecord {
   inputs: SetupInputs;
   campaigns: PlannedCampaign[];
   sourceNegatives: SourceNegative[];
+  portfolioId: string | null;
   version: number;
   submissionId: string | null;
   createdBy: string | null;
@@ -122,6 +125,7 @@ const record = (row: typeof d.$inferSelect): CampaignSetupDraftRecord => ({
   inputs: row.inputs,
   campaigns: row.campaigns,
   sourceNegatives: row.sourceNegatives,
+  portfolioId: row.portfolioId,
   version: row.version,
   submissionId: row.submissionId,
   createdBy: row.createdBy,
@@ -178,6 +182,24 @@ async function checkDraftReferences(tx: Tx, orgId: string, draft: SaveCampaignSe
     }
     throw error;
   }
+  if (draft.portfolioId !== null) {
+    const [portfolio] = await tx
+      .select({ id: amazonAdsPortfolios.id })
+      .from(amazonAdsPortfolios)
+      .where(
+        and(
+          eq(amazonAdsPortfolios.id, draft.portfolioId),
+          eq(amazonAdsPortfolios.profileId, draft.profileId),
+          isNull(amazonAdsPortfolios.removedAt),
+        ),
+      );
+    if (!portfolio) {
+      throw new CampaignSetupError(
+        'PORTFOLIO_MISMATCH',
+        'Das Portfolio gehört nicht zu diesem Profil oder besteht nicht mehr.',
+      );
+    }
+  }
   if (draft.productGroupId === null) return;
   const [group] = await tx
     .select({ profileId: productGroups.profileId })
@@ -217,6 +239,7 @@ export async function saveCampaignSetupDraft(
       inputs: draft.inputs,
       campaigns: draft.campaigns,
       sourceNegatives: draft.sourceNegatives,
+      portfolioId: draft.portfolioId,
       updatedBy: input.userId,
     };
 
@@ -290,6 +313,7 @@ export async function listCampaignSetupDrafts(
       id: d.id,
       profileId: d.profileId,
       productGroupId: d.productGroupId,
+      portfolioId: d.portfolioId,
       presetKey: d.presetKey,
       name: d.name,
       status: d.status,
@@ -525,6 +549,21 @@ export async function submitCampaignSetupDraft(
         sql`select pg_advisory_xact_lock(hashtext(${`campaign-setup:${profile.id}`}))`,
       );
       const sourceNegatives = draft.sourceNegatives.filter((source) => source.selected);
+      // Portfolio des Entwurfs (4.7): muss im Profil noch bestehen; Kampagnen tragen seine Amazon-ID.
+      let amazonPortfolioId: string | null = null;
+      if (draft.portfolioId !== null) {
+        const [portfolio] = await tx
+          .select({ amazonId: amazonAdsPortfolios.amazonPortfolioId })
+          .from(amazonAdsPortfolios)
+          .where(
+            and(
+              eq(amazonAdsPortfolios.id, draft.portfolioId),
+              eq(amazonAdsPortfolios.profileId, profile.id),
+              isNull(amazonAdsPortfolios.removedAt),
+            ),
+          );
+        amazonPortfolioId = portfolio?.amazonId ?? null;
+      }
       const issues = reviewCampaignPlan({
         campaigns: draft.campaigns,
         profile,
@@ -537,6 +576,7 @@ export async function submitCampaignSetupDraft(
           profile.id,
           sourceNegatives.map((source) => source.amazonAdGroupId),
         ),
+        portfolioMissing: draft.portfolioId !== null && amazonPortfolioId === null,
       });
       if (issues.some((issue) => issue.severity === 'error')) throw new ReviewRejected(issues);
 
@@ -553,6 +593,7 @@ export async function submitCampaignSetupDraft(
       const specs = planSetupItems(draft.campaigns, {
         campaignState: draft.campaignState as CampaignSetupState,
         sourceNegatives,
+        amazonPortfolioId,
       });
       const now = new Date();
       for (let start = 0; start < specs.length; start += 1000) {

@@ -52,6 +52,7 @@ describe('planSetupItems', () => {
           currencyCode: 'EUR',
           biddingStrategy: 'SALES_DOWN_ONLY',
           offAmazon: false,
+          amazonPortfolioId: null,
         },
       },
       {
@@ -186,6 +187,7 @@ describe('planSetupItems', () => {
           currencyCode: 'EUR',
           biddingStrategy: null,
           offAmazon: false,
+          amazonPortfolioId: null,
         },
       },
     ]);
@@ -224,5 +226,12 @@ describe('planSetupItems', () => {
         },
       },
     ]);
+  });
+
+  it('setzt das Portfolio des Entwurfs an jede neue Kampagne (4.7)', () => {
+    const items = planSetupItems([sp], { campaignState: 'ENABLED', amazonPortfolioId: '7001' });
+    expect(items[0]!.payload).toMatchObject({ entity: 'campaign', amazonPortfolioId: '7001' });
+    const without = planSetupItems([sp], { campaignState: 'ENABLED' });
+    expect(without[0]!.payload).toMatchObject({ entity: 'campaign', amazonPortfolioId: null });
   });
 });

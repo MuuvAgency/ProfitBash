@@ -334,4 +334,10 @@ describe('reviewCampaignPlan', () => {
       ]);
     });
   });
+
+  it('sperrt ein Portfolio, das es im Profil nicht mehr gibt (4.7)', () => {
+    expect(reviewCampaignPlan(input({ portfolioMissing: true }))).toEqual([
+      { severity: 'error', code: 'portfolioMissing' },
+    ]);
+  });
 });

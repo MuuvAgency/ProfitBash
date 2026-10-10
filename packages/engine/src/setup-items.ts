@@ -39,7 +39,12 @@ const PLACEMENTS: readonly [
 
 export function planSetupItems(
   campaigns: readonly PlannedCampaign[],
-  options: { campaignState: CampaignSetupState; sourceNegatives?: readonly SourceNegative[] },
+  options: {
+    campaignState: CampaignSetupState;
+    sourceNegatives?: readonly SourceNegative[];
+    /** Bestehendes Portfolio des Entwurfs für alle neuen Kampagnen (4.7, F9). */
+    amazonPortfolioId?: string | null;
+  },
 ): SetupItemSpec[] {
   const items: SetupItemSpec[] = [];
   for (const campaign of campaigns) {
@@ -60,6 +65,7 @@ export function planSetupItems(
         currencyCode: campaign.currencyCode,
         biddingStrategy: campaign.biddingStrategy,
         offAmazon: campaign.offAmazon,
+        amazonPortfolioId: options.amazonPortfolioId ?? null,
       },
     });
     if (!supported) continue;

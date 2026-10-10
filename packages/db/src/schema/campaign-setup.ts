@@ -57,6 +57,11 @@ export const campaignSetupDrafts = pgTable(
       .$type<SourceNegative[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    /**
+     * Bestehendes Portfolio für alle neuen Kampagnen (4.7, F9), interne ID. Ohne Fremdschlüssel: Das Übermitteln
+     * prüft, ob es im Profil noch besteht.
+     */
+    portfolioId: uuid('portfolio_id'),
     /** Zählt jedes Speichern (gleichzeitige Änderungen enden mit 409). */
     version: integer('version').notNull().default(1),
     submissionId: uuid('submission_id'),
@@ -101,9 +106,8 @@ export const campaignSetupItems = pgTable(
     organizationId: organizationId(),
     profileId: uuid('profile_id').notNull(),
     submissionId: uuid('submission_id').notNull(),
-    draftId: uuid('draft_id')
-      .notNull()
-      .references(() => campaignSetupDrafts.id),
+    /** Leer nur bei Portfolios (4.7), die ohne Entwurf angelegt werden. */
+    draftId: uuid('draft_id').references(() => campaignSetupDrafts.id),
     /** Reihenfolge der Anlage (Eltern vor Kindern) und der Zeilen in der Bulk-Datei. */
     position: integer('position').notNull(),
     /** `CAMPAIGN_SETUP_ITEM_ENTITIES`. */
@@ -140,11 +144,15 @@ export const campaignSetupItems = pgTable(
     ),
     check(
       'campaign_setup_items_entity_type_ck',
-      sql`${t.entityType} in ('campaign', 'placement', 'ad_group', 'product_ad', 'keyword', 'product_target', 'negative_keyword', 'negative_product_target', 'source_negative')`,
+      sql`${t.entityType} in ('campaign', 'placement', 'ad_group', 'product_ad', 'keyword', 'product_target', 'negative_keyword', 'negative_product_target', 'source_negative', 'portfolio')`,
     ),
     check(
       'campaign_setup_items_parent_ck',
-      sql`(${t.entityType} in ('campaign', 'placement')) = (${t.adGroupRef} is null)`,
+      sql`(${t.entityType} in ('campaign', 'placement', 'portfolio')) = (${t.adGroupRef} is null)`,
+    ),
+    check(
+      'campaign_setup_items_draft_ck',
+      sql`(${t.entityType} = 'portfolio') = (${t.draftId} is null)`,
     ),
     index('campaign_setup_items_submission_idx').on(t.submissionId, t.position),
     // Offene Zeilen und angelegte ohne echte ID (Bestätigung durch den nächsten Bulk-Import).

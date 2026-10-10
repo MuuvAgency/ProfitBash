@@ -64,7 +64,7 @@ export const adChangeSubmissions = pgTable(
       foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
     }),
     check('ad_change_submissions_channel_ck', sql`${t.channel} in ('api', 'bulk_file')`),
-    check('ad_change_submissions_kind_ck', sql`${t.kind} in ('changes', 'setup')`),
+    check('ad_change_submissions_kind_ck', sql`${t.kind} in ('changes', 'setup', 'portfolio')`),
     check(
       'ad_change_submissions_status_ck',
       sql`${t.status} in ('pending', 'running', 'finished', 'failed')`,

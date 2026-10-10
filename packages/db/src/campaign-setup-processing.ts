@@ -10,6 +10,7 @@ import {
   amazonAdsAdGroups,
   amazonAdsCampaigns,
   amazonAdsNegativeTargets,
+  amazonAdsPortfolios,
   amazonAdsProductAds,
   amazonAdsProfiles,
   amazonAdsTargets,
@@ -216,7 +217,8 @@ export async function confirmCampaignSetupItems(
       and(
         eq(s.organizationId, input.organizationId),
         eq(s.profileId, input.profileId),
-        eq(s.kind, 'setup'),
+        // Portfolios (4.7) werden wie Setups über den Namen bestätigt.
+        inArray(s.kind, ['setup', 'portfolio']),
         eq(s.channel, 'bulk_file'),
         sql`(${s.status} in ('pending', 'running') or exists (select 1 from ${i} where ${i.submissionId} = ${s.id} and ${i.profileId} = ${input.profileId} and ${unresolved}))`,
       ),
@@ -276,6 +278,23 @@ export async function confirmCampaignSetupItems(
   for (const row of rows) {
     const campaignKey = key(row, null);
     const payload = row.payload;
+    if (payload.entity === 'portfolio') {
+      // Neues Portfolio (4.7): über den Namen im Profil (ohne Groß/Klein, nicht entfernt).
+      if (!pending(row)) continue;
+      const [portfolio] = await tx
+        .select({ amazonId: amazonAdsPortfolios.amazonPortfolioId })
+        .from(amazonAdsPortfolios)
+        .where(
+          and(
+            eq(amazonAdsPortfolios.profileId, input.profileId),
+            sql`lower(${amazonAdsPortfolios.name}) = ${lower(payload.name)}`,
+            isNull(amazonAdsPortfolios.removedAt),
+          ),
+        )
+        .limit(1);
+      if (portfolio) await apply(row, portfolio.amazonId);
+      continue;
+    }
     if (payload.entity === 'source_negative') {
       // Negativ in der Quelle (4.6): bestehende Ad Group über ihre echte ID.
       if (!pending(row)) continue;

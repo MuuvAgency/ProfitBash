@@ -278,8 +278,11 @@ export type AdChangeChannel = (typeof AD_CHANGE_CHANNELS)[number];
  */
 export const AD_CHANGE_SUBMISSION_STATUSES = ['pending', 'running', 'finished', 'failed'] as const;
 export type AdChangeSubmissionStatus = (typeof AD_CHANGE_SUBMISSION_STATUSES)[number];
-/** Art einer Übermittlung: Änderungen (Phase 3) oder Anlagen eines Setup-Entwurfs (Phase 4, 4.4). */
-export const AD_CHANGE_SUBMISSION_KINDS = ['changes', 'setup'] as const;
+/**
+ * Art einer Übermittlung: Änderungen (Phase 3), Anlagen eines Setup-Entwurfs (Phase 4, 4.4) oder ein neues Portfolio
+ * (4.7, nur Bulk-Datei).
+ */
+export const AD_CHANGE_SUBMISSION_KINDS = ['changes', 'setup', 'portfolio'] as const;
 export type AdChangeSubmissionKind = (typeof AD_CHANGE_SUBMISSION_KINDS)[number];
 
 /** Warum eine Änderung nicht in den Warenkorb kam. */
