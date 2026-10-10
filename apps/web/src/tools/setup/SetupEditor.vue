@@ -82,7 +82,21 @@ const sourceNegatives = ref<SourceNegativeData[]>(
 );
 /** Werbemittel für Sponsored Brands (4.10), ein Satz je Entwurf. */
 const creativeForm = ref<CreativeForm>(creativeToForm(props.draft?.inputs.creative));
-const creativeValid = computed(() => creativeFormIssues(creativeForm.value).length === 0);
+/** Nur sichtbare Felder zählen: ohne SB-Baustein keine Werbemittel, ohne Video-Baustein kein Video. */
+const creativeInput = () =>
+  sbBlocks.value.length === 0
+    ? null
+    : formToCreative({
+        ...creativeForm.value,
+        videoAssetId: needsVideo.value ? creativeForm.value.videoAssetId : '',
+      });
+const creativeValid = computed(
+  () =>
+    sbBlocks.value.length === 0 ||
+    creativeFormIssues(creativeForm.value).every(
+      (field) => field !== 'videoAssetId' || needsVideo.value,
+    ),
+);
 const useProfileBids = ref(true);
 /** Bestehendes Portfolio für alle neuen Kampagnen (4.7, F9); neue erst nach dem nächsten Import wählbar. */
 const portfolioId = ref<string | null>(props.draft?.portfolioId ?? null);
@@ -185,8 +199,15 @@ const canPlan = computed(
     presetKey.value &&
     harvestValid.value,
 );
+/** Freischaltungen nur für Bausteine, die sie kennen (SB-vCPM gibt es per Bulk-Datei nicht, 4.10). */
+const unlockInput = () =>
+  Object.fromEntries(
+    Object.entries(unlocks.value).filter(
+      ([key]) => props.catalog.blocks.find((block) => block.key === key)?.adProduct !== 'SB',
+    ),
+  );
 const currentInputs = () =>
-  textsToInputs(texts.value, unlocks.value, harvest.value, formToCreative(creativeForm.value));
+  textsToInputs(texts.value, unlockInput(), harvest.value, creativeInput());
 async function plan() {
   if (!canPlan.value || planMutation.isPending.value) return;
   planErrorKey.value = null;
@@ -263,7 +284,7 @@ const amountEdited = (campaignName: string) =>
 // „Braucht Werbemittel“ gilt nicht mehr, sobald welche eingetragen sind (4.10).
 const issues = computed(() =>
   groupedIssues(
-    formToCreative(creativeForm.value) === null
+    creativeInput() === null
       ? hints.value
       : hints.value.filter((hint) => hint.code !== 'needsCreative'),
   ),

@@ -388,6 +388,42 @@ describe('buildCampaignPlan: Dubletten und Leitplanken', () => {
     );
   });
 
+  it('schaltet vCPM bei SB nicht frei (Bulk-Datei ohne Kostenart) und meldet SB-Regeln schon beim Planen (4.10)', () => {
+    const plan = buildCampaignPlan(
+      base({
+        preset: onlyBlocks('SB-HEADER-KW', 'SB-VIDEO-KW'),
+        unlocks: { 'SB-VIDEO-KW': { vcpm: true } },
+        profile: {
+          countryCode: 'FR',
+          currencyCode: 'EUR',
+          accountType: 'seller',
+          clientName: null,
+        },
+        productGroup: {
+          name: 'Flaschen',
+          items: [
+            { asin: 'B0FLASCHE1', sku: 'A', isHero: true },
+            { asin: 'B0FLASCHE2', sku: 'B', isHero: false },
+          ],
+        },
+      }),
+    );
+    expect(one(plan.campaigns, 'SB-VIDEO-KW').costType).toBe('cpc');
+    expect(plan.hints).toEqual(
+      expect.arrayContaining([
+        { severity: 'error', code: 'sbVcpmNotAvailable', campaign: 'SB | VIDEO | Flaschen' },
+        {
+          severity: 'error',
+          code: 'sbCollectionAsins',
+          campaign: 'SB | HEADER | Flaschen',
+          count: 2,
+        },
+        { severity: 'error', code: 'sbVideoNotAvailable', campaign: 'SB | VIDEO | Flaschen' },
+      ]),
+    );
+    expect(plan.hints.map((hint) => hint.code)).not.toContain('vcpmUnlocked');
+  });
+
   it('nimmt Wettbewerber nur von der Liste des Clients (F-S9)', () => {
     const conquest = onlyBlocks('SP-PAT-CONQUEST');
     expect(buildCampaignPlan(base({ preset: conquest })).hints).toContainEqual({

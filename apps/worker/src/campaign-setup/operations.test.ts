@@ -438,11 +438,31 @@ describe('buildSetupOperations', () => {
       { ...campaignPayload, adProduct: 'SB', name: SB, biddingStrategy: null, brandEntityId: null },
       { campaignRef: SB, adGroupRef: null },
     );
-    const adGroup = item({ entity: 'ad_group', name: SB, defaultBid: '0.90' }, { campaignRef: SB, adGroupRef: SB });
+    const adGroup = item(
+      { entity: 'ad_group', name: SB, defaultBid: '0.90' },
+      { campaignRef: SB, adGroupRef: SB },
+    );
     const result = buildSetupOperations([campaign, adGroup], context);
     expect(result.operations).toEqual([]);
     expect(result.rejected).toEqual([
       expect.objectContaining({ itemId: campaign.id, code: 'SB_BULK_FILE_ONLY' }),
+      expect.objectContaining({ itemId: adGroup.id, code: 'PARENT_NOT_CREATED' }),
+    ]);
+  });
+
+  it('sendet Kinder einer schon angelegten SB-Kampagne nicht über die API', () => {
+    const SB = 'SB | HEADER | Flaschen';
+    const campaign = item(
+      { ...campaignPayload, adProduct: 'SB', name: SB, biddingStrategy: null, brandEntityId: null },
+      { campaignRef: SB, adGroupRef: null, status: 'applied', amazonEntityId: '4401' },
+    );
+    const adGroup = item(
+      { entity: 'ad_group', name: SB, defaultBid: '0.90' },
+      { campaignRef: SB, adGroupRef: SB },
+    );
+    const result = buildSetupOperations([campaign, adGroup], context);
+    expect(result.operations).toEqual([]);
+    expect(result.rejected).toEqual([
       expect.objectContaining({ itemId: adGroup.id, code: 'PARENT_NOT_CREATED' }),
     ]);
   });

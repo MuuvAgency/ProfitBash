@@ -88,6 +88,7 @@ describe('saveCampaignSetupDraftSchema', () => {
       categories: [],
       harvest: [],
       unlocks: {},
+      creative: null,
     });
     expect(parsed.sourceNegatives).toEqual([]);
   });

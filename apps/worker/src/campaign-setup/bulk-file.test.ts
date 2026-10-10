@@ -502,11 +502,62 @@ describe('buildSetupBulkFile', () => {
     expect(file.rows).toBe(4);
     const sheet = read(file.content!, 'SB Multi Ad Group Campaigns');
     expect(sheet.sheets).toEqual(['SB Multi Ad Group Campaigns']);
-    expect(sheet.rows.map((row) => row.Entity)).toEqual(['Campaign', 'Ad Group', 'Video ad', 'Keyword']);
-    expect(sheet.rows[0]).toMatchObject({ 'Brand Entity ID': 'ENTITY1', 'Bid Optimization': 'true' });
+    expect(sheet.rows.map((row) => row.Entity)).toEqual([
+      'Campaign',
+      'Ad Group',
+      'Video ad',
+      'Keyword',
+    ]);
+    expect(sheet.rows[0]).toMatchObject({
+      'Brand Entity ID': 'ENTITY1',
+      'Bid Optimization': 'true',
+    });
     expect(sheet.rows[2]).toMatchObject({
       'Landing Page URL': 'https://www.amazon.co.uk/dp/B0TEST0001',
       'Video Asset IDs': 'amzn1.assetlibrary.asset1.video:version_v1',
     });
+  });
+
+  it('schreibt bei Vendoren keine Marken-ID (Guide)', () => {
+    const SB = 'SB | HEADER | Flaschen';
+    const sb = { campaignRef: SB, adGroupRef: SB };
+    const file = buildSetupBulkFile(
+      [
+        item(
+          {
+            entity: 'campaign',
+            adProduct: 'SB',
+            name: SB,
+            targetingType: 'manual',
+            state: 'ENABLED',
+            dailyBudget: '15.00',
+            currencyCode: 'EUR',
+            biddingStrategy: null,
+            offAmazon: false,
+            brandEntityId: 'ENTITY1',
+          },
+          { campaignRef: SB, adGroupRef: null },
+        ),
+        item({ entity: 'ad_group', name: SB, defaultBid: '0.90' }, sb),
+        item(
+          {
+            entity: 'sb_ad',
+            format: 'collection',
+            name: SB,
+            brandName: 'Waldkauz',
+            brandEntityId: 'ENTITY1',
+            logoAssetId: null,
+            videoAssetId: null,
+            adTitle: null,
+            asins: ['B0TEST0001', 'B0TEST0002', 'B0TEST0003'],
+          },
+          sb,
+        ),
+      ],
+      { countryCode: 'DE', accountType: 'vendor', startDate: '2099-10-10' },
+    );
+    expect(file.skipped).toEqual([]);
+    const rows = read(file.content!, 'SB Multi Ad Group Campaigns').rows;
+    expect(rows.map((row) => row['Brand Entity ID'])).toEqual([undefined, undefined, undefined]);
   });
 });

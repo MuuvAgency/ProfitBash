@@ -127,7 +127,13 @@ export type PlanHint =
   | { severity: 'warning'; code: 'campaignNameExists'; campaign: string; existing: string }
   | { severity: 'warning'; code: 'keywordAlreadyExact'; keyword: string; existing: string }
   | { severity: 'warning'; code: 'vcpmUnlocked' | 'offAmazonUnlocked'; campaign: string }
-  | { severity: 'error'; code: 'vcpmNotAvailable' | 'offAmazonNotAvailable'; campaign: string }
+  | {
+      severity: 'error';
+      code:
+        'vcpmNotAvailable' | 'offAmazonNotAvailable' | 'sbVcpmNotAvailable' | 'sbVideoNotAvailable';
+      campaign: string;
+    }
+  | { severity: 'error'; code: 'sbCollectionAsins'; campaign: string; count: number }
   | {
       severity: 'error';
       code: 'bidOutOfRange' | 'budgetOutOfRange';
@@ -481,6 +487,9 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
       if (unlock.vcpm) {
         if (block.adProduct === 'SP')
           hint({ severity: 'error', code: 'vcpmNotAvailable', campaign: name });
+        // Das SB-Blatt der Bulk-Datei kennt keine Kostenart (4.10): SB bleibt CPC.
+        else if (block.adProduct === 'SB')
+          hint({ severity: 'error', code: 'sbVcpmNotAvailable', campaign: name });
         else {
           costType = 'vcpm';
           hint({ severity: 'warning', code: 'vcpmUnlocked', campaign: name });
@@ -496,8 +505,20 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
           hint({ severity: 'warning', code: 'offAmazonUnlocked', campaign: name });
         }
       }
-      if (block.adProduct === 'SB')
+      if (block.adProduct === 'SB') {
         hint({ severity: 'info', code: 'needsCreative', campaign: name });
+        // Wie die Prüfung beim Übermitteln (Guide): Kollektion mit 3–10 Produkten, Video nur in US, UK und DE.
+        const count = ads(block).length;
+        if (block.sbAdFormat === 'collection' && (count < 3 || count > 10)) {
+          hint({ severity: 'error', code: 'sbCollectionAsins', campaign: name, count });
+        }
+        if (
+          block.sbAdFormat === 'video' &&
+          !['US', 'UK', 'GB', 'DE'].includes(input.profile.countryCode)
+        ) {
+          hint({ severity: 'error', code: 'sbVideoNotAvailable', campaign: name });
+        }
+      }
 
       campaigns.push({
         block: block.key,
@@ -516,7 +537,8 @@ export function buildCampaignPlan(input: PlanInput): CampaignPlan {
           ...(entry.topOfSearch !== undefined && { topOfSearch: entry.topOfSearch }),
         },
         // Sponsored Brands: Anzeigenformat des Bausteins (4.10).
-        ...(block.adProduct === 'SB' && block.sbAdFormat !== null && { sbAdFormat: block.sbAdFormat }),
+        ...(block.adProduct === 'SB' &&
+          block.sbAdFormat !== null && { sbAdFormat: block.sbAdFormat }),
         adGroup: { name, defaultBid: defaultBid(block, entry) },
         ads: ads(block),
         targets: slot.targets,
