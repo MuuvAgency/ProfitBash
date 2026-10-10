@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b. Als Nächstes: 5.3.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3. Als Nächstes: 5.4.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -252,37 +252,38 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     ggf. die sichtbaren Profile über einen eigenen Endpunkt laden.
 
 ### 5.3 Ziele (`/ads/goals`, vorgezogen aus Phase 6, F4)
-- [ ] Tabelle Ziele: Organisation, Client, optional Profil oder Produktgruppe; Kennzahl `acos` oder `roas` (eins aus dem
+- [x] Tabelle Ziele: Organisation, Client, optional Profil oder Produktgruppe; Kennzahl `acos` oder `roas` (eins aus dem
       anderen gerechnet), Wert als Decimal-String. Vorrang: Produktgruppe vor Profil vor Client; Gleichstand siehe oben.
-- [ ] Engine: wirksames Ziel je Target bzw. Kampagne; Rechner Break-even-ACoS aus Preis, Kosten je Einheit und Gebühren
+- [x] Engine: wirksames Ziel je Target bzw. Kampagne; Rechner Break-even-ACoS aus Preis, Kosten je Einheit und Gebühren
       (von Hand, nur das übernommene Ziel wird gespeichert), Ziel-ACoS = Break-even minus gewünschte Marge.
-- [ ] API hinter `requireFeature('goals', …)`, Seite mit Liste je Client, Bearbeiten, Rechner im Dialog; TACoS und Wachstum
+- [x] API hinter `requireFeature('goals', …)`, Seite mit Liste je Client, Bearbeiten, Rechner im Dialog; TACoS und Wachstum
       als Hinweis „braucht Umsatzdaten (Phase 7)“. Navigation (`phase: 6` → 5) und Platzhaltertext anpassen.
 
-- **Stand (2026-10-10, in Arbeit, Branch `5.3-goals`):**
-  - **Fertig, mit Tests:** Engine `packages/engine/src/goals.ts` (`goalValues`: ACoS in Prozent ↔ ROAS = 100 / ACoS,
-    gesetzter Wert exakt, der andere auf zwei Stellen; `effectiveGoal`: Produktgruppe vor Profil vor Client, bei
-    mehreren Gruppen das strengste Ziel; `calculateTargetAcos`: Break-even = (Preis − Kosten − Gebühren) / Preis,
-    Ziel = Break-even − Marge, `null`, wenn nichts bleibt). Shared `packages/shared/src/goals.ts` (`GOAL_METRICS`,
-    `GOAL_SCOPES`, Grenzen ACoS über 0 bis 100 %, ROAS 1 bis 100, höchstens zwei Nachkommastellen, Komma erlaubt;
-    `setGoalRequestSchema`, `goalSchema`, `goalsOverviewSchema`, `targetAcosRequestSchema`/`…ResponseSchema`).
-  - **Entwurf für den Rest (Claude, noch nicht gebaut):**
-    - Tabelle `goals`: Organisation, genau eins von `client_id` | `profile_id` | `product_group_id` (Check), `metric`
-      (`acos` | `roas`), `value` (`numeric`), `created_by`/`updated_by`, Zeitstempel; je Ziel-Objekt höchstens ein Ziel
-      (Teil-Unique-Indizes); zusammengesetzte Fremdschlüssel auf Client und Profil (`ON DELETE CASCADE`), für
-      Produktgruppen dazu `unique (id, organization_id)` an `product_groups` ergänzen.
-    - `packages/db/src/goals.ts`: `getGoalsOverview` (über `listVisibleClientsAndProfiles`: Clients mit sichtbarem
-      Profil, Profile ohne Client, Produktgruppen der sichtbaren Profile, je mit Ziel), `setGoal` (Upsert je Ziel-Objekt,
-      nur sichtbare Objekte, Audit `goal.set` mit vorher/nachher), `deleteGoal` (Audit `goal.delete`). Tests: fremde
-      Organisation, ausgeblendetes Profil, Client ohne sichtbares Profil.
-    - API hinter `requireFeature('goals', …)`: `GET /ads/goals` (Übersicht, `view`), `PUT /ads/goals` (`write`),
-      `DELETE /ads/goals/{id}` (`write`), `POST /ads/goals/calculate` (Rechner auf dem Server, weil das Web kein
-      `decimal.js` hat, ADR 003; `view`). Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
-    - Seite `/ads/goals`: je Client eine Kachel mit Ziel des Clients, darunter Profile und Produktgruppen mit eigenem
-      oder geerbtem Ziel („gilt vom Client“), Bearbeiten im Dialog (ACoS oder ROAS, der andere Wert als Vorschau),
-      Rechner im Dialog („als Ziel übernehmen“ setzt den Ziel-ACoS), Hinweis TACoS/Wachstum „braucht Umsatzdaten
-      (Phase 7)“; Loading, Empty, Error. Navigation `goals`: `phase: 6` → 5, Platzhaltertext `placeholder…goals`
-      anpassen, Seite in `PAGES` (`router/index.ts`).
+
+- [x] Umsetzung (2026-10-10, Stand für 5.4 und später):
+  - **Engine** `packages/engine/src/goals.ts`: `goalValues` (ACoS in Prozent ↔ ROAS = 100 / ACoS, gesetzter Wert
+    exakt, der andere auf zwei Stellen), `effectiveGoal` (Produktgruppe vor Profil vor Client, bei mehreren Gruppen
+    das strengste Ziel), `calculateTargetAcos` (Break-even = (Preis − Kosten − Gebühren) / Preis, Ziel = Break-even −
+    Marge, `null`, wenn nichts bleibt). **Shared** `packages/shared/src/goals.ts`: `GOAL_METRICS`, `GOAL_SCOPES`,
+    Grenzen (ACoS über 0 bis 100 %, ROAS 1 bis 100, höchstens zwei Nachkommastellen, Komma erlaubt), Schemas.
+  - **Tabelle `goals`** (Migration `0038_goals`): genau eins von `client_id` | `profile_id` | `product_group_id`
+    (Check `num_nonnulls = 1`), `metric`, `value numeric(5,2)`, `created_by`/`updated_by`; je Objekt höchstens ein Ziel
+    (drei Unique-Indizes, NULL zählt nicht, zugleich Ziel des Upserts); zusammengesetzte Fremdschlüssel mit
+    `ON DELETE CASCADE`, dafür `product_groups_id_org_uq` ergänzt.
+  - **Zugriffe** `packages/db/src/goals.ts`: `getGoalsOverview`, `setGoal` (Upsert, Audit `goal.set` mit
+    vorher/nachher), `deleteGoal` (Audit `goal.delete`). Sichtbar heißt: Profil sichtbar, Produktgruppe an einem
+    sichtbaren Profil, Client mit mindestens einem sichtbaren Profil; sonst `GoalError` `NOT_FOUND`. Für 5.5/5.7 fehlt
+    noch eine Lesefunktion „Ziele eines Profils als `GoalSetting[]`“ für `effectiveGoal` (erst dort bauen).
+  - **API** `routes/goals.ts` hinter `requireFeature('goals', …)`: `GET /ads/goals` (`view`), `PUT /ads/goals`
+    (`write`), `DELETE /ads/goals/{id}` (`write`), `POST /ads/goals/calculate` (`view`, speichert nichts; auf dem
+    Server, weil das Web kein `decimal.js` hat, ADR 003). Fehler `GOAL_NOT_FOUND` (404).
+  - **Seite** `GoalsPage.vue`: je Client eine Kachel (Client, Profile, Produktgruppen), „Ohne Client“ getrennt, eigenes
+    oder geerbtes Ziel („gilt vom Client/Profil“), Dialog mit Kennzahl, Wert, Vorschau des anderen Werts (nur Anzeige),
+    Rechner („Als Ziel übernehmen“), „Ziel entfernen“ ohne Rückfrage (ein Ziel ist sofort wieder gesetzt); Hinweis
+    TACoS/Wachstum. Navigation `goals` in Phase 5.
+  - **OpenAPI:** `goalSchema.nullable()` machte die Komponente `Goal` selbst nullable; deshalb
+    `z.union([goalSchema, z.null()])`.
+  - Browser-Pane geprüft (1440 px und Handy, Rechner, Übernehmen, Speichern, Vererbung), Testdaten entfernt.
 
 ### 5.4 Leitplanken und Automations-Einstellungen (`packages/shared`, `packages/db`, `apps/api`, `apps/web`)
 - [ ] Einstellungen je Organisation mit eigenen Startwerten, je Client überschreibbar (F-S6): höchste Gebotsänderung je
