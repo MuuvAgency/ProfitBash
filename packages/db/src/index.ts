@@ -7,6 +7,7 @@ export * from './amazon-ads-brands';
 export * from './amazon-ads-entities';
 export * from './amazon-ads-metrics';
 export * from './entity-period-metrics';
+export * from './notifications';
 export * from './amazon-requests';
 export * from './audit';
 export * from './connection-leases';
