@@ -97,6 +97,21 @@ const rows = () =>
     .orderBy(asc(fileImports.createdAt));
 
 describe('importProfileFiles', () => {
+  it('plant nach einer Datei mit Kennzahlen den Lauf der Automatik ein, sonst nicht (5.7)', async () => {
+    const runs: unknown[] = [];
+    const enqueueAutomationRun = async (job: unknown) => {
+      runs.push(job);
+    };
+    await upload('bulk', 'ohne.xlsx');
+    await run({ bulk: async () => ({ campaigns: 3 }) }, { enqueueAutomationRun }).result;
+    expect(runs).toEqual([]);
+
+    await upload('bulk', 'mit.xlsx');
+    await run({ bulk: async () => ({ campaigns: 3, entityMetrics: 12 }) }, { enqueueAutomationRun })
+      .result;
+    expect(runs).toEqual([{ organizationId: ids.org, profileId: ids.profile }]);
+  });
+
   it('importiert alle offenen Dateien des Profils nacheinander und summiert die Zähler', async () => {
     await upload('bulk', 'bulk.xlsx', 'bulk-inhalt');
     await upload('daily_report', 'bericht.csv', 'bericht-inhalt');

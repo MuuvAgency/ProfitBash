@@ -36,6 +36,12 @@ export const NOTIFICATIONS_CHECK_QUEUE = 'notifications-check';
 export const FILE_IMPORT_QUEUE = 'file-import';
 /** Auslöser alle 10 Min.: plant `file-import` für Profile mit wartenden oder hängenden Dateien ein (nach Absturz, Deploy). */
 export const FILE_IMPORT_SWEEP_QUEUE = 'file-import-all';
+/**
+ * Lauf der Automatik je Profil (5.7), `singletonKey` = Profil-ID. Eingeplant nach jedem Import mit Kennzahlen und
+ * täglich über `automation-run-all`; ohne neue Daten oder Einstellungen tut der Lauf nichts.
+ */
+export const AUTOMATION_RUN_QUEUE = 'automation-run';
+export const AUTOMATION_RUN_ALL_QUEUE = 'automation-run-all';
 /** EZB-Kurse, plattformweit (2.2). Die EZB veröffentlicht gegen 16:00; der Lauf holt den Vortag. */
 export const FX_RATES_QUEUE = 'fx-rates-sync';
 /** Nach einem Fehlschlag neuer Versuch nach einer Stunde, höchstens so oft (danach am nächsten Morgen). */
@@ -60,6 +66,8 @@ export const SCHEDULES = [
   { queue: FILE_IMPORT_SWEEP_QUEUE, cron: '*/10 * * * *' },
   // Nach den Syncs am Morgen, vor dem Arbeitsbeginn.
   { queue: NOTIFICATIONS_CHECK_QUEUE, cron: '0 7 * * *', tz: 'Europe/Berlin' },
+  // Nach den EZB-Kursen (06:00): fängt geänderte Regeln, Ziele und Einstellungen ein.
+  { queue: AUTOMATION_RUN_ALL_QUEUE, cron: '30 7 * * *', tz: 'Europe/Berlin' },
 ] as const;
 
 /** So lange darf ein Job laufen, bevor pg-boss ihn als abgelaufen führt. */
@@ -80,6 +88,8 @@ const ALL_QUEUES = [
   FX_RATES_QUEUE,
   FILE_IMPORT_QUEUE,
   FILE_IMPORT_SWEEP_QUEUE,
+  AUTOMATION_RUN_QUEUE,
+  AUTOMATION_RUN_ALL_QUEUE,
 ];
 
 /**
@@ -133,6 +143,8 @@ export interface JobQueue {
 }
 
 export interface ConnectionJobQueue extends JobQueue {
+  /** Liefert `false`, wenn für das Profil schon ein Lauf der Automatik wartet. */
+  enqueueAutomationRun(job: FileImportJob): Promise<boolean>;
   /** Liefert `false`, wenn für die Connection schon ein Job wartet. */
   enqueueConnectionJob(
     queue: ConnectionQueue,
@@ -164,6 +176,14 @@ export function createJobQueue(boss: PgBoss): ConnectionJobQueue {
           singletonKey: job.profileId,
           ...(options.tx && { db: fromDrizzle(options.tx, sql) }),
         },
+      );
+      return id !== null;
+    },
+    async enqueueAutomationRun(job) {
+      const id = await boss.send(
+        AUTOMATION_RUN_QUEUE,
+        { organizationId: job.organizationId, profileId: job.profileId },
+        { singletonKey: job.profileId },
       );
       return id !== null;
     },

@@ -30,6 +30,7 @@ export function notificationTexts(notification: Notification): { title: string; 
     where: where || t('notifications.submission'),
     applied: num('applied'),
     failed: num('failed'),
+    // `{count}` liefert vue-i18n aus dem Plural; ein eigener Parameter `count` überschriebe ihn.
     days: num('days'),
     account: str('account') || t('notifications.thisConnection'),
   };
@@ -38,6 +39,8 @@ export function notificationTexts(notification: Notification): { title: string; 
       ? num('failed')
       : kind === 'submission_finished'
         ? num('applied')
-        : num('days');
+        : kind === 'automation_proposals'
+          ? num('count')
+          : num('days');
   return { title: t(`${key}.title`), text: t(`${key}.text`, named, plural) };
 }

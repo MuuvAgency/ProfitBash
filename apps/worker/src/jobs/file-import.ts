@@ -65,6 +65,8 @@ export interface FileImportJobDeps {
   now: () => Date;
   /** Plant den nächsten Lauf für das Profil ein (nach dem Zeitbudget). */
   enqueueFollowUp: (job: FileImportJobData) => Promise<void>;
+  /** Plant den Lauf der Automatik ein, wenn eine Datei Kennzahlen gebracht hat (`phase-5.md` 5.7). */
+  enqueueAutomationRun?: (job: FileImportJobData) => Promise<void>;
 }
 
 function publicReason(error: unknown): string | null {
@@ -168,6 +170,8 @@ export async function importProfileFiles(
         add(result.counters);
       }
 
+      // Neue Kennzahlen sind der Takt der Automatik (auch wenn daneben eine andere Datei gescheitert ist).
+      if ((counters.entityMetrics ?? 0) > 0) await deps.enqueueAutomationRun?.(job);
       if (counters.filesFailed! > 0) {
         throw new JobFailure(
           `${counters.filesFailed} von ${counters.files} Dateien nicht importiert.`,
