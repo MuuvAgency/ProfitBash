@@ -156,6 +156,20 @@ describe('Prüfung eines geänderten Katalogs', () => {
     const missing = clone();
     missing.blocks.find((block) => block.key === 'SD-RT-VIEWS')!.lookbackDays = null;
     expect(found(missing)).toContainEqual({ issue: 'audienceNeedsLookback', key: 'SD-RT-VIEWS' });
+    // Amazon nimmt für Zielgruppen nur diese Rückblicke an (SD-v3-Spec, `TargetingPredicateNested`, 4.9).
+    const days = clone();
+    days.blocks.find((block) => block.key === 'SD-RT-VIEWS')!.lookbackDays = 45;
+    days.presets[0]!.blocks.push({ block: 'SD-RT-PURCHASE', lookbackDays: 120 });
+    expect(found(days)).toEqual(
+      expect.arrayContaining([
+        { issue: 'lookbackNotAllowed', key: 'SD-RT-VIEWS' },
+        { issue: 'presetLookbackNotAllowed', preset: 'muuv-standard', block: 'SD-RT-PURCHASE' },
+      ]),
+    );
+    // „Ähnlich wie“ (erweitert) gibt es nur bei Sponsored Products.
+    const expanded = clone();
+    expanded.blocks.find((block) => block.key === 'SD-PAT')!.productMatch = 'expanded';
+    expect(found(expanded)).toContainEqual({ issue: 'expandedOnlySp', key: 'SD-PAT' });
     const kind = clone();
     kind.blocks.find((block) => block.key === 'SD-RT-VIEWS')!.audience = null;
     kind.blocks[0]!.audience = 'views';

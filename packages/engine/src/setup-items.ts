@@ -13,8 +13,10 @@ import type {
  * vor Kindern. Kampagne und Ad Group tragen ihren Namen als vorläufige Text-ID (Bulk-Datei); über den Namen ordnet der
  * nächste Bulk-Import die echten IDs zu.
  *
- * Phase 4 legt zuerst nur Sponsored Products an (F1): SB- und SD-Kampagnen erscheinen als Kampagne mit
- * `supported: false` (die Übermittlung meldet sie als nicht angelegt) und ohne Kinder.
+ * Sponsored Products und seit 4.9 Sponsored Display (F1): SD-Kampagnen tragen ihre Taktik (Zielgruppen bzw.
+ * kontextbezogen) und Kostenart, die Ad Group die Gebotsoptimierung (`reach` nur mit freigeschaltetem vCPM),
+ * Zielgruppen werden zu `audience_target`. SB-Kampagnen erscheinen als Kampagne mit `supported: false` (die
+ * Übermittlung meldet sie als nicht angelegt) und ohne Kinder (4.10).
  *
  * Gewählte Negatives in der Quelle eines Harvest-Begriffs (4.6, F7) stehen am Ende: Sie gehören zu bestehenden
  * Kampagnen und nennen deren echte IDs; `campaignRef` und `adGroupRef` sind dort nur die Namen zur Anzeige.
@@ -48,7 +50,8 @@ export function planSetupItems(
 ): SetupItemSpec[] {
   const items: SetupItemSpec[] = [];
   for (const campaign of campaigns) {
-    const supported = campaign.adProduct === 'SP';
+    const supported = campaign.adProduct !== 'SB';
+    const sd = campaign.adProduct === 'SD';
     const campaignRef = campaign.name;
     items.push({
       entityType: 'campaign',
@@ -66,6 +69,10 @@ export function planSetupItems(
         biddingStrategy: campaign.biddingStrategy,
         offAmazon: campaign.offAmazon,
         amazonPortfolioId: options.amazonPortfolioId ?? null,
+        ...(sd && {
+          sdTactic: campaign.targeting === 'audience' ? 'audience' : 'contextual',
+          costType: campaign.costType,
+        }),
       },
     });
     if (!supported) continue;
@@ -84,6 +91,10 @@ export function planSetupItems(
       entity: 'ad_group',
       name: campaign.adGroup.name,
       defaultBid: campaign.adGroup.defaultBid,
+      ...(sd && {
+        bidOptimization:
+          campaign.costType === 'vcpm' ? 'reach' : (campaign.sdOptimization ?? 'clicks'),
+      }),
     });
     for (const ad of campaign.ads) child({ entity: 'product_ad', asin: ad.asin, sku: ad.sku });
     for (const target of campaign.targets) {
@@ -114,7 +125,12 @@ export function planSetupItems(
           });
           break;
         case 'audience':
-          // Zielgruppen gibt es nur bei Sponsored Display (4.9).
+          child({
+            entity: 'audience_target',
+            audience: target.audience,
+            lookbackDays: target.lookbackDays,
+            bid: target.bid,
+          });
           break;
       }
     }

@@ -17,7 +17,7 @@ import { comparableSearchTerm, createProtectedTermMatcher } from './search-terms
  * - `error` sperrt das Übermitteln: Name im Profil oder im Plan schon vergeben, Name ungültig, Grenzen von Amazon,
  *   Keyword zu lang, fehlende Anzeige, SKU oder Ziele, fremde Währung, Leitplanken nach F-S7 verletzt.
  * - `warning`: Keyword schon exakt gebucht, Off-Amazon freigeschaltet.
- * - `info`: Off-Amazon nur in den USA einstellbar; SB und SD legt Phase 4 erst mit 4.9/4.10 an.
+ * - `info`: Off-Amazon nur in den USA einstellbar; SB legt Phase 4 erst mit 4.10 an (SD seit 4.9).
  *
  * Gewählte Negatives in der Quelle (4.6, F7): Die Ad Group der Quelle muss als SP-Ad-Group im Profil bestehen,
  * geschützte Begriffe sperren (der Vorschlag nennt sie nie, ein geänderter Entwurf könnte es), Dubletten auch, und
@@ -58,7 +58,12 @@ export type PlanReviewIssue =
       campaign: string;
     }
   | { severity: 'error'; code: 'adGroupNameInvalid'; campaign: string; issue: string }
-  | { severity: 'error'; code: 'duplicateTarget'; campaign: string; target: string }
+  | {
+      severity: 'error';
+      code: 'duplicateTarget' | 'expandedNotAvailable';
+      campaign: string;
+      target: string;
+    }
   | { severity: 'error'; code: 'missingSku'; asin: string }
   | { severity: 'error'; code: 'portfolioMissing' }
   | {
@@ -159,11 +164,12 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
         }
       }
     }
-    if (campaign.adProduct !== 'SP')
+    if (campaign.adProduct === 'SB')
       add({ severity: 'info', code: 'adProductLater', campaign: name });
 
     if (campaign.ads.length === 0) add({ severity: 'error', code: 'noAds', campaign: name });
-    if (campaign.adProduct === 'SP' && input.profile.accountType === 'seller') {
+    // SP und SD bewerben bei Sellern über die SKU (SB über die ASIN).
+    if (campaign.adProduct !== 'SB' && input.profile.accountType === 'seller') {
       for (const ad of campaign.ads) {
         if (ad.sku === null) add({ severity: 'error', code: 'missingSku', asin: ad.asin });
       }
@@ -204,6 +210,10 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     for (const target of campaign.targets) check('bid', target.bid);
 
     for (const target of campaign.targets) {
+      // `asin-expanded` gibt es nur bei Sponsored Products (Bulk-Guides, SD-Spec ohne „expanded“).
+      if (target.type === 'product' && target.match === 'expanded' && campaign.adProduct !== 'SP') {
+        add({ severity: 'error', code: 'expandedNotAvailable', campaign: name, target: target.asin });
+      }
       if (target.type !== 'keyword') continue;
       if (tooLong(target.text, MAX_WORDS.keyword)) {
         add({ severity: 'error', code: 'keywordTooLong', keyword: target.text });

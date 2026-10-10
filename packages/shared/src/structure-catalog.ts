@@ -29,6 +29,9 @@ export const BLOCK_BIDDING_STRATEGIES = ['SALES_DOWN_ONLY', 'SALES_UP_AND_DOWN',
 export const BLOCK_SD_OPTIMIZATIONS = ['clicks', 'conversions'] as const;
 /** Zielgruppe von SD-Retargeting: wer die eigenen Produkte angesehen bzw. gekauft hat. */
 export const BLOCK_AUDIENCES = ['views', 'purchases'] as const;
+/** Rückblicke, die Amazon für Zielgruppen annimmt (SD-v3-Spec, `TargetingPredicateNested`, geprüft 2026-10-10). */
+export const SD_LOOKBACK_DAYS = [7, 14, 30, 60, 90, 180, 365] as const;
+const lookbackAllowed = (days: number) => (SD_LOOKBACK_DAYS as readonly number[]).includes(days);
 
 /** Platzhalter des Namensschemas. */
 export const NAMING_PLACEHOLDERS = [
@@ -209,6 +212,12 @@ export const structureCatalogSchema = z
       if (block.targeting === 'audience' && block.lookbackDays === null) {
         add('audienceNeedsLookback', { key });
       }
+      if (block.lookbackDays !== null && !lookbackAllowed(block.lookbackDays)) {
+        add('lookbackNotAllowed', { key });
+      }
+      // „Ähnlich wie“ (`asin-expanded`) kennen nur Sponsored Products.
+      if (block.productMatch === 'expanded' && block.adProduct !== 'SP')
+        add('expandedOnlySp', { key });
       if ((block.audience !== null) !== (block.targeting === 'audience')) {
         add('audienceKind', { key });
       }
@@ -242,6 +251,9 @@ export const structureCatalogSchema = z
         }
         if (block && entry.lookbackDays !== undefined && block.targeting !== 'audience') {
           add('presetLookbackWithoutAudience', params);
+        }
+        if (entry.lookbackDays !== undefined && !lookbackAllowed(entry.lookbackDays)) {
+          add('presetLookbackNotAllowed', params);
         }
       }
     }
