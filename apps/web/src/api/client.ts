@@ -40,6 +40,8 @@ export type GoalData = Schemas['Goal'];
 export type GoalsOverviewData = Schemas['GoalsOverview'];
 export type TargetAcosData = Schemas['TargetAcosResponse'];
 export type AutomationSettingsData = Schemas['AutomationSettings'];
+export type AutomationRulesData = Schemas['AutomationRulesResponse'];
+export type AutomationRulesPreviewData = Schemas['AutomationRulesPreview'];
 export type NotificationData = Schemas['Notification'];
 export type NotificationListData = Schemas['NotificationListResponse'];
 export type NotificationListQueryInput = NonNullable<
@@ -443,6 +445,14 @@ export function createApi(options: ApiOptions = {}) {
             body: input,
           }),
         ),
+      /** Regeln (5.6a/5.6b): ganze Liste mit `version`, 409 bei Konflikt. */
+      rules: (): Promise<AutomationRulesData> => unwrap(client.GET('/api/ads/automations/rules')),
+      saveRules: (input: Schemas['SaveAutomationRulesRequest']): Promise<AutomationRulesData> =>
+        unwrap(client.PUT('/api/ads/automations/rules', { body: input })),
+      previewRules: (
+        input: Schemas['PreviewAutomationRulesRequest'],
+      ): Promise<AutomationRulesPreviewData> =>
+        unwrap(client.POST('/api/ads/automations/rules/preview', { body: input })),
     },
 
     /** Benachrichtigungen (5.2a/5.2b), für alle Mitglieder; neueste zuerst, Seiten über `before`. */

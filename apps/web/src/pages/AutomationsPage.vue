@@ -8,6 +8,7 @@ import { useI18n } from 'vue-i18n';
 import { api, ApiError } from '../api';
 import type { AutomationSettingsData } from '../api/client';
 import GuardrailFields from '../automations/GuardrailFields.vue';
+import RulesTab from '../automations/RulesTab.vue';
 import {
   parseGuardrailInputs,
   toGuardrailInputs,
@@ -20,8 +21,8 @@ import { errorMessageKey } from '../i18n';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
 
 /**
- * Seite „Automationen & Regeln“ (`phase-5.md` 5.4): Gerüst mit dem Tab „Einstellungen“ (Leitplanken der
- * Organisation, je Client Modus, zuständiger Nutzer und überschriebene Werte). Weitere Tabs folgen (5.6b, 5.8, 5.10).
+ * Seite „Automationen & Regeln“ (`phase-5.md` 5.4, 5.6b): Tabs „Einstellungen“ (Leitplanken der Organisation, je
+ * Client Modus, zuständiger Nutzer und überschriebene Werte) und „Regeln“. Weitere Tabs folgen (5.8, 5.10).
  */
 const { t } = useI18n();
 const id = useId();
@@ -30,9 +31,14 @@ const orgId = useActiveOrgId();
 const queryClient = useQueryClient();
 const canWrite = computed(() => session.me?.features.automations.write ?? false);
 
-// shortcut: ein Tab, deshalb ohne Pfeiltasten; mit dem zweiten Tab (5.6b) wie im Katalog (`moveTab`).
-const TABS = ['settings'] as const;
+const TABS = ['settings', 'rules'] as const;
 const tab = ref<(typeof TABS)[number]>('settings');
+const tabId = (name: string) => `${id}-tab-${name}`;
+function moveTab(step: number) {
+  const next = TABS[(TABS.indexOf(tab.value) + step + TABS.length) % TABS.length]!;
+  tab.value = next;
+  document.getElementById(tabId(next))?.focus();
+}
 
 const queryKey = computed(() => ['automation-settings', orgId.value] as const);
 const settingsQuery = useQuery({
@@ -124,17 +130,30 @@ async function submitClient() {
       :description="t('automations.description')"
     />
 
-    <div role="tablist" :aria-label="t('automations.title')" class="flex gap-space-xs">
+    <div
+      role="tablist"
+      :aria-label="t('automations.title')"
+      class="flex gap-space-xs overflow-x-auto"
+    >
       <button
         v-for="name in TABS"
-        :id="`${id}-tab-${name}`"
+        :id="tabId(name)"
         :key="name"
         type="button"
         role="tab"
+        :data-automation-tab="name"
         :aria-controls="`${id}-panel`"
         :aria-selected="tab === name"
-        class="whitespace-nowrap rounded-control bg-violet-wash px-space-md py-space-sm text-body-md font-semibold text-violet outline-none focus-visible:ring-2 focus-visible:ring-violet"
+        :tabindex="tab === name ? 0 : -1"
+        :class="[
+          'whitespace-nowrap rounded-control px-space-md py-space-sm text-body-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-violet',
+          tab === name
+            ? 'bg-violet-wash font-semibold text-violet'
+            : 'text-ink-secondary hover:bg-violet-wash hover:text-ink',
+        ]"
         @click="tab = name"
+        @keydown.right.prevent="moveTab(1)"
+        @keydown.left.prevent="moveTab(-1)"
       >
         {{ t(`automations.tabs.${name}`) }}
       </button>
@@ -143,102 +162,110 @@ async function submitClient() {
     <div
       :id="`${id}-panel`"
       role="tabpanel"
-      :aria-labelledby="`${id}-tab-${tab}`"
+      :aria-labelledby="tabId(tab)"
       class="flex flex-col gap-gutter"
     >
-      <InlineError
-        v-if="settingsQuery.isError.value"
-        :message="t('automations.loadFailed')"
-        retryable
-        :retrying="settingsQuery.isFetching.value"
-        @retry="settingsQuery.refetch()"
-      />
-      <SkeletonBlock v-else-if="!data" shape="tile" height="20rem" />
+      <!-- KeepAlive: Der ungespeicherte Entwurf der Regeln übersteht den Wechsel des Tabs. -->
+      <KeepAlive>
+        <RulesTab v-if="tab === 'rules'" :clients="data?.clients" :can-write="canWrite" />
+      </KeepAlive>
+      <template v-if="tab === 'settings'">
+        <InlineError
+          v-if="settingsQuery.isError.value"
+          :message="t('automations.loadFailed')"
+          retryable
+          :retrying="settingsQuery.isFetching.value"
+          @retry="settingsQuery.refetch()"
+        />
+        <SkeletonBlock v-else-if="!data" shape="tile" height="20rem" />
 
-      <template v-else>
-        <section
-          class="flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
-        >
-          <div class="flex flex-col gap-space-xs">
-            <h2 class="text-headline-sm text-ink">{{ t('automations.defaults.title') }}</h2>
-            <p class="max-w-prose text-body-sm text-ink-secondary">
-              {{ t('automations.defaults.text') }}
-              <template v-if="!canEditDefaults">{{ t('automations.defaults.adminOnly') }}</template>
-            </p>
-          </div>
-          <form
-            class="flex flex-col gap-space-md"
-            @submit.prevent="submitDefaults"
-            @input="saveDefaults.reset()"
+        <template v-else>
+          <section
+            class="flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
           >
-            <InlineError
-              v-if="saveDefaults.isError.value"
-              :message="t(failure(saveDefaults.error.value))"
-            />
-            <GuardrailFields
-              v-model="defaults"
-              form="defaults"
-              :invalid="parsedDefaults.invalid"
-              :disabled="!canEditDefaults"
-            />
-            <div v-if="canEditDefaults" class="flex items-center gap-space-md">
-              <Button
-                type="submit"
-                data-defaults-save
-                :label="t('common.save')"
-                :loading="saveDefaults.isPending.value"
-                :disabled="parsedDefaults.value === null"
-              />
-              <span
-                v-if="saveDefaults.isSuccess.value"
-                class="text-body-sm text-ink-secondary"
-                aria-live="polite"
-              >
-                {{ t('automations.defaults.saved') }}
-              </span>
+            <div class="flex flex-col gap-space-xs">
+              <h2 class="text-headline-sm text-ink">{{ t('automations.defaults.title') }}</h2>
+              <p class="max-w-prose text-body-sm text-ink-secondary">
+                {{ t('automations.defaults.text') }}
+                <template v-if="!canEditDefaults">{{
+                  t('automations.defaults.adminOnly')
+                }}</template>
+              </p>
             </div>
-          </form>
-        </section>
-
-        <section
-          class="flex min-w-0 flex-col gap-space-sm rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
-        >
-          <h2 class="text-headline-sm text-ink">{{ t('automations.clients.title') }}</h2>
-          <p class="max-w-prose text-body-sm text-ink-secondary">
-            {{ t('automations.clients.text') }}
-          </p>
-          <p v-if="data.clients.length === 0" class="text-body-md text-ink-secondary">
-            {{ t('automations.clients.empty') }}
-          </p>
-          <ul v-else class="flex flex-col">
-            <li
-              v-for="row in data.clients"
-              :key="row.id"
-              :data-client-row="row.id"
-              class="flex flex-wrap items-center gap-x-space-md gap-y-space-xs border-b border-line py-space-sm last:border-b-0"
+            <form
+              class="flex flex-col gap-space-md"
+              @submit.prevent="submitDefaults"
+              @input="saveDefaults.reset()"
             >
-              <span class="min-w-0 flex-1 basis-48 truncate text-body-md text-ink">
-                {{ row.name }}
-              </span>
-              <span class="text-body-sm text-ink-secondary">
-                {{ t(`automations.mode.${row.mode}.label`) }}
-                <template v-if="row.mode === 'cart' && memberName(row.responsibleUserId)">
-                  · {{ memberName(row.responsibleUserId) }}
-                </template>
-                · {{ t('automations.clients.overrides', Object.keys(row.overrides).length) }}
-              </span>
-              <Button
-                v-if="canWrite"
-                icon="pi pi-pencil"
-                severity="secondary"
-                variant="text"
-                size="small"
-                :aria-label="t('automations.client.action', { name: row.name })"
-                @click="openClient(row)"
+              <InlineError
+                v-if="saveDefaults.isError.value"
+                :message="t(failure(saveDefaults.error.value))"
               />
-            </li>
-          </ul>
-        </section>
+              <GuardrailFields
+                v-model="defaults"
+                form="defaults"
+                :invalid="parsedDefaults.invalid"
+                :disabled="!canEditDefaults"
+              />
+              <div v-if="canEditDefaults" class="flex items-center gap-space-md">
+                <Button
+                  type="submit"
+                  data-defaults-save
+                  :label="t('common.save')"
+                  :loading="saveDefaults.isPending.value"
+                  :disabled="parsedDefaults.value === null"
+                />
+                <span
+                  v-if="saveDefaults.isSuccess.value"
+                  class="text-body-sm text-ink-secondary"
+                  aria-live="polite"
+                >
+                  {{ t('automations.defaults.saved') }}
+                </span>
+              </div>
+            </form>
+          </section>
+
+          <section
+            class="flex min-w-0 flex-col gap-space-sm rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
+          >
+            <h2 class="text-headline-sm text-ink">{{ t('automations.clients.title') }}</h2>
+            <p class="max-w-prose text-body-sm text-ink-secondary">
+              {{ t('automations.clients.text') }}
+            </p>
+            <p v-if="data.clients.length === 0" class="text-body-md text-ink-secondary">
+              {{ t('automations.clients.empty') }}
+            </p>
+            <ul v-else class="flex flex-col">
+              <li
+                v-for="row in data.clients"
+                :key="row.id"
+                :data-client-row="row.id"
+                class="flex flex-wrap items-center gap-x-space-md gap-y-space-xs border-b border-line py-space-sm last:border-b-0"
+              >
+                <span class="min-w-0 flex-1 basis-48 truncate text-body-md text-ink">
+                  {{ row.name }}
+                </span>
+                <span class="text-body-sm text-ink-secondary">
+                  {{ t(`automations.mode.${row.mode}.label`) }}
+                  <template v-if="row.mode === 'cart' && memberName(row.responsibleUserId)">
+                    · {{ memberName(row.responsibleUserId) }}
+                  </template>
+                  · {{ t('automations.clients.overrides', Object.keys(row.overrides).length) }}
+                </span>
+                <Button
+                  v-if="canWrite"
+                  icon="pi pi-pencil"
+                  severity="secondary"
+                  variant="text"
+                  size="small"
+                  :aria-label="t('automations.client.action', { name: row.name })"
+                  @click="openClient(row)"
+                />
+              </li>
+            </ul>
+          </section>
+        </template>
       </template>
     </div>
 
