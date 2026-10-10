@@ -691,7 +691,7 @@ Grenzen für Namen und Keywords von der Limits-Seite (4.4). Was noch offen ist, 
 ## Bewusst nicht in Phase 4
 
 - Keine automatischen Vorschläge für Graduation oder Preset-Wechsel und kein Optimizer (Phase 5)
-- Keine Budget-Caps, kein Dayparting (Phase 5)
+- Keine Budget-Caps (Phase 5), kein Dayparting (seit 2026-10-10 „später“, `phase-5.md` F7)
 - Keine automatischen Conquesting-Kriterien und keine Katalogdaten (Phase 7)
 - Kein SQP-gestütztes Setup (Phase 2b wartet auf Dateien)
 
