@@ -522,7 +522,33 @@ describe('Harvest von der Merkliste (4.6)', () => {
       .select()
       .from(auditEvents)
       .where(eq(auditEvents.action, 'search_term_harvest.remove'));
-    expect(event!.target).toMatchObject({ removed: 2, submissionId: id });
+    expect(event!.target).toMatchObject({
+      id: f.org,
+      removed: 2,
+      profileIds: [f.profile],
+      submissionId: id,
+    });
+  });
+
+  it('behält Begriffe, deren Keyword Amazon abgelehnt hat (API-Weg)', async () => {
+    const id = await harvestSubmission();
+    const rows = await items(id);
+    await recordCampaignSetupResults(testDb.db, {
+      organizationId: f.org,
+      submissionId: id,
+      now: new Date(),
+      results: rows.map((row) =>
+        row.entityType === 'keyword' || row.entityType === 'source_negative'
+          ? { itemId: row.id, outcome: 'failed', code: 'INVALID_KEYWORD', message: 'abgelehnt' }
+          : { itemId: row.id, outcome: 'applied', amazonEntityId: null },
+      ),
+    });
+    await finishAdChangeSubmission(testDb.db, {
+      organizationId: f.org,
+      submissionId: id,
+      now: new Date(),
+    });
+    expect(await remaining()).toEqual(['becher', 'nicht gewählt', 'trinkflasche']);
   });
 
   it('lässt die Merkliste stehen, wenn die Übermittlung verworfen wird', async () => {

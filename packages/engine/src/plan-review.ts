@@ -6,7 +6,8 @@ import {
 } from './ad-changes';
 import { Dec } from './decimal';
 import { campaignNameIssues, campaignNameMaxLength } from './naming';
-import { createProtectedTermMatcher } from './search-terms';
+import { plannedSpTerms } from './harvest';
+import { comparableSearchTerm, createProtectedTermMatcher } from './search-terms';
 
 /**
  * Prüfung eines gespeicherten Plans vor dem Übermitteln (`docs/tasks/phase-4.md` 4.4), ohne I/O. Ein Entwurf kann
@@ -19,7 +20,8 @@ import { createProtectedTermMatcher } from './search-terms';
  * - `info`: Off-Amazon nur in den USA einstellbar; SB und SD legt Phase 4 erst mit 4.9/4.10 an.
  *
  * Gewählte Negatives in der Quelle (4.6, F7): Die Ad Group der Quelle muss als SP-Ad-Group im Profil bestehen,
- * geschützte Begriffe sperren (der Vorschlag nennt sie nie, ein geänderter Entwurf könnte es), Dubletten auch.
+ * geschützte Begriffe sperren (der Vorschlag nennt sie nie, ein geänderter Entwurf könnte es), Dubletten auch, und
+ * der Plan muss den Begriff als Sponsored-Products-Ziel anlegen (sonst verlöre die Quelle den Traffic ohne Ersatz).
  */
 
 export interface PlanReviewInput {
@@ -56,7 +58,12 @@ export type PlanReviewIssue =
   | { severity: 'error'; code: 'adGroupNameInvalid'; campaign: string; issue: string }
   | { severity: 'error'; code: 'duplicateTarget'; campaign: string; target: string }
   | { severity: 'error'; code: 'missingSku'; asin: string }
-  | { severity: 'error'; code: 'sourceNegativeMissing'; campaign: string; target: string }
+  | {
+      severity: 'error';
+      code: 'sourceNegativeMissing' | 'sourceNegativeNotPlanned';
+      campaign: string;
+      target: string;
+    }
   | { severity: 'error'; code: 'sourceNegativeProtected'; keyword: string }
   | {
       severity: 'error';
@@ -229,6 +236,7 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
   }
 
   const isProtected = createProtectedTermMatcher(input.protectedTerms ?? []);
+  const plannedTerms = plannedSpTerms(input.campaigns);
   const sourceKeys = new Set<string>();
   for (const source of input.sourceNegatives ?? []) {
     if (!source.selected) continue;
@@ -243,6 +251,13 @@ export function reviewCampaignPlan(input: PlanReviewInput): PlanReviewIssue[] {
     sourceKeys.add(key);
     if (!input.sourceAdGroups?.has(`${source.amazonCampaignId}:${source.amazonAdGroupId}`)) {
       add({ severity: 'error', code: 'sourceNegativeMissing', campaign, target: label });
+    }
+    const isPlanned =
+      negative.type === 'keyword'
+        ? plannedTerms.keywords.has(comparableSearchTerm(negative.text))
+        : plannedTerms.asins.has(negative.asin.toUpperCase());
+    if (!isPlanned) {
+      add({ severity: 'error', code: 'sourceNegativeNotPlanned', campaign, target: label });
     }
     if (isProtected(label))
       add({ severity: 'error', code: 'sourceNegativeProtected', keyword: label });

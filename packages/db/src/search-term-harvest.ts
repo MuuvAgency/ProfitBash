@@ -1,6 +1,6 @@
 import { comparableSearchTerm, Dec } from '@profitbash/engine';
 import type { HarvestMarkSource } from '@profitbash/engine/plan';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { chunks } from './ad-change-entities';
 import { recordAuditEvent, type DbOrTx } from './audit';
@@ -374,6 +374,7 @@ export async function loadHarvestMarkSources(
       adProduct: h.adProduct,
       amazonCampaignId: h.amazonCampaignId,
       amazonAdGroupId: h.amazonAdGroupId,
+      campaignId: c.id,
       campaignName: c.name,
       adGroupId: g.id,
       adGroupName: g.name,
@@ -418,12 +419,18 @@ export async function loadHarvestMarkSources(
     .orderBy(desc(h.createdAt), asc(h.termKey))
     .limit(HARVEST_MARK_LIST_LIMIT);
 
-  // Negatives exakt der Quell-Ad-Groups (Keywords in Vergleichsform, ASINs groß).
-  const adGroupIds = [...new Set(rows.flatMap((row) => (row.adGroupId ? [row.adGroupId] : [])))];
+  // Negatives exakt der Quell-Ad-Groups und ihrer Kampagnen (Keywords in Vergleichsform, ASINs klein).
+  const sources = rows.flatMap((row) =>
+    row.adGroupId && row.campaignId
+      ? [{ adGroupId: row.adGroupId, campaignId: row.campaignId }]
+      : [],
+  );
   const negated = new Set<string>();
-  for (const part of chunks(adGroupIds)) {
+  for (const part of chunks(sources)) {
     const negatives = await db
       .select({
+        level: n.level,
+        campaignId: n.campaignId,
         adGroupId: n.adGroupId,
         targetType: n.targetType,
         keywordText: n.keywordText,
@@ -432,8 +439,16 @@ export async function loadHarvestMarkSources(
       .from(n)
       .where(
         and(
-          inArray(n.adGroupId, part),
-          eq(n.level, 'ad_group'),
+          or(
+            and(
+              eq(n.level, 'ad_group'),
+              inArray(n.adGroupId, [...new Set(part.map((source) => source.adGroupId))]),
+            ),
+            and(
+              eq(n.level, 'campaign'),
+              inArray(n.campaignId, [...new Set(part.map((source) => source.campaignId))]),
+            ),
+          ),
           isNull(n.removedAt),
           sql`(${n.targetType} = 'product' or upper(${n.matchType}) = 'EXACT')`,
         ),
@@ -443,7 +458,11 @@ export async function loadHarvestMarkSources(
         negative.targetType === 'keyword'
           ? comparableSearchTerm(negative.keywordText ?? '')
           : (negative.asin ?? '').toLowerCase();
-      negated.add(`${negative.adGroupId}:${value}`);
+      negated.add(
+        negative.level === 'campaign'
+          ? `c:${negative.campaignId}:${value}`
+          : `g:${negative.adGroupId}:${value}`,
+      );
     }
   }
 
@@ -462,6 +481,9 @@ export async function loadHarvestMarkSources(
     clicks: row.clicks,
     cost: row.cost,
     currencyCode: row.currencyCode,
-    alreadyNegative: row.adGroupId !== null && negated.has(`${row.adGroupId}:${row.termKey}`),
+    alreadyNegative:
+      row.adGroupId !== null &&
+      (negated.has(`g:${row.adGroupId}:${row.termKey}`) ||
+        negated.has(`c:${row.campaignId}:${row.termKey}`)),
   }));
 }

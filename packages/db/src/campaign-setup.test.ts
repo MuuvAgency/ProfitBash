@@ -369,6 +369,14 @@ const sourceNegative = (overrides: Partial<SourceNegative> = {}): SourceNegative
 });
 
 describe('Negatives in der Quelle (4.6)', () => {
+  // Der Plan legt die Begriffe an; sonst sperrt die Prüfung das Negativ (`sourceNegativeNotPlanned`).
+  const harvestCampaign = campaign('SP | EXACT | Harvest', {
+    targets: [
+      { type: 'keyword', text: 'trinkflasche 1l', matchType: 'exact', bid: '0.90' },
+      { type: 'keyword', text: 'becher', matchType: 'exact', bid: '0.90' },
+    ],
+  });
+
   it('speichert die Vorschläge mit Auswahl im Entwurf', async () => {
     const created = await save({
       sourceNegatives: [sourceNegative(), sourceNegative({ selected: false })],
@@ -379,6 +387,7 @@ describe('Negatives in der Quelle (4.6)', () => {
 
   it('übermittelt gewählte Negatives als Zeilen nach den Kampagnen', async () => {
     const created = await save({
+      campaigns: [harvestCampaign],
       sourceNegatives: [
         sourceNegative(),
         sourceNegative({
@@ -420,6 +429,7 @@ describe('Negatives in der Quelle (4.6)', () => {
       .where(eq(amazonAdsProfiles.id, f.profile));
     try {
       const created = await save({
+        campaigns: [harvestCampaign],
         sourceNegatives: [
           sourceNegative(),
           sourceNegative({

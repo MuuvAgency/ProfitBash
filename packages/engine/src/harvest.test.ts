@@ -196,4 +196,32 @@ describe('planSourceNegatives', () => {
     });
     expect(result.sourceNegatives[0]?.selected).toBe(false);
   });
+
+  it('zählt nur Ziele von Sponsored Products als angelegt (SB und SD legt das Setup noch nicht an)', () => {
+    const result = planSourceNegatives({
+      ...base,
+      campaigns: [
+        {
+          ...campaign([
+            { type: 'keyword', text: 'trinkflasche 1l', matchType: 'broad', bid: '0.50' },
+          ]),
+          adProduct: 'SB',
+        },
+      ],
+      marks: [mark()],
+    });
+    expect(result.sourceNegatives).toEqual([]);
+    expect(result.hints.map((hint) => hint.code)).toEqual(['sourceNotPlanned']);
+  });
+
+  it('negiert keine ASIN in einer Keyword-Ad-Group (dort nimmt Amazon keine negativen Produkt-Ziele)', () => {
+    const result = planSourceNegatives({
+      ...base,
+      marks: [{ ...asinMark, sourceKeyword: { text: 'flasche', matchType: 'BROAD' } }],
+    });
+    expect(result.sourceNegatives).toEqual([]);
+    expect(result.hints).toEqual([
+      { severity: 'info', code: 'sourceKeywordAdGroup', keyword: 'b0fremd001' },
+    ]);
+  });
 });

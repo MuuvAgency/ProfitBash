@@ -404,10 +404,11 @@ export async function releaseHarvestMarks(
       actorUserId: null,
       action: 'search_term_harvest.remove',
       target: {
+        // Wie `removeHarvestMarks`: Organisation als ID, Profile als Liste.
         type: 'search_term_harvest',
-        id: draft.profileId,
-        profileId: draft.profileId,
+        id: draft.organizationId,
         removed: removed.length,
+        profileIds: [draft.profileId],
         submissionId: input.submissionId,
       },
     });
