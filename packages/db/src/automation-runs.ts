@@ -6,7 +6,8 @@ import {
   type AutomationRule,
   type Guardrails,
 } from '@profitbash/shared';
-import { and, desc, eq, gte, inArray, isNull, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { visibleProfilesScope } from './access';
 import { chunks, valueColumns } from './ad-change-entities';
 import { recordAuditEvent } from './audit';
 import { loadGuardrailDefaults } from './automation';
@@ -42,6 +43,8 @@ import {
  * Organisation und Profil gebunden): Plan (Modus, Leitplanken, Regeln, Ziele, Datenstand), Entities mit Kennzahlen
  * und das Speichern von Lauf und Vorschlägen. Gerechnet wird im Worker (`@profitbash/engine`, Grenzen von Amazon).
  */
+
+const p = automationProposals;
 
 export interface AutomationRunScope {
   organizationId: string;
@@ -503,7 +506,6 @@ export async function saveAutomationRun(
       .where(eq(amazonAdsProfiles.id, input.profileId))
       .for('update');
 
-    const p = automationProposals;
     // Aus dem Warenkorb geworfen (die Änderung ist gelöscht) heißt verworfen.
     await tx
       .update(p)
@@ -679,4 +681,289 @@ export async function listAutomationRunProfiles(db: Db): Promise<AutomationRunSc
     .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, m.profileId))
     .where(and(isNull(amazonAdsProfiles.removedAt), eq(amazonAdsProfiles.isHidden, false)))
     .orderBy(m.organizationId, m.profileId);
+}
+
+// ---------------------------------------------------------------------------
+// Läufe und Vorschläge für Nutzer (5.8)
+// ---------------------------------------------------------------------------
+
+export interface AutomationRunAccess {
+  userId: string;
+  orgId: string;
+}
+
+export interface AutomationRunRecord {
+  id: string;
+  profileId: string;
+  accountName: string;
+  mode: string;
+  periodStart: string;
+  periodEnd: string;
+  metricsImportedAt: Date;
+  counts: Record<string, number>;
+  warnings: string[];
+  createdAt: Date;
+}
+
+export const AUTOMATION_RUN_LIST_LIMIT = 100;
+
+/** Die letzten Läufe der sichtbaren Profile, neueste zuerst. `null` für Nicht-Mitglieder. */
+export async function listAutomationRuns(
+  db: Db,
+  access: AutomationRunAccess,
+): Promise<AutomationRunRecord[] | null> {
+  const scope = await visibleProfilesScope(db, access);
+  if (scope === null) return null;
+  const r = automationRuns;
+  return db
+    .select({
+      id: r.id,
+      profileId: r.profileId,
+      accountName: amazonAdsProfiles.accountName,
+      mode: r.mode,
+      periodStart: r.periodStart,
+      periodEnd: r.periodEnd,
+      metricsImportedAt: r.metricsImportedAt,
+      counts: r.counts,
+      warnings: r.warnings,
+      createdAt: r.createdAt,
+    })
+    .from(r)
+    .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, r.profileId))
+    .where(inArray(r.profileId, scope.ids))
+    .orderBy(desc(r.createdAt))
+    .limit(AUTOMATION_RUN_LIST_LIMIT);
+}
+
+/** Filter der Vorschlagsliste; abgelöste Vorschläge (`superseded`) erscheinen nie. */
+export type AutomationProposalFilter = 'open' | 'staged' | 'dismissed';
+
+export interface AutomationProposalRecord {
+  id: string;
+  runId: string;
+  profileId: string;
+  accountName: string;
+  entityType: string;
+  entityId: string;
+  campaignName: string | null;
+  adGroupName: string | null;
+  /** Angaben zur Anzeige eines Targets; `null` bei Kampagnen. */
+  target: {
+    targetType: string | null;
+    keywordText: string | null;
+    matchType: string | null;
+    expression: unknown;
+  } | null;
+  field: string;
+  before: string | null;
+  after: string;
+  currencyCode: string | null;
+  source: string;
+  ruleName: string | null;
+  limitedBy: string[];
+  detail: Record<string, unknown>;
+  status: AutomationProposalFilter;
+  createdAt: Date;
+}
+
+export const AUTOMATION_PROPOSAL_LIST_LIMIT = 500;
+
+/** Ein Vorschlag, dessen Änderung im Warenkorb gelöscht wurde, gilt als verworfen. */
+const STATUS_FILTER = {
+  open: eq(p.status, 'open'),
+  staged: and(eq(p.status, 'staged'), isNotNull(p.adChangeId)),
+  dismissed: or(eq(p.status, 'dismissed'), and(eq(p.status, 'staged'), isNull(p.adChangeId))),
+};
+
+/**
+ * Vorschläge der sichtbaren Profile in einem Status, neueste zuerst, höchstens `AUTOMATION_PROPOSAL_LIST_LIMIT`;
+ * `total` zählt alle. `null` für Nicht-Mitglieder.
+ */
+export async function listAutomationProposals(
+  db: Db,
+  input: AutomationRunAccess & { status: AutomationProposalFilter },
+): Promise<{ proposals: AutomationProposalRecord[]; total: number } | null> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return null;
+  const where = and(inArray(p.profileId, scope.ids), STATUS_FILTER[input.status]);
+  const [counted] = await db.select({ total: count() }).from(p).where(where);
+  const rows = await db
+    .select({
+      proposal: p,
+      accountName: amazonAdsProfiles.accountName,
+      campaignName: amazonAdsCampaigns.name,
+      adGroupName: amazonAdsAdGroups.name,
+      targetId: amazonAdsTargets.id,
+      targetType: amazonAdsTargets.targetType,
+      keywordText: amazonAdsTargets.keywordText,
+      matchType: amazonAdsTargets.matchType,
+      expression: amazonAdsTargets.expression,
+    })
+    .from(p)
+    .innerJoin(amazonAdsProfiles, eq(amazonAdsProfiles.id, p.profileId))
+    .leftJoin(amazonAdsCampaigns, eq(amazonAdsCampaigns.id, p.campaignId))
+    .leftJoin(amazonAdsAdGroups, eq(amazonAdsAdGroups.id, p.adGroupId))
+    .leftJoin(
+      amazonAdsTargets,
+      and(eq(p.entityType, 'target'), eq(amazonAdsTargets.id, p.entityId)),
+    )
+    .where(where)
+    .orderBy(desc(p.createdAt), p.id)
+    .limit(AUTOMATION_PROPOSAL_LIST_LIMIT);
+  return {
+    total: counted!.total,
+    proposals: rows.map(({ proposal: x, ...row }) => ({
+      id: x.id,
+      runId: x.runId,
+      profileId: x.profileId,
+      accountName: row.accountName,
+      entityType: x.entityType,
+      entityId: x.entityId,
+      campaignName: row.campaignName,
+      adGroupName: row.adGroupName,
+      target: row.targetId
+        ? {
+            targetType: row.targetType,
+            keywordText: row.keywordText,
+            matchType: row.matchType,
+            expression: row.expression,
+          }
+        : null,
+      field: x.field,
+      before: x.oldValue ?? x.oldAmount,
+      after: (x.newValue ?? x.newAmount)!,
+      currencyCode: x.currencyCode,
+      source: x.source,
+      ruleName: x.ruleName,
+      limitedBy: x.limitedBy,
+      detail: x.detail,
+      status: input.status,
+      createdAt: x.createdAt,
+    })),
+  };
+}
+
+export interface AutomationProposalActionResult {
+  changed: number;
+  /** Nicht (mehr) offen, nicht sichtbar oder an der Stelle liegt schon eine eigene Änderung. */
+  skipped: number;
+}
+
+/**
+ * Legt offene Vorschläge als Änderungen (Herkunft `automation`) in den Warenkorb des Nutzers. Liegt dort schon
+ * eine Änderung an derselben Stelle, bleibt der Vorschlag offen. Audit `automation_proposals.stage`. Das Recht
+ * `write` prüft die API. `null` für Nicht-Mitglieder.
+ */
+export async function stageAutomationProposals(
+  db: Db,
+  input: AutomationRunAccess & { ids: readonly string[] },
+): Promise<AutomationProposalActionResult | null> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return null;
+  return db.transaction(async (tx) => {
+    const open = await tx
+      .select()
+      .from(p)
+      .where(
+        and(inArray(p.id, [...input.ids]), inArray(p.profileId, scope.ids), eq(p.status, 'open')),
+      )
+      .for('update');
+    let changed = 0;
+    const now = new Date();
+    for (const part of chunks(open, INSERT_CHUNK)) {
+      const inserted = await tx
+        .insert(adChanges)
+        .values(
+          part.map((x) => ({
+            organizationId: x.organizationId,
+            profileId: x.profileId,
+            origin: 'automation',
+            operation: 'update',
+            entityType: x.entityType,
+            entityId: x.entityId,
+            campaignId: x.campaignId,
+            adGroupId: x.adGroupId,
+            field: x.field,
+            oldValue: x.oldValue,
+            newValue: x.newValue,
+            oldAmount: x.oldAmount,
+            newAmount: x.newAmount,
+            currencyCode: x.currencyCode,
+            createdBy: input.userId,
+          })),
+        )
+        .onConflictDoNothing()
+        .returning({ id: adChanges.id, entityId: adChanges.entityId, field: adChanges.field });
+      const changeIds = new Map(inserted.map((row) => [`${row.entityId}:${row.field}`, row.id]));
+      for (const x of part) {
+        const adChangeId = changeIds.get(`${x.entityId}:${x.field}`);
+        if (!adChangeId) continue;
+        await tx
+          .update(p)
+          .set({ status: 'staged', adChangeId, resolvedBy: input.userId, resolvedAt: now })
+          .where(eq(p.id, x.id));
+        changed += 1;
+      }
+    }
+    if (changed > 0) {
+      await recordAuditEvent(tx, {
+        organizationId: input.orgId,
+        actorUserId: input.userId,
+        action: 'automation_proposals.stage',
+        target: { type: 'automation_proposals', id: input.orgId, count: changed },
+      });
+    }
+    return { changed, skipped: input.ids.length - changed };
+  });
+}
+
+/**
+ * Verwirft Vorschläge: offene und solche, deren Änderung noch im Warenkorb liegt (die Zeile wird gelöscht, auch im
+ * Warenkorb eines anderen Nutzers). Schon übermittelte bleiben. Verworfenes kommt erst mit neuen Kennzahlen wieder.
+ * Audit `automation_proposals.dismiss`. `null` für Nicht-Mitglieder.
+ */
+export async function dismissAutomationProposals(
+  db: Db,
+  input: AutomationRunAccess & { ids: readonly string[] },
+): Promise<AutomationProposalActionResult | null> {
+  const scope = await visibleProfilesScope(db, input);
+  if (scope === null) return null;
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ id: p.id, adChangeId: p.adChangeId, changeStatus: adChanges.status })
+      .from(p)
+      .leftJoin(adChanges, eq(adChanges.id, p.adChangeId))
+      .where(
+        and(
+          inArray(p.id, [...input.ids]),
+          inArray(p.profileId, scope.ids),
+          inArray(p.status, ['open', 'staged']),
+        ),
+      )
+      .for('update', { of: p });
+    const dismissable = rows.filter(
+      (row) => row.adChangeId === null || row.changeStatus === 'pending',
+    );
+    const changeIds = dismissable.flatMap((row) => (row.adChangeId ? [row.adChangeId] : []));
+    for (const part of chunks(changeIds)) {
+      await tx
+        .delete(adChanges)
+        .where(and(inArray(adChanges.id, part), eq(adChanges.status, 'pending')));
+    }
+    for (const part of chunks(dismissable.map((row) => row.id))) {
+      await tx
+        .update(p)
+        .set({ status: 'dismissed', resolvedBy: input.userId, resolvedAt: new Date() })
+        .where(inArray(p.id, part));
+    }
+    if (dismissable.length > 0) {
+      await recordAuditEvent(tx, {
+        organizationId: input.orgId,
+        actorUserId: input.userId,
+        action: 'automation_proposals.dismiss',
+        target: { type: 'automation_proposals', id: input.orgId, count: dismissable.length },
+      });
+    }
+    return { changed: dismissable.length, skipped: input.ids.length - dismissable.length };
+  });
 }

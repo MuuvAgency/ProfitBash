@@ -3,8 +3,12 @@ import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seedAdChangeFixture, type AdChangeFixture } from './ad-change-fixture';
 import {
+  dismissAutomationProposals,
+  listAutomationProposals,
   listAutomationRunProfiles,
+  listAutomationRuns,
   loadAutomationRunEntities,
+  stageAutomationProposals,
   planAutomationRun,
   saveAutomationRun,
   type AutomationProposalInput,
@@ -98,7 +102,10 @@ const bid = (patch: Partial<AutomationProposalInput> = {}): AutomationProposalIn
   detail: { clicks: 40 },
   ...patch,
 });
-const save = async (proposals: AutomationProposalInput[], counts = { targets: 2 }) =>
+const save = async (
+  proposals: AutomationProposalInput[],
+  counts: Record<string, number> = { targets: 2 },
+) =>
   saveAutomationRun(testDb.db, {
     ...scope(),
     plan: await plan(),
@@ -589,5 +596,210 @@ describe('saveAutomationRun', () => {
       { status: 'submitted' },
     ]);
     expect((await proposalRows()).map((x) => x.status)).toEqual(['staged']);
+  });
+});
+
+describe('Läufe und Vorschläge für Nutzer (5.8)', () => {
+  let other: AdChangeFixture;
+  const as = (userId: string, orgId = f.org) => ({ userId, orgId });
+  const ids = async () =>
+    (
+      await testDb.db
+        .select({ id: automationProposals.id })
+        .from(automationProposals)
+        .orderBy(automationProposals.field)
+    ).map((x) => x.id);
+  const twoProposals = () =>
+    save([
+      bid(),
+      bid({
+        entityType: 'campaign',
+        entityId: f.campaign,
+        adGroupId: null,
+        field: 'budget',
+        before: '20',
+        after: '18',
+        limitedBy: [],
+      }),
+    ]);
+
+  beforeAll(async () => {
+    other = await seedAdChangeFixture(testDb.db, 'andere');
+  });
+
+  it('listet die Läufe der sichtbaren Profile, neueste zuerst; fremde Organisationen sehen nichts', async () => {
+    await standardMetrics();
+    await save([bid()], { targets: 2, noRule: 1 });
+    await changeRules(1);
+    await save([]);
+
+    const runs = (await listAutomationRuns(testDb.db, as(f.emil)))!;
+    expect(runs).toMatchObject([
+      { profileId: f.profile, accountName: 'Nordwind DE', counts: { proposals: 0 } },
+      {
+        mode: 'shadow',
+        periodStart: OCTOBER.startDate,
+        periodEnd: OCTOBER.endDate,
+        metricsImportedAt: NOW,
+        counts: { targets: 2, noRule: 1, proposals: 1, staged: 0 },
+        warnings: [],
+      },
+    ]);
+    expect(await listAutomationRuns(testDb.db, as(other.emil, other.org))).toEqual([]);
+    expect(await listAutomationRuns(testDb.db, as(other.emil))).toBeNull();
+  });
+
+  it('listet Vorschläge je Status mit Namen der Entity, Kampagne und Ad Group', async () => {
+    await standardMetrics();
+    await twoProposals();
+
+    const open = (await listAutomationProposals(testDb.db, { ...as(f.emil), status: 'open' }))!;
+    expect(open.total).toBe(2);
+    expect(open.proposals).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          profileId: f.profile,
+          accountName: 'Nordwind DE',
+          entityType: 'target',
+          entityId: f.keyword,
+          campaignName: 'Kampagne 1001',
+          adGroupName: 'AG 2001',
+          target: expect.objectContaining({ keywordText: 'kw 3001', matchType: 'BROAD' }),
+          field: 'bid',
+          before: '0.50',
+          after: '0.40',
+          currencyCode: 'EUR',
+          source: 'rule',
+          ruleName: 'Viele Klicks ohne Bestellung',
+          limitedBy: ['bidFloor'],
+          detail: { clicks: 40 },
+          status: 'open',
+        }),
+        expect.objectContaining({
+          entityType: 'campaign',
+          campaignName: 'Kampagne 1001',
+          adGroupName: null,
+          target: null,
+          field: 'budget',
+          before: '20',
+          after: '18',
+        }),
+      ]),
+    );
+    expect(await listAutomationProposals(testDb.db, { ...as(f.emil), status: 'staged' })).toEqual({
+      proposals: [],
+      total: 0,
+    });
+    expect(
+      await listAutomationProposals(testDb.db, { ...as(other.emil, other.org), status: 'open' }),
+    ).toEqual({ proposals: [], total: 0 });
+  });
+
+  it('übernimmt offene Vorschläge in den eigenen Warenkorb (Audit), auch mehrere; doppelt zählt nicht', async () => {
+    await standardMetrics();
+    await twoProposals();
+    await testDb.db.delete(auditEvents);
+    const all = await ids();
+
+    expect(await stageAutomationProposals(testDb.db, { ...as(f.ada), ids: all })).toEqual({
+      changed: 2,
+      skipped: 0,
+    });
+    expect(await cartRows()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ origin: 'automation', createdBy: f.ada, field: 'bid' }),
+        expect.objectContaining({ createdBy: f.ada, field: 'budget', newAmount: '18' }),
+      ]),
+    );
+    const staged = (await listAutomationProposals(testDb.db, { ...as(f.emil), status: 'staged' }))!;
+    expect(staged.proposals.map((x) => x.status)).toEqual(['staged', 'staged']);
+    expect(await testDb.db.select().from(auditEvents)).toMatchObject([
+      { action: 'automation_proposals.stage', actorUserId: f.ada, target: { count: 2 } },
+    ]);
+    expect(await stageAutomationProposals(testDb.db, { ...as(f.emil), ids: all })).toEqual({
+      changed: 0,
+      skipped: 2,
+    });
+  });
+
+  it('übernimmt nicht, wenn im eigenen Warenkorb schon eine Änderung an derselben Stelle liegt, und nichts Fremdes', async () => {
+    await standardMetrics();
+    await twoProposals();
+    const [bidProposal] = await ids();
+    await testDb.db.insert(adChanges).values({
+      organizationId: f.org,
+      profileId: f.profile,
+      origin: 'explorer',
+      operation: 'update',
+      entityType: 'target',
+      entityId: f.keyword,
+      campaignId: f.campaign,
+      adGroupId: f.adGroup,
+      field: 'bid',
+      oldAmount: '0.50',
+      newAmount: '0.70',
+      currencyCode: 'EUR',
+      createdBy: f.ada,
+    });
+    expect(
+      await stageAutomationProposals(testDb.db, { ...as(f.ada), ids: [bidProposal!] }),
+    ).toEqual({ changed: 0, skipped: 1 });
+    expect(
+      await stageAutomationProposals(testDb.db, {
+        ...as(other.emil, other.org),
+        ids: [bidProposal!],
+      }),
+    ).toEqual({ changed: 0, skipped: 1 });
+    expect((await proposalRows()).map((x) => x.status)).toEqual(['open', 'open']);
+  });
+
+  it('verwirft offene und im Warenkorb liegende Vorschläge samt Warenkorb-Zeile (Audit); Übermitteltes bleibt', async () => {
+    await standardMetrics();
+    await assignClient();
+    await setClient({ mode: 'cart', responsibleUserId: f.emil });
+    await twoProposals();
+    const [bidProposal, budgetProposal] = await ids();
+    const [submission] = await testDb.db
+      .insert(adChangeSubmissions)
+      .values({ organizationId: f.org, profileId: f.profile, channel: 'bulk_file' })
+      .returning({ id: adChangeSubmissions.id });
+    await testDb.db
+      .update(adChanges)
+      .set({ status: 'submitted', submissionId: submission!.id })
+      .where(eq(adChanges.field, 'budget'));
+    await testDb.db.delete(auditEvents);
+
+    expect(
+      await dismissAutomationProposals(testDb.db, {
+        ...as(f.ada),
+        ids: [bidProposal!, budgetProposal!],
+      }),
+    ).toEqual({ changed: 1, skipped: 1 });
+    expect(await cartRows()).toEqual([]);
+    const dismissed = (await listAutomationProposals(testDb.db, {
+      ...as(f.ada),
+      status: 'dismissed',
+    }))!;
+    expect(dismissed.proposals).toMatchObject([{ id: bidProposal, status: 'dismissed' }]);
+    expect(await testDb.db.select().from(auditEvents)).toMatchObject([
+      { action: 'automation_proposals.dismiss', actorUserId: f.ada, target: { count: 1 } },
+    ]);
+    // Der nächste Lauf mit demselben Datenstand bringt den verworfenen nicht zurück.
+    await changeRules(1);
+    expect(await save([bid()])).toMatchObject({ proposals: 0, dismissed: 1 });
+  });
+
+  it('zeigt einen im Warenkorb gelöschten Vorschlag als verworfen', async () => {
+    await standardMetrics();
+    await assignClient();
+    await setClient({ mode: 'cart', responsibleUserId: f.emil });
+    await save([bid()]);
+    await testDb.db.delete(adChanges);
+    expect(
+      (await listAutomationProposals(testDb.db, { ...as(f.emil), status: 'dismissed' }))!.proposals,
+    ).toMatchObject([{ status: 'dismissed' }]);
+    expect(
+      (await listAutomationProposals(testDb.db, { ...as(f.emil), status: 'staged' }))!.total,
+    ).toBe(0);
   });
 });
