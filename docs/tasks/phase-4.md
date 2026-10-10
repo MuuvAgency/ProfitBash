@@ -522,6 +522,15 @@ geprüfte, noch nicht übermittelte Plan eines Setups.
     simulieren“ (wie „Strategie und Platzierungen“); der Link trägt Strategie, Platzierungen, Amazon Business,
     Währung und Namen als wenige Query-Werte (`simulatorLink`, keine IDs). Das Basisgebot trägt man ein (es gilt je
     Keyword bzw. Ad Group, nicht je Kampagne).
+  - **Review-Befunde (eingearbeitet):** Das Basisgebot nimmt das Dezimalkomma (0,85); Zeilen tragen die Position
+    der Zielgruppe (`audienceIndex`), damit gleich benannte Zielgruppen nicht kollidieren; Prozent nur als ganze
+    Zahl ohne andere Schreibweisen (1e2), ungültige Felder mit `aria-invalid`, Hinweis per `aria-live`; eine neue
+    Query auf derselben Seite wird neu eingelesen; Faktor mit bis zu sechs Nachkommastellen. Geprüft im
+    Browser-Pane (Aufruf aus dem Explorer mit Strategie und Platzierung der Kampagne, Handy, Hell-Modus, Konsole).
+    **Bewusst so:** „Gebot simulieren“ steht in der Leiste markierter Zeilen und erscheint deshalb nur, wo man Zeilen
+    markieren kann (Schreibrecht) und für eine änderbare SP-Kampagne (nicht archiviert); die Seite selbst ist mit
+    `view` im Feature `tools` erreichbar. Amazon Business mit 0 % zählt als gesetzt (gleiche Zeilen doppelt).
+    Höchstgebote je Marktplatz begrenzt der Simulator nicht.
   - **Offen bzw. bewusst so:** Kein CPC-Bezug aus echten Platzierungsdaten (Ideen-Dokument D) und kein gestapelter
     Balken: Die Platzierungsberichte liegen ProfitBash noch nicht vor. SB und SD rechnet der Simulator nicht (andere
     Regeln, kommt bei Bedarf mit 4.9/4.10). Zielgruppen-Anpassungen bestehender Kampagnen kennt der Import nicht;

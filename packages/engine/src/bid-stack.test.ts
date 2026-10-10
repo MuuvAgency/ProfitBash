@@ -73,6 +73,11 @@ describe('simulateBidStack', () => {
 
   it('lehnt ungültige Eingaben ab', () => {
     expect(() => simulateBidStack(input({ bid: '-1' }))).toThrow(RangeError);
+    expect(() => simulateBidStack(input({ bid: '0' }))).toThrow(RangeError);
+    expect(() => simulateBidStack(input({ bid: 'abc' }))).toThrow(RangeError);
+    expect(() =>
+      simulateBidStack(input({ placements: { top: 12.5, productPages: 0, restOfSearch: 0 } })),
+    ).toThrow(RangeError);
     expect(() =>
       simulateBidStack(input({ placements: { top: 901, productPages: 0, restOfSearch: 0 } })),
     ).toThrow(RangeError);

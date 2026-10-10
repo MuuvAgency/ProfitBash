@@ -1335,7 +1335,7 @@ export const de = {
     ruleBased:
       'Regelbasierte Gebote beziffert Amazon nicht; die Spanne zeigt das Gebot ohne Änderung durch die Regel.',
     invalid:
-      'Bitte ein Basisgebot größer 0 (z. B. 0.85) und Anpassungen als ganze Zahlen von 0 bis 900 eingeben.',
+      'Bitte ein Basisgebot größer 0 (z. B. 0,85) und Anpassungen als ganze Zahlen von 0 bis 900 eingeben; das markierte Feld ist ungültig.',
     yes: 'ja',
     column: {
       placement: 'Platzierung',
