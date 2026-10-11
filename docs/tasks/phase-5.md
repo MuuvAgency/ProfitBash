@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a, 5.11b, 5.13a. Als Nächstes: 5.13b, 5.13c; 5.12 bleibt offen (frühestens nach einigen Wochen mit Daten).**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a, 5.11b, 5.13a, 5.13b. Als Nächstes: 5.13c; 5.12 bleibt offen (frühestens nach einigen Wochen mit Daten).**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -893,9 +893,32 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     ohne Datei mit Kennzahlen in der Dev-DB; folgt in 5.13c). Dev-DB auf `0047` migrieren (`pnpm db:migrate`).
 
 #### 5.13b Läufe: Gründe ohne Vorschlag und erwartete Datensätze
-- [ ] Gründe ohne Vorschlag je Lauf im Tab „Läufe“ (`automation_runs.counts`, auch `budgetCap`, `findings`, `structure`).
-- [ ] Übersicht je Profil: Datensätze, die die Automatik erwartet (Bulk-Datei mit Kennzahlen, Suchbegriff-Blätter,
+- [x] Gründe ohne Vorschlag je Lauf im Tab „Läufe“ (`automation_runs.counts`, auch `budgetCap`, `findings`, `structure`).
+- [x] Übersicht je Profil: Datensätze, die die Automatik erwartet (Bulk-Datei mit Kennzahlen, Suchbegriff-Blätter,
       Zeitraum, Alter), was vorliegt und was fehlt.
+- [x] Umsetzung (2026-10-11):
+  - **Zugriff** `listAutomationDatasets` (`packages/db/src/automation-runs.ts`, über `visibleProfilesScope`): je
+    sichtbarem Profil die Anzeigentypen mit nicht archivierten Kampagnen (`expectedAdProducts`) und der Datenstand
+    (`findProfileMetricsState`): Zeitraum, Tage, Upload, Alter in Tagen, Anzeigentypen mit Kennzahlen und mit
+    Suchbegriff-Zeilen **genau dieses Zeitraums** (darauf rechnet die Graduation). `shortcut:` drei Abfragen je Profil.
+  - **API** (Feature `automations`): `GET /ads/automations/datasets` (`view`).
+  - **Seite:** Abschnitt „Datensätze je Profil“ oben im Tab „Läufe“ (`automations/DatasetsOverview.vue`), auch ohne
+    Lauf sichtbar, mit eigenem Lade-, Leer- und Fehlerzustand: Kennzahlen je Anzeigentyp, „Fehlt: …“ für
+    Anzeigentypen mit Kampagnen, aber ohne Kennzahlen, fehlende Suchbegriff-Blätter, Zeitraum (Hinweis unter 30 Tagen,
+    F2) und Alter (Hinweis ab 8 Tagen, `BULK_FILE_STALE_DAYS` wie die Meldung „keine Bulk-Datei“).
+  - **Läufe:** je Lauf „Ohne Vorschlag: …“ mit den Gründen aus `counts` (`insufficientData`, `unchanged`, `noRule`,
+    `noGoal`, `noBase`, `inactive`, `vcpm`, `protectedTerm`, `manualPending`, `budgetCap`; unbekannte Schlüssel
+    bleiben weg), dazu Befunde und Graduation-/Preset-Vorschläge. Läufe im Modus „aus“ zeigen statt der Zähler
+    „Nur Prüfungen und Cap-Meldungen“.
+  - **Grenzen:** Die Übersicht kennt nur die Bulk-Datei; Profile mit Tageswerten über die API (heute nur Demo-Daten)
+    stehen als „keine Bulk-Datei“ da, weil der Lauf nur auf Dateien rechnet (5.9b). Ob ein Blatt in der Datei fehlte
+    oder nur keine Zeilen hatte, ist nicht zu unterscheiden. Suchbegriffe gelten als vorhanden, sobald ein
+    Anzeigentyp welche hat (SD hat keine).
+  - **Review (ponytail-review, Kriterien auf den Diff angewandt):** keine Befunde, die eine Änderung brauchten.
+  - **Browser-Pane (2026-10-11):** Abschnitt mit den Profilen der Dev-DB (alle ohne Datei mit Kennzahlen) und leerer
+    Zustand der Läufe, Desktop dunkel, Handy hell ohne waagerechtes Scrollen, Konsole ohne Fehler. Mit einer Datei
+    folgt die Prüfung in 5.13c.
+  - **Nach TDD:** Zugriff, Route und Oberfläche liefen vorher rot.
 
 #### 5.13c Definition of Done, Browser-Pane, offene Punkte
 - [ ] Definition of Done prüfen, Browser-Pane (mit Dominiks Bulk-Datei), offene Punkte festhalten.
