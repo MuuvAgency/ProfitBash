@@ -105,6 +105,7 @@ export function graduationProposals(input: GraduationInput): GraduationProposal[
     sums.set(key, sum);
   }
 
+  const reachable = new Map<string, Set<string>>();
   const best = new Map<string, GraduationProposal>();
   for (const sum of sums.values()) {
     const acos = acosOf(sum.spend, sum.sales);
@@ -120,7 +121,8 @@ export function graduationProposals(input: GraduationInput): GraduationProposal[
             ? goal.mul(edge.maxAcosPercentOfGoal).div(100)
             : harvestAcos;
         if (acos.gt(maxAcos)) return false;
-        const reached = downstream(input.edges, edge.to);
+        let reached = reachable.get(edge.to);
+        if (!reached) reachable.set(edge.to, (reached = downstream(input.edges, edge.to)));
         return !booked.some((block) => block === null || reached.has(block));
       })
       .map((edge) => edge.to);
