@@ -6,7 +6,8 @@
   am 2026-10-07 um die Suchbegriff-Regeln (`search_term_rules`) und geschützte Begriffe, am 2026-10-08 um die
   abweichenden Regeln je Profil (`search_term_rule_overrides`) und die Änderungen an Amazon-Werbung (`ad_changes`),
   am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`),
-  am 2026-10-10 um Benachrichtigungen (`notifications`, `notification_reads`)
+  am 2026-10-10 um Benachrichtigungen (`notifications`, `notification_reads`),
+  am 2026-10-11 um das Audit-Log und die Freigaben je Client (`member_client_grants`)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -102,6 +103,15 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   werden sie nur über `notifications.ts`: Profil sichtbar nach `visibleProfilesScope()` (Admins auch ausgeblendete),
   ohne Profil Mitgliedschaft (`getOrgRole()`), dazu der Empfängerkreis (`audience`). Der SSE-Kanal der API prüft das je
   Ereignis neu; `pg_notify` trägt nur IDs.
+- **Audit-Log** (ab Phase 6, 6.1): `audit_events` sind keine Profildaten. Gelesen werden sie nur über `listAuditEvents`
+  (`audit.ts`) für die aktive Organisation hinter `orgAdminOnly`; plattformweite Ereignisse gehören nicht dazu.
+- **Freigaben je Client** (ab Phase 6, 6.2): `member_client_grants` gehört der Organisation. Der Access-Layer wertet sie
+  in `visibilityConditions` aus (Mitglied mit Freigaben: nur Profile dieser Clients, auch keine ohne Client; ohne
+  Freigaben: alle; Admins: alle); gepflegt werden sie in der Mitgliederverwaltung (`setMemberClientGrants`, Audit
+  `member.grants_update`). Für Client-Daten **ohne** Profil gibt es `visibleClientIds()`: Der Struktur-Katalog zeigt
+  und ändert Presets je Client nur für sichtbare Clients. Bewusst org-weit bleiben für Eingeschränkte: Regeln der
+  Automatik (nennen Clients nur als ID), Katalog, Tags, die Zähler „Produktgruppen je Preset“ (nur Zahlen) und
+  Benachrichtigungen ohne Profil. Ein Client mit Freigaben lässt sich in der DB nicht löschen (kein `cascade`).
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.
@@ -122,7 +132,7 @@ oben betrifft, ist ein Review-Befund.
 - Die Datenbank erzwingt bereits, dass Profile, Clients und Connections zur selben Org gehören
   (zusammengesetzte Fremdschlüssel über `(id, organization_id)`).
 - Der Access-Layer bietet heute für Profile `visibleProfilesScope()` (Unterabfrage für Mengen), `visibleProfileIds()`
-  und `canSeeProfile()`, dazu `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()`. Ausgeblendete und entfernte Profile sehen nur Org-Admins (`includeHidden`, `includeRemoved`).
+  und `canSeeProfile()`, für Clients `visibleClientIds()`, dazu `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()`. Ausgeblendete und entfernte Profile sehen nur Org-Admins (`includeHidden`, `includeRemoved`).
 
 ## Verworfene Alternativen
 
