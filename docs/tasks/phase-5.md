@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a, 5.11b, 5.13a, 5.13b. Als Nächstes: 5.13c; 5.12 bleibt offen (frühestens nach einigen Wochen mit Daten).**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1–5.11b und 5.13 (a–c); Phase 5 ist bis auf 5.12 abgeschlossen (frühestens nach einigen Wochen mit Daten, siehe „Offen nach Phase 5“).**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -921,7 +921,8 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **Nach TDD:** Zugriff, Route und Oberfläche liefen vorher rot.
 
 #### 5.13c Definition of Done, Browser-Pane, offene Punkte
-- [ ] Definition of Done prüfen, Browser-Pane (mit Dominiks Bulk-Datei), offene Punkte festhalten.
+- [x] Definition of Done prüfen, Browser-Pane, offene Punkte festhalten. **Ohne Bulk-Datei** (Dominik, 2026-10-11:
+      ohne Datei abschließen; in der Dev-DB kam kein neuer Import an).
 - **Definition of Done geprüft (2026-10-11), je Punkt der Beleg:**
   - *Nichts automatisch an Amazon:* Der Job `automation-run` kennt keinen Übermittlungsweg (einziger Import aus
     `@profitbash/amazon-ads` ist `amazonAdsValueLimit`); Vorschläge enden in `automation_proposals` bzw. `ad_changes`.
@@ -939,6 +940,25 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - *Browser-Pane (2026-10-11):* `/notifications`, `/ads/goals`, `/ads/budgets`, alle fünf Tabs von
     `/ads/automations` und `/ads/tools/catalog` bei 1440 px dunkel, Tablet hell und Handy dunkel: kein waagerechtes
     Scrollen, kein Ladefehler, Konsole ohne Fehler.
+
+## Offen nach Phase 5 (Stand 2026-10-11)
+
+- **5.12 Schatten-Auswertung:** erst nach einigen Wochen mit Läufen und Übermittlungen; dort auch das Aufräumen alter
+  Zeiträume, Läufe und Vorschläge (5.1, 5.7).
+- **Prüfung mit echten Daten im Browser** (kein Lauf ohne Datei mit Kennzahlen in der Dev-DB): Vorschläge und
+  Warenkorb (5.8), Enforcer (5.9b), Befunde (5.10), Graduation-/Preset-Vorschläge (5.11b), Schätzung „≈“ im Pacing
+  (5.9a), Lauf im Modus „aus“ (5.13a), Datensätze und Gründe ohne Vorschlag mit Werten (5.13b). Nachholen, sobald
+  eine Bulk-Datei mit Kennzahlen und Suchbegriff-Blättern hochgeladen ist; dabei Platzierungstexte, deutsche
+  SD-Spalten und SB-Kennzahlen ansehen (5.1).
+- **Off-Amazon-Spalte** einlesen, sobald eine US-Datei vorliegt (5.10).
+- **Konstanten ohne Einstellung:** Glättung des Optimizers (12 Klicks), Spanne der Pacing-Schätzung; Runden auf zwei
+  Stellen (JPY bräuchte null, 5.4).
+- **Nicht gebaut, je Aufgabe notiert:** Profile nur mit Tageswerten bekommen keinen Lauf (5.9b); Vorschau der Regeln
+  rechnet vereinfacht (5.6a); Client kann Boden/Höchstgebot nicht auf „keiner“ setzen (5.4); Profilfilter der
+  Benachrichtigungen kennt nur geladene Profile (5.2b); Markieren mehrerer Graduation-/Preset-Vorschläge (5.11b).
+- **Dev-DB (Reste, nicht per psql löschbar):** eine Zeile in `automation_rules` (Version 1), Audit-Events
+  (`automation_rules.update`, `budget_cap.create`, `budget_cap.delete`, zweimal `campaign_blocks.update`). Migriert
+  bis `0047_automation_run_mode_off`.
 
 ## Offen vor dem Bau (nicht von Dominik zu entscheiden)
 
