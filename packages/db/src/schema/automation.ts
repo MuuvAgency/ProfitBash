@@ -170,7 +170,10 @@ export const automationProposals = pgTable(
     }).onDelete('cascade'),
     check('automation_proposals_entity_type_ck', sql`${t.entityType} in ('target', 'campaign')`),
     check('automation_proposals_field_ck', sql`${t.field} in ('bid', 'budget', 'state')`),
-    check('automation_proposals_source_ck', sql`${t.source} in ('rule', 'optimizer', 'budget_cap')`),
+    check(
+      'automation_proposals_source_ck',
+      sql`${t.source} in ('rule', 'optimizer', 'budget_cap')`,
+    ),
     check(
       'automation_proposals_status_ck',
       sql`${t.status} in ('open', 'staged', 'dismissed', 'superseded')`,
