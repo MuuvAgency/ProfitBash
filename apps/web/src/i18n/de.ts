@@ -1040,6 +1040,10 @@ export const de = {
       tooManyWords: 'Mehr als {max} Wörter',
     },
     pending: {
+      origin: {
+        automation: 'Vorschlag der Automatik',
+        budget_cap: 'Vorschlag des Budget-Caps',
+      },
       loadFailed: 'Der Warenkorb konnte nicht geladen werden.',
       empty: {
         title: 'Der Warenkorb ist leer',

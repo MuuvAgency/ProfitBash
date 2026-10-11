@@ -280,6 +280,14 @@ async function discardChanges(changeIds?: string[]) {
           >
             <ChangeSummary :change="change" />
             <div class="flex min-w-0 flex-col gap-space-xs text-body-sm">
+              <p
+                v-if="change.origin === 'automation' || change.origin === 'budget_cap'"
+                class="text-ink-secondary"
+              >
+                <i class="pi pi-bolt mr-space-xs" aria-hidden="true" />{{
+                  t(`changes.pending.origin.${change.origin}`)
+                }}
+              </p>
               <p v-if="violationText(change)" class="text-on-loss-wash">
                 <i class="pi pi-ban mr-space-xs" aria-hidden="true" />{{ violationText(change) }}
               </p>
