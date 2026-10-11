@@ -82,3 +82,4 @@ export * from './pipeline';
 export * from './pacing';
 export * from './cap-enforcer';
 export * from './checks';
+export * from './structure-proposals';
