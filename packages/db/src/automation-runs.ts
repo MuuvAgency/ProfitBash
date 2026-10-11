@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
-import { createProtectedTermMatcher, type GoalSetting } from '@profitbash/engine';
+import { createProtectedTermMatcher, type CheckResult, type GoalSetting } from '@profitbash/engine';
 import {
   guardrailOverridesSchema,
   type AutomationMode,
+  type CheckSettings,
   type AutomationRule,
   type Guardrails,
 } from '@profitbash/shared';
@@ -11,6 +12,7 @@ import { visibleProfilesScope } from './access';
 import { chunks, valueColumns } from './ad-change-entities';
 import { recordAuditEvent } from './audit';
 import { loadGuardrailDefaults } from './automation';
+import { loadCheckSettings, syncAutomationFindings } from './automation-checks';
 import { loadAutomationRules } from './automation-rules';
 import { loadProfileCapPacing, type ProfileCapPacing } from './budget-caps';
 import type { Db } from './client';
@@ -72,6 +74,8 @@ export interface AutomationRunPlan {
   state: ProfileMetricsState;
   /** Budget-Caps des Profils mit Pacing im laufenden Monat (5.9b). */
   caps: ProfileCapPacing[];
+  /** Einstellungen der Prüfungen (5.10). */
+  checks: CheckSettings;
   fingerprint: string;
   /** `olderPeriod`: Der Zeitraum endet vor dem des vorigen Laufs (ältere Datei nachträglich hochgeladen). */
   warnings: string[];
@@ -182,6 +186,7 @@ export async function planAutomationRun(
     .sort((a, b) => a.scopeId.localeCompare(b.scopeId));
 
   const caps = await loadProfileCapPacing(db, scope, now);
+  const checks = await loadCheckSettings(db, scope.organizationId);
   // Der Tageskurs gehört nicht dazu: Er ändert sich täglich und löste sonst jeden Tag einen Lauf aus.
   const fingerprint = createHash('sha256')
     .update(
@@ -193,6 +198,7 @@ export async function planAutomationRun(
         guardrails,
         mode,
         responsibleUserId,
+        checks,
         // Betrag, Schwellen, Monat und Umfang; ohne Caps bleibt der Hash der alte.
         ...(caps.length > 0 && {
           caps: caps.map((cap) => ({
@@ -227,6 +233,7 @@ export async function planAutomationRun(
     protectedTerms: settings?.protectedTerms ?? [],
     state,
     caps,
+    checks,
     fingerprint,
     warnings: previous && state.period.endDate < previous.periodEnd ? ['olderPeriod'] : [],
   };
@@ -250,6 +257,8 @@ export interface AutomationRunEntities {
     /** Tagesbudget; `null` bei anderen Budgetarten. */
     budget: string | null;
     metrics: AutomationPeriodSums | null;
+    /** Gebotsanpassungen je Platzierung (`extra.placementBidAdjustments`) mit den Summen der Platzierung. */
+    placements: { placement: string; percent: number; metrics: AutomationPeriodSums | null }[];
   }[];
   adGroups: {
     id: string;
@@ -292,12 +301,17 @@ export async function loadAutomationRunEntities(
 ): Promise<AutomationRunEntities> {
   // Datenstand je Entity; älter als die neueste Datei des Profils zählt nicht (Entity fehlt dort: archiviert,
   // herausgefiltert), ein Teil-Export mit demselben Zeitraumende schon.
-  const sums = async (level: 'campaign' | 'adGroup' | 'target') => {
+  const sums = async (level: 'campaign' | 'adGroup' | 'target' | 'placement') => {
     const byAmazonId = new Map<string, AutomationPeriodSums>();
     for (const row of await listLatestEntityPeriodMetrics(db, { ...scope, level })) {
       if (row.periodEnd < plan.state.period.endDate) continue;
+      // Platzierungen heißen in jeder Kampagne gleich.
+      const key =
+        level === 'placement'
+          ? `${row.amazonCampaignId}:${row.amazonEntityId}`
+          : row.amazonEntityId;
       // Bei SD der Umsatz aus Klicks (`sales`), nicht „Views & Clicks“.
-      byAmazonId.set(row.amazonEntityId, {
+      byAmazonId.set(key, {
         impressions: Number(row.impressions),
         clicks: Number(row.clicks),
         orders: Number(row.purchases),
@@ -307,10 +321,11 @@ export async function loadAutomationRunEntities(
     }
     return byAmazonId;
   };
-  const [campaignSums, adGroupSums, targetSums] = [
+  const [campaignSums, adGroupSums, targetSums, placementSums] = [
     await sums('campaign'),
     await sums('adGroup'),
     await sums('target'),
+    await sums('placement'),
   ];
   const campaigns = await db
     .select({
@@ -442,6 +457,10 @@ export async function loadAutomationRunEntities(
       costType: costType(c.extra),
       budget: c.budgetType === 'DAILY' ? c.budgetAmount : null,
       metrics: campaignSums.get(c.amazonId) ?? null,
+      placements: placementAdjustments(c.extra).map((entry) => ({
+        ...entry,
+        metrics: placementSums.get(`${c.amazonId}:${entry.placement}`) ?? null,
+      })),
     })),
     adGroups: adGroups.map((g) => ({
       id: g.id,
@@ -471,6 +490,19 @@ export async function loadAutomationRunEntities(
   };
 }
 
+/** `extra.placementBidAdjustments` (`[{ placement, percentage }]`, ungeprüft) als Liste mit Zahlen. */
+function placementAdjustments(extra: unknown): { placement: string; percent: number }[] {
+  const list = (extra as { placementBidAdjustments?: unknown } | null)?.placementBidAdjustments;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((entry) => {
+    const { placement, percentage } = (entry ?? {}) as Record<string, unknown>;
+    const percent = Number(percentage);
+    return typeof placement === 'string' && percentage != null && Number.isFinite(percent)
+      ? [{ placement, percent }]
+      : [];
+  });
+}
+
 export interface AutomationProposalInput {
   entityType: 'target' | 'campaign';
   entityId: string;
@@ -493,6 +525,8 @@ export interface SaveAutomationRunInput extends AutomationRunScope {
   /** Zähler des Laufs (geprüfte Entities, Gründe ohne Vorschlag). */
   counts: Record<string, number>;
   proposals: readonly AutomationProposalInput[];
+  /** Befunde der Prüfungen (5.10); ohne Angabe bleiben die bestehenden unberührt. */
+  findings?: readonly CheckResult[];
 }
 
 export interface SaveAutomationRunResult {
@@ -594,9 +628,18 @@ export async function saveAutomationRun(
       }
     }
 
+    const findings =
+      input.findings &&
+      (await syncAutomationFindings(tx, {
+        organizationId: input.organizationId,
+        profileId: input.profileId,
+        findings: input.findings,
+        now: new Date(),
+      }));
     const ruleNames = new Map(plan.rules.map((rule) => [rule.id, rule.name]));
     const counts = {
       ...input.counts,
+      ...(findings && { findings: findings.total }),
       proposals: proposals.length,
       staged: staged.size,
       dismissed: input.proposals.length - proposals.length,
@@ -670,6 +713,19 @@ export async function saveAutomationRun(
         params: { count: staged.size },
         link: '/ads/changes',
         dedupeKey: `automation_proposals:${runId}`,
+      });
+    }
+    // Prüfungen (5.10): nur neue Warnungen melden, Hinweise nicht.
+    if (findings && findings.addedWarnings > 0) {
+      await createNotification(tx, {
+        organizationId: input.organizationId,
+        profileId: input.profileId,
+        audience: 'members',
+        kind: 'automation_findings',
+        severity: 'warning',
+        params: { count: findings.addedWarnings },
+        link: '/ads/automations?tab=checks',
+        dedupeKey: `automation_findings:${runId}`,
       });
     }
     // Caps (5.9b): je Cap, Monat und Schwelle eine Meldung an alle, die das Profil sehen.

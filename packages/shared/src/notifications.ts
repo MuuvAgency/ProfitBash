@@ -18,6 +18,8 @@ export const NOTIFICATION_KINDS = [
   // Budget-Caps (5.9b): Warnschwelle erreicht; Prognose über dem Cap.
   'budget_cap_threshold',
   'budget_cap_forecast',
+  // Prüfungen (5.10): neue Befunde.
+  'automation_findings',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
