@@ -24,6 +24,7 @@ import {
   automationProposals,
   automationRules,
   automationRuns,
+  budgetCaps,
   clientAutomationSettings,
   clients,
   goals,
@@ -80,7 +81,7 @@ const standardMetrics = () =>
     row('target', '3002', 10, '6.00', '0', 0),
   ]);
 async function plan(): Promise<AutomationRunPlan> {
-  const result = await planAutomationRun(testDb.db, scope());
+  const result = await planAutomationRun(testDb.db, scope(), NOW);
   if (result.skip !== null) throw new Error(`Kein Plan: ${result.skip}`);
   return result;
 }
@@ -179,6 +180,7 @@ afterAll(async () => {
 beforeEach(async () => {
   const { db } = testDb;
   await db.delete(automationProposals);
+  await db.delete(budgetCaps);
   await db.delete(automationRuns);
   await db.delete(adChanges);
   await db.delete(notifications);
@@ -801,5 +803,135 @@ describe('Läufe und Vorschläge für Nutzer (5.8)', () => {
     expect(
       (await listAutomationProposals(testDb.db, { ...as(f.emil), status: 'staged' }))!.total,
     ).toBe(0);
+  });
+});
+
+describe('Budget-Caps im Lauf (5.9b)', () => {
+  // Kampagne 1001: 400 in 30 Tagen bis 07.10., davon 7 im Oktober (≈ 93,33); Tagesbudget 20.
+  const addCap = async (amount = '100') => {
+    const [row] = await testDb.db
+      .insert(budgetCaps)
+      .values({
+        organizationId: f.org,
+        profileId: f.profile,
+        scopeType: 'profile',
+        scopeIds: [],
+        amount,
+        monthAmounts: {},
+        warnPercents: [80, 100],
+      })
+      .returning({ id: budgetCaps.id });
+    return row!.id;
+  };
+  const capProposal = (patch: Partial<AutomationProposalInput> = {}) =>
+    bid({
+      entityType: 'campaign',
+      entityId: f.campaign,
+      adGroupId: null,
+      field: 'budget',
+      before: '20',
+      after: '16',
+      source: 'budget_cap',
+      ruleId: null,
+      limitedBy: ['budgetDecrease'],
+      ...patch,
+    });
+  const capNotifications = async () =>
+    (await testDb.db.select().from(notifications).orderBy(notifications.kind)).filter((n) =>
+      n.kind.startsWith('budget_cap'),
+    );
+
+  it('der Plan trägt die Caps des Profils mit Pacing; ein geänderter Cap macht einen Lauf fällig', async () => {
+    await standardMetrics();
+    const capId = await addCap();
+
+    expect((await plan()).caps).toMatchObject([
+      {
+        id: capId,
+        month: '2026-10',
+        amount: '100.00',
+        pacing: { actual: { value: '93.33' }, warnLevel: 80, forecastOver: true },
+        campaigns: [{ id: f.campaign, input: { cost: '400.00', active: true, dailyBudget: '20' } }],
+      },
+    ]);
+    await save([]);
+    expect(await planAutomationRun(testDb.db, scope(), NOW)).toEqual({ skip: 'unchanged' });
+    await testDb.db.update(budgetCaps).set({ amount: '500' }).where(eq(budgetCaps.id, capId));
+    expect((await planAutomationRun(testDb.db, scope(), NOW)).skip).toBeNull();
+    // Der Monatswechsel rechnet neu.
+    await save([]);
+    expect(
+      (await planAutomationRun(testDb.db, scope(), new Date('2026-11-02T08:00:00Z'))).skip,
+    ).toBeNull();
+  });
+
+  it('Warenkorb: Vorschläge des Enforcers tragen die Herkunft budget_cap, sperren den Lauf nicht und werden ersetzt', async () => {
+    await standardMetrics();
+    await assignClient();
+    await setClient({ mode: 'cart', responsibleUserId: f.emil });
+    const current = await plan();
+    await save([capProposal()]);
+
+    expect(await cartRows()).toMatchObject([
+      {
+        origin: 'budget_cap',
+        createdBy: f.emil,
+        field: 'budget',
+        oldAmount: '20',
+        newAmount: '16',
+      },
+    ]);
+    const entities = await loadAutomationRunEntities(testDb.db, scope(), current, NOW);
+    expect(entities.manualPending.has(f.campaign)).toBe(false);
+
+    await changeRules(1);
+    await save([capProposal({ after: '17' })]);
+    expect(await cartRows()).toMatchObject([{ origin: 'budget_cap', newAmount: '17' }]);
+  });
+
+  it('aus der Liste übernommen behält der Vorschlag die Herkunft budget_cap', async () => {
+    await standardMetrics();
+    await save([capProposal()]);
+    const [open] = await testDb.db.select({ id: automationProposals.id }).from(automationProposals);
+
+    await stageAutomationProposals(testDb.db, { userId: f.ada, orgId: f.org, ids: [open!.id] });
+    expect(await cartRows()).toMatchObject([{ origin: 'budget_cap', createdBy: f.ada }]);
+  });
+
+  it('meldet je Cap, Monat und Schwelle einmal an alle, die das Profil sehen; dazu die Prognose über dem Cap', async () => {
+    await standardMetrics();
+    const capId = await addCap();
+    await save([]);
+
+    expect(await capNotifications()).toMatchObject([
+      {
+        kind: 'budget_cap_forecast',
+        audience: 'members',
+        severity: 'warning',
+        profileId: f.profile,
+        link: '/ads/budgets',
+        params: { amount: '100.00', currencyCode: 'EUR', forecast: '413.33' },
+        dedupeKey: `budget_cap_forecast:${capId}:2026-10`,
+      },
+      {
+        kind: 'budget_cap_threshold',
+        audience: 'members',
+        severity: 'warning',
+        params: { percent: 80, amount: '100.00', currencyCode: 'EUR', actual: '93.33' },
+        dedupeKey: `budget_cap_threshold:${capId}:2026-10:80`,
+      },
+    ]);
+    await changeRules(1);
+    await save([]);
+    expect(await capNotifications()).toHaveLength(2);
+
+    // Ein kleinerer Cap ist erreicht: neue Schwelle, als Fehler.
+    await testDb.db.update(budgetCaps).set({ amount: '90' }).where(eq(budgetCaps.id, capId));
+    await save([]);
+    expect((await capNotifications()).map((n) => [n.kind, n.severity, n.params.percent])).toEqual([
+      ['budget_cap_forecast', 'warning', undefined],
+      ['budget_cap_threshold', 'warning', 80],
+      ['budget_cap_threshold', 'error', 100],
+    ]);
   });
 });

@@ -64,7 +64,7 @@ export const automationProposalSchema = z
     before: z.string().nullable(),
     after: z.string(),
     currencyCode: z.string().nullable(),
-    source: z.enum(['rule', 'optimizer']),
+    source: z.enum(['rule', 'optimizer', 'budget_cap']),
     ruleName: z.string().nullable(),
     /** Leitplanken, die den Vorschlag begrenzt haben. */
     limitedBy: z.array(z.string()),

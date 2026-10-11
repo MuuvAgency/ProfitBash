@@ -146,7 +146,7 @@ export const automationProposals = pgTable(
     oldAmount: numeric('old_amount', { mode: 'string' }),
     newAmount: numeric('new_amount', { mode: 'string' }),
     currencyCode: text('currency_code'),
-    /** `rule` | `optimizer`. */
+    /** `rule` | `optimizer` | `budget_cap` (Enforcer, 5.9b). */
     source: text('source').notNull(),
     /** Regel, die gegriffen hat, mit ihrem Namen zum Zeitpunkt des Laufs (Regeln sind änderbar). */
     ruleId: uuid('rule_id'),
@@ -170,7 +170,7 @@ export const automationProposals = pgTable(
     }).onDelete('cascade'),
     check('automation_proposals_entity_type_ck', sql`${t.entityType} in ('target', 'campaign')`),
     check('automation_proposals_field_ck', sql`${t.field} in ('bid', 'budget', 'state')`),
-    check('automation_proposals_source_ck', sql`${t.source} in ('rule', 'optimizer')`),
+    check('automation_proposals_source_ck', sql`${t.source} in ('rule', 'optimizer', 'budget_cap')`),
     check(
       'automation_proposals_status_ck',
       sql`${t.status} in ('open', 'staged', 'dismissed', 'superseded')`,

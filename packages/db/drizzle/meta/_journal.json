@@ -302,6 +302,13 @@
       "when": 1791700268096,
       "tag": "0042_budget_caps",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791701449249,
+      "tag": "0043_proposal_source_budget_cap",
+      "breakpoints": true
     }
   ]
 }
