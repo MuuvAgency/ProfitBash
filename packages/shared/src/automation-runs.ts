@@ -1,18 +1,18 @@
 import { z } from 'zod';
+import { AUTOMATION_MODES } from './automation';
 
 /**
  * Läufe und Vorschläge der Automatik (`docs/tasks/phase-5.md` 5.7, 5.8). Ein **Lauf** rechnet für ein Profil auf dem
  * Datenstand einer Datei; ein **Vorschlag** ist eine gewünschte Änderung mit Herkunft und Begründung.
  */
 
-export const AUTOMATION_RUN_MODES = ['shadow', 'cart'] as const;
-
 export const automationRunSchema = z
   .object({
     id: z.uuid(),
     profileId: z.uuid(),
     accountName: z.string(),
-    mode: z.enum(AUTOMATION_RUN_MODES),
+    /** `off`: Lauf ohne Vorschläge, nur Prüfungen und Cap-Meldungen (5.13). */
+    mode: z.enum(AUTOMATION_MODES),
     /** Datenstand: Zeitraum der Datei und Zeitpunkt ihres Uploads. */
     periodStart: z.string(),
     periodEnd: z.string(),

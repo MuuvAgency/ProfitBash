@@ -20,6 +20,8 @@ Hand hochgeladen wird. Die Automatik muss damit heute nützlich sein und später
    täglich (07:30 Berlin). Ein Lauf entsteht nur, wenn sich seit dem letzten etwas geändert hat: Ein Hash über
    Datenstand, Regeln, Ziele, Leitplanken, Modus und zuständigen Nutzer (`automation_runs.fingerprint`) entscheidet;
    sonst gibt es weder einen Lauf noch einen `job_runs`-Eintrag. Der Tageskurs gehört nicht in den Hash.
+   Der Modus „aus“ eines Clients schaltet nur die Vorschläge ab; der Lauf entsteht trotzdem und liefert Cap-Meldungen
+   und Prüfungen (Dominik, 2026-10-11, `phase-5.md` 5.13a).
 3. **Vorschläge statt Writes.** Jeder Lauf speichert, worauf er gerechnet hat, und je Vorschlag Herkunft (Regel oder
    Optimizer), vorher/nachher, Kennzahlen und begrenzende Leitplanken (`automation_runs`, `automation_proposals`). An
    Amazon geht nichts: Im Schattenmodus bleiben Vorschläge im Protokoll; im Modus `cart` werden sie ausstehende

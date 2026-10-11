@@ -20,7 +20,7 @@ import {
   DEFAULT_STRUCTURE_CATALOG,
 } from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createJobRunner } from '../run-job';
 import {
   computeAutomationProposals,
@@ -268,6 +268,42 @@ describe('runAutomation mit Prüfungen (5.10)', () => {
     ]);
     const [jobRun] = await testDb.db.select().from(jobRuns);
     expect(jobRun!.counters).toMatchObject({ findings: 2 });
+  });
+});
+
+describe('runAutomation im Modus „aus“ (5.13)', () => {
+  afterEach(async () => {
+    await testDb.db.update(schema.amazonAdsProfiles).set({ clientId: null });
+    await testDb.db.delete(schema.clients).where(eq(schema.clients.slug, 'aus'));
+  });
+
+  it('rechnet keine Vorschläge, hält aber die Befunde fest und meldet den Cap', async () => {
+    const [client] = await testDb.db
+      .insert(schema.clients)
+      .values({ organizationId: f.org, name: 'Aus', slug: 'aus' })
+      .returning({ id: schema.clients.id });
+    await testDb.db.update(schema.amazonAdsProfiles).set({ clientId: client!.id });
+    await testDb.db
+      .insert(schema.clientAutomationSettings)
+      .values({ clientId: client!.id, organizationId: f.org, mode: 'off', overrides: {} });
+    await testDb.db.insert(budgetCaps).values({
+      organizationId: f.org,
+      profileId: f.profile,
+      scopeType: 'profile',
+      scopeIds: [],
+      amount: '200',
+      monthAmounts: {},
+      warnPercents: [80, 100],
+    });
+    await run();
+
+    expect(await proposals()).toEqual([]);
+    expect(await testDb.db.select().from(automationFindings)).not.toHaveLength(0);
+    const [jobRun] = await testDb.db.select().from(jobRuns);
+    expect(jobRun!.counters).toMatchObject({ targets: 0, campaigns: 0, proposals: 0 });
+    expect((await testDb.db.select().from(schema.notifications)).map((n) => n.kind)).toContain(
+      'budget_cap_forecast',
+    );
   });
 });
 

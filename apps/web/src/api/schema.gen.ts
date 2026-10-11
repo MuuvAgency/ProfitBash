@@ -10089,7 +10089,7 @@ export interface components {
             profileId: string;
             accountName: string;
             /** @enum {string} */
-            mode: "shadow" | "cart";
+            mode: "off" | "shadow" | "cart";
             periodStart: string;
             periodEnd: string;
             metricsImportedAt: string;

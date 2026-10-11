@@ -303,7 +303,7 @@ export interface AutomationRunDeps {
 }
 
 /**
- * Ein Lauf für ein Profil. `null`, wenn keiner fällig ist (Modus „aus“, keine Kennzahlen, kein Kurs, oder seit dem
+ * Ein Lauf für ein Profil. `null`, wenn keiner fällig ist (keine Kennzahlen, kein Kurs, oder seit dem
  * letzten Lauf nichts Neues): dann entsteht auch kein `job_runs`-Eintrag.
  */
 export async function runAutomation(
@@ -322,9 +322,13 @@ export async function runAutomation(
   if (plan.skip !== null) return null;
   return runJob('automation-run', scope, async ({ runId }) => {
     const entities = await loadAutomationRunEntities(deps.db, job, plan, deps.now());
-    const { proposals, counts } = computeAutomationProposals(plan, entities);
+    // Modus „aus“ schaltet nur die Vorschläge ab; Prüfungen und Cap-Meldungen laufen (Dominik, 2026-10-11).
+    const off = plan.mode === 'off';
+    const { proposals, counts } = off
+      ? { proposals: [], counts: { targets: 0, campaigns: 0 } }
+      : computeAutomationProposals(plan, entities);
     const findings = computeAutomationFindings(plan, entities);
-    const structure = await loadStructureProposals(deps.db, job, plan);
+    const structure = off ? [] : await loadStructureProposals(deps.db, job, plan);
     const saved = await saveAutomationRun(deps.db, {
       ...job,
       plan,
