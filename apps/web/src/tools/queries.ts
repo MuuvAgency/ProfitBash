@@ -124,6 +124,31 @@ export function useSetClientPreset() {
   });
 }
 
+// --- Baustein je Kampagne (5.11a) ---------------------------------------------------------
+
+const CAMPAIGN_BLOCKS_KEY = 'campaign-blocks';
+
+export function useCampaignBlocks(profileId: Ref<string | null>) {
+  const orgId = useActiveOrgId();
+  return useQuery({
+    queryKey: computed(() => [CAMPAIGN_BLOCKS_KEY, orgId.value, profileId.value] as const),
+    queryFn: () => api.tools.campaignBlocks.list(profileId.value!),
+    enabled: computed(() => orgId.value !== null && profileId.value !== null),
+    staleTime: 30_000,
+  });
+}
+
+export function useSetCampaignBlocks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      profileId: string;
+      assignments: { campaignId: string; blockKey: string | null }[];
+    }) => api.tools.campaignBlocks.set(input),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: [CAMPAIGN_BLOCKS_KEY] }),
+  });
+}
+
 // --- Kampagnen-Setup (4.5) ---------------------------------------------------------------
 
 const SETUP_KEY = 'setup-drafts';

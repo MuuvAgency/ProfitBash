@@ -399,4 +399,138 @@ describe('Seite „Struktur-Katalog“', () => {
     expect(document.querySelector('[data-switch="launch>muuv-standard"]')).toBeNull();
     expect(document.querySelector('[data-catalog-issues]')).toBeNull();
   });
+
+  describe('Reiter „Kampagnen“ (Baustein je Kampagne, 5.11a)', () => {
+    const P1 = '00000000-0000-4000-8000-0000000000a1';
+    const K = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
+    const campaign = (n: number, name: string, extra: Record<string, unknown> = {}) => ({
+      campaignId: K(n),
+      amazonCampaignId: `100${n}`,
+      name,
+      adProduct: 'SP',
+      state: 'ENABLED',
+      blockKey: null,
+      source: null,
+      suggestedBlockKey: null,
+      ...extra,
+    });
+    const campaignRoutes = (overrides: Record<string, Responder | Response> = {}) => ({
+      'GET /api/ads/tools/product-groups': json({
+        groups: [],
+        clients: [],
+        profiles: [
+          {
+            id: P1,
+            accountName: 'Waldkauz DE',
+            countryCode: 'DE',
+            accountType: 'seller',
+            clientId: C1,
+          },
+        ],
+      }),
+      'GET /api/ads/tools/campaign-blocks': json({
+        campaigns: [
+          campaign(1, 'SP | AUTO | Flaschen', { suggestedBlockKey: 'SP-AUTO' }),
+          campaign(2, 'SP | EXACT | Flaschen', { blockKey: 'SP-KW-EXACT', source: 'setup' }),
+          campaign(3, 'Sommer', {}),
+          campaign(4, 'SP | PAT | Flaschen', { suggestedBlockKey: 'SP-PAT' }),
+        ],
+        truncated: false,
+      }),
+      'PUT /api/ads/tools/campaign-blocks': json({ changed: 1 }),
+      ...overrides,
+    });
+    async function open(overrides: Record<string, Responder | Response> = {}) {
+      const mounted = await mountPage(campaignRoutes(overrides));
+      await tab('campaigns');
+      await choose('[data-campaign-profile]', P1);
+      await found(`[data-campaign="${K(1)}"]`);
+      return mounted;
+    }
+    const sent = (requests: RecordedRequest[]) => puts(requests, '/api/ads/tools/campaign-blocks');
+
+    it('zeigt Baustein, Herkunft und Vorschlag je Kampagne', async () => {
+      await open();
+      const setup = document.querySelector(`[data-campaign="${K(2)}"]`)!;
+      expect(setup.querySelector<HTMLSelectElement>('select')!.value).toBe('SP-KW-EXACT');
+      expect(setup.textContent).toContain('aus dem Setup');
+      const suggested = document.querySelector(`[data-campaign="${K(1)}"]`)!;
+      expect(suggested.querySelector<HTMLSelectElement>('select')!.value).toBe('');
+      expect(suggested.textContent).toContain('Vorschlag: Automatisch');
+      // Nur Bausteine des Anzeigentyps stehen zur Wahl.
+      expect(suggested.querySelector('option[value="SD-PAT"]')).toBeNull();
+    });
+
+    it('bestätigt einen Vorschlag, alle Vorschläge und eine Wahl von Hand; leer nimmt sie zurück', async () => {
+      const { requests } = await open();
+      (await found<HTMLButtonElement>(`[data-campaign="${K(1)}"] [data-campaign-confirm]`)).click();
+      await flushPromises();
+      expect(sent(requests).at(-1)).toEqual({
+        profileId: P1,
+        assignments: [{ campaignId: K(1), blockKey: 'SP-AUTO' }],
+      });
+      (await found<HTMLButtonElement>('[data-campaign-confirm-all]')).click();
+      await flushPromises();
+      expect(sent(requests).at(-1)).toEqual({
+        profileId: P1,
+        assignments: [
+          { campaignId: K(1), blockKey: 'SP-AUTO' },
+          { campaignId: K(4), blockKey: 'SP-PAT' },
+        ],
+      });
+      await choose(`[data-campaign="${K(3)}"] select`, 'SP-KW-BROAD-CLUSTER');
+      expect(sent(requests).at(-1)).toEqual({
+        profileId: P1,
+        assignments: [{ campaignId: K(3), blockKey: 'SP-KW-BROAD-CLUSTER' }],
+      });
+      await choose(`[data-campaign="${K(2)}"] select`, '');
+      expect(sent(requests).at(-1)).toEqual({
+        profileId: P1,
+        assignments: [{ campaignId: K(2), blockKey: null }],
+      });
+    });
+
+    it('zeigt Fehler beim Laden und beim Speichern, einen leeren Zustand und Viewern alles lesend', async () => {
+      await open({
+        'PUT /api/ads/tools/campaign-blocks': json(
+          { error: { code: 'CAMPAIGN_BLOCK_UNKNOWN_BLOCK', message: 'x' } },
+          400,
+        ),
+      });
+      (await found<HTMLButtonElement>(`[data-campaign="${K(1)}"] [data-campaign-confirm]`)).click();
+      await vi.waitFor(() =>
+        expect(document.body.textContent).toContain('Diesen Baustein gibt es'),
+      );
+      cleanupMounted();
+
+      await mountPage(
+        campaignRoutes({
+          'GET /api/ads/tools/campaign-blocks': json({ error: { code: 'X', message: 'x' } }, 500),
+        }),
+      );
+      await tab('campaigns');
+      await choose('[data-campaign-profile]', P1);
+      await found('[data-campaigns-error]');
+      cleanupMounted();
+
+      await mountPage(
+        campaignRoutes({
+          'GET /api/ads/tools/campaign-blocks': json({ campaigns: [], truncated: false }),
+        }),
+      );
+      await tab('campaigns');
+      await choose('[data-campaign-profile]', P1);
+      await vi.waitFor(() =>
+        expect(document.body.textContent).toContain('Dieses Profil hat keine Kampagnen'),
+      );
+      cleanupMounted();
+
+      await open({ 'GET /api/me': json(meFixture({ orgRole: 'viewer' })) });
+      expect(document.querySelector('[data-campaign-confirm]')).toBeNull();
+      expect(document.querySelector('[data-campaign-confirm-all]')).toBeNull();
+      expect(
+        document.querySelector<HTMLSelectElement>(`[data-campaign="${K(1)}"] select`)!.disabled,
+      ).toBe(true);
+    });
+  });
 });

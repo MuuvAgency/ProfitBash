@@ -59,6 +59,7 @@ export type ProductGroupData = Schemas['ProductGroup'];
 export type ProductGroupListData = Schemas['ProductGroupListResponse'];
 export type AdvertisedProductsData = Schemas['AdvertisedProductsResponse'];
 export type StructureCatalogData = Schemas['StructureCatalogResponse'];
+export type CampaignBlocksData = Schemas['CampaignBlocksResponse'];
 export type PlanSetupInput = Schemas['PlanCampaignSetupRequest'];
 export type PlanSetupData = Schemas['PlanCampaignSetupResponse'];
 export type SetupDraftData = Schemas['CampaignSetupDraft'];
@@ -357,7 +358,15 @@ export function createApi(options: ApiOptions = {}) {
             }),
           ),
       },
-      /** Kampagnen-Setup (`phase-4.md` 4.5): planen, Entwürfe, übermitteln. */
+      /** Baustein je Kampagne (`phase-5.md` 5.11a). */
+      campaignBlocks: {
+        list: (profileId: string): Promise<CampaignBlocksData> =>
+          unwrap(
+            client.GET('/api/ads/tools/campaign-blocks', { params: { query: { profileId } } }),
+          ),
+        set: (body: Schemas['SetCampaignBlocksRequest']) =>
+          unwrap(client.PUT('/api/ads/tools/campaign-blocks', { body })),
+      },
       portfolios: {
         list: (profileId: string): Promise<PortfolioListData> =>
           unwrap(client.GET('/api/ads/tools/portfolios', { params: { query: { profileId } } })),
