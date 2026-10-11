@@ -262,6 +262,29 @@ describe('/api/clients/{id}/access', () => {
     ).toBe(true);
   });
 
+  it('ein Client, der (fälschlich) auf eine Agentur-Org zeigt, öffnet deren Mitglieder nicht', async () => {
+    const { db } = ctx.testDb;
+    const [other] = await db
+      .select({ id: schema.organizations.id })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.slug, 'andere'));
+    await createUser(ctx, { email: 'chef@andere.test', org: { id: other!.id, role: 'admin' } });
+    await db
+      .update(schema.clients)
+      .set({ clientOrganizationId: other!.id })
+      .where(eq(schema.clients.id, ids.sued));
+    try {
+      expect((await call('GET', access(ids.sued), admin)).status).toBe(404);
+      const res = await call('POST', access(ids.sued), admin, { email: 'y@x.test', name: 'Y' });
+      expect(res.status).toBe(404);
+    } finally {
+      await db
+        .update(schema.clients)
+        .set({ clientOrganizationId: null })
+        .where(eq(schema.clients.id, ids.sued));
+    }
+  });
+
   it('Mitglieder der Agentur lassen sich hier nicht entfernen', async () => {
     const members = await call<{ members: Member[] }>('GET', '/members', admin);
     const target = members.body.members.find((m) => m.email === 'editor@muuv.test')!;

@@ -467,11 +467,19 @@ export async function clientAccessScope(
   return db.transaction(async (tx) => {
     // Sperrt den Client, damit zwei gleichzeitige Anfragen nicht zwei Kunden-Orgs anlegen.
     const [client] = await tx
-      .select({ name: clients.name, customerOrgId: clients.clientOrganizationId })
+      .select({
+        name: clients.name,
+        customerOrgId: clients.clientOrganizationId,
+        customerOrgType: organizations.type,
+      })
       .from(clients)
+      .leftJoin(organizations, eq(organizations.id, clients.clientOrganizationId))
       .where(and(eq(clients.id, clientId), eq(clients.organizationId, admin.orgId)))
-      .for('update');
-    if (!client) throw new MemberError('NOT_FOUND', 'Client nicht gefunden.');
+      .for('update', { of: clients });
+    // Nur Kunden-Orgs: Zeigte die Verknüpfung je auf eine Agentur-Org, ließen sich sonst deren Konten übernehmen.
+    if (!client || (client.customerOrgId && client.customerOrgType !== 'client')) {
+      throw new MemberError('NOT_FOUND', 'Client nicht gefunden.');
+    }
     const scope = (orgId: string): MemberAdminInput => ({
       ...admin,
       orgId,
@@ -489,15 +497,13 @@ export async function clientAccessScope(
         createdAt: new Date(),
       })
       .returning({ id: organizations.id });
-    await tx
-      .insert(orgEntitlements)
-      .values(
-        CUSTOMER_ORG_FEATURES.map((feature) => ({
-          organizationId: org!.id,
-          feature,
-          enabled: true,
-        })),
-      );
+    await tx.insert(orgEntitlements).values(
+      CUSTOMER_ORG_FEATURES.map((feature) => ({
+        organizationId: org!.id,
+        feature,
+        enabled: true,
+      })),
+    );
     await tx.update(clients).set({ clientOrganizationId: org!.id }).where(eq(clients.id, clientId));
     await recordAuditEvent(tx, {
       organizationId: admin.orgId,
