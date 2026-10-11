@@ -12,7 +12,7 @@ const emit = defineEmits<{ read: []; navigate: [] }>();
 
 const { t } = useI18n();
 const session = useSessionStore();
-const texts = computed(() => notificationTexts(props.notification));
+const texts = computed(() => notificationTexts(props.notification, session.preferences.locale));
 const unread = computed(() => props.notification.readAt === null);
 const time = computed(() =>
   formatDateTime(props.notification.createdAt, session.preferences.locale),

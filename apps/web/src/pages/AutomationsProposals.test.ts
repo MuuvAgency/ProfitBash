@@ -132,6 +132,38 @@ describe('Seite „Automationen“: Vorschläge', () => {
     expect(first).not.toContain('bisher Standardgebot');
   });
 
+  it('Vorschläge des Enforcers nennen den Cap, Ist, Prognose und den Datenstand', async () => {
+    const capped = proposal({
+      id: P2,
+      entityType: 'campaign',
+      adGroupName: null,
+      target: null,
+      field: 'state',
+      before: 'ENABLED',
+      after: 'PAUSED',
+      currencyCode: null,
+      source: 'budget_cap',
+      ruleName: null,
+      limitedBy: [],
+      detail: {
+        capAmount: '500',
+        capCurrencyCode: 'EUR',
+        actual: '620.5',
+        forecast: '1653.33',
+        dataThrough: '2026-10-07',
+      },
+    });
+    await mountTab('proposals', {
+      'GET /api/ads/automations/proposals': json({ proposals: [capped], total: 1 }),
+    });
+    await vi.waitFor(() => expect($(`[data-proposal-row="${P2}"]`)).not.toBeNull());
+
+    expect(text(row(P2))).toContain('Budget-Cap');
+    expect(text(row(P2))).toContain(
+      'Cap 500,00 € · Ist ≈ 620,50 € · Prognose ≈ 1.653,33 € · Daten bis 07.10.2026',
+    );
+  });
+
   it('nennt es, wenn das Target bisher mit dem Standardgebot der Ad Group bietet', async () => {
     await mountTab('proposals', {
       'GET /api/ads/automations/proposals': json({

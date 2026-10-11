@@ -10379,7 +10379,9 @@
               "bulk_file_stale",
               "consent_expiring",
               "automation_proposals",
-              "automation_responsible_missing"
+              "automation_responsible_missing",
+              "budget_cap_threshold",
+              "budget_cap_forecast"
             ]
           },
           "severity": {
@@ -11851,7 +11853,8 @@
             "type": "string",
             "enum": [
               "rule",
-              "optimizer"
+              "optimizer",
+              "budget_cap"
             ]
           },
           "ruleName": {
@@ -17448,7 +17451,9 @@
                 "bulk_file_stale",
                 "consent_expiring",
                 "automation_proposals",
-                "automation_responsible_missing"
+                "automation_responsible_missing",
+                "budget_cap_threshold",
+                "budget_cap_forecast"
               ]
             },
             "required": false,

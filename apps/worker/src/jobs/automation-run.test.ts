@@ -12,6 +12,7 @@ import {
   type AdChangeFixture,
   type TestDatabase,
 } from '@profitbash/db/testing';
+import { computePacing } from '@profitbash/engine';
 import { DEFAULT_AUTOMATION_RULES, DEFAULT_GUARDRAILS } from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -29,6 +30,7 @@ const {
   amazonAdsEntityPeriodMetrics,
   automationProposals,
   automationRuns,
+  budgetCaps,
   goals,
   jobRuns,
 } = schema;
@@ -73,6 +75,7 @@ afterAll(() => testDb?.close());
 beforeEach(async () => {
   const { db } = testDb;
   await db.delete(automationProposals);
+  await db.delete(budgetCaps);
   await db.delete(automationRuns);
   await db.delete(adChanges);
   await db.delete(jobRuns);
@@ -220,6 +223,26 @@ describe('runAutomation', () => {
   });
 });
 
+describe('runAutomation mit Budget-Cap (5.9b)', () => {
+  it('legt bei Prognose über dem Cap einen Vorschlag mit Herkunft budget_cap ins Protokoll', async () => {
+    // Kampagne 1001: ≈ 93,33 im Oktober, Prognose 413,33 bei einem Cap von 200; Tagesbudget 20, höchstens −20 %.
+    await testDb.db.insert(budgetCaps).values({
+      organizationId: f.org,
+      profileId: f.profile,
+      scopeType: 'profile',
+      scopeIds: [],
+      amount: '200',
+      monthAmounts: {},
+      warnPercents: [80, 100],
+    });
+    await run();
+
+    const rows = (await proposals()).filter((x) => x.entityId === f.campaign);
+    expect(rows).toMatchObject([{ field: 'budget', source: 'budget_cap', ruleName: null }]);
+    expect([Number(rows[0]!.oldAmount), Number(rows[0]!.newAmount)]).toEqual([20, 16]);
+  });
+});
+
 describe('computeAutomationProposals', () => {
   const metrics = { impressions: 9000, clicks: 100, orders: 0, spend: '1600.00', sales: '0' };
   const plan = (patch: Partial<AutomationRunPlan> = {}): AutomationRunPlan => ({
@@ -233,6 +256,7 @@ describe('computeAutomationProposals', () => {
     goals: [{ scope: 'profile', scopeId: 'p1', metric: 'acos', value: '20' }],
     protectedTerms: [],
     state: { period: PERIOD, importedAt: NOW, source: 'file' },
+    caps: [],
     fingerprint: 'x',
     warnings: [],
     ...patch,
@@ -324,6 +348,103 @@ describe('computeAutomationProposals', () => {
     expect(
       computeAutomationProposals(withRule, stale).proposals.filter((x) => x.field === 'budget'),
     ).toEqual([]);
+  });
+
+  describe('Budget-Caps (5.9b)', () => {
+    // c1: 1600 in 30 Tagen bis 07.10., davon 7 im Oktober (≈ 373,33, untere Schätzung 186,67); je Tag 53,33.
+    const cap = (id: string, amount: string): AutomationRunPlan['caps'][number] => ({
+      id,
+      month: '2026-10',
+      amount,
+      warnPercents: [80, 100],
+      pacing: computePacing({
+        month: '2026-10',
+        cap: amount,
+        warnPercents: [80, 100],
+        campaigns: [input],
+      }),
+      campaigns: [{ id: 'c1', input }],
+    });
+    const input = {
+      cost: '1600.00',
+      periodStart: PERIOD.startDate,
+      periodEnd: PERIOD.endDate,
+      active: true,
+      dailyBudget: '200.00',
+    };
+    const budgetRule = { ...DEFAULT_AUTOMATION_RULES[2]!, enabled: true };
+    const campaignProposals = (caps: AutomationRunPlan['caps'], patch = {}) =>
+      computeAutomationProposals(plan({ rules: [budgetRule], caps }), entities(patch));
+
+    it('Prognose über dem Cap: der Enforcer senkt das Tagesbudget, die Budget-Regel ruht', () => {
+      const { proposals } = campaignProposals([cap('cap1', '500')]);
+      expect(proposals.filter((x) => x.entityType === 'campaign')).toMatchObject([
+        {
+          entityId: 'c1',
+          campaignId: 'c1',
+          adGroupId: null,
+          field: 'budget',
+          before: '200',
+          after: '160',
+          source: 'budget_cap',
+          ruleId: null,
+          limitedBy: ['budgetDecrease'],
+          detail: {
+            capId: 'cap1',
+            capAmount: '500',
+            month: '2026-10',
+            actual: '373.33',
+            forecast: '1653.33',
+            desired: '5.28',
+            spend: '1600.00',
+          },
+        },
+      ]);
+    });
+
+    it('Prognose unter dem Cap: die Regel gilt wie bisher', () => {
+      const { proposals } = campaignProposals([cap('cap1', '5000')]);
+      expect(proposals.filter((x) => x.entityType === 'campaign')).toMatchObject([
+        { field: 'budget', after: '180', source: 'rule', ruleId: budgetRule.id },
+      ]);
+    });
+
+    it('untere Schätzung über dem Cap: pausieren; bei mehreren Caps gilt der strengste Vorschlag', () => {
+      const { proposals } = campaignProposals([cap('cap1', '500'), cap('cap2', '100')]);
+      expect(proposals.filter((x) => x.entityType === 'campaign')).toMatchObject([
+        {
+          field: 'state',
+          before: 'ENABLED',
+          after: 'PAUSED',
+          source: 'budget_cap',
+          limitedBy: [],
+          detail: { capId: 'cap2', actualLow: '186.67', dataThrough: '2026-10-07' },
+        },
+      ]);
+    });
+
+    it('rechnet mit dem Budget aus einer übermittelten Änderung und lässt händisch belegte Kampagnen aus', () => {
+      const lowered = campaignProposals([cap('cap1', '500')], {
+        bases: new Map([['c1:budget', { base: '150.00', windowStart: '200.00' }]]),
+      });
+      expect(lowered.proposals.filter((x) => x.entityType === 'campaign')).toMatchObject([
+        { before: '150', after: '120', source: 'budget_cap' },
+      ]);
+      const manual = campaignProposals([cap('cap1', '500')], { manualPending: new Set(['c1']) });
+      expect(manual.proposals.filter((x) => x.entityType === 'campaign')).toEqual([]);
+      expect(manual.counts.manualPending).toBe(1);
+    });
+
+    it('nichts zu senken (Budget schon am Minimum): kein Vorschlag, gezählt als budgetCap', () => {
+      const atMinimum = entities();
+      atMinimum.campaigns[0]!.budget = '0.01';
+      const result = computeAutomationProposals(
+        plan({ rules: [budgetRule], caps: [cap('cap1', '500')] }),
+        atMinimum,
+      );
+      expect(result.proposals.filter((x) => x.entityType === 'campaign')).toEqual([]);
+      expect(result.counts.budgetCap).toBe(1);
+    });
   });
 });
 
