@@ -14,8 +14,10 @@ import {
   decideCampaign,
   decideTarget,
   effectiveGoal,
+  enforceCap,
   formatDecimal,
   parseDecimal,
+  type CapAction,
   type Decision,
 } from '@profitbash/engine';
 import { z } from 'zod';
@@ -38,7 +40,12 @@ const state = (value: string | null) => value?.toUpperCase() ?? '';
 
 /**
  * Rechnet die Vorschläge eines Laufs (ohne I/O). `counts`: geprüfte Targets und Kampagnen und je Grund, wie oft es
- * keinen Vorschlag gab (`manualPending`: von Hand gelegte offene Änderung).
+ * keinen Vorschlag gab (`manualPending`: von Hand gelegte offene Änderung; `budgetCap`: Kampagne unter einem Cap
+ * mit Prognose über dem Betrag, bei der es nichts zu senken gibt).
+ *
+ * Vorrang (Dominik, 2026-10-11): Liegt die Prognose eines Caps über dem Betrag, gilt für dessen Kampagnen der
+ * Vorschlag des Enforcers, Budget-Regeln ruhen dort. Fällt eine Kampagne unter mehrere solche Caps, gilt der
+ * strengste Vorschlag (pausieren vor dem niedrigsten Budget).
  */
 export function computeAutomationProposals(
   plan: AutomationRunPlan,
@@ -143,6 +150,42 @@ export function computeAutomationProposals(
     );
   }
 
+  const budgetOf = (campaign: AutomationRunEntities['campaigns'][number]) =>
+    entities.bases.get(`${campaign.id}:budget`)?.base ?? campaign.budget;
+  const capped = new Set<string>();
+  const capActions = new Map<string, { action: CapAction; cap: (typeof plan.caps)[number] }>();
+  for (const cap of plan.caps) {
+    if (!cap.pacing.forecastOver) continue;
+    const actions = enforceCap({
+      month: cap.month,
+      cap: cap.amount,
+      maxBudgetDecreasePercent: plan.guardrails.maxBudgetDecreasePercent,
+      // Alle Kampagnen im Umfang zählen fürs Ist; senken lässt sich nur, was der Lauf kennt.
+      campaigns: cap.campaigns.flatMap(({ id, input }) => {
+        if (input === null) return [];
+        const campaign = campaigns.get(id);
+        if (!campaign) return [{ ...input, id, active: false, limit: null }];
+        capped.add(id);
+        return [
+          {
+            ...input,
+            id,
+            dailyBudget: budgetOf(campaign),
+            limit: limit(campaign.adProduct, 'budget', campaign.costType),
+          },
+        ];
+      }),
+    });
+    for (const action of actions) {
+      const other = capActions.get(action.id)?.action;
+      const stricter =
+        other === undefined ||
+        (other.field === 'budget' &&
+          (action.field === 'state' || parseDecimal(action.after).lt(parseDecimal(other.after))));
+      if (stricter) capActions.set(action.id, { action, cap });
+    }
+  }
+
   for (const campaign of entities.campaigns) {
     // Ohne Kennzahlen im Datenstand (fehlt in der neuesten Datei) gibt es nichts zu prüfen.
     if (campaign.metrics === null) continue;
@@ -151,11 +194,49 @@ export function computeAutomationProposals(
       count('manualPending');
       continue;
     }
+    if (capped.has(campaign.id)) {
+      const hit = capActions.get(campaign.id);
+      if (!hit) {
+        count('budgetCap');
+        continue;
+      }
+      const { action, cap } = hit;
+      proposals.push({
+        entityType: 'campaign',
+        entityId: campaign.id,
+        campaignId: campaign.id,
+        adGroupId: null,
+        source: 'budget_cap',
+        ruleId: null,
+        ...(action.field === 'state'
+          ? { field: 'state', before: ACTIVE, after: 'PAUSED', limitedBy: [] }
+          : {
+              field: 'budget',
+              before: action.before,
+              after: action.after,
+              limitedBy: action.limitedBy,
+            }),
+        detail: {
+          ...campaign.metrics,
+          period: plan.state.period,
+          capId: cap.id,
+          capAmount: cap.amount,
+          capCurrencyCode: profile.currencyCode,
+          month: cap.month,
+          actual: cap.pacing.actual.value,
+          actualLow: cap.pacing.actual.low,
+          forecast: cap.pacing.forecast.value,
+          dataThrough: cap.pacing.dataThrough,
+          ...(action.field === 'budget' && { desired: action.desired }),
+        },
+      });
+      continue;
+    }
     // Kampagnen tragen Produkte mehrerer Gruppen: Es gilt das Ziel von Profil bzw. Client.
     const goal = goalAcos([]);
     const decision = decideCampaign({
       state: state(campaign.state),
-      budget: entities.bases.get(`${campaign.id}:budget`)?.base ?? campaign.budget,
+      budget: budgetOf(campaign),
       metrics: campaign.metrics,
       goalAcos: goal,
       maxBudgetDecreasePercent: plan.guardrails.maxBudgetDecreasePercent,
@@ -190,7 +271,7 @@ export async function runAutomation(
   const scope = { organizationId: job.organizationId, scope: job.profileId };
   let plan: Awaited<ReturnType<typeof planAutomationRun>>;
   try {
-    plan = await planAutomationRun(deps.db, job);
+    plan = await planAutomationRun(deps.db, job, deps.now());
   } catch (error) {
     // Auch ein Fehler vor dem Lauf gehört in `job_runs`, sonst bliebe er unsichtbar.
     return runJob('automation-run', scope, () => Promise.reject(error));

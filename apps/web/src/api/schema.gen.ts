@@ -5590,7 +5590,7 @@ export interface paths {
             parameters: {
                 query?: {
                     unread?: "true" | "false";
-                    kind?: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing";
+                    kind?: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing" | "budget_cap_threshold" | "budget_cap_forecast";
                     profileId?: string;
                     before?: number;
                     limit?: number;
@@ -9211,7 +9211,7 @@ export interface components {
             id: string;
             seq: number;
             /** @enum {string} */
-            kind: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing";
+            kind: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing" | "budget_cap_threshold" | "budget_cap_forecast";
             /** @enum {string} */
             severity: "info" | "success" | "warning" | "error";
             /** Format: uuid */
@@ -9551,7 +9551,7 @@ export interface components {
             after: string;
             currencyCode: string | null;
             /** @enum {string} */
-            source: "rule" | "optimizer";
+            source: "rule" | "optimizer" | "budget_cap";
             ruleName: string | null;
             limitedBy: string[];
             detail: {

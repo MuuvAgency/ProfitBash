@@ -2,6 +2,7 @@
 import {
   AUTOMATION_PROPOSAL_FILTERS,
   formatCurrency,
+  formatDay,
   formatNumber,
   MISSING_VALUE,
 } from '@profitbash/shared';
@@ -59,8 +60,8 @@ function value(x: AutomationProposalData, raw: string | null) {
   return x.currencyCode ? formatCurrency(raw, x.currencyCode, locale.value) : raw;
 }
 const source = (x: AutomationProposalData) =>
-  x.source === 'optimizer'
-    ? t('automations.proposals.source.optimizer')
+  x.source !== 'rule'
+    ? t(`automations.proposals.source.${x.source}`)
     : x.ruleName
       ? t('automations.proposals.source.rule', { name: x.ruleName })
       : t('automations.proposals.source.ruleUnnamed');
@@ -79,7 +80,20 @@ function metrics(x: AutomationProposalData): string[] {
     typeof n === 'number'
       ? t(`automations.proposals.metrics.${key}`, { n: formatNumber(n, locale.value) }, n)
       : null;
+  // Enforcer (5.9b): Der Zustand hat keine Währung, deshalb steht die des Caps in der Begründung.
+  const { capAmount, capCurrencyCode, actual, forecast, dataThrough } = x.detail;
+  const capMoney = (raw: unknown) =>
+    typeof raw === 'string' && typeof capCurrencyCode === 'string'
+      ? formatCurrency(raw, capCurrencyCode, locale.value)
+      : '';
   return [
+    typeof capAmount === 'string' &&
+      t('automations.proposals.cap', {
+        amount: capMoney(capAmount),
+        actual: capMoney(actual),
+        forecast: capMoney(forecast),
+        day: formatDay(typeof dataThrough === 'string' ? dataThrough : null, locale.value),
+      }),
     counted('clicks', clicks),
     counted('orders', orders),
     amount(spend) && t('automations.proposals.metrics.spend', { amount: amount(spend) }),

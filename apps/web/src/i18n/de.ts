@@ -1278,7 +1278,13 @@ export const de = {
       field: { bid: 'Gebot', budget: 'Tagesbudget', state: 'Zustand' },
       state: { ENABLED: 'Aktiv', PAUSED: 'Pausiert' },
       noOwnBid: 'bisher Standardgebot',
-      source: { rule: 'Regel: {name}', ruleUnnamed: 'Regel', optimizer: 'Optimizer' },
+      source: {
+        rule: 'Regel: {name}',
+        ruleUnnamed: 'Regel',
+        optimizer: 'Optimizer',
+        budget_cap: 'Budget-Cap',
+      },
+      cap: 'Cap {amount} · Ist ≈ {actual} · Prognose ≈ {forecast} · Daten bis {day}',
       limitedBy: 'Begrenzt durch: {reasons}',
       guardrail: {
         weeklyChange: 'Änderung je 7 Tage',
@@ -2629,6 +2635,16 @@ export const de = {
         label: 'Neue Vorschläge der Automatik',
         title: 'Neue Vorschläge der Automatik',
         text: '{profileName}: {count} Vorschlag liegt in deinem Warenkorb. | {profileName}: {count} Vorschläge liegen in deinem Warenkorb.',
+      },
+      budget_cap_threshold: {
+        label: 'Budget-Cap: Schwelle erreicht',
+        title: 'Budget-Cap: Schwelle erreicht',
+        text: '{profileName}: {percent} % des Caps von {amount} erreicht (Ist ≈ {actual}).',
+      },
+      budget_cap_forecast: {
+        label: 'Budget-Cap: Prognose über dem Cap',
+        title: 'Prognose über dem Budget-Cap',
+        text: '{profileName}: Die Prognose zum Monatsende (≈ {forecast}) liegt über dem Cap von {amount}. Vorschläge stehen unter Automationen.',
       },
       automation_responsible_missing: {
         label: 'Automatik ohne Zuständigen',

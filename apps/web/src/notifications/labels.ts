@@ -1,11 +1,14 @@
-import type { Notification } from '@profitbash/shared';
+import { formatCurrency, type Locale, type Notification } from '@profitbash/shared';
 import { i18n } from '../i18n';
 
 /**
  * Titel und Text einer Benachrichtigung (5.2b) aus `notifications.kind.<kind>` und den Parametern des Servers.
  * Fehlt ein Parameter (ältere Zeilen, neue Arten), bleibt der Text lesbar.
  */
-export function notificationTexts(notification: Notification): { title: string; text: string } {
+export function notificationTexts(
+  notification: Notification,
+  locale: Locale = 'de-DE',
+): { title: string; text: string } {
   const { t, te } = i18n.global;
   const { kind, params, profileName } = notification;
   const key = `notifications.kind.${kind}`;
@@ -17,6 +20,8 @@ export function notificationTexts(notification: Notification): { title: string; 
     const value = Number(params[name] ?? 0);
     return Number.isFinite(value) ? value : 0;
   };
+  const money = (name: string) =>
+    str(name) && str('currencyCode') ? formatCurrency(str(name), str('currencyCode'), locale) : '';
   const channel = str('channel');
   const channelKey = `changes.channel.${channel}`;
   const where = [profileName, channel && te(channelKey) ? t(channelKey) : null]
@@ -33,6 +38,11 @@ export function notificationTexts(notification: Notification): { title: string; 
     // `{count}` liefert vue-i18n aus dem Plural; ein eigener Parameter `count` überschriebe ihn.
     days: num('days'),
     account: str('account') || t('notifications.thisConnection'),
+    // Budget-Caps (5.9b)
+    percent: num('percent'),
+    amount: money('amount'),
+    actual: money('actual'),
+    forecast: money('forecast'),
   };
   const plural =
     kind === 'submission_failed'

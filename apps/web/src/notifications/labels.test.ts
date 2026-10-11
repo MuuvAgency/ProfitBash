@@ -28,6 +28,24 @@ describe('notificationTexts', () => {
     expect(missing).toEqual([]);
   });
 
+  it('Budget-Caps: Schwelle und Prognose mit Beträgen in der Währung des Profils', () => {
+    const amounts = { amount: '1000.00', currencyCode: 'EUR' };
+    expect(
+      texts({
+        kind: 'budget_cap_threshold',
+        params: { ...amounts, percent: 80, actual: '812.5' },
+      }).text.replaceAll('\u00a0', ' '),
+    ).toBe('Nordwind DE: 80 % des Caps von 1.000,00 € erreicht (Ist ≈ 812,50 €).');
+    expect(
+      texts({
+        kind: 'budget_cap_forecast',
+        params: { ...amounts, forecast: '1450' },
+      }).text.replaceAll('\u00a0', ' '),
+    ).toBe(
+      'Nordwind DE: Die Prognose zum Monatsende (≈ 1.450,00 €) liegt über dem Cap von 1.000,00 €. Vorschläge stehen unter Automationen.',
+    );
+  });
+
   it('setzt Parameter, Profil und Weg ein', () => {
     expect(texts({ kind: 'automation_proposals', params: { count: 1 } }).text).toBe(
       'Nordwind DE: 1 Vorschlag liegt in deinem Warenkorb.',
