@@ -54,10 +54,21 @@ function toPlatformRole(role: string | null | undefined): PlatformRole {
 }
 
 /**
+ * Was ein Login einer Kunden-Org (`organizations.type = client`) aufrufen darf (`phase-6.md` F1). Alles andere
+ * lehnt `requireSession` ab, auch jede neue Route (fail-closed). Welche Daten eine freigegebene Route zeigt,
+ * entscheidet weiter der Access-Layer.
+ */
+function isOpenForCustomerOrgs(path: string): boolean {
+  // Eigene Einstellungen des Nutzers (Darstellung), keine Daten der Agentur.
+  return path === '/api/me' || path === '/api/settings' || path.startsWith('/api/settings/');
+}
+
+/**
  * Verlangt eine gültige Session und setzt `c.var.auth`: Nutzer, Mitgliedschaften und die aktive
  * Organisation. Die aktive Org kommt aus der Session, sofern der Nutzer dort (noch) Mitglied ist,
  * sonst die älteste Mitgliedschaft; dieser Fallback wird in die Session zurückgeschrieben, damit
- * better-auth-Endpunkte dieselbe Org sehen. Rollen werden bei jeder Anfrage frisch gelesen.
+ * better-auth-Endpunkte dieselbe Org sehen. Rollen werden bei jeder Anfrage frisch gelesen. Ist die aktive
+ * Organisation eine Kunden-Org, sind nur die dafür freigegebenen Pfade erreichbar (`isOpenForCustomerOrgs`).
  *
  * Verlängert better-auth die Session dabei, wird der neue Cookie an den Browser weitergereicht.
  */
@@ -84,6 +95,10 @@ export function requireSession({
         .update(sessions)
         .set({ activeOrganizationId })
         .where(eq(sessions.id, result.session.id));
+    }
+
+    if (activeOrganization?.type === 'client' && !isOpenForCustomerOrgs(c.req.path)) {
+      throw new ApiError(403, 'CUSTOMER_ORG_FORBIDDEN', 'Für Kundenzugänge nicht freigegeben.');
     }
 
     c.set('auth', {
