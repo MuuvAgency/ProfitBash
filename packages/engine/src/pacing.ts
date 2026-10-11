@@ -74,10 +74,47 @@ export function monthInTimeZone(now: Date, timeZone: string): string {
     .slice(0, 7);
 }
 
+/** Grenzen des Monats als Tagesnummern. */
+function monthBounds(value: string) {
+  const [year, month] = value.split('-').map(Number) as [number, number];
+  return {
+    monthStart: Date.UTC(year, month - 1, 1) / DAY_MS,
+    monthEnd: Date.UTC(year, month, 0) / DAY_MS,
+  };
+}
+
+/**
+ * Anteil einer Kampagne am Monat: Ausgaben im Monat (`share`), Ausgaben des Zeitraums außerhalb (`outside`), letzter
+ * Tag mit Daten im Monat und was sie nach dem Datenstand voraussichtlich je Tag ausgibt. `null` für einen Zeitraum,
+ * der vor seinem Anfang endet.
+ */
+export function campaignPacing(month: string, campaign: PacingCampaign) {
+  const { monthStart, monthEnd } = monthBounds(month);
+  const start = dayNumber(campaign.periodStart);
+  const end = dayNumber(campaign.periodEnd);
+  const days = end - start + 1;
+  if (days <= 0) return null;
+  const inMonth = Math.max(0, Math.min(end, monthEnd) - Math.max(start, monthStart) + 1);
+  const cost = parseDecimal(campaign.cost);
+  const rate = cost.div(days);
+  const share = rate.mul(inMonth);
+  const perDay = !campaign.active
+    ? new Dec(0)
+    : campaign.dailyBudget === null
+      ? rate
+      : Dec.min(rate, parseDecimal(campaign.dailyBudget));
+  return {
+    share,
+    outside: cost.minus(share),
+    lastDay: inMonth > 0 ? Math.min(end, monthEnd) : null,
+    /** Tage des Monats nach dem Datenstand. */
+    remainingDays: Math.max(0, monthEnd - Math.max(end, monthStart - 1)),
+    perDay,
+  };
+}
+
 export function computePacing(input: PacingInput): Pacing {
-  const [year, month] = input.month.split('-').map(Number) as [number, number];
-  const monthStart = Date.UTC(year, month - 1, 1) / DAY_MS;
-  const monthEnd = Date.UTC(year, month, 0) / DAY_MS;
+  const { monthStart, monthEnd } = monthBounds(input.month);
   const daysInMonth = monthEnd - monthStart + 1;
   const spread = parseDecimal(input.spread ?? PACING_SPREAD);
   const cap = parseDecimal(input.cap);
@@ -88,28 +125,17 @@ export function computePacing(input: PacingInput): Pacing {
   let lastDay: number | null = null;
   let exact = true;
   for (const campaign of input.campaigns) {
-    const start = dayNumber(campaign.periodStart);
-    const end = dayNumber(campaign.periodEnd);
-    const days = end - start + 1;
-    if (days <= 0) continue;
-    const inMonth = Math.max(0, Math.min(end, monthEnd) - Math.max(start, monthStart) + 1);
-    const cost = parseDecimal(campaign.cost);
-    const rate = cost.div(days);
-    const share = rate.mul(inMonth);
-    actual = actual.plus(share);
-    if (inMonth > 0) {
-      lastDay = Math.max(lastDay ?? 0, Math.min(end, monthEnd));
-      if (inMonth < days) {
+    const part = campaignPacing(input.month, campaign);
+    if (part === null) continue;
+    actual = actual.plus(part.share);
+    if (part.lastDay !== null) {
+      lastDay = Math.max(lastDay ?? 0, part.lastDay);
+      if (!part.outside.isZero()) {
         exact = false;
-        uncertainty = uncertainty.plus(Dec.min(share, cost.minus(share)).mul(spread));
+        uncertainty = uncertainty.plus(Dec.min(part.share, part.outside).mul(spread));
       }
     }
-    if (campaign.active) {
-      const remaining = Math.max(0, monthEnd - Math.max(end, monthStart - 1));
-      const perDay =
-        campaign.dailyBudget === null ? rate : Dec.min(rate, parseDecimal(campaign.dailyBudget));
-      future = future.plus(perDay.mul(remaining));
-    }
+    future = future.plus(part.perDay.mul(part.remainingDays));
   }
 
   const elapsedDays = lastDay === null ? 0 : lastDay - monthStart + 1;
