@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8. Als Nächstes: 5.9a.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a. Als Nächstes: 5.9b.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -567,11 +567,58 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **ADR 006, Punkt 7 bestätigt:** Angewendete Änderungen zählen nur 7 Tage als Ausgangswert der Leitplanken.
 
 ### 5.9a Budgets: Caps und Pacing (`/ads/budgets`)
-- [ ] Tabelle Caps: Profil, Monat (einmalig oder jeden Monat), Betrag in der Währung des Profils, Umfang (ganzes Profil,
+- [x] Tabelle Caps: Profil, Monat (einmalig oder jeden Monat), Betrag in der Währung des Profils, Umfang (ganzes Profil,
       Portfolios oder Tags), Warnschwellen.
-- [ ] Engine Pacing: Ist im Monat (Tageswerte exakt; Zeitraumsummen anteilig, „≈“, mit unterer und oberer Schätzung), Soll
+- [x] Engine Pacing: Ist im Monat (Tageswerte exakt; Zeitraumsummen anteilig, „≈“, mit unterer und oberer Schätzung), Soll
       linear, Prognose zum Monatsende; Tests für Monatswechsel, Datei über zwei Monate, Zeitzone des Profils.
-- [ ] Seite: Caps je Profil, Balken Ist/Soll/Prognose, Datenstand, Kampagnen im Umfang.
+- [x] Seite: Caps je Profil, Balken Ist/Soll/Prognose, Datenstand, Kampagnen im Umfang.
+- [x] Umsetzung (2026-10-11, Stand für 5.9b und 5.10):
+  - **Engine** `packages/engine/src/pacing.ts`: `computePacing({ month, cap, warnPercents, campaigns })` rechnet je
+    Kampagne aus Ausgaben und Zeitraum ihres Datenstands und summiert: `actual`, `forecast` (je `value`, `low`,
+    `high`), `planned` (Cap × Tage bis zum Datenstand / Tage des Monats), `exact`, `dataThrough`, `warnLevel`
+    (höchste erreichte Schwelle), `forecastOver`. `monthInTimeZone(now, timeZone)` liefert den laufenden Monat des
+    Profils. **Eigene Annahmen:** Ragt der Zeitraum über den Monat hinaus, zählt der Anteil nach Tagen („≈“), die
+    Spanne ist ± 50 % des kleineren Teils (im Monat oder außerhalb; `PACING_SPREAD`). Die Prognose rechnet nach dem
+    Datenstand je aktiver Kampagne den Tagesschnitt ihres Zeitraums fort, höchstens ihr Tagesbudget; pausierte
+    geben nichts mehr aus. Die Spanne der Prognose ist die des Ist.
+  - **Shared** `packages/shared/src/budgets.ts`: `budgetCapInputSchema` (Profil, Umfang `profile` | `portfolios` |
+    `tags` mit internen IDs, Betrag über 0 mit zwei Stellen, `monthAmounts` `JJJJ-MM` → Betrag, bis zu drei
+    Warnschwellen 1–100, Start 80 und 100), Schemas der Übersicht. Höchstens 20 Caps je Profil.
+  - **Tabelle** `budget_caps` (Migration `0042_budget_caps`): Profil, `scope_type`, `scope_ids` (jsonb, ohne
+    Fremdschlüssel: ein gelöschtes Tag fällt aus dem Umfang), `amount`, `month_amounts`, `warn_percents`.
+    **„Einmalig“ ist die Ausnahme eines Monats** am Dauer-Cap (Dominik, 2026-10-11); einen Cap, der nur einen
+    Monat lang gilt, gibt es nicht.
+  - **Zugriffe** `packages/db/src/budget-caps.ts` (über `visibleProfilesScope`): `getBudgetsOverview` (sichtbare
+    Profile mit Caps, Pacing im laufenden Monat, Portfolios und Tags für den Umfang, je Cap die 50 Kampagnen mit
+    den höchsten Ausgaben), `saveBudgetCap` (anlegen bzw. ändern; Portfolios müssen zum Profil gehören, Tags zur
+    Organisation; Audit `budget_cap.create` / `.update` nur bei einer Änderung), `deleteBudgetCap` (Audit
+    `budget_cap.delete`). **Kennzahlen:** Tageswerte des Monats (`amazon_ads_campaign_daily_metrics`, Profile mit
+    API-Reports bzw. Demo-Daten) zählen exakt und gehen vor; sonst die Summen des Datenstands je Kampagne
+    (`listLatestEntityPeriodMetrics`, auch aus älteren Dateien). Entfernte Kampagnen zählen beim Ist mit.
+  - **API** (Feature `budgets`): `GET /ads/budgets` (`view`), `POST /ads/budgets/caps`, `PUT` und `DELETE
+    /ads/budgets/caps/{id}` (`write`; 404 `BUDGET_CAP_NOT_FOUND`, 400 `BUDGET_CAP_INVALID_SCOPE`, 409
+    `BUDGET_CAP_LIMIT_REACHED`).
+  - **Seite** `BudgetsPage.vue`: je Profil Monat und Datenstand, je Cap Umfang, Betrag (mit Hinweis auf den
+    abweichenden Monat), Balken (Ist, Prognose hell dahinter, Strich fürs Soll), Ist mit „≈“ und Spanne, Soll bis
+    zum Datenstand, Prognose, erreichte Warnschwelle, „Prognose über dem Cap“, aufklappbar die Kampagnen im
+    Umfang. Dialog: Umfang, Betrag, abweichende Monate, Warnschwellen; geprüft mit dem Schema aus shared. Viewer
+    lesen nur. Skeleton, leerer Zustand, Fehler.
+  - **Browser-Pane (2026-10-11):** mit den Tageswerten der Demo-Profile geprüft (Cap anlegen, Anzeige mit
+    Warnschwelle und Prognose, Kampagnenliste, Dialog, löschen; Desktop dunkel, Handy hell ohne waagerechtes
+    Scrollen, Konsole). Der Test-Cap ist wieder gelöscht; in der Dev-DB bleiben zwei Audit-Events
+    (`budget_cap.create`, `budget_cap.delete`). Dev-DB migriert bis `0042_budget_caps`.
+  - **Review (ponytail-review):** Zeitraum mit Ende vor Anfang ergab `Infinity` (jetzt übersprungen, Test);
+    `shortcut:` für die Abfragen je Profil; Platzhalter `JJJJ-MM` am Monatsfeld. Zurückgewiesen: Speichern ohne
+    Änderung setzt `updated_at` neu (kein Audit).
+  - **Nicht gebaut:** Meldungen zu den Warnschwellen (brauchen den Lauf, kommen mit 5.9b); Rückfrage vor dem
+    Löschen; Pacing vergangener oder künftiger Monate; Verlaufskurve (`plan.md` §7); Caps in einer anderen
+    Währung als der des Profils. Die Schätzung mit Zeitraumsummen ist nur im Test und nicht im Browser geprüft
+    (keine Datei mit Kennzahlen in der Dev-DB).
+  - **Nicht nach TDD im strengen Sinn:** Der Test des Schemas in shared lief erst nach dem Schema (sofort grün);
+    Engine, Zugriffe, API und Seite liefen vorher rot.
+  - **Für 5.9b:** `withPacing` in `budget-caps.ts` rechnet Caps eines Profils samt Kampagnen im Umfang; für den
+    Lauf als Systemzugriff herausführen (ohne Sichtbarkeit). `forecastOver` löst den Enforcer aus, `warnLevel`
+    die Meldungen; „pausieren“ bei `actual.low` über dem Cap.
 
 ### 5.9b Budgets: Enforcer (nach 5.7)
 - [ ] Im Lauf: Prognose über Cap → Benachrichtigung und Vorschlag „Tagesbudgets anteilig senken“ (Herkunft `budget_cap`,

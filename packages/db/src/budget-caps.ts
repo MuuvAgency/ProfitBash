@@ -291,6 +291,7 @@ export async function getBudgetsOverview(
     ...portfolios.map((p) => [p.id, p.name ?? p.amazonPortfolioId] as const),
   ]);
 
+  // shortcut: bis zu fünf Abfragen je Profil; bei sehr vielen Profilen je Tabelle eine Abfrage über alle.
   const result: BudgetsOverviewRecord['profiles'] = [];
   for (const profile of profiles) {
     const scope = { organizationId: input.orgId, profileId: profile.id };
