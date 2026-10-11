@@ -7,7 +7,8 @@
   abweichenden Regeln je Profil (`search_term_rule_overrides`) und die Änderungen an Amazon-Werbung (`ad_changes`),
   am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`),
   am 2026-10-10 um Benachrichtigungen (`notifications`, `notification_reads`),
-  am 2026-10-11 um das Audit-Log und die Freigaben je Client (`member_client_grants`)
+  am 2026-10-11 um das Audit-Log, die Freigaben je Client (`member_client_grants`) und die Kunden-Org
+  (`clients.client_organization_id`)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -112,12 +113,24 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   und ändert Presets je Client nur für sichtbare Clients. Bewusst org-weit bleiben für Eingeschränkte: Regeln der
   Automatik (nennen Clients nur als ID), Katalog, Tags, die Zähler „Produktgruppen je Preset“ (nur Zahlen) und
   Benachrichtigungen ohne Profil. Ein Client mit Freigaben lässt sich in der DB nicht löschen (kein `cascade`).
+- **Kunden-Org** (ab Phase 6, 6.3a): `clients.client_organization_id` (eindeutig) verknüpft eine Organisation mit
+  `type = client` mit genau einem Client der Eigentümer-Org. Der Access-Layer wertet das in `getMembership` aus:
+  Mitglieder der Kunden-Org sehen die nicht ausgeblendeten, nicht entfernten Profile dieses Clients (`organization_id`
+  der Eigentümer-Org), nie mit `includeHidden`/`includeRemoved`; `visibleClientIds()` nennt nur diesen Client; ohne
+  Verknüpfung sehen sie nichts. Ihre Rolle gilt immer als `viewer` (`getOrgRole()`, `listMemberships()`), egal was
+  gespeichert ist, damit gibt es nie `write` und keine Admin-Routen. Zusätzlich lässt die API für Kunden-Orgs nur
+  ausdrücklich freigegebene Pfade zu (`isOpenForCustomerOrgs` in `requireSession`, sonst 403
+  `CUSTOMER_ORG_FORBIDDEN`): Neue Routen sind für Kunden geschlossen, bis sie eingetragen und mit zweitem Client
+  getestet sind (`customer-org.test.ts` läuft über alle registrierten Routen). Abfragen, die eigene Tabellen nach
+  `organization_id = aktive Organisation` filtern, liefern für Kunden weiterhin nichts.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.
 
-**Offen für Phase 6:** ob und wie Kunden-Orgs Client-Daten lesen (Punkt 2 hängt Ziele, Budgets und Auswertungen an
-den Client). Dann bekommt der Access-Layer Helfer für Clients (`docs/tasks/phase-0.md`, „Offen für Phase 6“).
+**Entschieden in Phase 6 (F1, 2026-10-11):** Kunden-Orgs lesen nur Dashboard und Explorer (Kennzahlen ihrer Profile).
+Client-Daten der Agentur (Ziele, Budgets, Regeln, geschützte Begriffe, Tags, Ansichten, Benachrichtigungen) sehen sie
+nicht; der Helfer für Clients ist `visibleClientIds()`. Freigaben einzelner Profile an Kunden (`profile_grants`) und
+mehrere Clients je Kunden-Org kommen erst bei Bedarf.
 
 Eine nutzerseitige Abfrage von Profildaten, die nicht über den Access-Layer begrenzt ist und keine der Ausnahmen
 oben betrifft, ist ein Review-Befund.

@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2.**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a.**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -187,13 +187,33 @@ Plattform-Rolle `superadmin`.
     Eingeschränkte nicht, bis er freigegeben wird (gewollt).
 
 ### 6.3a Kunden-Org: Modell und Access-Layer
-- [ ] `clients.client_organization_id` (eindeutig, FK auf `organizations`), Migration; ADR 002 ergänzen
+- [x] `clients.client_organization_id` (eindeutig, FK auf `organizations`), Migration; ADR 002 ergänzen
       („Offen für Phase 6“ auflösen).
-- [ ] Access-Layer nach der Festlegung oben; `listVisibleClientsAndProfiles` liefert für Kunden genau ihren Client
+- [x] Access-Layer nach der Festlegung oben; `listVisibleClientsAndProfiles` liefert für Kunden genau ihren Client
       (`phase-2.md` 2.4). Tests: Kunde sieht nur seinen Client, nie Ausgeblendetes, nie mit `includeHidden`.
-- [ ] `resolveFeatureAccess`/`requireFeature`: Kunden-Org nie `write`; `/api/me` nennt den Typ der aktiven Organisation
+- [x] `resolveFeatureAccess`/`requireFeature`: Kunden-Org nie `write`; `/api/me` nennt den Typ der aktiven Organisation
       (steht schon in `organizations[].type`).
-- [ ] Test über alle registrierten Routen mit einem Kunden-Login (Definition of Done, fail-closed).
+- [x] Test über alle registrierten Routen mit einem Kunden-Login (Definition of Done, fail-closed).
+- **Umsetzung (2026-10-11):**
+  - Migration `0049_client_organization`: `clients.client_organization_id` (FK auf `organizations`, `set null` beim
+    Löschen der Kunden-Org, eindeutiger Index).
+  - Access-Layer (`getMembership`): Kunden-Org = Typ `client` **oder** verknüpft (ein falsch gesetzter Wert allein
+    öffnet nichts). Regel wie festgelegt; ohne Verknüpfung sieht die Kunden-Org nichts. `visibleClientIds()` nennt nur
+    den verknüpften Client. `listVisibleClientsAndProfiles` filtert die Clients nicht mehr nach `orgId` (die IDs
+    stammen aus dem Scope).
+  - **Nie `write`:** Statt `resolveFeatureAccess` zu ändern, liefern `getOrgRole()` und `listMemberships()` für
+    Kunden-Orgs immer `viewer`. Damit gilt es an allen Stellen (`requireFeature`, `requireRole`, `orgAdminOnly`,
+    `/api/me`, Routen mit eigener Rollenprüfung), auch bei falsch gespeicherter Rolle.
+  - **Fail-closed über alle Routen:** `requireSession` lässt für eine aktive Kunden-Org nur freigegebene Pfade zu
+    (`isOpenForCustomerOrgs` in `middleware.ts`; heute `/api/me` und `/api/settings*`), sonst 403
+    `CUSTOMER_ORG_FORBIDDEN`. `apps/api/src/customer-org.test.ts` ruft jede registrierte Route als Kunde auf (alle
+    Features gebucht, Rolle falsch auf `admin`): 403, kein Text des zweiten Clients, kein neues Audit-Event. Eine
+    neue Route ist damit für Kunden zu, bis sie in Middleware **und** Test eingetragen ist (6.3b: Auswertungen).
+  - **Abweichungen / offen:** Eigene gespeicherte Ansichten der Kunden-Org (Festlegung „erlaubt“) sind noch nicht
+    freigegeben; sie brauchen `write`, das Kunden nie haben. Bei Bedarf in 6.3b entscheiden. Persönliche
+    Einstellungen (`PUT /api/settings`, Audit ohne Organisation) dürfen Kunden ändern. Tests, die eine zweite
+    **Agentur** mit `type: 'client'` anlegten, nutzen jetzt `internal` (`access.test.ts`).
+  - Keine Änderung an der Oberfläche (folgt in 6.3b), daher keine Browser-Prüfung.
 
 ### 6.3b Kunden-Org: freigegebene Seiten (F1)
 - [ ] Dashboard und Explorer (Auswertungs-Endpunkte, Filteroptionen, Währungen) für Kunden-Logins: Abfragen, die nach
