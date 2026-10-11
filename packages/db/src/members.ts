@@ -9,6 +9,8 @@ import {
   memberClientGrants,
   memberPasswordLinks,
   members,
+  organizations,
+  orgEntitlements,
   savedViews,
   sessions,
   users,
@@ -63,6 +65,27 @@ export interface MemberAdminInput {
    * mit einem Link versehen; sonst könnte ein Org-Admin über „Link neu erzeugen“ das Superadmin-Konto übernehmen.
    */
   actorIsSuperadmin?: boolean;
+  /**
+   * Kundenzugang (6.3c): `orgId` ist die Kunden-Org dieses Clients. Nur von `clientAccessScope` gesetzt; das Audit
+   * steht dann als `client_access.*` im Log der Eigentümer-Org.
+   */
+  customerOf?: { ownerOrgId: string; clientId: string };
+}
+
+/** Audit der Mitgliederverwaltung; für Kundenzugänge im Log der Agentur statt in dem der Kunden-Org. */
+function recordMemberEvent(
+  tx: DbOrTx,
+  input: MemberAdminInput,
+  action: 'create' | 'remove' | 'link_create',
+  target: { id: string } & Record<string, unknown>,
+) {
+  const { customerOf } = input;
+  return recordAuditEvent(tx, {
+    organizationId: customerOf?.ownerOrgId ?? input.orgId,
+    actorUserId: input.actorUserId,
+    action: `${customerOf ? 'client_access' : 'member'}.${action}`,
+    target: { type: 'member', ...target, ...(customerOf && { clientId: customerOf.clientId }) },
+  });
 }
 
 const protectedUser = () =>
@@ -222,18 +245,12 @@ export async function addMember(
       })
       .returning({ id: members.id });
     const link = await issueLink(tx, input);
-    await recordAuditEvent(tx, {
-      organizationId: input.orgId,
-      actorUserId: input.actorUserId,
-      action: 'member.create',
-      target: {
-        type: 'member',
-        id: membership!.id,
-        userId: input.userId,
-        email: user.email,
-        role: input.role,
-        linkExpiresAt: link.expiresAt.toISOString(),
-      },
+    await recordMemberEvent(tx, input, 'create', {
+      id: membership!.id,
+      userId: input.userId,
+      email: user.email,
+      role: input.role,
+      linkExpiresAt: link.expiresAt.toISOString(),
     });
     const [member] = await loadMembers(tx, { ...input, memberId: membership!.id });
     return { member: member!, ...link };
@@ -393,18 +410,12 @@ export async function removeMember(
         ),
       )
       .returning({ id: savedViews.id });
-    await recordAuditEvent(tx, {
-      organizationId: input.orgId,
-      actorUserId: input.actorUserId,
-      action: 'member.remove',
-      target: {
-        type: 'member',
-        id: member.id,
-        userId: member.userId,
-        role: member.role,
-        sessionsEnded: ended.length,
-        personalViewsDeleted: views.length,
-      },
+    await recordMemberEvent(tx, input, 'remove', {
+      id: member.id,
+      userId: member.userId,
+      role: member.role,
+      sessionsEnded: ended.length,
+      personalViewsDeleted: views.length,
     });
   });
 }
@@ -430,18 +441,71 @@ export async function regeneratePasswordLink(
       );
     }
     const link = await issueLink(tx, { ...input, userId: member.userId });
-    await recordAuditEvent(tx, {
-      organizationId: input.orgId,
-      actorUserId: input.actorUserId,
-      action: 'member.link_create',
-      target: {
-        type: 'member',
-        id: member.id,
-        userId: member.userId,
-        linkExpiresAt: link.expiresAt.toISOString(),
-      },
+    await recordMemberEvent(tx, input, 'link_create', {
+      id: member.id,
+      userId: member.userId,
+      linkExpiresAt: link.expiresAt.toISOString(),
     });
     return link;
+  });
+}
+
+/** Was eine Kunden-Org bucht (`phase-6.md` F1): Dashboard und Explorer, nur lesend. */
+export const CUSTOMER_ORG_FEATURES = ['dashboard', 'sp-explorer'] as const;
+
+/**
+ * Kundenzugang eines Clients (`phase-6.md` 6.3c, F3): liefert die Eingabe, mit der `listMembers`, `addMember` (immer
+ * Rolle `viewer`), `regeneratePasswordLink` und `removeMember` die Nutzer der Kunden-Org verwalten. `orgId` ist die
+ * Eigentümer-Org des handelnden Admins; fremde oder unbekannte Clients → `NOT_FOUND`. Ohne Kunden-Org: `null`, mit
+ * `create` entsteht sie (Typ `client`, Entitlements nach F1, verknüpft über `clients.client_organization_id`).
+ */
+export async function clientAccessScope(
+  db: Db,
+  input: MemberAdminInput & { clientId: string; create?: boolean },
+): Promise<MemberAdminInput | null> {
+  const { clientId, create, ...admin } = input;
+  return db.transaction(async (tx) => {
+    // Sperrt den Client, damit zwei gleichzeitige Anfragen nicht zwei Kunden-Orgs anlegen.
+    const [client] = await tx
+      .select({ name: clients.name, customerOrgId: clients.clientOrganizationId })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), eq(clients.organizationId, admin.orgId)))
+      .for('update');
+    if (!client) throw new MemberError('NOT_FOUND', 'Client nicht gefunden.');
+    const scope = (orgId: string): MemberAdminInput => ({
+      ...admin,
+      orgId,
+      customerOf: { ownerOrgId: admin.orgId, clientId },
+    });
+    if (client.customerOrgId) return scope(client.customerOrgId);
+    if (!create) return null;
+    const [org] = await tx
+      .insert(organizations)
+      // Der Slug muss nur eindeutig sein; Kunden-Orgs haben keine eigene Adresse.
+      .values({
+        name: client.name,
+        slug: `kunde-${clientId}`,
+        type: 'client',
+        createdAt: new Date(),
+      })
+      .returning({ id: organizations.id });
+    await tx
+      .insert(orgEntitlements)
+      .values(
+        CUSTOMER_ORG_FEATURES.map((feature) => ({
+          organizationId: org!.id,
+          feature,
+          enabled: true,
+        })),
+      );
+    await tx.update(clients).set({ clientOrganizationId: org!.id }).where(eq(clients.id, clientId));
+    await recordAuditEvent(tx, {
+      organizationId: admin.orgId,
+      actorUserId: admin.actorUserId,
+      action: 'client_access.org_create',
+      target: { type: 'client', id: clientId, clientId, customerOrganizationId: org!.id },
+    });
+    return scope(org!.id);
   });
 }
 
