@@ -2112,6 +2112,7 @@ export const de = {
       switches: 'Preset-Wechsel',
       naming: 'Namensschema',
       assignments: 'Zuordnung',
+      campaigns: 'Kampagnen',
     },
     save: 'Katalog speichern',
     discard: 'Verwerfen',
@@ -2288,6 +2289,26 @@ export const de = {
       add: 'Kante hinzufügen',
       remove: 'Kante {from} → {to} entfernen',
       empty: 'Noch keine Kanten.',
+    },
+    campaigns: {
+      description:
+        'Zu welchem Baustein eine bestehende Kampagne gehört. Kampagnen aus dem Kampagnen-Setup kennen ihren Baustein; für alle anderen schlägt ProfitBash einen aus dem Namen vor, der erst nach deiner Bestätigung zählt. Die Automatik braucht die Zuordnung für Graduation-Vorschläge. Gespeichert wird sofort, gegen den gespeicherten Katalog.',
+      profile: 'Profil',
+      chooseProfile: 'Profil wählen',
+      profilesFailed: 'Die Profile konnten nicht geladen werden.',
+      loadFailed: 'Die Kampagnen konnten nicht geladen werden.',
+      empty: 'Dieses Profil hat keine Kampagnen.',
+      truncated:
+        'Das Profil hat mehr Kampagnen, als hier stehen; gezeigt werden die ersten {count}.',
+      summary: '{assigned} von {total} Kampagnen haben einen Baustein.',
+      block: 'Baustein von {name}',
+      none: 'Kein Baustein',
+      unnamed: 'Ohne Namen',
+      source: { setup: 'aus dem Setup', manual: 'bestätigt' },
+      suggestion: 'Vorschlag: {block}',
+      confirm: 'Bestätigen',
+      confirmLabel: 'Vorschlag {block} für {name} bestätigen',
+      confirmAll: 'Alle Vorschläge bestätigen ({count})',
     },
     switches: {
       description:
@@ -2831,6 +2852,10 @@ export const de = {
     CONNECTION_NOT_FOUND: 'Die Connection gibt es nicht mehr. Bitte lade die Seite neu.',
     PROFILE_NOT_FOUND: 'Das Profil gibt es nicht mehr. Bitte lade die Seite neu.',
     CLIENT_NOT_FOUND: 'Den Client gibt es nicht mehr. Bitte lade die Seite neu.',
+    CAMPAIGN_BLOCK_UNKNOWN_BLOCK:
+      'Diesen Baustein gibt es für den Anzeigentyp der Kampagne nicht (mehr). Bitte lade die Seite neu.',
+    CAMPAIGN_BLOCK_UNKNOWN_CAMPAIGN:
+      'Die Kampagne gibt es im Profil nicht mehr. Bitte lade die Seite neu.',
     MEMBER_EMAIL_TAKEN: 'Diese E-Mail-Adresse gehört schon zu einem Mitglied.',
     MEMBER_LAST_ADMIN: 'Die Organisation braucht mindestens einen Admin.',
     MEMBER_SELF: 'Dein eigenes Konto kannst du hier nicht entfernen.',

@@ -16,6 +16,7 @@ import { errorMessageKey } from '../i18n';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
 import CatalogAssignments from '../tools/catalog/CatalogAssignments.vue';
 import CatalogBlocks from '../tools/catalog/CatalogBlocks.vue';
+import CatalogCampaigns from '../tools/catalog/CatalogCampaigns.vue';
 import CatalogEdges from '../tools/catalog/CatalogEdges.vue';
 import CatalogNaming from '../tools/catalog/CatalogNaming.vue';
 import CatalogPresets from '../tools/catalog/CatalogPresets.vue';
@@ -101,7 +102,15 @@ const issues = computed(() =>
       ),
 );
 
-const TABS = ['presets', 'blocks', 'edges', 'switches', 'naming', 'assignments'] as const;
+const TABS = [
+  'presets',
+  'blocks',
+  'edges',
+  'switches',
+  'naming',
+  'assignments',
+  'campaigns',
+] as const;
 const tab = ref<(typeof TABS)[number]>('presets');
 const tabId = (name: string) => `catalog-tab-${name}`;
 function moveTab(step: number) {
@@ -257,7 +266,8 @@ function loadDefaults() {
         <CatalogEdges v-else-if="tab === 'edges'" />
         <CatalogSwitches v-else-if="tab === 'switches'" />
         <CatalogNaming v-else-if="tab === 'naming'" />
-        <CatalogAssignments v-else :data="data" />
+        <CatalogAssignments v-else-if="tab === 'assignments'" :data="data" />
+        <CatalogCampaigns v-else :data="data" />
       </div>
 
       <div
