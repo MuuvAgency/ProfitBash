@@ -21,6 +21,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import { getOrgRole, visibleProfilesScope } from './access';
+import { chunks } from './ad-change-entities';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import { AutomationError } from './automation';
 import type { Db } from './client';
@@ -128,9 +129,9 @@ export async function syncAutomationFindings(
     await db.update(f).set({ detail: finding.detail, lastSeenAt: input.now }).where(eq(f.id, id));
   }
   await db.delete(f).where(and(ofProfile, kept.length > 0 ? notInArray(f.id, kept) : undefined));
-  if (added.length > 0) {
+  for (const part of chunks(added)) {
     await db.insert(f).values(
-      added.map((finding) => ({
+      part.map((finding) => ({
         ...finding,
         organizationId: input.organizationId,
         profileId: input.profileId,

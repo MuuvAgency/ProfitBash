@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b. Als Nächstes: 5.10.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10. Als Nächstes: 5.11a.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -664,12 +664,61 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     auch `budgetCap`).
 
 ### 5.10 Prüfungen „kein Geld verbrennen“ (Ideen-Dokument E)
-- [ ] Prüfungen als Daten mit Schwellen je Organisation, Ergebnis je Lauf: aktive vCPM-Kampagnen (nur SD; SB-Blätter haben
+- [x] Prüfungen als Daten mit Schwellen je Organisation, Ergebnis je Lauf: aktive vCPM-Kampagnen (nur SD; SB-Blätter haben
       keine Kostenart), Platzierungs-Anpassung über Schwelle bei Platzierungs- bzw. Kampagnen-ACoS über Ziel (Kennzahlen je
       Platzierung aus 5.1), Targets mit Ausgaben über Schwelle ohne Bestellung, Kampagnen ohne Ziel bzw. ohne Cap.
       Off-Amazon: Spalte nur in US-Dateien; einlesen und prüfen, wo vorhanden.
-- [ ] Hinweis-Checkliste je Kampagne für Dinge ohne Daten (Sponsored Prompts, SB-vCPM, Off-Amazon außerhalb der USA).
-- [ ] Tab „Prüfungen“, Benachrichtigung nur bei neuen Befunden, Befund quittierbar.
+- [x] Hinweis-Checkliste je Kampagne für Dinge ohne Daten (Sponsored Prompts, SB-vCPM, Off-Amazon außerhalb der USA).
+- [x] Tab „Prüfungen“, Benachrichtigung nur bei neuen Befunden, Befund quittierbar.
+- [x] Umsetzung (2026-10-11, Stand für 5.11a und später):
+  - **Shared** `packages/shared/src/automation-checks.ts` (auch als Einstiegspunkt für die Engine): Arten `vcpm`,
+    `placement`, `spendNoOrders` (Warnung) und `noGoal`, `noCap` (Hinweis); `checkSettingsSchema` (je Art an/aus,
+    Platzierungs-Anpassung ab x %, Ausgaben ohne Bestellung ab x €). **Startwerte (Dominik, 2026-10-11):** alle an,
+    +50 %, 20 €.
+  - **Engine** `packages/engine/src/checks.ts`, `runChecks`: aktive vCPM-Kampagnen; je Platzierung mit Anpassung ab
+    der Schwelle der ACoS der Platzierung (hat sie keine Ausgaben in der Datei, der ACoS der Kampagne) gegen das
+    Ziel von Profil bzw. Client, Ausgaben ohne Umsatz liegen über jedem Ziel; aktive Targets in aktiven Kampagnen
+    mit Ausgaben ab der Schwelle (EUR, mit dem Kurs umgerechnet) ohne Bestellung; `noGoal` und `noCap` **je Profil
+    ein Hinweis** mit der Zahl der aktiven Kampagnen (nicht je Kampagne: ohne Ziel am Profil wären es sonst alle).
+  - **Tabellen** (Migration `0044_automation_checks`): `automation_check_settings` (ein Dokument je Organisation,
+    ohne Zeile die Startwerte) und `automation_findings` (aktuelle Befunde je Profil; eindeutig je Art, Entity und
+    `key`, bei `placement` die Platzierung; erstes und letztes Auftreten, Quittung).
+  - **Zugriffe** `packages/db/src/automation-checks.ts`: `loadCheckSettings`, `saveCheckSettings` (nur Admins,
+    Audit `automation_checks.update`), `syncAutomationFindings` (bestehende behalten ID, erstes Auftreten und
+    Quittung, neue kommen dazu, verschwundene werden gelöscht: **kommt ein Befund zurück, ist er neu**),
+    `getAutomationChecks` (sichtbare Profile, offen oder quittiert, Warnungen zuerst, höchstens 500),
+    `acknowledgeAutomationFindings` (Audit `automation_findings.acknowledge`).
+  - **Lauf:** Die Einstellungen stehen im Plan und im `fingerprint`; `loadAutomationRunEntities` liefert je
+    Kampagne die Anpassungen aus `extra.placementBidAdjustments` mit den Summen der Platzierung (Ebene `placement`
+    aus 5.1); `computeAutomationFindings` im Job; `saveAutomationRun` gleicht die Befunde in der Transaktion des
+    Laufs ab, zählt sie (`counts.findings`) und meldet **nur neue Warnungen** (`automation_findings`, an alle, die
+    das Profil sehen, Link `/ads/automations?tab=checks`).
+  - **API** (Feature `automations`): `GET /ads/automations/checks?status=open|acknowledged` (`view`), `POST
+    /ads/automations/checks/acknowledge` (`write`, bis zu 500 IDs), `PUT /ads/automations/checks/settings` (`write`
+    und Admin, sonst 403 `AUTOMATION_DEFAULTS_FORBIDDEN`).
+  - **Seite:** Tab „Prüfungen“ (`automations/ChecksTab.vue`): Befunde mit Art, Ort, Zahlen und „seit“, Filter
+    offen/quittiert, „Quittieren“ einzeln und für alle gezeigten, Einstellungen (für Nicht-Admins gesperrt) und
+    die Liste „Von Hand prüfen“ für Dinge ohne Daten (Sponsored Prompts, SB-vCPM, Off-Amazon). `?tab=` öffnet
+    einen Tab der Seite direkt.
+  - **Abweichungen vom Aufgabentext:**
+    - **Off-Amazon wird nicht eingelesen.** Die Spalte gibt es nur in US-Dateien, und es liegt keine vor, an der
+      Name und Werte zu prüfen wären; geraten wird nicht. Sie steht in der Liste „Von Hand prüfen“. Offen, bis
+      eine US-Datei da ist.
+    - Die Hinweis-Checkliste ist eine Liste je Organisation, nicht je Kampagne abzuhaken.
+  - **Grenzen:** Steht die Automatik eines Clients auf „aus“, laufen auch die Prüfungen nicht. Kampagnen ohne
+    Kennzahlen im Datenstand werden nicht geprüft. Befunde ändern sich erst mit dem nächsten Lauf (neue Datei oder
+    geänderte Einstellungen, Regeln, Ziele, Caps), nicht sofort nach dem Anlegen eines Ziels oder Caps.
+  - **Review (ponytail-review):** neue Befunde werden in Blöcken eingefügt (viele Targets ohne Bestellung).
+    Zurückgewiesen: bestehende Befunde einzeln aktualisieren (je Befund eine Abfrage; bei den erwarteten Mengen
+    unkritisch).
+  - **Browser-Pane (2026-10-11):** Tab über `?tab=checks`, leerer Zustand, Einstellungen mit den Startwerten und
+    die Liste von Hand geprüft (als Text; Handy ohne waagerechtes Scrollen), nichts gespeichert. **Nicht mit
+    Befunden geprüft** (kein Lauf ohne Datei mit Kennzahlen in der Dev-DB) und ohne Bildschirmfoto (die Pane war
+    nicht sichtbar). Dev-DB migriert bis `0044_automation_checks`.
+  - **Nicht nach TDD im strengen Sinn:** Test und Komponente des Tabs entstanden zusammen (der Test lief erst
+    mit der Komponente, zwei Fehlschläge aus Tippfehlern im Code); Engine, Zugriffe, Lauf und API liefen vorher rot.
+  - **Weiter offen aus 5.8:** Gründe ohne Vorschlag je Lauf anzeigen (`automation_runs.counts`, jetzt auch
+    `budgetCap` und `findings`).
 
 ### 5.11a Katalog: Kriterien und Zuordnung (Vorarbeit für 5.11b)
 - [ ] Graduation-Kanten und Presets im Struktur-Katalog um Kriterien erweitern (Schwellen auf einen Datei-Zeitraum, z. B.
