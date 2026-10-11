@@ -39,14 +39,16 @@ beforeAll(async () => {
     target: { type: action.split('.')[0]!, id: `t${minutes}` },
     createdAt: at(minutes),
   });
-  await db.insert(auditEvents).values([
-    event(1, 'tag.create', ids.anna),
-    event(2, 'member.create', ids.ben),
-    event(3, 'tag.delete', ids.anna),
-    event(4, 'file_import.create', null),
-    event(5, 'tag.create', ids.ben, ids.otherOrg),
-    event(6, 'platform.cleanup', null, null),
-  ]);
+  await db
+    .insert(auditEvents)
+    .values([
+      event(1, 'tag.create', ids.anna),
+      event(2, 'member.create', ids.ben),
+      event(3, 'tag.delete', ids.anna),
+      event(4, 'file_import.create', null),
+      event(5, 'tag.create', ids.ben, ids.otherOrg),
+      event(6, 'platform.cleanup', null, null),
+    ]);
 });
 
 afterAll(async () => {
@@ -65,7 +67,10 @@ describe('listAuditEvents', () => {
       'tag.create',
     ]);
     expect(page.nextCursor).toBeNull();
-    expect(page.events[0]).toMatchObject({ actor: null, target: { type: 'file_import', id: 't4' } });
+    expect(page.events[0]).toMatchObject({
+      actor: null,
+      target: { type: 'file_import', id: 't4' },
+    });
     expect(page.events[1]!.actor).toEqual({ id: ids.anna, name: 'Anna', email: 'anna@muuv.test' });
     expect(page.events[1]!.createdAt).toEqual(at(3));
   });

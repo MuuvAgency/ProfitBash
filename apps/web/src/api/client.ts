@@ -1,4 +1,7 @@
 import type {
+  AuditEventFilters,
+  AuditEventList,
+  AuditEventListQuery,
   AmazonOAuthStart,
   BulkPeriod,
   Client,
@@ -522,6 +525,13 @@ export function createApi(options: ApiOptions = {}) {
         (await unwrap(client.GET('/api/notifications/unread-count'))).count,
       markRead: async (input: { ids: string[] } | { all: true }): Promise<number> =>
         (await unwrap(client.POST('/api/notifications/read', { body: input }))).updated,
+    },
+
+    /** Audit-Log der aktiven Org (6.1, nur Admins), neueste zuerst, Seiten über `cursor`. */
+    auditEvents: {
+      list: (query: AuditEventListQuery = {}): Promise<AuditEventList> =>
+        unwrap(client.GET('/api/audit-events', { params: { query } })),
+      filters: (): Promise<AuditEventFilters> => unwrap(client.GET('/api/audit-events/filters')),
     },
 
     /** Letzte Jobläufe der aktiven Org (Sync-Status), neueste zuerst. */

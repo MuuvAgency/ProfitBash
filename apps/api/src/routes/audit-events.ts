@@ -34,7 +34,8 @@ const auditEventFiltersRoute = createRoute({
   method: 'get',
   path: '/audit-events/filters',
   tags: ['Betrieb'],
-  summary: 'Bereiche und Handelnde, die im Audit-Log der aktiven Organisation vorkommen (nur Admin)',
+  summary:
+    'Bereiche und Handelnde, die im Audit-Log der aktiven Organisation vorkommen (nur Admin)',
   responses: {
     200: { description: 'Auswahl für die Filter.', content: json(auditEventFiltersSchema) },
     ...errors,
@@ -65,9 +66,6 @@ export function registerAuditEventRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
   });
 
   app.openapi({ ...auditEventFiltersRoute, middleware: orgAdminOnly(deps) }, async (c) =>
-    c.json(
-      await listAuditEventFilters(db, c.get('auth').activeOrganization!.organizationId),
-      200,
-    ),
+    c.json(await listAuditEventFilters(db, c.get('auth').activeOrganization!.organizationId), 200),
   );
 }
