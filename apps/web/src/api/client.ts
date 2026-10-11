@@ -37,6 +37,7 @@ export type SearchTermRowData = Schemas['SearchTermRow'];
 export type HarvestMarkData = Schemas['HarvestMark'];
 export type TagData = Schemas['Tag'];
 export type GoalData = Schemas['Goal'];
+export type CheckFindingData = Schemas['CheckFinding'];
 export type GoalsOverviewData = Schemas['GoalsOverview'];
 export type BudgetsOverviewData = Schemas['BudgetsOverview'];
 export type BudgetCapData = Schemas['BudgetCap'];
@@ -480,6 +481,13 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/automations/proposals/stage', { body: { ids } })),
       dismissProposals: (ids: string[]): Promise<AutomationProposalActionData> =>
         unwrap(client.POST('/api/ads/automations/proposals/dismiss', { body: { ids } })),
+      /** Prüfungen (5.10): Befunde und Einstellungen. */
+      checks: (status: 'open' | 'acknowledged'): Promise<Schemas['AutomationChecks']> =>
+        unwrap(client.GET('/api/ads/automations/checks', { params: { query: { status } } })),
+      acknowledgeFindings: (ids: string[]): Promise<AutomationProposalActionData> =>
+        unwrap(client.POST('/api/ads/automations/checks/acknowledge', { body: { ids } })),
+      saveCheckSettings: (input: Schemas['CheckSettings']): Promise<Schemas['AutomationChecks']> =>
+        unwrap(client.PUT('/api/ads/automations/checks/settings', { body: input })),
     },
 
     /** Benachrichtigungen (5.2a/5.2b), für alle Mitglieder; neueste zuerst, Seiten über `before`. */

@@ -4,10 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import { computed, ref, useId, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { api, ApiError } from '../api';
 import type { AutomationSettingsData } from '../api/client';
 import GuardrailFields from '../automations/GuardrailFields.vue';
+import ChecksTab from '../automations/ChecksTab.vue';
 import ProposalsTab from '../automations/ProposalsTab.vue';
 import RulesTab from '../automations/RulesTab.vue';
 import RunsTab from '../automations/RunsTab.vue';
@@ -24,8 +26,8 @@ import { useActiveOrgId, useSessionStore } from '../stores/session';
 
 /**
  * Seite „Automationen & Regeln“ (`phase-5.md` 5.4, 5.6b): Tabs „Einstellungen“ (Leitplanken der Organisation, je
- * Client Modus, zuständiger Nutzer und überschriebene Werte), „Regeln“, „Vorschläge“ und „Läufe“ (5.8). Ein
- * weiterer Tab folgt (5.10).
+ * Client Modus, zuständiger Nutzer und überschriebene Werte), „Regeln“, „Vorschläge“, „Läufe“ (5.8) und
+ * „Prüfungen“ (5.10).
  */
 const { t } = useI18n();
 const id = useId();
@@ -34,8 +36,10 @@ const orgId = useActiveOrgId();
 const queryClient = useQueryClient();
 const canWrite = computed(() => session.me?.features.automations.write ?? false);
 
-const TABS = ['settings', 'rules', 'proposals', 'runs'] as const;
-const tab = ref<(typeof TABS)[number]>('settings');
+const TABS = ['settings', 'rules', 'proposals', 'runs', 'checks'] as const;
+// `?tab=` öffnet einen Tab direkt (Link aus der Benachrichtigung zu neuen Befunden).
+const wanted = useRoute().query.tab;
+const tab = ref<(typeof TABS)[number]>(TABS.find((name) => name === wanted) ?? 'settings');
 const tabId = (name: string) => `${id}-tab-${name}`;
 function moveTab(step: number) {
   const next = TABS[(TABS.indexOf(tab.value) + step + TABS.length) % TABS.length]!;
@@ -174,6 +178,7 @@ async function submitClient() {
       </KeepAlive>
       <ProposalsTab v-if="tab === 'proposals'" :can-write="canWrite" />
       <RunsTab v-else-if="tab === 'runs'" />
+      <ChecksTab v-else-if="tab === 'checks'" :can-write="canWrite" />
       <template v-if="tab === 'settings'">
         <InlineError
           v-if="settingsQuery.isError.value"

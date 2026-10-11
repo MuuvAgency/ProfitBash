@@ -1248,7 +1248,76 @@ export const de = {
     description:
       'Die Automatik macht Vorschläge für Gebote und Budgets. Leitplanken begrenzen jeden Vorschlag; an Amazon geht nichts ohne dich.',
     loadFailed: 'Die Einstellungen konnten nicht geladen werden.',
-    tabs: { settings: 'Einstellungen', rules: 'Regeln', proposals: 'Vorschläge', runs: 'Läufe' },
+    tabs: {
+      settings: 'Einstellungen',
+      rules: 'Regeln',
+      proposals: 'Vorschläge',
+      runs: 'Läufe',
+      checks: 'Prüfungen',
+    },
+    checks: {
+      title: 'Prüfungen',
+      text: 'Jeder Lauf der Automatik sucht je Profil nach Stellen, an denen Geld ohne Wirkung abfließen kann. Ein quittierter Befund bleibt quittiert, solange er in jedem Lauf wieder auftritt; verschwindet er und kommt zurück, ist er neu.',
+      loadFailed: 'Die Prüfungen konnten nicht geladen werden.',
+      acknowledgeFailed: 'Das Quittieren hat nicht geklappt. Bitte versuche es noch einmal.',
+      statusLabel: 'Status',
+      status: { open: 'Offen', acknowledged: 'Quittiert' },
+      shown: '{shown} von {total}',
+      acknowledge: 'Quittieren',
+      acknowledgeAll: 'Alle quittieren',
+      since: 'seit {day}',
+      acknowledgedAt: 'quittiert am {day}',
+      severity: { warning: 'Warnung', info: 'Hinweis' },
+      kind: {
+        vcpm: 'Aktive vCPM-Kampagne',
+        placement: 'Platzierung über dem Ziel',
+        spendNoOrders: 'Ausgaben ohne Bestellung',
+        noGoal: 'Kampagnen ohne Ziel',
+        noCap: 'Kampagnen ohne Budget-Cap',
+      },
+      basis: { placement: 'ACoS der Platzierung', campaign: 'ACoS der Kampagne' },
+      detail: {
+        vcpm: 'Die Kampagne rechnet je 1.000 sichtbare Impressions ab, nicht je Klick.',
+        placement: '{placement}: Anpassung +{percent} %, ACoS {acos} % bei Ziel {goal} % ({basis})',
+        placementNoSales:
+          '{placement}: Anpassung +{percent} %, {spend} Ausgaben ohne Umsatz bei Ziel {goal} % ({basis})',
+        spendNoOrders: '{spend} Ausgaben, {clicks} Klicks, keine Bestellung im Zeitraum',
+        noGoal:
+          'Eine aktive Kampagne ohne Ziel: weder das Profil noch der Client hat eines. | {n} aktive Kampagnen ohne Ziel: weder das Profil noch der Client hat eines.',
+        noCap:
+          'Eine aktive Kampagne unter keinem Budget-Cap | {n} aktive Kampagnen unter keinem Budget-Cap',
+      },
+      empty: {
+        open: {
+          title: 'Keine offenen Befunde',
+          text: 'Befunde entstehen mit dem nächsten Lauf nach einer Bulk-Datei mit Kennzahlen.',
+        },
+        acknowledged: {
+          title: 'Nichts quittiert',
+          text: 'Quittierte Befunde stehen hier, solange sie weiter auftreten.',
+        },
+      },
+      settings: {
+        title: 'Einstellungen der Prüfungen',
+        text: 'Gelten für die ganze Organisation und wirken mit dem nächsten Lauf.',
+        readOnly: 'Gelten für die ganze Organisation. Nur Admins ändern sie.',
+        enabled: 'Aktive Prüfungen',
+        placementMinPercent: 'Platzierungs-Anpassung ab (%)',
+        spendNoOrdersMinEur: 'Ausgaben ohne Bestellung ab (EUR)',
+        save: 'Einstellungen speichern',
+        saved: 'Gespeichert.',
+        invalid:
+          'Bitte die Werte prüfen: Anpassung als ganze Zahl von 1 bis 900, Betrag über 0 mit höchstens zwei Nachkommastellen.',
+      },
+      manual: {
+        title: 'Von Hand prüfen',
+        text: 'Das steht nicht in der Bulk-Datei; ProfitBash kann es nicht sehen. Bitte in der Werbekonsole je Kampagne prüfen:',
+        prompts: 'Sponsored Prompts: ob sie aktiv sind und was sie kosten.',
+        sbVcpm:
+          'Sponsored Brands mit Abrechnung nach vCPM (die SB-Blätter nennen keine Kostenart).',
+        offAmazon: 'Ausspielung außerhalb von Amazon (die Spalte gibt es nur in US-Dateien).',
+      },
+    },
     proposals: {
       title: 'Vorschläge',
       text: 'Was die Automatik ändern würde, mit Begründung. An Amazon geht nichts: Übernommene Vorschläge liegen als ausstehende Änderungen in deinem Warenkorb. Verworfenes kommt erst mit neuen Kennzahlen wieder.',
@@ -2649,6 +2718,11 @@ export const de = {
         label: 'Budget-Cap: Prognose über dem Cap',
         title: 'Prognose über dem Budget-Cap',
         text: '{profileName}: Die Prognose zum Monatsende (≈ {forecast}) liegt über dem Cap von {amount}. Vorschläge stehen unter Automationen.',
+      },
+      automation_findings: {
+        label: 'Neue Befunde der Prüfungen',
+        title: 'Neue Befunde der Prüfungen',
+        text: '{profileName}: {count} neuer Befund unter Automationen, Prüfungen. | {profileName}: {count} neue Befunde unter Automationen, Prüfungen.',
       },
       automation_responsible_missing: {
         label: 'Automatik ohne Zuständigen',
