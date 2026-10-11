@@ -43,6 +43,7 @@ import {
 import {
   planStructure,
   structureFingerprint,
+  clearOpenStructureProposals,
   syncStructureProposals,
   type StructureProposalInput,
   type StructurePlan,
@@ -61,12 +62,15 @@ export interface AutomationRunScope {
   profileId: string;
 }
 
-export type AutomationRunSkip = 'profileGone' | 'off' | 'noMetrics' | 'noFxRate' | 'unchanged';
+export type AutomationRunSkip = 'profileGone' | 'noMetrics' | 'noFxRate' | 'unchanged';
 
 export interface AutomationRunPlan {
   profile: { id: string; clientId: string | null; currencyCode: string; countryCode: string };
-  /** Wirksamer Modus: `cart` nur mit einem zuständigen Nutzer, der Schreibrecht hat. */
-  mode: Exclude<AutomationMode, 'off'>;
+  /**
+   * Wirksamer Modus: `cart` nur mit einem zuständigen Nutzer, der Schreibrecht hat. `off` schaltet nur die
+   * Vorschläge ab (Gebote, Budgets, Graduation, Presets); Cap-Meldungen und Prüfungen laufen (Dominik, 2026-10-11).
+   */
+  mode: AutomationMode;
   responsibleUserId: string | null;
   /** Der Client steht auf `cart`, der zuständige Nutzer fehlt aber oder darf nicht mehr schreiben. */
   responsibleMissing: boolean;
@@ -133,7 +137,6 @@ export async function planAutomationRun(
         .where(eq(clients.id, profile.clientId))
     : [];
   const wanted = (settings?.mode ?? 'shadow') as AutomationMode;
-  if (wanted === 'off') return { skip: 'off' };
   const state = await findProfileMetricsState(db, scope);
   if (state === null) return { skip: 'noMetrics' };
   const rateDate = await latestFxRateDate(db);
@@ -156,7 +159,7 @@ export async function planAutomationRun(
       );
     if (member && WRITE_ROLES.includes(member.role)) responsibleUserId = settings.responsibleUserId;
   }
-  const mode = responsibleUserId === null ? 'shadow' : 'cart';
+  const mode = wanted === 'off' ? 'off' : responsibleUserId === null ? 'shadow' : 'cart';
 
   const overrides = guardrailOverridesSchema.safeParse(settings?.overrides);
   const guardrails: Guardrails = {
@@ -591,7 +594,10 @@ export async function saveAutomationRun(
         ),
       );
     const dismissed = new Set(dismissedRows.map((row) => `${row.entityId}:${row.field}`));
-    const proposals = input.proposals.filter((x) => !dismissed.has(`${x.entityId}:${x.field}`));
+    const proposals =
+      plan.mode === 'off'
+        ? []
+        : input.proposals.filter((x) => !dismissed.has(`${x.entityId}:${x.field}`));
 
     // Eigene offene Zeilen ersetzen; der Fremdschlüssel leert `ad_change_id` der alten Vorschläge.
     await tx
@@ -650,7 +656,10 @@ export async function saveAutomationRun(
         findings: input.findings,
         now: new Date(),
       }));
+    // Modus „aus“: offene Graduation- und Preset-Vorschläge fallen weg, Verworfenes bleibt für später gemerkt.
+    if (plan.mode === 'off') await clearOpenStructureProposals(tx, input);
     const structure =
+      plan.mode !== 'off' &&
       input.structure &&
       (await syncStructureProposals(tx, {
         organizationId: input.organizationId,
@@ -665,7 +674,7 @@ export async function saveAutomationRun(
       ...(structure && { structure: structure.total }),
       proposals: proposals.length,
       staged: staged.size,
-      dismissed: input.proposals.length - proposals.length,
+      dismissed: plan.mode === 'off' ? 0 : input.proposals.length - proposals.length,
     };
     const [run] = await tx
       .insert(automationRuns)

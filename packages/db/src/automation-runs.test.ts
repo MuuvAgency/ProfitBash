@@ -30,6 +30,7 @@ import {
   automationProposals,
   automationRules,
   automationRuns,
+  automationStructureProposals,
   budgetCaps,
   clientAutomationSettings,
   clients,
@@ -267,11 +268,21 @@ describe('planAutomationRun', () => {
     expect(result.goals).toHaveLength(2);
   });
 
-  it('Modus „aus“ läuft nicht; ohne Schreibrecht des Zuständigen fällt „Warenkorb“ auf den Schattenmodus', async () => {
+  it('Modus „aus“ plant einen Lauf ohne Zuständigen (Cap-Meldungen und Prüfungen laufen weiter); ohne Schreibrecht des Zuständigen fällt „Warenkorb“ auf den Schattenmodus', async () => {
     await standardMetrics();
     await assignClient();
-    await setClient({ mode: 'off' });
-    expect(await planAutomationRun(testDb.db, scope())).toEqual({ skip: 'off' });
+    await setClient({ mode: 'shadow' });
+    await save([]);
+    // Der Wechsel auf „aus“ macht einen Lauf fällig: Er räumt die offenen Vorschläge ab.
+    await testDb.db
+      .update(clientAutomationSettings)
+      .set({ mode: 'off', responsibleUserId: f.emil });
+    expect(await plan()).toMatchObject({
+      mode: 'off',
+      responsibleUserId: null,
+      responsibleMissing: false,
+    });
+    await testDb.db.delete(automationRuns);
 
     await testDb.db
       .update(clientAutomationSettings)
@@ -896,6 +907,57 @@ describe('Budget-Caps im Lauf (5.9b)', () => {
     await changeRules(1);
     await save([capProposal({ after: '17' })]);
     expect(await cartRows()).toMatchObject([{ origin: 'budget_cap', newAmount: '17' }]);
+  });
+
+  it('Modus „aus“: keine Vorschläge (auch übergebene nicht), offene Graduation-/Preset-Vorschläge fallen weg, verworfene bleiben; Cap-Meldungen und Befunde laufen', async () => {
+    await standardMetrics();
+    await assignClient();
+    await setClient({ mode: 'shadow' });
+    await addCap();
+    await save([bid()]);
+    await testDb.db.delete(notifications);
+    const structure = { organizationId: f.org, profileId: f.profile, kind: 'graduation' };
+    const seen = { detail: {}, firstSeenAt: NOW, lastSeenAt: NOW };
+    await testDb.db.insert(automationStructureProposals).values([
+      { ...structure, ...seen, subject: 'offen', key: 'SP-AUTO' },
+      { ...structure, ...seen, subject: 'verworfen', key: 'SP-AUTO', dismissedAt: NOW },
+    ]);
+    await testDb.db.update(clientAutomationSettings).set({ mode: 'off' });
+
+    const result = await saveAutomationRun(testDb.db, {
+      ...scope(),
+      plan: await plan(),
+      jobRunId: null,
+      counts: { targets: 0, campaigns: 0 },
+      proposals: [bid()],
+      findings: [
+        {
+          kind: 'noGoal',
+          entityType: 'profile',
+          entityId: f.profile,
+          campaignId: null,
+          key: '',
+          detail: {},
+        },
+      ],
+      structure: [{ kind: 'graduation', subject: 'neu', key: 'SP-AUTO', detail: {} }],
+    });
+
+    expect(result).toMatchObject({ proposals: 0, staged: 0 });
+    expect((await proposalRows()).map((x) => x.status)).toEqual(['superseded']);
+    expect(
+      (await testDb.db.select().from(automationStructureProposals)).map((x) => x.subject),
+    ).toEqual(['verworfen']);
+    expect(await testDb.db.select().from(automationFindings)).toHaveLength(1);
+    expect((await capNotifications()).map((n) => n.kind)).toEqual([
+      'budget_cap_forecast',
+      'budget_cap_threshold',
+    ]);
+    const [latest] = await listAutomationRuns(testDb.db, { userId: f.ada, orgId: f.org }).then(
+      (runs) => runs!,
+    );
+    expect(latest).toMatchObject({ mode: 'off', counts: { proposals: 0, findings: 1 } });
+    await testDb.db.delete(automationStructureProposals);
   });
 
   it('aus der Liste übernommen behält der Vorschlag die Herkunft budget_cap', async () => {

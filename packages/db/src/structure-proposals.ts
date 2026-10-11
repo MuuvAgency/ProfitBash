@@ -334,6 +334,22 @@ export async function syncStructureProposals(
   return { total: input.proposals.length, added: added.length };
 }
 
+/** Modus „aus“ (5.13): Offenes entfernen; Verworfenes bleibt, damit es nach dem Einschalten verworfen ist. */
+export async function clearOpenStructureProposals(
+  db: DbOrTx,
+  scope: StructureScope,
+): Promise<void> {
+  await db
+    .delete(s)
+    .where(
+      and(
+        eq(s.profileId, scope.profileId),
+        eq(s.organizationId, scope.organizationId),
+        isNull(s.dismissedAt),
+      ),
+    );
+}
+
 export interface StructureProposalAccess {
   userId: string;
   orgId: string;

@@ -114,7 +114,7 @@ export const automationRuns = pgTable(
       columns: [t.profileId, t.organizationId],
       foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
     }).onDelete('cascade'),
-    check('automation_runs_mode_ck', sql`${t.mode} in ('shadow', 'cart')`),
+    check('automation_runs_mode_ck', sql`${t.mode} in ('off', 'shadow', 'cart')`),
     index('automation_runs_profile_created_idx').on(t.profileId, t.createdAt.desc()),
   ],
 );

@@ -1541,7 +1541,10 @@ export const de = {
         'Eigene Leitplanken des Clients. Leere Felder übernehmen den Wert der Organisation (grau).',
     },
     mode: {
-      off: { label: 'Aus', hint: 'Kein Lauf, keine Vorschläge.' },
+      off: {
+        label: 'Aus',
+        hint: 'Keine Vorschläge (Gebote, Budgets, Graduation, Presets); Cap-Meldungen und Prüfungen laufen weiter.',
+      },
       shadow: {
         label: 'Schattenmodus',
         hint: 'Rechnet und protokolliert Vorschläge, legt aber nichts in den Warenkorb.',

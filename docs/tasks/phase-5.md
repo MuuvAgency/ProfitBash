@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a, 5.11b. Als Nächstes: 5.12 (frühestens nach einigen Wochen mit Daten), dann 5.13.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a, 5.11b, 5.13a. Als Nächstes: 5.13b, 5.13c; 5.12 bleibt offen (frühestens nach einigen Wochen mit Daten).**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -861,8 +861,41 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
       Zeiträumen; ausdrücklich als Orientierung ohne Wirkungsnachweis gekennzeichnet. Schalter „Vorschläge in den
       Warenkorb“ an derselben Stelle.
 
-### 5.13 Abschluss
-- [ ] Definition of Done prüfen, Browser-Pane, offene Punkte festhalten.
+- **Entschieden (Dominik, 2026-10-11, zu Beginn der dritten Session; für 5.12 und 5.13):**
+  - **5.12** bleibt offen: Es liegen noch keine Wochen mit Läufen und Übermittlungen vor.
+  - **Übersicht „diese Datensätze erwartet die Automatik“** je Profil kommt jetzt, in 5.13b.
+  - **Verworfene Graduation-/Preset-Vorschläge** bleiben verworfen, solange sie in jedem Lauf wieder auftreten
+    (die Festlegung aus 5.11b gilt).
+  - **Browser-Prüfung mit echten Daten:** Dominik lädt am Ende der Session eine Bulk-Datei mit Kennzahlen und
+    Suchbegriff-Blättern in die Dev-DB (5.13c).
+
+### 5.13 Abschluss (aufgeteilt am 2026-10-11: je Teil ein Branch und PR)
+
+#### 5.13a Modus „aus“ schaltet nur die Vorschläge ab
+- [x] Lauf im Modus „aus“: keine Vorschläge (Gebote, Budgets, Graduation, Presets), Cap-Meldungen und Prüfungen laufen.
+- [x] Umsetzung (2026-10-11):
+  - **Plan:** `planAutomationRun` überspringt „aus“ nicht mehr (`skip: 'off'` entfällt); der Plan trägt `mode: 'off'`
+    ohne Zuständigen. Der Modus steht im `fingerprint`: Der Wechsel auf „aus“ macht einen Lauf fällig.
+  - **Job:** Im Modus „aus“ rechnet er weder Gebots- und Budgetvorschläge (auch nicht die des Enforcers) noch
+    Graduation und Presets; `computeAutomationFindings` läuft wie sonst. Zähler `targets` und `campaigns` sind 0.
+  - **Speichern** (`saveAutomationRun`): übergebene Vorschläge zählen im Modus „aus“ nicht. Wie bei jedem Lauf werden
+    die offenen Vorschläge des Profils abgelöst und die eigenen offenen Warenkorb-Zeilen (Herkunft `automation`,
+    `budget_cap`) gelöscht: **Wer auf „aus“ stellt, räumt damit auch den Warenkorb von Vorschlägen der Automatik.**
+    Offene Graduation-/Preset-Vorschläge fallen weg (`clearOpenStructureProposals`), **verworfene bleiben
+    gespeichert**, damit sie nach dem Einschalten verworfen sind. Cap-Meldungen und Befunde wie in jedem Lauf.
+  - **Daten:** `automation_runs.mode` erlaubt `off` (Migration `0047_automation_run_mode_off`);
+    `AUTOMATION_RUN_MODES` entfällt, der Lauf nutzt `AUTOMATION_MODES`. Der Tab „Läufe“ zeigt solche Läufe als „Aus“;
+    Hinweistext des Modus in den Einstellungen angepasst.
+  - **Grenze:** Profile ohne Datei mit Kennzahlen bekommen weiter keinen Lauf (`noMetrics`), also auch im Modus
+    „aus“ keine Cap-Meldung (wie 5.9b).
+
+#### 5.13b Läufe: Gründe ohne Vorschlag und erwartete Datensätze
+- [ ] Gründe ohne Vorschlag je Lauf im Tab „Läufe“ (`automation_runs.counts`, auch `budgetCap`, `findings`, `structure`).
+- [ ] Übersicht je Profil: Datensätze, die die Automatik erwartet (Bulk-Datei mit Kennzahlen, Suchbegriff-Blätter,
+      Zeitraum, Alter), was vorliegt und was fehlt.
+
+#### 5.13c Definition of Done, Browser-Pane, offene Punkte
+- [ ] Definition of Done prüfen, Browser-Pane (mit Dominiks Bulk-Datei), offene Punkte festhalten.
 
 ## Offen vor dem Bau (nicht von Dominik zu entscheiden)
 

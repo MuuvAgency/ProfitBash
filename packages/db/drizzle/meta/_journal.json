@@ -330,6 +330,13 @@
       "when": 1791706518778,
       "tag": "0046_structure_proposals",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791713472264,
+      "tag": "0047_automation_run_mode_off",
+      "breakpoints": true
     }
   ]
 }
