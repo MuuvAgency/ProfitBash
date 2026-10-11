@@ -478,6 +478,7 @@ const LABEL = 'text-label-eyebrow uppercase text-ink-tertiary';
                 v-model="row.month"
                 :data-cap-month="index"
                 type="month"
+                placeholder="JJJJ-MM"
                 :class="INPUT"
               />
             </div>

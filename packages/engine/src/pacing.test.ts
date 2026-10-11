@@ -109,6 +109,13 @@ describe('computePacing', () => {
       forecast: { value: '0' },
     });
   });
+  it('überspringt Zeilen, deren Zeitraum vor seinem Anfang endet', () => {
+    expect(pacing([campaign('300', '2026-10-10', '2026-10-09')])).toMatchObject({
+      dataThrough: null,
+      actual: { value: '0' },
+      forecast: { value: '0' },
+    });
+  });
 });
 
 describe('monthInTimeZone', () => {

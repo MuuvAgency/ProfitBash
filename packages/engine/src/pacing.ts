@@ -91,6 +91,7 @@ export function computePacing(input: PacingInput): Pacing {
     const start = dayNumber(campaign.periodStart);
     const end = dayNumber(campaign.periodEnd);
     const days = end - start + 1;
+    if (days <= 0) continue;
     const inMonth = Math.max(0, Math.min(end, monthEnd) - Math.max(start, monthStart) + 1);
     const cost = parseDecimal(campaign.cost);
     const rate = cost.div(days);
