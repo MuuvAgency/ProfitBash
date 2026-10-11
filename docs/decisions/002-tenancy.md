@@ -122,7 +122,9 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   ausdrücklich freigegebene Pfade zu (`isOpenForCustomerOrgs` in `requireSession`, sonst 403
   `CUSTOMER_ORG_FORBIDDEN`): Neue Routen sind für Kunden geschlossen, bis sie eingetragen und mit zweitem Client
   getestet sind (`customer-org.test.ts` läuft über alle registrierten Routen). Abfragen, die eigene Tabellen nach
-  `organization_id = aktive Organisation` filtern, liefern für Kunden weiterhin nichts.
+  `organization_id = aktive Organisation` filtern, liefern für Kunden weiterhin nichts. Freigegeben sind seit 6.3b die
+  Auswertungen für Dashboard und Explorer: Der Datenstand liest dafür die Läufe (`job_runs`) der Eigentümer-Org des
+  sichtbaren Profils; Tags zählen in den Auswertungen nur für die aktive Organisation.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

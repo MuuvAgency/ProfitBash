@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a.**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b (Browser-Prüfung als Kunde mit 6.3c).**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -216,11 +216,27 @@ Plattform-Rolle `superadmin`.
   - Keine Änderung an der Oberfläche (folgt in 6.3b), daher keine Browser-Prüfung.
 
 ### 6.3b Kunden-Org: freigegebene Seiten (F1)
-- [ ] Dashboard und Explorer (Auswertungs-Endpunkte, Filteroptionen, Währungen) für Kunden-Logins: Abfragen, die nach
+- [x] Dashboard und Explorer (Auswertungs-Endpunkte, Filteroptionen, Währungen) für Kunden-Logins: Abfragen, die nach
       der aktiven Organisation filtern, auf den Profil-Scope umstellen; je Endpunkt Test mit zweitem Client.
-- [ ] Web: Shell für Kunden-Orgs (nur gebuchte Einträge, keine Platzhalter späterer Phasen, kein Warenkorb, keine
+- [x] Web: Shell für Kunden-Orgs (nur gebuchte Einträge, keine Platzhalter späterer Phasen, kein Warenkorb, keine
       Quick-Tools, keine Glocke); Bedienelemente zum Bearbeiten im Explorer hängen bereits an `write`.
-- [ ] Browser-Prüfung als Kunde.
+- [ ] Browser-Prüfung als Kunde (mit 6.3c: Erst dort lässt sich ein Kundenzugang über die Oberfläche anlegen
+      und wieder entfernen).
+- **Umsetzung (2026-10-11):**
+  - **Freigegeben** (`CUSTOMER_ORG_PATHS` in `middleware.ts`): `POST /api/ads/filter-options`, `/dashboard`,
+    `/explorer/rows`, `/timeseries`. Die ASIN-Suche (Quick-Tool) und alles andere bleiben zu.
+  - **Abfragen:** Die Auswertungen liefen schon über `visibleProfilesScope()`. Umgestellt: „Letzter Sync“ im
+    Datenstand liest die Läufe der Eigentümer-Org des Profils statt der aktiven Organisation
+    (`queryDashboardStatus`); Tags in den Explorer-Zeilen und der Tag-Filter zählen nur Zuweisungen der aktiven
+    Organisation (Kunden sehen und filtern keine Tags der Agentur).
+  - **Tests:** `routes/analytics-customer.test.ts` je Endpunkt mit zweitem Client, zweiter Kunden-Org,
+    ausgeblendetem Profil, gelöster Verknüpfung; `customer-org.test.ts` führt die vier Pfade als freigegeben.
+  - **Web:** `isCustomerOrg()`/`useIsCustomerOrg()`; neue Zugriffsart `agency` (Menüeintrag Benachrichtigungen,
+    Route Suchbegriff-Analyse). Für Kunden entfallen Glocke und Live-Kanal, Quick-Tools, gespeicherte Ansichten und
+    der Reiter „Suchbegriff-Analyse“. Tests in `ExplorerPage.test.ts` und `DashboardPage.test.ts` prüfen, dass ein
+    Kunden-Login nur freigegebene Pfade anfragt (`isOpenForCustomers` in `test/fixtures.ts` spiegelt die Liste der API).
+  - **Bewusst so:** Die Explorer-Ebene „Suchbegriffe“ (Kennzahlen) bleibt für Kunden sichtbar, die Analyse mit Regeln
+    und geschützten Begriffen nicht. Gespeicherte Ansichten für Kunden gibt es nicht (siehe 6.3a).
 
 ### 6.3c Kundenzugang verwalten (F3)
 - [ ] `packages/db`: Kunden-Org zu einem Client anlegen (Typ `client`, Entitlements nach F1), Kunden-Nutzer anlegen
