@@ -47,21 +47,28 @@ async function setupBlocks(db: Reader, profileId: string): Promise<Map<string, s
     .select({
       amazonCampaignId: campaignSetupItems.amazonEntityId,
       name: campaignSetupItems.campaignRef,
-      campaigns: campaignSetupDrafts.campaigns,
+      draftId: campaignSetupItems.draftId,
     })
     .from(campaignSetupItems)
-    .innerJoin(campaignSetupDrafts, eq(campaignSetupDrafts.id, campaignSetupItems.draftId))
     .where(
       and(
         eq(campaignSetupItems.profileId, profileId),
         eq(campaignSetupItems.entityType, 'campaign'),
         isNotNull(campaignSetupItems.amazonEntityId),
+        isNotNull(campaignSetupItems.draftId),
       ),
     )
     .orderBy(asc(campaignSetupItems.createdAt));
   const blocks = new Map<string, string>();
+  if (rows.length === 0) return blocks;
+  // Den Plan je Entwurf einmal laden, nicht je Kampagnen-Zeile.
+  const drafts = await db
+    .select({ id: campaignSetupDrafts.id, campaigns: campaignSetupDrafts.campaigns })
+    .from(campaignSetupDrafts)
+    .where(inArray(campaignSetupDrafts.id, [...new Set(rows.map((row) => row.draftId!))]));
+  const plans = new Map(drafts.map((draft) => [draft.id, draft.campaigns as PlannedCampaign[]]));
   for (const row of rows) {
-    const planned = (row.campaigns as PlannedCampaign[]).find((c) => c.name === row.name);
+    const planned = plans.get(row.draftId!)?.find((c) => c.name === row.name);
     if (planned) blocks.set(row.amazonCampaignId!, planned.block);
   }
   return blocks;
