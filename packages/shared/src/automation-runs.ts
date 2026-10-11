@@ -99,3 +99,43 @@ export const automationProposalActionResponseSchema = z
     skipped: z.int(),
   })
   .meta({ id: 'AutomationProposalActionResponse' });
+
+// ---------------------------------------------------------------------------
+// Graduation- und Preset-Vorschläge (5.11b)
+// ---------------------------------------------------------------------------
+
+export const STRUCTURE_PROPOSAL_KINDS = ['graduation', 'presetSwitch'] as const;
+export const STRUCTURE_PROPOSAL_FILTERS = ['open', 'dismissed'] as const;
+export type StructureProposalFilter = (typeof STRUCTURE_PROPOSAL_FILTERS)[number];
+
+export const structureProposalSchema = z
+  .object({
+    id: z.uuid(),
+    profileId: z.uuid(),
+    accountName: z.string(),
+    currencyCode: z.string(),
+    kind: z.enum(STRUCTURE_PROPOSAL_KINDS),
+    /** `graduation`: Suchbegriff in Vergleichsform; `presetSwitch`: ID der Produktgruppe. */
+    subject: z.string(),
+    /** `graduation`: Baustein der Quelle; `presetSwitch`: Ziel-Preset. */
+    key: z.string(),
+    /**
+     * `graduation`: `searchTerm`, `fromBlock`, `toBlocks`, `clicks`, `orders`, `spend`, `sales`, `acos`,
+     * `periodStart`, `periodEnd`. `presetSwitch`: `productGroupName`, `from`, `to`, `orders`, `spend`, `sales`,
+     * `acos`, `goalAcos`.
+     */
+    detail: z.record(z.string(), z.unknown()),
+    firstSeenAt: z.string(),
+    dismissedAt: z.string().nullable(),
+  })
+  .meta({ id: 'StructureProposal' });
+export type StructureProposal = z.infer<typeof structureProposalSchema>;
+
+export const structureProposalsResponseSchema = z
+  .object({
+    /** Neueste zuerst, höchstens 500. */
+    proposals: z.array(structureProposalSchema),
+    total: z.int(),
+  })
+  .meta({ id: 'StructureProposalsResponse' });
+export type StructureProposalsResponse = z.infer<typeof structureProposalsResponseSchema>;

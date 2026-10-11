@@ -1,6 +1,9 @@
 import { createRoute, z, type OpenAPIHono } from '@hono/zod-openapi';
 import {
+  acceptStructureProposals,
   acknowledgeAutomationFindings,
+  dismissStructureProposals,
+  listStructureProposals,
   AutomationError,
   dismissAutomationProposals,
   getAutomationChecks,
@@ -34,6 +37,8 @@ import {
   previewAutomationRulesRequestSchema,
   saveAutomationRulesRequestSchema,
   setClientAutomationRequestSchema,
+  STRUCTURE_PROPOSAL_FILTERS,
+  structureProposalsResponseSchema,
 } from '@profitbash/shared';
 import type { AppDeps, AppEnv } from '../context';
 import { ApiError } from '../errors';
@@ -212,6 +217,38 @@ const acknowledgeRoute = createRoute({
   },
 });
 
+const structureProposalsRoute = createRoute({
+  method: 'get',
+  path: '/ads/automations/structure-proposals',
+  tags: ['Automationen'],
+  summary: 'Graduation- und Preset-Vorschläge der sichtbaren Profile (offen oder verworfen)',
+  request: {
+    query: z.object({ status: z.enum(STRUCTURE_PROPOSAL_FILTERS).default('open') }),
+  },
+  responses: {
+    200: { description: 'Vorschläge.', content: json(structureProposalsResponseSchema) },
+    ...errors,
+  },
+});
+
+const structureAction = (action: 'accept' | 'dismiss', summary: string) =>
+  createRoute({
+    method: 'post',
+    path: `/ads/automations/structure-proposals/${action}`,
+    tags: ['Automationen'],
+    summary,
+    request: { body: { content: json(automationProposalIdsRequestSchema), required: true } },
+    responses: {
+      200: { description: 'Ergebnis.', content: json(automationProposalActionResponseSchema) },
+      ...errors,
+    },
+  });
+const acceptStructureRoute = structureAction(
+  'accept',
+  'Vorschläge annehmen: Begriff auf die Merkliste bzw. Preset der Produktgruppe ändern (Recht „write“)',
+);
+const dismissStructureRoute = structureAction('dismiss', 'Vorschläge verwerfen (Recht „write“)');
+
 const STATUS_BY_CODE = {
   FORBIDDEN: [403, 'AUTOMATION_DEFAULTS_FORBIDDEN'],
   NOT_FOUND: [404, 'CLIENT_NOT_FOUND'],
@@ -334,6 +371,37 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
   app.openapi({ ...dismissProposalsRoute, middleware: guard('write') }, async (c) =>
     c.json(
       await run(() => dismissAutomationProposals(db, { ...actor(c), ...c.req.valid('json') })),
+      200,
+    ),
+  );
+
+  app.openapi({ ...structureProposalsRoute, middleware: guard('view') }, async (c) => {
+    const { proposals, total } = await run(() =>
+      listStructureProposals(db, { ...actor(c), ...c.req.valid('query') }),
+    );
+    return c.json(
+      {
+        total,
+        proposals: proposals.map((row) => ({
+          ...row,
+          firstSeenAt: row.firstSeenAt.toISOString(),
+          dismissedAt: row.dismissedAt?.toISOString() ?? null,
+        })),
+      },
+      200,
+    );
+  });
+
+  app.openapi({ ...acceptStructureRoute, middleware: guard('write') }, async (c) =>
+    c.json(
+      await run(() => acceptStructureProposals(db, { ...actor(c), ...c.req.valid('json') })),
+      200,
+    ),
+  );
+
+  app.openapi({ ...dismissStructureRoute, middleware: guard('write') }, async (c) =>
+    c.json(
+      await run(() => dismissStructureProposals(db, { ...actor(c), ...c.req.valid('json') })),
       200,
     ),
   );

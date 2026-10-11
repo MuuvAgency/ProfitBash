@@ -4,6 +4,7 @@ import {
   saveAutomationRun,
   schema,
   syncAutomationFindings,
+  syncStructureProposals,
 } from '@profitbash/db';
 import { seedAdChangeFixture, type AdChangeFixture } from '@profitbash/db/testing';
 import {
@@ -499,5 +500,104 @@ describe('Prüfungen (/api/ads/automations/checks)', () => {
     expect((await putSettings(admin, { ...settings, placementMinPercent: 0 })).status).toBe(400);
     expect((await putSettings(admin, { ...settings, spendNoOrdersMinEur: '0' })).status).toBe(400);
     expect((await putSettings(admin, { placementMinPercent: 50 })).status).toBe(400);
+  });
+});
+
+describe('Graduation- und Preset-Vorschläge (/api/ads/automations/structure-proposals)', () => {
+  type List = {
+    total: number;
+    proposals: { id: string; kind: string; subject: string; dismissedAt: string | null }[];
+  };
+  const list = (cookie?: string, status?: string) =>
+    call<List>('GET', `/structure-proposals${status ? `?status=${status}` : ''}`, cookie);
+  const act = (action: 'accept' | 'dismiss', cookie: string | undefined, ids: string[]) =>
+    call<{ changed: number; skipped: number }>('POST', `/structure-proposals/${action}`, cookie, {
+      ids,
+    });
+  const PERIOD = { periodStart: '2026-09-08', periodEnd: '2026-10-07' };
+
+  beforeEach(async () => {
+    const { db } = ctx.testDb;
+    await db.delete(schema.automationStructureProposals);
+    await db.delete(schema.searchTermHarvestMarks);
+    await db.delete(schema.amazonAdsSearchTermPeriodMetrics);
+    await hide(false);
+    await db.insert(schema.amazonAdsSearchTermPeriodMetrics).values({
+      organizationId: f.org,
+      profileId: f.profile,
+      adProduct: 'SPONSORED_PRODUCTS',
+      ...PERIOD,
+      amazonCampaignId: '1001',
+      amazonAdGroupId: '2001',
+      amazonTargetId: '3001',
+      searchTerm: 'trinkflasche 1l',
+      currencyCode: 'EUR',
+      impressions: 500,
+      clicks: 40,
+      cost: '10.00',
+      sales: '100.00',
+      purchases: 3,
+      units: 3,
+      importedAt: new Date('2026-10-10T08:00:00Z'),
+    });
+    await syncStructureProposals(db, {
+      organizationId: f.org,
+      profileId: f.profile,
+      now: new Date('2026-10-10T08:00:00Z'),
+      proposals: [
+        {
+          kind: 'graduation',
+          subject: 'trinkflasche 1l',
+          key: 'SP-AUTO',
+          detail: {
+            searchTerm: 'trinkflasche 1l',
+            toBlocks: ['SP-KW-EXACT'],
+            orders: 3,
+            ...PERIOD,
+          },
+        },
+      ],
+    });
+  });
+
+  it('liefert die Vorschläge der sichtbaren Profile, auch für Viewer', async () => {
+    const res = await list(viewer);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      total: 1,
+      proposals: [
+        {
+          kind: 'graduation',
+          subject: 'trinkflasche 1l',
+          key: 'SP-AUTO',
+          profileId: f.profile,
+          accountName: 'Nordwind DE',
+          detail: { orders: 3 },
+          firstSeenAt: '2026-10-10T08:00:00.000Z',
+          dismissedAt: null,
+        },
+      ],
+    });
+    expect((await list(viewer, 'dismissed')).body.proposals).toEqual([]);
+    expect((await list(viewer, 'alle')).status).toBe(400);
+    expect((await list(foreign)).body.proposals).toEqual([]);
+    await hide(true);
+    expect((await list(editor)).body.total).toBe(0);
+    expect((await list()).status).toBe(401);
+  });
+
+  it('Editoren verwerfen und nehmen an (Merkliste); Viewer und Fremde nicht', async () => {
+    const { id } = (await list(editor)).body.proposals[0]!;
+    for (const action of ['accept', 'dismiss'] as const) {
+      expect((await act(action, viewer, [id])).status).toBe(403);
+      expect((await act(action, undefined, [id])).status).toBe(401);
+      expect((await act(action, editor, [])).status).toBe(400);
+      expect((await act(action, foreign, [id])).body).toEqual({ changed: 0, skipped: 1 });
+    }
+    expect((await act('accept', editor, [id])).body).toEqual({ changed: 1, skipped: 0 });
+    expect((await list(editor)).body.total).toBe(0);
+    expect(await ctx.testDb.db.select().from(schema.searchTermHarvestMarks)).toMatchObject([
+      { termKey: 'trinkflasche 1l', profileId: f.profile },
+    ]);
   });
 });
