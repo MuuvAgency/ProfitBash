@@ -722,6 +722,119 @@ describe('Profile ohne Connection (Datei-Import, 1.11a)', () => {
     return wrapper.get('section[aria-label="Profile ohne Connection"]');
   }
 
+  describe('Kundenzugang am Client (6.3c)', () => {
+    const ACCESS_PATH = `/api/clients/${nordwind.id}/access`;
+    const kim = {
+      id: '7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+      userId: '8b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e',
+      name: 'Kim Kunde',
+      email: 'kim@nordwind.test',
+      role: 'viewer',
+      status: 'active',
+      linkExpiresAt: null,
+      isSelf: false,
+      clientIds: [],
+      createdAt: '2026-10-11T09:00:00.000Z',
+    };
+    const link = {
+      url: 'http://localhost:5173/set-password#abc',
+      expiresAt: '2026-10-18T09:00:00.000Z',
+    };
+
+    async function openAccess(overrides: Parameters<typeof stubFetch>[0]) {
+      const stub = stubFetch(routes(overrides));
+      const { wrapper } = await mountPage();
+      await waitForRow(wrapper, 'Nordwind GmbH');
+      await wrapper
+        .get('button[aria-label="Kundenzugang für Nordwind verwalten"]')
+        .trigger('click');
+      await flushPromises();
+      await vi.waitFor(() => expect(dialog()).not.toBeNull());
+      return { ...stub, form: dialog()! };
+    }
+
+    it('ohne Kunden-Nutzer: Hinweis; anlegen zeigt den Link nur einmal', async () => {
+      let members: unknown[] = [];
+      const { requests, form } = await openAccess({
+        [`GET ${ACCESS_PATH}`]: () => json({ members }),
+        [`POST ${ACCESS_PATH}`]: () => {
+          members = [{ ...kim, status: 'pending', linkExpiresAt: link.expiresAt }];
+          return json({ member: members[0], link }, 201);
+        },
+      });
+      await vi.waitFor(() => expect(form.text()).toContain('Noch kein Kundenzugang'));
+      expect(form.text()).toContain('nur lesend');
+
+      await form.get('form').trigger('submit');
+      await flushPromises();
+      expect(form.get('[role="alert"]').text()).toContain('Bitte E-Mail-Adresse und Name angeben.');
+
+      await form.get('input[type="email"]').setValue(' kim@nordwind.test ');
+      await form.get('input[data-client-access-name]').setValue('Kim Kunde');
+      await form.get('form').trigger('submit');
+      await vi.waitFor(() =>
+        expect(form.get<HTMLInputElement>('input[data-client-access-link]').element.value).toBe(
+          link.url,
+        ),
+      );
+      const post = requests.find((r) => r.method === 'POST' && r.path === ACCESS_PATH);
+      expect(post?.body).toEqual({ email: 'kim@nordwind.test', name: 'Kim Kunde' });
+      await vi.waitFor(() => expect(form.text()).toContain('kim@nordwind.test'));
+      expect(form.text()).toContain('Link offen bis 18.10.2026');
+    });
+
+    it('zeigt die Nutzer, erzeugt einen neuen Link und entzieht den Zugang erst nach Rückfrage', async () => {
+      let members: unknown[] = [kim];
+      const { requests, form } = await openAccess({
+        [`GET ${ACCESS_PATH}`]: () => json({ members }),
+        [`POST ${ACCESS_PATH}/${kim.id}/password-link`]: json(link, 201),
+        [`DELETE ${ACCESS_PATH}/${kim.id}`]: () => {
+          members = [];
+          return new Response(null, { status: 204 });
+        },
+      });
+      await vi.waitFor(() => expect(form.text()).toContain('Kim Kunde'));
+      expect(form.text()).toContain('Aktiv');
+
+      await form
+        .get('button[aria-label="Neuen Link zum Passwort-Setzen für Kim Kunde erzeugen"]')
+        .trigger('click');
+      await vi.waitFor(() =>
+        expect(form.find('input[data-client-access-link]').exists()).toBe(true),
+      );
+
+      await form.get('button[aria-label="Zugang von Kim Kunde entziehen"]').trigger('click');
+      await flushPromises();
+      expect(requests.some((r) => r.method === 'DELETE')).toBe(false);
+      await form.get('button[data-client-access-remove-confirm]').trigger('click');
+      await vi.waitFor(() => expect(form.text()).toContain('Noch kein Kundenzugang'));
+      expect(
+        requests.some((r) => r.method === 'DELETE' && r.path === `${ACCESS_PATH}/${kim.id}`),
+      ).toBe(true);
+    });
+
+    it('Ladefehler mit „Erneut versuchen“; ein Fehler beim Anlegen steht im Dialog', async () => {
+      let fail = true;
+      const { form } = await openAccess({
+        [`GET ${ACCESS_PATH}`]: () => (fail ? serverError() : json({ members: [] })),
+        [`POST ${ACCESS_PATH}`]: json({ error: { code: 'MEMBER_EMAIL_TAKEN', message: 'x' } }, 409),
+      });
+      await vi.waitFor(() =>
+        expect(form.text()).toContain('Die Kunden-Nutzer konnten nicht geladen werden.'),
+      );
+      fail = false;
+      const retry = form.findAll('button').find((b) => b.text() === 'Erneut versuchen')!;
+      await retry.trigger('click');
+      await vi.waitFor(() => expect(form.text()).toContain('Noch kein Kundenzugang'));
+
+      await form.get('input[type="email"]').setValue('editor@muuv.test');
+      await form.get('input[data-client-access-name]').setValue('Edi');
+      await form.get('form').trigger('submit');
+      await vi.waitFor(() => expect(form.find('[role="alert"]').exists()).toBe(true));
+      expect(form.find('input[data-client-access-link]').exists()).toBe(false);
+    });
+  });
+
   it('zeigt Datei-Profile in einem eigenen Abschnitt, getrennt von den Connections', async () => {
     stubFetch(routes({ 'GET /api/profiles/file': json({ profiles: [fileProfile] }) }));
     const { wrapper } = await mountPage();

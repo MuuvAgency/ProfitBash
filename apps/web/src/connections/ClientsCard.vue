@@ -3,11 +3,13 @@ import type { Client } from '@profitbash/shared';
 import Button from 'primevue/button';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import ClientAccessDialog from './ClientAccessDialog.vue';
 import ProtectedTermsDialog from './ProtectedTermsDialog.vue';
 
 /**
  * Clients der Organisation mit ihren geschützten Begriffen (`phase-2b.md` 2b.2, Dominik 2026-10-07: Pflege bei
- * „Clients & Connections“). Angelegt und zugeordnet werden Clients weiter an den Profilen.
+ * „Clients & Connections“) und dem Kundenzugang (`phase-6.md` 6.3c). Angelegt und zugeordnet werden Clients weiter an
+ * den Profilen.
  */
 const props = defineProps<{ clients: Client[] }>();
 
@@ -16,6 +18,8 @@ const { t } = useI18n();
 /** Aus der Liste gelesen, damit der Dialog nach dem Speichern den neuen Stand kennt. */
 const editingId = ref<string | null>(null);
 const editing = computed(() => props.clients.find((c) => c.id === editingId.value) ?? null);
+const accessId = ref<string | null>(null);
+const access = computed(() => props.clients.find((c) => c.id === accessId.value) ?? null);
 </script>
 
 <template>
@@ -55,17 +59,27 @@ const editing = computed(() => props.clients.find((c) => c.id === editingId.valu
             t('connections.clients.noProtectedTerms')
           }}</span>
         </div>
-        <Button
-          :label="t('connections.clients.editProtectedTerms')"
-          :aria-label="t('connections.clients.editProtectedTermsFor', { client: client.name })"
-          size="small"
-          severity="secondary"
-          class="shrink-0 self-start sm:self-center"
-          @click="editingId = client.id"
-        />
+        <div class="flex shrink-0 flex-wrap gap-space-sm self-start sm:self-center">
+          <Button
+            :label="t('connections.clients.editProtectedTerms')"
+            :aria-label="t('connections.clients.editProtectedTermsFor', { client: client.name })"
+            size="small"
+            severity="secondary"
+            @click="editingId = client.id"
+          />
+          <Button
+            icon="pi pi-users"
+            :label="t('connections.clientAccess.button')"
+            :aria-label="t('connections.clientAccess.buttonFor', { client: client.name })"
+            size="small"
+            severity="secondary"
+            @click="accessId = client.id"
+          />
+        </div>
       </li>
     </ul>
 
     <ProtectedTermsDialog :client="editing" @close="editingId = null" />
+    <ClientAccessDialog :client="access" @close="accessId = null" />
   </section>
 </template>
