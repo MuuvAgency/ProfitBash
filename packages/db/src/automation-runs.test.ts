@@ -1,4 +1,8 @@
-import { DEFAULT_AUTOMATION_RULES, DEFAULT_GUARDRAILS } from '@profitbash/shared';
+import {
+  DEFAULT_AUTOMATION_RULES,
+  DEFAULT_CHECK_SETTINGS,
+  DEFAULT_GUARDRAILS,
+} from '@profitbash/shared';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seedAdChangeFixture, type AdChangeFixture } from './ad-change-fixture';
@@ -21,6 +25,8 @@ import {
   amazonAdsEntityPeriodMetrics,
   amazonAdsProfiles,
   auditEvents,
+  automationCheckSettings,
+  automationFindings,
   automationProposals,
   automationRules,
   automationRuns,
@@ -180,6 +186,8 @@ afterAll(async () => {
 beforeEach(async () => {
   const { db } = testDb;
   await db.delete(automationProposals);
+  await db.delete(automationFindings);
+  await db.delete(automationCheckSettings);
   await db.delete(budgetCaps);
   await db.delete(automationRuns);
   await db.delete(adChanges);
@@ -339,6 +347,7 @@ describe('loadAutomationRunEntities', () => {
         costType: null,
         budget: '20',
         metrics: { impressions: 50000, clicks: 500, orders: 40, spend: '400.00', sales: '1000.00' },
+        placements: [{ placement: 'PLACEMENT_TOP', percent: 50, metrics: null }],
       },
     ]);
     expect(entities.adGroups).toEqual([
@@ -933,5 +942,95 @@ describe('Budget-Caps im Lauf (5.9b)', () => {
       ['budget_cap_threshold', 'warning', 80],
       ['budget_cap_threshold', 'error', 100],
     ]);
+  });
+});
+
+describe('Prüfungen im Lauf (5.10)', () => {
+  const finding = (kind: 'vcpm' | 'noCap') => ({
+    kind,
+    entityType: kind === 'vcpm' ? ('campaign' as const) : ('profile' as const),
+    entityId: kind === 'vcpm' ? f.campaign : f.profile,
+    campaignId: kind === 'vcpm' ? f.campaign : null,
+    key: '',
+    detail: {},
+  });
+  const saveWith = async (findings: ReturnType<typeof finding>[]) =>
+    saveAutomationRun(testDb.db, {
+      ...scope(),
+      plan: await plan(),
+      jobRunId: null,
+      counts: { targets: 2 },
+      proposals: [],
+      findings,
+    });
+  const findingNotifications = async () =>
+    (await testDb.db.select().from(notifications)).filter((n) => n.kind === 'automation_findings');
+
+  it('der Plan trägt die Einstellungen der Prüfungen; geänderte Einstellungen machen einen Lauf fällig', async () => {
+    await standardMetrics();
+    expect((await plan()).checks).toEqual(DEFAULT_CHECK_SETTINGS);
+    await save([]);
+    expect(await planAutomationRun(testDb.db, scope(), NOW)).toEqual({ skip: 'unchanged' });
+
+    const settings = { ...DEFAULT_CHECK_SETTINGS, placementMinPercent: 100 };
+    await testDb.db.insert(automationCheckSettings).values({ organizationId: f.org, settings });
+    expect((await plan()).checks).toEqual(settings);
+  });
+
+  it('liefert je Kampagne die Platzierungs-Anpassungen mit den Summen der Platzierung', async () => {
+    await importMetrics([
+      row('campaign', '1001', 500, '400.00', '1000.00', 40),
+      row('placement', 'PLACEMENT_TOP', 200, '150.00', '300.00', 12),
+    ]);
+    const entities = await loadAutomationRunEntities(testDb.db, scope(), await plan(), NOW);
+
+    expect(entities.campaigns.find((c) => c.id === f.campaign)!.placements).toEqual([
+      {
+        placement: 'PLACEMENT_TOP',
+        percent: 50,
+        metrics: { impressions: 20000, clicks: 200, orders: 12, spend: '150.00', sales: '300.00' },
+      },
+    ]);
+  });
+
+  it('gleicht die Befunde ab, zählt sie am Lauf und meldet nur neue Warnungen an alle, die das Profil sehen', async () => {
+    await standardMetrics();
+    await saveWith([finding('vcpm'), finding('noCap')]);
+
+    expect((await testDb.db.select().from(automationFindings)).map((x) => x.kind).sort()).toEqual([
+      'noCap',
+      'vcpm',
+    ]);
+    const [run] = await testDb.db.select().from(automationRuns);
+    expect(run!.counts).toMatchObject({ findings: 2 });
+    expect(await findingNotifications()).toMatchObject([
+      {
+        audience: 'members',
+        severity: 'warning',
+        profileId: f.profile,
+        params: { count: 1 },
+        link: '/ads/automations?tab=checks',
+      },
+    ]);
+
+    // Derselbe Befund im nächsten Lauf: keine neue Meldung; verschwunden: gelöscht.
+    await changeRules(1);
+    await saveWith([finding('vcpm')]);
+    expect(await findingNotifications()).toHaveLength(1);
+    expect((await testDb.db.select().from(automationFindings)).map((x) => x.kind)).toEqual([
+      'vcpm',
+    ]);
+    // Nur ein Hinweis neu: keine Meldung.
+    await changeRules(2);
+    await saveWith([finding('vcpm'), finding('noCap')]);
+    expect(await findingNotifications()).toHaveLength(1);
+  });
+
+  it('ohne Angabe von Befunden bleiben die bestehenden stehen', async () => {
+    await standardMetrics();
+    await saveWith([finding('vcpm')]);
+    await changeRules(1);
+    await save([]);
+    expect(await testDb.db.select().from(automationFindings)).toHaveLength(1);
   });
 });

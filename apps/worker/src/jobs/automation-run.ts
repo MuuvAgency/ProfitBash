@@ -15,9 +15,11 @@ import {
   decideTarget,
   effectiveGoal,
   enforceCap,
+  runChecks,
   formatDecimal,
   parseDecimal,
   type CapAction,
+  type CheckResult,
   type Decision,
 } from '@profitbash/engine';
 import { z } from 'zod';
@@ -254,6 +256,46 @@ export function computeAutomationProposals(
   return { proposals, counts };
 }
 
+/** Befunde der Prüfungen (5.10) aus denselben Entities; Kampagnen ohne Kennzahlen im Datenstand bleiben außen vor. */
+export function computeAutomationFindings(
+  plan: AutomationRunPlan,
+  entities: AutomationRunEntities,
+): CheckResult[] {
+  const capped = new Set(plan.caps.flatMap((cap) => cap.campaigns.map((campaign) => campaign.id)));
+  return runChecks({
+    settings: plan.checks,
+    profileId: plan.profile.id,
+    eurRate: plan.eurRate,
+    // Kampagnen tragen Produkte mehrerer Gruppen: Es gilt das Ziel von Profil bzw. Client.
+    goalAcos:
+      effectiveGoal(plan.goals, {
+        clientId: plan.profile.clientId,
+        profileId: plan.profile.id,
+        productGroupIds: [],
+      })?.acos ?? null,
+    campaigns: entities.campaigns.flatMap((campaign) =>
+      campaign.metrics === null
+        ? []
+        : [
+            {
+              id: campaign.id,
+              state: state(campaign.state),
+              costType: campaign.costType,
+              metrics: campaign.metrics,
+              placements: campaign.placements,
+              capped: capped.has(campaign.id),
+            },
+          ],
+    ),
+    targets: entities.targets.map((target) => ({
+      id: target.id,
+      campaignId: target.campaignId,
+      state: state(target.state),
+      metrics: target.metrics,
+    })),
+  });
+}
+
 export interface AutomationRunDeps {
   db: Db;
   now: () => Date;
@@ -280,12 +322,14 @@ export async function runAutomation(
   return runJob('automation-run', scope, async ({ runId }) => {
     const entities = await loadAutomationRunEntities(deps.db, job, plan, deps.now());
     const { proposals, counts } = computeAutomationProposals(plan, entities);
+    const findings = computeAutomationFindings(plan, entities);
     const saved = await saveAutomationRun(deps.db, {
       ...job,
       plan,
       jobRunId: runId,
       counts,
       proposals,
+      findings,
     });
     return {
       counters: {
@@ -293,6 +337,7 @@ export async function runAutomation(
         campaigns: counts.campaigns!,
         proposals: saved.proposals,
         staged: saved.staged,
+        findings: findings.length,
       },
     };
   });

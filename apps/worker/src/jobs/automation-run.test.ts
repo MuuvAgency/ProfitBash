@@ -13,7 +13,11 @@ import {
   type TestDatabase,
 } from '@profitbash/db/testing';
 import { computePacing } from '@profitbash/engine';
-import { DEFAULT_AUTOMATION_RULES, DEFAULT_GUARDRAILS } from '@profitbash/shared';
+import {
+  DEFAULT_AUTOMATION_RULES,
+  DEFAULT_CHECK_SETTINGS,
+  DEFAULT_GUARDRAILS,
+} from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createJobRunner } from '../run-job';
@@ -29,6 +33,7 @@ const {
   adChanges,
   amazonAdsEntityPeriodMetrics,
   automationProposals,
+  automationFindings,
   automationRuns,
   budgetCaps,
   goals,
@@ -75,6 +80,7 @@ afterAll(() => testDb?.close());
 beforeEach(async () => {
   const { db } = testDb;
   await db.delete(automationProposals);
+  await db.delete(automationFindings);
   await db.delete(budgetCaps);
   await db.delete(automationRuns);
   await db.delete(adChanges);
@@ -243,6 +249,27 @@ describe('runAutomation mit Budget-Cap (5.9b)', () => {
   });
 });
 
+describe('runAutomation mit Prüfungen (5.10)', () => {
+  it('hält die Befunde des Profils fest und zählt sie am Lauf', async () => {
+    // Kampagne 1001: Platzierung „Top“ +50 %, ACoS 40 % bei Ziel 25 %; kein Cap im Profil.
+    await run();
+
+    const rows = await testDb.db.select().from(automationFindings).orderBy(automationFindings.kind);
+    expect(rows).toMatchObject([
+      { kind: 'noCap', entityType: 'profile', entityId: f.profile, detail: { campaigns: 1 } },
+      {
+        kind: 'placement',
+        entityType: 'campaign',
+        entityId: f.campaign,
+        key: 'PLACEMENT_TOP',
+        detail: { percent: 50, acos: '40', goalAcos: '25', basis: 'campaign' },
+      },
+    ]);
+    const [jobRun] = await testDb.db.select().from(jobRuns);
+    expect(jobRun!.counters).toMatchObject({ findings: 2 });
+  });
+});
+
 describe('computeAutomationProposals', () => {
   const metrics = { impressions: 9000, clicks: 100, orders: 0, spend: '1600.00', sales: '0' };
   const plan = (patch: Partial<AutomationRunPlan> = {}): AutomationRunPlan => ({
@@ -257,6 +284,7 @@ describe('computeAutomationProposals', () => {
     protectedTerms: [],
     state: { period: PERIOD, importedAt: NOW, source: 'file' },
     caps: [],
+    checks: DEFAULT_CHECK_SETTINGS,
     fingerprint: 'x',
     warnings: [],
     ...patch,
@@ -270,6 +298,7 @@ describe('computeAutomationProposals', () => {
         costType: null,
         budget: '200.00',
         metrics,
+        placements: [],
       },
     ],
     adGroups: [
