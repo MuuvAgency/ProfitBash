@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei).**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1.**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -123,15 +123,34 @@ Plattform-Rolle `superadmin`.
   den Superadmin als `actor_user_id` und den Nutzer im `target` (`impersonatedUserId`); das Audit-Log (6.1) zeigt beides.
 
 ### 6.1 Audit-Log (`/admin/audit`)
-- [ ] `packages/db/src/audit.ts`: `listAuditEvents(db, { orgId, from, to, actorUserId, area, cursor, limit })` mit Name
+- [x] `packages/db/src/audit.ts`: `listAuditEvents(db, { orgId, from, to, actorUserId, area, cursor, limit })` mit Name
       und E-Mail des Handelnden (auch „System“ bei `actor_user_id` leer, „gelöschter Nutzer“), neueste zuerst, Cursor.
       Liste der Bereiche und Handelnden für die Filter aus den vorhandenen Ereignissen.
-- [ ] `GET /api/audit-events` hinter `orgAdminOnly` (nur aktive Organisation; fremde Organisation, Editor → 403), zod für
+- [x] `GET /api/audit-events` hinter `orgAdminOnly` (nur aktive Organisation; fremde Organisation, Editor → 403), zod für
       Query und Antwort, `pnpm api:generate`.
-- [ ] Seite: Tabelle (Zeit in der Zeitzone des Browsers, Nutzer, Aktion als lesbarer Text über i18n mit Rückfall auf den
+- [x] Seite: Tabelle (Zeit in der Zeitzone des Browsers, Nutzer, Aktion als lesbarer Text über i18n mit Rückfall auf den
       Schlüssel, Objekt), Details des `target` aufklappbar, Filterleiste, „Mehr laden“; Loading, Empty, Error.
-- [ ] Test, dass kein bekanntes Secret-Feld im `target` landet (Stichprobe über die vorhandenen Aufrufer von
+- [x] Test, dass kein bekanntes Secret-Feld im `target` landet (Stichprobe über die vorhandenen Aufrufer von
       `recordAuditEvent`: Token, Passwort, Link).
+- **Umsetzung (2026-10-11):**
+  - `packages/db/src/audit.ts`: `listAuditEvents` (Organisation als Zugriffsregel wie bei Jobläufen, ADR 002; Filter
+    Zeitraum `from` einschließlich / `to` ausschließlich, Handelnder, Bereich = Teil der Aktion vor dem Punkt als
+    ganzer Vergleich, kein Muster) und `listAuditEventFilters` (vorkommende Bereiche und Handelnde). Der Cursor ist die
+    ID der letzten Zeile und wird in der DB aufgelöst (volle Zeitauflösung, nur in derselben Organisation).
+  - `GET /api/audit-events` und `/api/audit-events/filters` hinter `orgAdminOnly`, 50 je Seite (`AUDIT_EVENT_PAGE_SIZE`).
+  - **Secrets:** Statt einer Stichprobe über die Aufrufer entfernt `listAuditEvents` beim Lesen alle Felder, deren Name
+    `token`, `password` oder `secret` enthält, auch verschachtelt (zweites Netz, mit Test). In der Dev-DB und im Code
+    gibt es heute kein solches Feld im `target`.
+  - `pages/AuditLogPage.vue`: Filter stehen in der URL (`?area=&actor=&from=&to=`, Tage in der Zeitzone des Browsers,
+    ungültige Werte gelten als „Alle“), Aktionen und Bereiche als Text über `audit.action.*` / `audit.area.*` (Punkt
+    als `:`), unbekannte als Schlüssel; Details als aufklappbares JSON; „Ältere laden“.
+  - **Abweichung:** Ereignisse ohne Nutzer und solche gelöschter Nutzer zeigen beide „System“ (`actor_user_id` ist in
+    beiden Fällen leer). Plattformweite Ereignisse (`organization_id` leer) zeigt erst der Plattform-Admin (6.4).
+  - Browser-Pane geprüft mit den 69 Ereignissen der Dev-DB (nur gelesen, nichts angelegt): Liste, Filter Bereich
+    (echtes Auswahlfeld), „Ältere laden“, Details, Handy (375 px) und Tablet ohne waagerechtes Scrollen, Dunkel,
+    Konsole leer. Nicht geprüft: 1440 px (Pane schmaler), Zeitraum-Auswahl von Hand (per Test abgedeckt).
+  - Review (ponytail): keine Befunde zum Beheben. Bewusst so: Die Filterauswahl liest alle Ereignisse der Organisation
+    (`distinct`), bei sehr großen Logs eigene Tabelle oder Cache.
 
 ### 6.2 Profil-Freigaben je Mitglied (F2)
 - [ ] Tabelle `member_client_grants` (Mitglied, Client, Organisation; zusammengesetzte Fremdschlüssel wie üblich).
