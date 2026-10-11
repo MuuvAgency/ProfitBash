@@ -27,6 +27,13 @@ export function describeCatalogIssues(
   const describe = (issue: CatalogIssue): string => {
     if (issue.code === 'custom' && issue.params && typeof issue.params.issue === 'string') {
       const { issue: code, ...params } = issue.params;
+      // Preset-Wechsel nennen Presets, Kanten Bausteine.
+      if (/switch/i.test(String(code))) {
+        return t(`catalog.issue.${String(code)}`, {
+          from: presetName(params.from),
+          to: presetName(params.to),
+        });
+      }
       return t(`catalog.issue.${String(code)}`, {
         ...params,
         ...('key' in params && { key: blockLabel(params.key) }),
@@ -56,6 +63,7 @@ export function describeCatalogIssues(
       }
     } else if (section === 'naming') where = t('catalog.where.naming');
     else if (section === 'edges') where = t('catalog.where.edges');
+    else if (section === 'presetSwitches') where = t('catalog.where.presetSwitches');
     return t('catalog.issue.field', {
       where,
       field: typeof field === 'string' ? t(`catalog.field.${field}`) : '',

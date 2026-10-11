@@ -2,6 +2,7 @@ import {
   DEFAULT_STRUCTURE_CATALOG,
   structureCatalogSchema,
   type StructureCatalog,
+  upgradeStructureCatalog,
 } from '@profitbash/shared';
 import { and, asc, count, eq, isNotNull, notInArray } from 'drizzle-orm';
 import { getOrgRole } from './access';
@@ -38,7 +39,7 @@ type Reader = Pick<Db, 'select'>;
 
 /**
  * Katalog der Organisation ohne Rechteprüfung (für andere Module des Access-Layers). Ohne Zeile die Startwerte
- * (Version 0); ein Dokument, das nicht mehr zum Schema passt, fällt mit seiner Version auf die Startwerte zurück,
+ * (Version 0); ein Dokument von vor 5.11a wird angehoben (`upgradeStructureCatalog`); eines, das nicht mehr zum Schema passt, fällt mit seiner Version auf die Startwerte zurück,
  * damit ein Admin es überschreiben kann.
  */
 export async function loadStructureCatalog(
@@ -54,7 +55,7 @@ export async function loadStructureCatalog(
     .from(structureCatalogs)
     .where(eq(structureCatalogs.organizationId, orgId));
   if (!row) return { catalog: DEFAULT_STRUCTURE_CATALOG, version: 0, updatedAt: null };
-  const parsed = structureCatalogSchema.safeParse(row.catalog);
+  const parsed = structureCatalogSchema.safeParse(upgradeStructureCatalog(row.catalog));
   return {
     catalog: parsed.success ? parsed.data : DEFAULT_STRUCTURE_CATALOG,
     version: row.version,

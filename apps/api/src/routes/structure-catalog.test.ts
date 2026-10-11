@@ -122,7 +122,7 @@ describe('Struktur-Katalog (/api/ads/tools/catalog)', () => {
     expect(stale.body.error.code).toBe('STRUCTURE_CATALOG_VERSION_CONFLICT');
 
     const broken = changed();
-    broken.edges.push({ from: 'SP-BRAND-DEF', to: 'SP-KW-EXACT' });
+    broken.edges.push({ ...broken.edges[0]!, from: 'SP-BRAND-DEF', to: 'SP-KW-EXACT' });
     const invalid = await save(admin, broken, 1);
     expect(invalid.status).toBe(400);
   });

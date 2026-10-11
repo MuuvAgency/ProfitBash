@@ -328,4 +328,75 @@ describe('Seite „Struktur-Katalog“', () => {
       (await found<HTMLInputElement>('[data-preset="muuv-standard"] [data-preset-name]')).value,
     ).toBe('Muuv-Standard');
   });
+
+  it('ändert die Kriterien einer Graduation-Kante (leer = Harvest-Regel)', async () => {
+    const { requests } = await mountPage({
+      'PUT /api/ads/tools/catalog': json(catalogResponse({ version: 4 })),
+    });
+    await tab('edges');
+    await type('[data-edge="SP-AUTO>SP-KW-EXACT"] [data-edge-orders]', '5');
+    await type('[data-edge="SP-KW-EXACT>SP-KW-EXACT-SINGLE"] [data-edge-acos]', '');
+    (await found<HTMLButtonElement>('[data-catalog-save]')).click();
+    await flushPromises();
+    const [body] = puts(requests, '/api/ads/tools/catalog') as {
+      catalog: typeof DEFAULT_STRUCTURE_CATALOG;
+    }[];
+    const edge = (id: string) => body!.catalog.edges.find((e) => `${e.from}>${e.to}` === id);
+    expect(edge('SP-AUTO>SP-KW-EXACT')).toMatchObject({ minOrders: 5, maxAcosPercentOfGoal: null });
+    expect(edge('SP-KW-EXACT>SP-KW-EXACT-SINGLE')).toMatchObject({
+      minOrders: 8,
+      maxAcosPercentOfGoal: null,
+    });
+  });
+
+  it('zeigt die Preset-Wechsel und legt einen neuen an', async () => {
+    const { requests } = await mountPage({
+      'PUT /api/ads/tools/catalog': json(catalogResponse({ version: 4 })),
+    });
+    await tab('switches');
+    const first = await found('[data-switch="launch>muuv-standard"]');
+    expect(first.textContent).toContain('Launch');
+    expect(first.querySelector<HTMLInputElement>('[data-switch-orders]')!.value).toBe('30');
+    await choose('[data-switch-from]', 'control');
+    await choose('[data-switch-to]', 'launch');
+    (await found<HTMLButtonElement>('[data-switch-add]')).click();
+    await flushPromises();
+    // Ohne Bedingung ist der Wechsel ungültig.
+    expect((await found('[data-catalog-issues]')).textContent).toContain(
+      'Wechsel Kontrolle → Launch: mindestens eine Bedingung',
+    );
+    await type('[data-switch="control>launch"] [data-switch-spend]', '12,5');
+    await choose('[data-switch="control>launch"] [data-switch-comparison]', 'gte');
+    await type('[data-switch="control>launch"] [data-switch-acos]', '120');
+    (await found<HTMLButtonElement>('[data-catalog-save]')).click();
+    await flushPromises();
+    const [body] = puts(requests, '/api/ads/tools/catalog') as {
+      catalog: typeof DEFAULT_STRUCTURE_CATALOG;
+    }[];
+    expect(body!.catalog.presetSwitches.at(-1)).toEqual({
+      from: 'control',
+      to: 'launch',
+      minOrders: null,
+      minSpend: '12.5',
+      acos: { comparison: 'gte', percentOfGoal: 120 },
+    });
+  });
+
+  it('entfernt mit einem Preset auch dessen Wechsel', async () => {
+    await mountPage();
+    const remove = await vi.waitFor(() => {
+      const button = [...document.querySelectorAll('button')].find(
+        (b) => b.getAttribute('aria-label') === 'Preset „Launch“ löschen',
+      );
+      if (!button) throw new Error('kein Löschen');
+      return button;
+    });
+    remove.click();
+    (await found<HTMLButtonElement>('[data-preset-delete-confirm]')).click();
+    await flushPromises();
+    await tab('switches');
+    await found('[data-switch="muuv-standard>control"]');
+    expect(document.querySelector('[data-switch="launch>muuv-standard"]')).toBeNull();
+    expect(document.querySelector('[data-catalog-issues]')).toBeNull();
+  });
 });

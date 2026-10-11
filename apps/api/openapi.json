@@ -10202,6 +10202,24 @@
                 "to": {
                   "type": "string",
                   "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
+                },
+                "minOrders": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 100000,
+                  "default": null
+                },
+                "maxAcosPercentOfGoal": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 1000,
+                  "default": null
                 }
               },
               "required": [
@@ -10280,6 +10298,74 @@
             },
             "minItems": 1,
             "maxItems": 30
+          },
+          "presetSwitches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+                },
+                "to": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+                },
+                "minOrders": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 100000,
+                  "default": null
+                },
+                "minSpend": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^\\d{1,7}(\\.\\d{1,2})?$",
+                  "default": null
+                },
+                "acos": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "comparison": {
+                      "type": "string",
+                      "enum": [
+                        "lte",
+                        "gte"
+                      ]
+                    },
+                    "percentOfGoal": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    }
+                  },
+                  "default": null,
+                  "required": [
+                    "comparison",
+                    "percentOfGoal"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 100,
+            "default": []
           },
           "naming": {
             "type": "object",

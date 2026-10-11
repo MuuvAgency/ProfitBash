@@ -82,6 +82,10 @@ const removingUsage = computed(() => {
 function confirmRemove() {
   const key = removing.value?.key;
   draft.value.presets = draft.value.presets.filter((preset) => preset.key !== key);
+  // Wechsel von und zu dem Preset wären sonst ungültig (`switchUnknownPreset`).
+  draft.value.presetSwitches = draft.value.presetSwitches.filter(
+    (entry) => entry.from !== key && entry.to !== key,
+  );
   removing.value = null;
 }
 const overrideLabel = (field: string, key: string) =>
