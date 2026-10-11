@@ -2,7 +2,7 @@
 
 - **Status:** angenommen
 - **Datum:** 2026-10-10 (Phase 5, Aufgabe 5.7)
-- **Beteiligte:** Dominik (F1, F3 in `docs/tasks/phase-5.md`; Festlegungen aus dem Review des Plans)
+- **Beteiligte:** Dominik (F1, F3 in `docs/tasks/phase-5.md`; Festlegungen aus dem Review des Plans; Punkt 7 bestätigt am 2026-10-11)
 
 ## Kontext
 
