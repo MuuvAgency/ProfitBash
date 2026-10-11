@@ -123,9 +123,9 @@ const actorOptions = computed(() =>
   })),
 );
 
-/** Kurzbeschreibung des Objekts: Name, sonst E-Mail, sonst der Typ. */
+/** Kurzbeschreibung des Objekts, soweit es einen Namen hat; alles Weitere steht in den Details. */
 function targetSummary(target: AuditEvent['target']): string {
-  for (const key of ['name', 'email', 'fileName', 'type']) {
+  for (const key of ['name', 'email', 'fileName']) {
     const value = target[key];
     if (typeof value === 'string' && value !== '') return value;
   }

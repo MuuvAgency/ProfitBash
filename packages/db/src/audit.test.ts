@@ -113,6 +113,29 @@ describe('listAuditEvents', () => {
   });
 });
 
+describe('listAuditEvents: Secrets', () => {
+  it('liefert keine Felder, deren Name nach Token, Passwort oder Secret klingt, auch verschachtelt', async () => {
+    const orgId = await createTestOrganization(testDb.db, 'secrets');
+    await testDb.db.insert(auditEvents).values({
+      organizationId: orgId,
+      actorUserId: null,
+      action: 'connection.create',
+      target: {
+        type: 'connection',
+        id: 'c1',
+        refreshToken: 'Atzr|geheim',
+        after: { name: 'Konto', clientSecret: 'geheim', list: [{ password: 'geheim', ok: 1 }] },
+      },
+    });
+    const { events } = await listAuditEvents(testDb.db, { orgId, limit: 10 });
+    expect(events[0]!.target).toEqual({
+      type: 'connection',
+      id: 'c1',
+      after: { name: 'Konto', list: [{ ok: 1 }] },
+    });
+  });
+});
+
 describe('listAuditEventFilters', () => {
   it('nennt Bereiche und Handelnde der Organisation', async () => {
     const filters = await listAuditEventFilters(testDb.db, ids.org);
