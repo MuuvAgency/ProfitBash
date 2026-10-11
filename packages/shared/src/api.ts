@@ -476,9 +476,8 @@ export const auditEventListQuerySchema = z.object({
 });
 export type AuditEventListQuery = z.infer<typeof auditEventListQuerySchema>;
 
-const auditActorSchema = z
-  .object({ id: z.uuid(), name: z.string(), email: z.string() })
-  .meta({ id: 'AuditActor' });
+// Ohne eigene Komponente: `.nullable()` darunter machte sie sonst auch in `actors` nullbar (OpenAPI).
+const auditActorSchema = z.object({ id: z.uuid(), name: z.string(), email: z.string() });
 export type AuditActor = z.infer<typeof auditActorSchema>;
 
 export const auditEventSchema = z
