@@ -73,7 +73,7 @@ beforeAll(async () => {
     .insert(organizations)
     .values([
       { name: 'Muuv', slug: 'muuv', type: 'internal', createdAt: new Date() },
-      { name: 'Andere Agentur', slug: 'andere', type: 'client', createdAt: new Date() },
+      { name: 'Andere Agentur', slug: 'andere', type: 'internal', createdAt: new Date() },
     ])
     .returning({ id: organizations.id });
 
@@ -161,7 +161,7 @@ describe('listMemberships', () => {
         organizationId: ids.other,
         name: 'Andere Agentur',
         slug: 'andere',
-        type: 'client',
+        type: 'internal',
         role: 'editor',
       },
     ]);

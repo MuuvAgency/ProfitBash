@@ -43,9 +43,9 @@ export interface ProfileVisibilityInput {
 
 interface MembershipRow {
   id: string;
+  /** In einer Kunden-Org immer `viewer`, unabhängig vom gespeicherten Wert. */
   role: OrgRole;
-  /** Typ der Organisation (`internal` | `client`). */
-  orgType: string;
+  customerOrg: boolean;
   /** Nur Kunden-Org: der verknüpfte Client der Eigentümer-Org. */
   customerOf: { clientId: string; ownerOrgId: string } | null;
 }
@@ -65,20 +65,17 @@ async function getMembership(db: Db, userId: string, orgId: string): Promise<Mem
     .where(and(eq(members.userId, userId), eq(members.organizationId, orgId)))
     .limit(1);
   if (!membership || !isOrgRole(membership.role)) return null;
-  const { id, role, orgType, clientId, ownerOrgId } = membership;
-  return {
-    id,
-    role,
-    orgType,
-    customerOf: clientId !== null && ownerOrgId !== null ? { clientId, ownerOrgId } : null,
-  };
+  const { id, orgType, clientId, ownerOrgId } = membership;
+  const customerOf = clientId !== null && ownerOrgId !== null ? { clientId, ownerOrgId } : null;
+  const customerOrg = isCustomerOrg(orgType, clientId);
+  return { id, role: customerOrg ? 'viewer' : membership.role, customerOrg, customerOf };
 }
 
 /** Kunden-Org: nach Typ oder Verknüpfung, damit ein falsch gesetzter Wert allein nichts öffnet. */
-const isCustomerOrg = (membership: MembershipRow) =>
-  membership.orgType === 'client' || membership.customerOf !== null;
+const isCustomerOrg = (orgType: string, linkedClientId: string | null) =>
+  orgType === 'client' || linkedClientId !== null;
 
-/** Rolle des Nutzers in der Organisation oder `null`, wenn er kein Mitglied ist. */
+/** Rolle des Nutzers in der Organisation oder `null`, wenn er kein Mitglied ist. In Kunden-Orgs immer `viewer`. */
 export async function getOrgRole(db: Db, userId: string, orgId: string): Promise<OrgRole | null> {
   return (await getMembership(db, userId, orgId))?.role ?? null;
 }
@@ -101,8 +98,7 @@ export async function visibleClientIds(
 ): Promise<string[] | null> {
   const membership = await getMembership(db, input.userId, input.orgId);
   if (membership === null) return [];
-  if (isCustomerOrg(membership))
-    return membership.customerOf ? [membership.customerOf.clientId] : [];
+  if (membership.customerOrg) return membership.customerOf ? [membership.customerOf.clientId] : [];
   if (membership.role === 'admin') return null;
   const rows = await grantedClientIds(db, membership.id);
   return rows.length === 0 ? null : rows.map((row) => row.clientId);
@@ -118,7 +114,8 @@ export interface Membership {
 
 /**
  * Alle Organisationen, in denen der Nutzer Mitglied ist, älteste Mitgliedschaft zuerst.
- * Mitgliedschaften mit unbekannter Rolle werden ausgelassen (die DB lässt keine zu).
+ * Mitgliedschaften mit unbekannter Rolle werden ausgelassen (die DB lässt keine zu). In Kunden-Orgs ist die Rolle
+ * immer `viewer` (wie `getOrgRole`).
  */
 export async function listMemberships(db: Db, userId: string): Promise<Membership[]> {
   const rows = await db
@@ -128,12 +125,18 @@ export async function listMemberships(db: Db, userId: string): Promise<Membershi
       slug: organizations.slug,
       type: organizations.type,
       role: members.role,
+      linkedClientId: clients.id,
     })
     .from(members)
     .innerJoin(organizations, eq(organizations.id, members.organizationId))
+    .leftJoin(clients, eq(clients.clientOrganizationId, members.organizationId))
     .where(eq(members.userId, userId))
     .orderBy(asc(members.createdAt), asc(organizations.id));
-  return rows.filter((row): row is Membership => isOrgRole(row.role));
+  return rows.flatMap(({ linkedClientId, role, ...row }) =>
+    isOrgRole(role)
+      ? [{ ...row, role: isCustomerOrg(row.type, linkedClientId) ? ('viewer' as const) : role }]
+      : [],
+  );
 }
 
 /** Feature-Keys, die die Organisation gebucht und aktiviert hat (`org_entitlements.enabled`). */
@@ -154,7 +157,7 @@ async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Prom
   const membership = await getMembership(db, input.userId, input.orgId);
   if (membership === null) return null;
   const { role } = membership;
-  if (isCustomerOrg(membership)) {
+  if (membership.customerOrg) {
     if (input.includeHidden || input.includeRemoved) {
       throw new AccessDeniedError(
         'Kunden-Orgs sehen keine ausgeblendeten oder entfernten Profile.',

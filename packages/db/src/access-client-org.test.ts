@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   AccessDeniedError,
   canSeeProfile,
+  getOrgRole,
+  listMemberships,
   listVisibleClientsAndProfiles,
   visibleClientIds,
   visibleProfileIds,
@@ -150,6 +152,19 @@ describe('Kunden-Org im Access-Layer', () => {
     await expect(
       visibleProfileIds(testDb.db, { ...asAdmin, includeRemoved: true }),
     ).rejects.toBeInstanceOf(AccessDeniedError);
+  });
+
+  it('Mitglieder einer Kunden-Org gelten immer als viewer, auch mit falsch gesetzter Rolle', async () => {
+    expect(await getOrgRole(testDb.db, ids.customerAdmin, ids.customerOrg)).toBe('viewer');
+    expect(await listMemberships(testDb.db, ids.customerAdmin)).toEqual([
+      {
+        organizationId: ids.customerOrg,
+        name: 'Nordwind GmbH',
+        slug: 'nordwind-kunde',
+        type: 'client',
+        role: 'viewer',
+      },
+    ]);
   });
 
   it('der Kunde ist kein Mitglied der Eigentümer-Org', async () => {
