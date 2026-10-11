@@ -38,6 +38,9 @@ export type HarvestMarkData = Schemas['HarvestMark'];
 export type TagData = Schemas['Tag'];
 export type GoalData = Schemas['Goal'];
 export type GoalsOverviewData = Schemas['GoalsOverview'];
+export type BudgetsOverviewData = Schemas['BudgetsOverview'];
+export type BudgetCapData = Schemas['BudgetCap'];
+export type BudgetCapInputData = Schemas['BudgetCapInput'];
 export type TargetAcosData = Schemas['TargetAcosResponse'];
 export type AutomationSettingsData = Schemas['AutomationSettings'];
 export type AutomationRulesData = Schemas['AutomationRulesResponse'];
@@ -431,6 +434,17 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.DELETE('/api/ads/goals/{id}', { params: { path: { id } } })),
       calculate: (input: Schemas['TargetAcosRequest']): Promise<TargetAcosData> =>
         unwrap(client.POST('/api/ads/goals/calculate', { body: input })),
+    },
+
+    /** Budgets (`phase-5.md` 5.9a): Caps je Profil mit Pacing im laufenden Monat. */
+    budgets: {
+      overview: (): Promise<BudgetsOverviewData> => unwrap(client.GET('/api/ads/budgets')),
+      createCap: (input: BudgetCapInputData) =>
+        unwrap(client.POST('/api/ads/budgets/caps', { body: input })),
+      updateCap: (id: string, input: BudgetCapInputData) =>
+        unwrap(client.PUT('/api/ads/budgets/caps/{id}', { params: { path: { id } }, body: input })),
+      removeCap: (id: string) =>
+        unwrap(client.DELETE('/api/ads/budgets/caps/{id}', { params: { path: { id } } })),
     },
 
     /** Automationen (`phase-5.md` 5.4): Leitplanken der Organisation und Einstellungen je Client. */
