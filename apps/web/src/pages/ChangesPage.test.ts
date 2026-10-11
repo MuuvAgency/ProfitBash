@@ -200,6 +200,33 @@ describe('Änderungen: Ausstehend', () => {
     ).toBeUndefined();
   });
 
+  it('kennzeichnet Vorschläge der Automatik und des Budget-Caps', async () => {
+    stubFetch(
+      routes({
+        'GET /api/ads/changes/pending': json(
+          cart([
+            pendingChange(C1),
+            pendingChange(C2, { origin: 'automation' }),
+            pendingChange(C3, {
+              origin: 'budget_cap',
+              entityType: 'campaign',
+              entity: null,
+              adGroupName: null,
+              field: 'budget',
+            }),
+          ]),
+        ),
+      }),
+    );
+    await mountPage();
+    await vi.waitFor(() => expect(document.querySelector(`[data-change="${C3}"]`)).not.toBeNull());
+
+    const text = (id: string) => document.querySelector(`[data-change="${id}"]`)!.textContent;
+    expect(text(C1)).not.toContain('Vorschlag');
+    expect(text(C2)).toContain('Vorschlag der Automatik');
+    expect(text(C3)).toContain('Vorschlag des Budget-Caps');
+  });
+
   it('zeigt Skeleton, leeren Warenkorb mit Weg in den Explorer und einen Fehler mit „Erneut versuchen“', async () => {
     stubFetch(routes());
     const { wrapper } = await mountPage();
