@@ -233,3 +233,40 @@ export const automationFindings = pgTable(
     uniqueIndex('automation_findings_key_uq').on(t.profileId, t.kind, t.entityId, t.key),
   ],
 );
+
+/**
+ * Aktuelle Graduation- und Preset-Vorschläge je Profil (`phase-5.md` 5.11b), abgeglichen wie die Befunde: Jeder
+ * Lauf hält bestehende, legt neue an und löscht, was nicht mehr zutrifft (auch Angenommenes: der Begriff steht dann
+ * auf der Merkliste bzw. die Gruppe hat das neue Preset). `graduation`: `subject` = Suchbegriff in Vergleichsform,
+ * `key` = Baustein der Quelle. `presetSwitch`: `subject` = Produktgruppe, `key` = Ziel-Preset. Zugriffe nur über
+ * `structure-proposals.ts`.
+ */
+export const automationStructureProposals = pgTable(
+  'automation_structure_proposals',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: uuid('profile_id').notNull(),
+    kind: text('kind').notNull(),
+    subject: text('subject').notNull(),
+    key: text('key').notNull(),
+    /** Kennzahlen und Schwellen des Vorschlags, bei `graduation` auch der Datei-Zeitraum. */
+    detail: jsonb('detail').$type<Record<string, unknown>>().notNull(),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true, mode: 'date' }).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true, mode: 'date' }).notNull(),
+    dismissedBy: uuid('dismissed_by').references(() => users.id, { onDelete: 'set null' }),
+    dismissedAt: timestamp('dismissed_at', { withTimezone: true, mode: 'date' }),
+  },
+  (t) => [
+    foreignKey({
+      name: 'automation_structure_proposals_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    check(
+      'automation_structure_proposals_kind_ck',
+      sql`${t.kind} in ('graduation', 'presetSwitch')`,
+    ),
+    uniqueIndex('automation_structure_proposals_key_uq').on(t.profileId, t.kind, t.subject, t.key),
+  ],
+);
