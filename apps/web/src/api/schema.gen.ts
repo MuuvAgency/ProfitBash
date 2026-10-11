@@ -5726,7 +5726,7 @@ export interface paths {
             parameters: {
                 query?: {
                     unread?: "true" | "false";
-                    kind?: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing" | "budget_cap_threshold" | "budget_cap_forecast" | "automation_findings";
+                    kind?: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing" | "budget_cap_threshold" | "budget_cap_forecast" | "automation_findings" | "structure_proposals";
                     profileId?: string;
                     before?: number;
                     limit?: number;
@@ -9590,7 +9590,7 @@ export interface components {
             id: string;
             seq: number;
             /** @enum {string} */
-            kind: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing" | "budget_cap_threshold" | "budget_cap_forecast" | "automation_findings";
+            kind: "file_import_imported" | "file_import_failed" | "submission_finished" | "submission_failed" | "bulk_file_stale" | "consent_expiring" | "automation_proposals" | "automation_responsible_missing" | "budget_cap_threshold" | "budget_cap_forecast" | "automation_findings" | "structure_proposals";
             /** @enum {string} */
             severity: "info" | "success" | "warning" | "error";
             /** Format: uuid */

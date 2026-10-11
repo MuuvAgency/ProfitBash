@@ -2,6 +2,7 @@ import { amazonAdsValueLimit } from '@profitbash/amazon-ads';
 import {
   listAutomationRunProfiles,
   loadAutomationRunEntities,
+  loadStructureProposals,
   planAutomationRun,
   saveAutomationRun,
   type AutomationPeriodSums,
@@ -323,6 +324,7 @@ export async function runAutomation(
     const entities = await loadAutomationRunEntities(deps.db, job, plan, deps.now());
     const { proposals, counts } = computeAutomationProposals(plan, entities);
     const findings = computeAutomationFindings(plan, entities);
+    const structure = await loadStructureProposals(deps.db, job, plan);
     const saved = await saveAutomationRun(deps.db, {
       ...job,
       plan,
@@ -330,6 +332,7 @@ export async function runAutomation(
       counts,
       proposals,
       findings,
+      structure,
     });
     return {
       counters: {
@@ -338,6 +341,7 @@ export async function runAutomation(
         proposals: saved.proposals,
         staged: saved.staged,
         findings: findings.length,
+        structure: structure.length,
       },
     };
   });

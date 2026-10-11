@@ -32,7 +32,7 @@ const base = {
   ]),
   // Harvest-Regel der Suchbegriff-Einstufung: ab 3 Käufen, ACoS höchstens 25 %.
   harvest: { minOrders: 3, maxAcos: '0.25' },
-  goalAcos: '20',
+  goalAcos: '20' as string | null,
   marked: new Set<string>(),
   exactIn: new Map<string, (string | null)[]>(),
 };
