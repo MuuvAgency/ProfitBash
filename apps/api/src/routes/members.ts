@@ -8,6 +8,7 @@ import {
   redeemPasswordLink,
   regeneratePasswordLink,
   removeMember,
+  setMemberClientGrants,
   updateMemberRole,
   type MemberRecord,
 } from '@profitbash/db';
@@ -16,6 +17,7 @@ import {
   idParamSchema,
   memberCreateSchema,
   memberListSchema,
+  memberClientGrantsSchema,
   memberPatchSchema,
   memberSchema,
   memberWithLinkSchema,
@@ -103,6 +105,24 @@ const deleteRoute = createRoute({
   responses: { 204: { description: 'Entfernt.' }, ...adminErrors, ...notFound, ...conflict },
 });
 
+const grantsRoute = createRoute({
+  method: 'put',
+  path: '/members/{id}/client-grants',
+  tags: ['Mitglieder'],
+  summary:
+    'Freigaben ersetzen: Clients, auf die das Mitglied eingeschränkt ist; leer = alle (nur Admin)',
+  request: {
+    params: idParamSchema,
+    body: { required: true, content: json(memberClientGrantsSchema) },
+  },
+  responses: {
+    200: { description: 'Mitglied mit den neuen Freigaben.', content: json(memberSchema) },
+    ...adminErrors,
+    ...notFound,
+    ...conflict,
+  },
+});
+
 const linkRoute = createRoute({
   method: 'post',
   path: '/members/{id}/password-link',
@@ -143,6 +163,7 @@ const redeemRoute = createRoute({
 
 const ERROR_STATUS: Record<MemberError['code'], [ContentfulStatusCode, string]> = {
   NOT_FOUND: [404, 'MEMBER_NOT_FOUND'],
+  UNKNOWN_CLIENT: [409, 'MEMBER_UNKNOWN_CLIENT'],
   LAST_ADMIN: [409, 'MEMBER_LAST_ADMIN'],
   SELF: [409, 'MEMBER_SELF'],
   EMAIL_TAKEN: [409, 'MEMBER_EMAIL_TAKEN'],
@@ -242,6 +263,18 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
         ...adminOf(c),
         memberId: c.req.valid('param').id,
         role: c.req.valid('json').role,
+        now: new Date(),
+      }),
+    );
+    return c.json(toMember(record), 200);
+  });
+
+  app.openapi({ ...grantsRoute, middleware }, async (c) => {
+    const record = await mapErrors(() =>
+      setMemberClientGrants(db, {
+        ...adminOf(c),
+        memberId: c.req.valid('param').id,
+        clientIds: c.req.valid('json').clientIds,
         now: new Date(),
       }),
     );

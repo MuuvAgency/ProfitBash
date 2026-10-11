@@ -6920,6 +6920,13 @@
           "isSelf": {
             "type": "boolean"
           },
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -6934,6 +6941,7 @@
           "status",
           "linkExpiresAt",
           "isSelf",
+          "clientIds",
           "createdAt"
         ]
       },
@@ -7009,6 +7017,22 @@
         },
         "required": [
           "role"
+        ]
+      },
+      "MemberClientGrants": {
+        "type": "object",
+        "properties": {
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "clientIds"
         ]
       },
       "PasswordLinkInfo": {
@@ -16569,6 +16593,97 @@
         "responses": {
           "204": {
             "description": "Entfernt."
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Mitglied nicht gefunden (auch: andere Organisation).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "E-Mail vergeben, letzter Admin, eigenes Konto oder Mitglied einer anderen Organisation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/members/{id}/client-grants": {
+      "put": {
+        "tags": [
+          "Mitglieder"
+        ],
+        "summary": "Freigaben ersetzen: Clients, auf die das Mitglied eingeschränkt ist; leer = alle (nur Admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberClientGrants"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mitglied mit den neuen Freigaben.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Member"
+                }
+              }
+            }
           },
           "400": {
             "description": "Ungültige Eingabe.",
