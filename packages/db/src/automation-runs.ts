@@ -12,6 +12,7 @@ import { chunks, valueColumns } from './ad-change-entities';
 import { recordAuditEvent } from './audit';
 import { loadGuardrailDefaults } from './automation';
 import { loadAutomationRules } from './automation-rules';
+import { loadProfileCapPacing, type ProfileCapPacing } from './budget-caps';
 import type { Db } from './client';
 import {
   findProfileMetricsState,
@@ -69,6 +70,8 @@ export interface AutomationRunPlan {
   goals: GoalSetting[];
   protectedTerms: string[];
   state: ProfileMetricsState;
+  /** Budget-Caps des Profils mit Pacing im laufenden Monat (5.9b). */
+  caps: ProfileCapPacing[];
   fingerprint: string;
   /** `olderPeriod`: Der Zeitraum endet vor dem des vorigen Laufs (ältere Datei nachträglich hochgeladen). */
   warnings: string[];
@@ -83,6 +86,7 @@ const WRITE_ROLES = ['admin', 'editor'];
 export async function planAutomationRun(
   db: Db,
   scope: AutomationRunScope,
+  now = new Date(),
 ): Promise<{ skip: AutomationRunSkip } | ({ skip: null } & AutomationRunPlan)> {
   const [profile] = await db
     .select({
@@ -177,6 +181,7 @@ export async function planAutomationRun(
     })
     .sort((a, b) => a.scopeId.localeCompare(b.scopeId));
 
+  const caps = await loadProfileCapPacing(db, scope, now);
   // Der Tageskurs gehört nicht dazu: Er ändert sich täglich und löste sonst jeden Tag einen Lauf aus.
   const fingerprint = createHash('sha256')
     .update(
@@ -188,6 +193,16 @@ export async function planAutomationRun(
         guardrails,
         mode,
         responsibleUserId,
+        // Betrag, Schwellen, Monat und Umfang; ohne Caps bleibt der Hash der alte.
+        ...(caps.length > 0 && {
+          caps: caps.map((cap) => ({
+            id: cap.id,
+            month: cap.month,
+            amount: cap.amount,
+            warnPercents: cap.warnPercents,
+            campaigns: cap.campaigns.map((campaign) => campaign.id).sort(),
+          })),
+        }),
       }),
     )
     .digest('hex');
@@ -211,6 +226,7 @@ export async function planAutomationRun(
     goals: goalSettings,
     protectedTerms: settings?.protectedTerms ?? [],
     state,
+    caps,
     fingerprint,
     warnings: previous && state.period.endDate < previous.periodEnd ? ['olderPeriod'] : [],
   };
@@ -264,6 +280,9 @@ export interface AutomationRunEntities {
 }
 
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+/** Herkunft der Warenkorb-Zeilen, die der Lauf selbst legt und ersetzt. */
+const OWN_ORIGINS = ['automation', 'budget_cap'];
+const originOf = (source: string) => (source === 'budget_cap' ? 'budget_cap' : 'automation');
 
 export async function loadAutomationRunEntities(
   db: Db,
@@ -394,7 +413,7 @@ export async function loadAutomationRunEntities(
   for (const change of changes) {
     if (change.status === 'pending') {
       // Die eigenen offenen Zeilen ersetzt der Lauf.
-      if (change.origin !== 'automation') manualPending.add(change.entityId!);
+      if (!OWN_ORIGINS.includes(change.origin)) manualPending.add(change.entityId!);
       continue;
     }
     if (change.newAmount === null || (change.field !== 'bid' && change.field !== 'budget')) {
@@ -460,7 +479,8 @@ export interface AutomationProposalInput {
   field: 'bid' | 'budget' | 'state';
   before: string;
   after: string;
-  source: 'rule' | 'optimizer';
+  /** `budget_cap`: Vorschlag des Enforcers (5.9b). */
+  source: 'rule' | 'optimizer' | 'budget_cap';
   ruleId: string | null;
   limitedBy: string[];
   /** Begründung fürs Protokoll (Kennzahlen, Ziel, gewünschter Wert). */
@@ -532,7 +552,7 @@ export async function saveAutomationRun(
         and(
           eq(adChanges.profileId, input.profileId),
           eq(adChanges.status, 'pending'),
-          eq(adChanges.origin, 'automation'),
+          inArray(adChanges.origin, OWN_ORIGINS),
         ),
       );
     // Übernommene Vorschläge, deren Änderung schon übermittelt ist, bleiben `staged` (Verlauf).
@@ -555,7 +575,7 @@ export async function saveAutomationRun(
             part.map((x) => ({
               organizationId: input.organizationId,
               profileId: input.profileId,
-              origin: 'automation',
+              origin: originOf(x.source),
               operation: 'update',
               entityType: x.entityType,
               entityId: x.entityId,
@@ -651,6 +671,34 @@ export async function saveAutomationRun(
         link: '/ads/changes',
         dedupeKey: `automation_proposals:${runId}`,
       });
+    }
+    // Caps (5.9b): je Cap, Monat und Schwelle eine Meldung an alle, die das Profil sehen.
+    for (const cap of plan.caps) {
+      const base = {
+        organizationId: input.organizationId,
+        profileId: input.profileId,
+        audience: 'members' as const,
+        link: '/ads/budgets',
+      };
+      const amounts = { amount: cap.amount, currencyCode: plan.profile.currencyCode };
+      if (cap.pacing.warnLevel !== null) {
+        await createNotification(tx, {
+          ...base,
+          kind: 'budget_cap_threshold',
+          severity: cap.pacing.warnLevel >= 100 ? 'error' : 'warning',
+          params: { ...amounts, percent: cap.pacing.warnLevel, actual: cap.pacing.actual.value },
+          dedupeKey: `budget_cap_threshold:${cap.id}:${cap.month}:${cap.pacing.warnLevel}`,
+        });
+      }
+      if (cap.pacing.forecastOver) {
+        await createNotification(tx, {
+          ...base,
+          kind: 'budget_cap_forecast',
+          severity: 'warning',
+          params: { ...amounts, forecast: cap.pacing.forecast.value },
+          dedupeKey: `budget_cap_forecast:${cap.id}:${cap.month}`,
+        });
+      }
     }
     if (plan.responsibleMissing) {
       await createNotification(tx, {
@@ -877,7 +925,7 @@ export async function stageAutomationProposals(
           part.map((x) => ({
             organizationId: x.organizationId,
             profileId: x.profileId,
-            origin: 'automation',
+            origin: originOf(x.source),
             operation: 'update',
             entityType: x.entityType,
             entityId: x.entityId,

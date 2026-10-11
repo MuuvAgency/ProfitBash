@@ -19,6 +19,7 @@ import {
   amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
   amazonAdsPortfolios,
+  amazonAdsProfiles,
   budgetCaps,
   tagAssignments,
   tags,
@@ -102,6 +103,19 @@ const snapshot = (row: CapRow) => ({
   warnPercents: row.warnPercents,
 });
 
+/** Cap eines Profils für den Lauf der Automatik (5.9b): Pacing im laufenden Monat und alle Kampagnen im Umfang. */
+export interface ProfileCapPacing {
+  id: string;
+  /** Laufender Monat in der Zeitzone des Profils (`YYYY-MM`). */
+  month: string;
+  /** Betrag in diesem Monat. */
+  amount: string;
+  warnPercents: number[];
+  pacing: Pacing;
+  /** `input: null`: Kampagne ohne Kennzahlen. */
+  campaigns: { id: string; input: PacingCampaign | null }[];
+}
+
 interface DailyMonth {
   /** Letzter Tag des Monats mit Tageswerten. */
   lastDay: string | null;
@@ -144,7 +158,7 @@ async function withPacing(
   rows: readonly CapRow[],
   labels: ReadonlyMap<string, string>,
   daily: DailyMonth,
-): Promise<BudgetCapRecord[]> {
+): Promise<(BudgetCapRecord & { inputs: ProfileCapPacing['campaigns'] })[]> {
   if (rows.length === 0) return [];
   const c = amazonAdsCampaigns;
   const campaigns = await db
@@ -235,6 +249,7 @@ async function withPacing(
         warnPercents: row.warnPercents,
         campaigns: inScope.flatMap((entry) => entry.input ?? []),
       }),
+      inputs: inScope.map(({ campaign, input }) => ({ id: campaign.id, input })),
       campaignCount: inScope.length,
       campaigns: inScope
         .toSorted((a, b) => compareDecimal(b.actual, a.actual))
@@ -312,14 +327,16 @@ export async function getBudgetsOverview(
       portfolios: portfolios
         .filter((p) => p.profileId === profile.id)
         .map((p) => ({ id: p.id, name: p.name ?? p.amazonPortfolioId })),
-      caps: await withPacing(
-        db,
-        { id: profile.id, organizationId: input.orgId },
-        month,
-        caps.filter((cap) => cap.profileId === profile.id),
-        labels,
-        daily,
-      ),
+      caps: (
+        await withPacing(
+          db,
+          { id: profile.id, organizationId: input.orgId },
+          month,
+          caps.filter((cap) => cap.profileId === profile.id),
+          labels,
+          daily,
+        )
+      ).map(({ inputs: _inputs, ...cap }) => cap),
     });
   }
   return { profiles: result, tags: orgTags };
@@ -431,4 +448,43 @@ export async function deleteBudgetCap(
     });
     return true as const;
   });
+}
+
+/**
+ * Caps eines Profils mit Pacing im laufenden Monat, für den Lauf der Automatik (Systemzugriff ohne Nutzer, an
+ * Organisation und Profil gebunden). Ohne Profil oder ohne Caps leer.
+ */
+export async function loadProfileCapPacing(
+  db: DbOrTx,
+  scope: { organizationId: string; profileId: string },
+  now: Date,
+): Promise<ProfileCapPacing[]> {
+  const ofProfile = and(
+    eq(budgetCaps.profileId, scope.profileId),
+    eq(budgetCaps.organizationId, scope.organizationId),
+  );
+  const rows = await db.select().from(budgetCaps).where(ofProfile).orderBy(asc(budgetCaps.id));
+  if (rows.length === 0) return [];
+  const [profile] = await db
+    .select({ timezone: amazonAdsProfiles.timezone })
+    .from(amazonAdsProfiles)
+    .where(eq(amazonAdsProfiles.id, scope.profileId));
+  if (!profile) return [];
+  const month = monthInTimeZone(now, profile.timezone);
+  const caps = await withPacing(
+    db,
+    { id: scope.profileId, organizationId: scope.organizationId },
+    month,
+    rows,
+    new Map(),
+    await loadDailyMonth(db, scope.profileId, month),
+  );
+  return caps.map((cap) => ({
+    id: cap.id,
+    month,
+    amount: cap.effectiveAmount,
+    warnPercents: cap.warnPercents,
+    pacing: cap.pacing,
+    campaigns: cap.inputs,
+  }));
 }

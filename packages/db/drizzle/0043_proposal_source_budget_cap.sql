@@ -1,0 +1,2 @@
+ALTER TABLE "automation_proposals" DROP CONSTRAINT "automation_proposals_source_ck";--> statement-breakpoint
+ALTER TABLE "automation_proposals" ADD CONSTRAINT "automation_proposals_source_ck" CHECK ("automation_proposals"."source" in ('rule', 'optimizer', 'budget_cap'));
