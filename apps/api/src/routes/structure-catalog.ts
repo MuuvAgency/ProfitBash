@@ -1,13 +1,18 @@
 import { createRoute, z, type OpenAPIHono } from '@hono/zod-openapi';
 import {
+  CampaignBlockError,
   getStructureCatalog,
+  listCampaignBlocks,
   saveStructureCatalog,
+  setCampaignBlocks,
   setClientPreset,
   StructureCatalogError,
 } from '@profitbash/db';
 import {
+  campaignBlocksResponseSchema,
   errorResponseSchema,
   saveStructureCatalogRequestSchema,
+  setCampaignBlocksRequestSchema,
   setClientPresetRequestSchema,
   structureCatalogResponseSchema,
 } from '@profitbash/shared';
@@ -17,7 +22,8 @@ import { requireFeature, requireSession } from '../middleware';
 
 /**
  * Struktur-Katalog (`docs/tasks/phase-4.md` 4.2, F11), Feature `tools`: lesen mit `view`; speichern nur Org-Admins
- * (prüft der Access-Layer, 403 `STRUCTURE_CATALOG_FORBIDDEN`); Presets je Client mit `write` (Admins und Editoren).
+ * (prüft der Access-Layer, 403 `STRUCTURE_CATALOG_FORBIDDEN`); Presets je Client und Bausteine je Kampagne
+ * (`phase-5.md` 5.11a) mit `write` (Admins und Editoren).
  */
 
 const json = <T>(schema: T) => ({ 'application/json': { schema } });
@@ -76,6 +82,35 @@ const clientPresetRoute = createRoute({
   },
 });
 
+const campaignBlocksRoute = createRoute({
+  method: 'get',
+  path: '/ads/tools/campaign-blocks',
+  tags: ['Tools'],
+  summary: 'Kampagnen eines Profils mit ihrem Baustein und einem Vorschlag aus dem Namen',
+  request: { query: z.object({ profileId: z.uuid() }) },
+  responses: {
+    200: { description: 'Kampagnen.', content: json(campaignBlocksResponseSchema) },
+    ...errors,
+    404: { description: 'Profil nicht gefunden.', content: json(errorResponseSchema) },
+  },
+});
+
+const setCampaignBlocksRoute = createRoute({
+  method: 'put',
+  path: '/ads/tools/campaign-blocks',
+  tags: ['Tools'],
+  summary: 'Baustein von Kampagnen bestätigen oder die Bestätigung zurücknehmen (Recht „write“)',
+  request: { body: { content: json(setCampaignBlocksRequestSchema), required: true } },
+  responses: {
+    200: {
+      description: 'Zahl der geänderten Zuordnungen.',
+      content: json(z.object({ changed: z.number().int() })),
+    },
+    ...errors,
+    404: { description: 'Profil nicht gefunden.', content: json(errorResponseSchema) },
+  },
+});
+
 const STATUS_BY_CODE = {
   FORBIDDEN: [403, 'STRUCTURE_CATALOG_FORBIDDEN'],
   VERSION_CONFLICT: [409, 'STRUCTURE_CATALOG_VERSION_CONFLICT'],
@@ -84,6 +119,9 @@ const STATUS_BY_CODE = {
 } as const;
 
 function toApiError(error: unknown): unknown {
+  if (error instanceof CampaignBlockError) {
+    return new ApiError(400, `CAMPAIGN_BLOCK_${error.code}`, error.message);
+  }
   if (!(error instanceof StructureCatalogError)) return error;
   const [status, code] = STATUS_BY_CODE[error.code];
   return new ApiError(status, code, error.message);
@@ -122,6 +160,25 @@ export function registerStructureCatalogRoutes(app: OpenAPIHono<AppEnv>, deps: A
   app.openapi({ ...saveRoute, middleware: guard('write') }, async (c) => {
     await run(() => saveStructureCatalog(db, { ...actor(c), ...c.req.valid('json') }));
     return c.json(await view(actor(c)), 200);
+  });
+
+  const noProfile = () => new ApiError(404, 'PROFILE_NOT_FOUND', 'Profil nicht gefunden.');
+
+  app.openapi({ ...campaignBlocksRoute, middleware: guard('view') }, async (c) => {
+    const result = await listCampaignBlocks(db, { ...actor(c), ...c.req.valid('query') });
+    if (result === null) throw noProfile();
+    return c.json(result, 200);
+  });
+
+  app.openapi({ ...setCampaignBlocksRoute, middleware: guard('write') }, async (c) => {
+    let result;
+    try {
+      result = await setCampaignBlocks(db, { ...actor(c), ...c.req.valid('json') });
+    } catch (error) {
+      throw toApiError(error);
+    }
+    if (result === null) throw noProfile();
+    return c.json(result, 200);
   });
 
   app.openapi({ ...clientPresetRoute, middleware: guard('write') }, async (c) => {

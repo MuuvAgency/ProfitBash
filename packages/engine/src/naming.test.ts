@@ -4,6 +4,7 @@ import {
   campaignNameMaxLength,
   MAX_CAMPAIGN_NAME_LENGTH,
   renderCampaignName,
+  suggestBlockFromName,
   uniqueCampaignName,
 } from './naming';
 
@@ -100,5 +101,39 @@ describe('uniqueCampaignName', () => {
   it('kürzt auf die Höchstlänge des Kontos', () => {
     const long = 'x'.repeat(116);
     expect(uniqueCampaignName(long, [long], 116)).toHaveLength(116);
+  });
+});
+
+describe('suggestBlockFromName', () => {
+  const blocks = [
+    { key: 'SP-KW-EXACT', code: 'EXACT', adProduct: 'SP' },
+    { key: 'SP-KW-EXACT-SINGLE', code: 'EXACT1', adProduct: 'SP' },
+    { key: 'SP-PAT', code: 'PAT', adProduct: 'SP' },
+    { key: 'SP-PAT-EXPANDED-SELF', code: 'PAT-EXP', adProduct: 'SP' },
+    { key: 'SD-PAT', code: 'PAT', adProduct: 'SD' },
+  ] as const;
+
+  it('findet das Kürzel als eigenes Wort im Namen, nur unter Bausteinen des Anzeigentyps', () => {
+    expect(suggestBlockFromName('SP | EXACT1 | Flaschen | trinkflasche 1l', 'SP', blocks)).toBe(
+      'SP-KW-EXACT-SINGLE',
+    );
+    expect(suggestBlockFromName('SD | PAT | Flaschen', 'SD', blocks)).toBe('SD-PAT');
+    expect(suggestBlockFromName('sp_exact_flaschen', 'SP', blocks)).toBe('SP-KW-EXACT');
+  });
+
+  it('nimmt das längere Kürzel, wenn eines im anderen steckt', () => {
+    expect(suggestBlockFromName('SP | PAT-EXP | Flaschen', 'SP', blocks)).toBe(
+      'SP-PAT-EXPANDED-SELF',
+    );
+  });
+
+  it('nimmt bei mehreren Kürzeln das vorderste (das Schema nennt den Baustein vor Gruppe und Ziel)', () => {
+    expect(suggestBlockFromName('SP | PAT | Exact Fit Hüllen', 'SP', blocks)).toBe('SP-PAT');
+  });
+
+  it('schlägt nichts vor, wenn kein Kürzel als Wort vorkommt', () => {
+    expect(suggestBlockFromName('Sommer Kampagne Exakte Begriffe', 'SP', blocks)).toBeNull();
+    expect(suggestBlockFromName('SP | EXACT | Flaschen', 'SB', blocks)).toBeNull();
+    expect(suggestBlockFromName(null, 'SP', blocks)).toBeNull();
   });
 });
