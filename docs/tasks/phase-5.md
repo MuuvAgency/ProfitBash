@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a. Als Nächstes: 5.9b.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b. Als Nächstes: 5.10.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -621,9 +621,47 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     die Meldungen; „pausieren“ bei `actual.low` über dem Cap.
 
 ### 5.9b Budgets: Enforcer (nach 5.7)
-- [ ] Im Lauf: Prognose über Cap → Benachrichtigung und Vorschlag „Tagesbudgets anteilig senken“ (Herkunft `budget_cap`,
+- [x] Im Lauf: Prognose über Cap → Benachrichtigung und Vorschlag „Tagesbudgets anteilig senken“ (Herkunft `budget_cap`,
       Budget-Leitplanke, Grenzen von Amazon); „pausieren“ nur, wenn schon die untere Schätzung über dem Cap liegt, mit
       Hinweis auf den Datenstand. Modus wie F3.
+- [x] Umsetzung (2026-10-11, Stand für 5.10):
+  - **Engine** `packages/engine/src/cap-enforcer.ts`, `enforceCap({ month, cap, campaigns, maxBudgetDecreasePercent })`:
+    Liegt die Prognose über dem Cap, bleibt für die Tage nach dem Datenstand „Cap − Ist“; jede aktive Kampagne mit
+    Tagesbudget bekommt denselben Anteil ihres erwarteten Tagesschnitts als neues Budget (eigene Formel), dann
+    `applyBudgetGuardrail` (höchste Senkung je Lauf) und Amazons Grenzen. Liegt schon die **untere Schätzung** des
+    Ist über dem Cap, schlägt er vor, alle aktiven Kampagnen im Umfang zu pausieren. Kampagnen ohne Ausgaben, ohne
+    Tagesbudget oder am Minimum bleiben unberührt. `campaignPacing` (aus `pacing.ts`) liefert Anteil und
+    Tagesschnitt je Kampagne.
+  - **Plan des Laufs:** `planAutomationRun(db, scope, now)` lädt die Caps des Profils mit Pacing
+    (`loadProfileCapPacing` in `budget-caps.ts`, Systemzugriff) nach `plan.caps`. Betrag, Schwellen, Monat und die
+    Kampagnen im Umfang stehen im `fingerprint`: Ein geänderter Cap, ein neuer Monat oder ein geänderter Umfang macht
+    einen Lauf fällig.
+  - **Job** (`computeAutomationProposals`): **Vorrang wie entschieden.** Für Kampagnen unter einem Cap mit Prognose
+    über dem Betrag ruhen die Kampagnen-Regeln; es gilt der Vorschlag des Enforcers (bei mehreren Caps der
+    strengste: pausieren vor dem niedrigsten Budget), sonst zählt der Lauf `budgetCap`. Ausgangsbudget ist wie bei
+    den Regeln der neueste Wert aus übermittelten Änderungen. Eine von Hand gelegte offene Änderung sperrt weiter.
+    Die Begründung trägt Cap, Betrag, Währung, Ist, untere Schätzung, Prognose und „Daten bis“.
+  - **Speichern:** Vorschläge mit `source = 'budget_cap'` (Migration `0043_proposal_source_budget_cap`) landen im
+    Modus `cart` mit Herkunft `budget_cap` im Warenkorb; der Lauf ersetzt seine offenen Zeilen beider Herkünfte, und
+    keine davon sperrt die Entity mehr. Auch „In meinen Warenkorb“ behält die Herkunft.
+  - **Meldungen** (in der Transaktion des Laufs, an alle, die das Profil sehen, Link `/ads/budgets`):
+    `budget_cap_threshold` (je Cap, Monat und Schwelle einmal; ab 100 % als Fehler) und `budget_cap_forecast` (je
+    Cap und Monat einmal).
+  - **Oberfläche:** Vorschlagsliste mit Herkunft „Budget-Cap“ und der Zeile „Cap · Ist ≈ · Prognose ≈ · Daten bis“;
+    Texte der beiden Meldungen; der Warenkorb kennzeichnet Zeilen der Automatik („Vorschlag der Automatik“ bzw.
+    „… des Budget-Caps“, offener Punkt aus 5.8).
+  - **Review (ponytail-review):** keine Befunde, die eine Änderung brauchten.
+  - **Grenzen, bewusst so:**
+    - Steht die Automatik eines Clients auf „aus“, läuft nichts, also auch keine Cap-Meldung.
+    - Der tägliche Auslöser kennt nur Profile mit Kennzahlen aus einer Datei; Profile, die nur Tageswerte haben
+      (heute nur Demo-Daten), bekommen keinen Lauf und damit keine Meldungen.
+    - Die Senkung ist je Lauf durch die Leitplanke begrenzt (Start −20 %); reicht das nicht, bleibt die Prognose
+      über dem Cap, bis der nächste Lauf fällig ist (neue Datei oder geänderte Einstellungen).
+    - Am Monatsanfang ohne Daten im Monat rechnet die Prognose allein mit dem Tagesschnitt der letzten Datei.
+  - **Nicht im Browser geprüft:** Für einen Lauf fehlt in der Dev-DB eine Datei mit Kennzahlen (wie 5.8). Die
+    Dev-DB ist auf `0043_proposal_source_budget_cap` zu migrieren.
+  - **Weiter offen aus 5.8:** Gründe ohne Vorschlag je Lauf anzeigen (stehen in `automation_runs.counts`, jetzt
+    auch `budgetCap`).
 
 ### 5.10 Prüfungen „kein Geld verbrennen“ (Ideen-Dokument E)
 - [ ] Prüfungen als Daten mit Schwellen je Organisation, Ergebnis je Lauf: aktive vCPM-Kampagnen (nur SD; SB-Blätter haben
