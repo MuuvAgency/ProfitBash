@@ -17,6 +17,7 @@ import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
 import { targetLabel } from '../explorer/amazon-labels';
 import { useActiveOrgId, useSessionStore } from '../stores/session';
+import StructureProposals from './StructureProposals.vue';
 
 /**
  * Tab „Vorschläge“ (`phase-5.md` 5.8): je Vorschlag Entity, vorher/nachher, Regel bzw. Optimizer, Leitplanke und
@@ -153,6 +154,7 @@ const act = (kind: 'stage' | 'dismiss', ids: string[]) =>
 
 <template>
   <div class="flex flex-col gap-gutter">
+    <StructureProposals :can-write="canWrite" />
     <section
       class="flex min-w-0 flex-col gap-space-md rounded-tile bg-tile p-space-md shadow-tile sm:p-space-lg"
     >

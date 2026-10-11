@@ -60,6 +60,7 @@ export type ProductGroupListData = Schemas['ProductGroupListResponse'];
 export type AdvertisedProductsData = Schemas['AdvertisedProductsResponse'];
 export type StructureCatalogData = Schemas['StructureCatalogResponse'];
 export type CampaignBlocksData = Schemas['CampaignBlocksResponse'];
+export type StructureProposalData = Schemas['StructureProposal'];
 export type PlanSetupInput = Schemas['PlanCampaignSetupRequest'];
 export type PlanSetupData = Schemas['PlanCampaignSetupResponse'];
 export type SetupDraftData = Schemas['CampaignSetupDraft'];
@@ -484,6 +485,16 @@ export function createApi(options: ApiOptions = {}) {
       /** Läufe und Vorschläge (5.8). */
       runs: async (): Promise<AutomationRunData[]> =>
         (await unwrap(client.GET('/api/ads/automations/runs'))).runs,
+      structureProposals: (
+        status: 'open' | 'dismissed',
+      ): Promise<Schemas['StructureProposalsResponse']> =>
+        unwrap(
+          client.GET('/api/ads/automations/structure-proposals', { params: { query: { status } } }),
+        ),
+      actOnStructureProposals: (action: 'accept' | 'dismiss', ids: string[]) =>
+        unwrap(
+          client.POST(`/api/ads/automations/structure-proposals/${action}`, { body: { ids } }),
+        ),
       proposals: (status: AutomationProposalData['status']): Promise<AutomationProposalsData> =>
         unwrap(client.GET('/api/ads/automations/proposals', { params: { query: { status } } })),
       stageProposals: (ids: string[]): Promise<AutomationProposalActionData> =>

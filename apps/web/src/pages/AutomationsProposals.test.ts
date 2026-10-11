@@ -1,3 +1,4 @@
+import { DEFAULT_STRUCTURE_CATALOG } from '@profitbash/shared';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch, type RecordedRequest } from '../test/fetch-stub';
@@ -81,6 +82,7 @@ async function mountTab(
     }),
     'GET /api/ads/automations/proposals': json({ proposals: [proposal(), pause], total: 2 }),
     'GET /api/ads/automations/runs': json({ runs: [run] }),
+    'GET /api/ads/automations/structure-proposals': json({ proposals: [], total: 0 }),
     ...overrides,
   });
   const mounted = await mountWithApp(undefined, { path: '/ads/automations' });
@@ -302,5 +304,148 @@ describe('Seite „Automationen“: Läufe', () => {
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain('Die Läufe konnten nicht geladen werden'),
     );
+  });
+});
+
+describe('Abschnitt „Struktur“ im Tab „Vorschläge“ (5.11b)', () => {
+  const S1 = '00000000-0000-4000-8000-0000000000e1';
+  const S2 = '00000000-0000-4000-8000-0000000000e2';
+  const base = {
+    profileId: PROFILE,
+    accountName: 'Nordwind DE',
+    currencyCode: 'EUR',
+    firstSeenAt: '2026-10-10T08:00:00.000Z',
+    dismissedAt: null,
+  };
+  const graduation = {
+    ...base,
+    id: S1,
+    kind: 'graduation',
+    subject: 'trinkflasche 1l',
+    key: 'SP-AUTO',
+    detail: {
+      searchTerm: 'Trinkflasche 1L',
+      fromBlock: 'SP-AUTO',
+      toBlocks: ['SP-KW-BROAD-CLUSTER', 'SP-KW-EXACT'],
+      clicks: 40,
+      orders: 3,
+      spend: '10',
+      sales: '100',
+      acos: '10',
+      periodStart: '2026-09-08',
+      periodEnd: '2026-10-07',
+    },
+  };
+  const presetSwitch = {
+    ...base,
+    id: S2,
+    kind: 'presetSwitch',
+    subject: '00000000-0000-4000-8000-0000000000f1',
+    key: 'muuv-standard',
+    detail: {
+      productGroupName: 'Flaschen',
+      from: 'launch',
+      to: 'muuv-standard',
+      orders: 31,
+      spend: '120.00',
+      sales: '900.00',
+      acos: '13.33',
+      goalAcos: '20',
+    },
+  };
+  const routes = (overrides: Record<string, Responder | Response> = {}) => ({
+    'GET /api/ads/automations/structure-proposals': json({
+      proposals: [graduation, presetSwitch],
+      total: 2,
+    }),
+    'GET /api/ads/tools/catalog': json({
+      catalog: structuredClone(DEFAULT_STRUCTURE_CATALOG),
+      version: 0,
+      updatedAt: null,
+      clientPresets: [],
+      productGroupPresets: [],
+      clients: [],
+    }),
+    'POST /api/ads/automations/structure-proposals/accept': json({ changed: 1, skipped: 0 }),
+    'POST /api/ads/automations/structure-proposals/dismiss': json({ changed: 1, skipped: 0 }),
+    ...overrides,
+  });
+  const row = (id: string) =>
+    vi.waitFor(() => {
+      const element = $(`[data-structure-row="${id}"]`);
+      if (!element) throw new Error('keine Zeile');
+      return element;
+    });
+  const posts = (requests: RecordedRequest[], action: string) =>
+    requests
+      .filter(
+        (r) =>
+          r.method === 'POST' && r.path === `/api/ads/automations/structure-proposals/${action}`,
+      )
+      .map((r) => r.body);
+
+  it('zeigt Graduation mit Bausteinen und Kennzahlen und den Preset-Wechsel mit Namen', async () => {
+    await mountTab('proposals', routes());
+    const first = await row(S1);
+    expect(first.textContent).toContain('Trinkflasche 1L');
+    expect(first.textContent).toContain('Automatisch → Breit-Cluster, Exakt');
+    expect(first.textContent).toContain('3 Bestellungen');
+    expect(first.textContent).toContain('ACoS 10 %');
+    expect(first.textContent).toContain('Nordwind DE');
+    const second = await row(S2);
+    expect(second.textContent).toContain('Flaschen');
+    expect(second.textContent).toContain('Launch → Muuv-Standard');
+    expect(second.textContent).toContain('Ziel-ACoS 20 %');
+  });
+
+  it('nimmt an und verwirft je Vorschlag und meldet das Ergebnis', async () => {
+    const { requests } = await mountTab('proposals', routes());
+    (await row(S1)).querySelector<HTMLButtonElement>('[data-structure-accept]')!.click();
+    await flushPromises();
+    expect(posts(requests, 'accept')).toEqual([{ ids: [S1] }]);
+    await vi.waitFor(() => expect(document.body.textContent).toContain('1 Vorschlag angenommen'));
+    (await row(S2)).querySelector<HTMLButtonElement>('[data-structure-dismiss]')!.click();
+    await flushPromises();
+    expect(posts(requests, 'dismiss')).toEqual([{ ids: [S2] }]);
+  });
+
+  it('sagt, wenn sich ein Vorschlag nicht mehr annehmen ließ', async () => {
+    await mountTab(
+      'proposals',
+      routes({
+        'POST /api/ads/automations/structure-proposals/accept': json({ changed: 0, skipped: 1 }),
+      }),
+    );
+    (await row(S1)).querySelector<HTMLButtonElement>('[data-structure-accept]')!.click();
+    await vi.waitFor(() => expect(document.body.textContent).toContain('ließ sich nicht annehmen'));
+  });
+
+  it('Viewer lesen nur; leerer Zustand und Fehler haben eigene Texte', async () => {
+    await mountTab('proposals', routes(), { orgRole: 'viewer' });
+    await row(S1);
+    expect($('[data-structure-accept]')).toBeNull();
+    expect($('[data-structure-dismiss]')).toBeNull();
+    cleanupMounted();
+
+    await mountTab('proposals');
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain(
+        'Keine offenen Graduation- oder Preset-Vorschläge',
+      ),
+    );
+    cleanupMounted();
+
+    await mountTab(
+      'proposals',
+      routes({
+        'GET /api/ads/automations/structure-proposals': json(
+          { error: { code: 'X', message: 'x' } },
+          500,
+        ),
+      }),
+    );
+    await vi.waitFor(() => expect($('[data-structure-error]')).not.toBeNull());
+    // Ein Fehler hier lässt die Gebots- und Budget-Vorschläge stehen.
+    expect($(`[data-proposal-row="${P1}"]`)).not.toBeNull();
   });
 });
