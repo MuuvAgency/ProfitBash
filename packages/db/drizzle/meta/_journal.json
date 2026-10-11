@@ -295,6 +295,13 @@
       "when": 1791661848494,
       "tag": "0041_automation_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791700268096,
+      "tag": "0042_budget_caps",
+      "breakpoints": true
     }
   ]
 }
