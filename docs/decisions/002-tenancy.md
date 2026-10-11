@@ -125,6 +125,10 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   `organization_id = aktive Organisation` filtern, liefern für Kunden weiterhin nichts. Freigegeben sind seit 6.3b die
   Auswertungen für Dashboard und Explorer: Der Datenstand liest dafür die Läufe (`job_runs`) der Eigentümer-Org des
   sichtbaren Profils; Tags zählen in den Auswertungen nur für die aktive Organisation.
+- **Kundenzugang verwalten** (ab Phase 6, 6.3c): Org-Admins der Eigentümer-Org verwalten die Mitglieder der
+  Kunden-Org eines **eigenen** Clients (`clientAccessScope` in `members.ts` prüft `clients.organization_id` = aktive
+  Organisation, Routen `/api/clients/{id}/access` hinter `orgAdminOnly`). Das ist der einzige Zugriff auf
+  Mitgliedschaften einer anderen Organisation; das Audit dazu steht bei der Eigentümer-Org (`client_access.*`).
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

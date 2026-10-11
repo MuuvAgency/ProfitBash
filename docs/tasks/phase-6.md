@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b (Browser-Prüfung als Kunde mit 6.3c).**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b, 6.3c.**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -220,8 +220,8 @@ Plattform-Rolle `superadmin`.
       der aktiven Organisation filtern, auf den Profil-Scope umstellen; je Endpunkt Test mit zweitem Client.
 - [x] Web: Shell für Kunden-Orgs (nur gebuchte Einträge, keine Platzhalter späterer Phasen, kein Warenkorb, keine
       Quick-Tools, keine Glocke); Bedienelemente zum Bearbeiten im Explorer hängen bereits an `write`.
-- [ ] Browser-Prüfung als Kunde (mit 6.3c: Erst dort lässt sich ein Kundenzugang über die Oberfläche anlegen
-      und wieder entfernen).
+- [x] Browser-Prüfung als Kunde (mit 6.3c: Erst dort lässt sich ein Kundenzugang über die Oberfläche anlegen
+      und wieder entfernen; Ergebnis in der Notiz zu 6.3c).
 - **Umsetzung (2026-10-11):**
   - **Freigegeben** (`CUSTOMER_ORG_PATHS` in `middleware.ts`): `POST /api/ads/filter-options`, `/dashboard`,
     `/explorer/rows`, `/timeseries`. Die ASIN-Suche (Quick-Tool) und alles andere bleiben zu.
@@ -239,10 +239,37 @@ Plattform-Rolle `superadmin`.
     und geschützten Begriffen nicht. Gespeicherte Ansichten für Kunden gibt es nicht (siehe 6.3a).
 
 ### 6.3c Kundenzugang verwalten (F3)
-- [ ] `packages/db`: Kunden-Org zu einem Client anlegen (Typ `client`, Entitlements nach F1), Kunden-Nutzer anlegen
+- [x] `packages/db`: Kunden-Org zu einem Client anlegen (Typ `client`, Entitlements nach F1), Kunden-Nutzer anlegen
       (Rolle `viewer`, Passwort-Link aus 2.10 wiederverwenden), entziehen (Mitgliedschaft und Sessions beenden),
       Audit `client_access.*`. Ein Nutzer, der schon Mitglied der Agentur ist, kann kein Kunden-Nutzer werden.
-- [ ] API hinter `orgAdminOnly` der Eigentümer-Org; Oberfläche am Client unter „Clients & Connections“.
+- [x] API hinter `orgAdminOnly` der Eigentümer-Org; Oberfläche am Client unter „Clients & Connections“.
+- **Umsetzung (2026-10-11):**
+  - **Wiederverwendung statt zweiter Verwaltung:** `clientAccessScope()` (`packages/db/src/members.ts`) prüft den
+    Client der Eigentümer-Org und liefert die Eingabe für die vorhandenen `listMembers`, `addMember` (immer `viewer`),
+    `regeneratePasswordLink` und `removeMember`, mit `orgId` = Kunden-Org. Mit `create` entsteht die Kunden-Org beim
+    ersten Nutzer (Name des Clients, Slug `kunde-<clientId>`, Typ `client`, Entitlements `CUSTOMER_ORG_FEATURES` =
+    Dashboard und Explorer, Audit `client_access.org_create`).
+  - **Audit** steht im Log der Agentur, nicht in dem der Kunden-Org: `client_access.create`, `.link_create`,
+    `.remove` (je mit `clientId`), über `recordMemberEvent`. Texte unter `audit.action` / `audit.area`.
+  - **API** hinter `orgAdminOnly` (in `routes/members.ts`, teilt Nutzeranlage, Link-URL und Fehlerabbildung):
+    `GET`/`POST /api/clients/{id}/access`, `POST …/{memberId}/password-link`, `DELETE …/{memberId}`. Fremder oder
+    unbekannter Client und fremde Mitgliedschaft → 404; wer schon irgendwo Mitglied ist → 409 `MEMBER_EMAIL_TAKEN`.
+  - **Oberfläche:** Knopf „Kundenzugang“ je Client in der Kachel „Clients“ (`ClientAccessDialog.vue`): Liste mit
+    Status, „Neuer Link“, Entziehen mit Rückfrage in der Zeile, Formular zum Anlegen, Link einmalig mit „Kopieren“;
+    Loading, Empty, Error.
+  - **Browser-Pane geprüft (auch für 6.3b):** Als Admin Kunden-Nutzer für „Kranich (Demo)“ über die echten
+    Bedienelemente angelegt, Passwort über den Link gesetzt, als Kunde angemeldet: Sidebar nur Dashboard und Explorer,
+    keine Glocke, keine Quick-Tools, keine Ansichten; nur freigegebene Anfragen (`/api/me`, Einstellungen, vier
+    Auswertungs-Endpunkte); Explorer zeigt nur Kampagnen von Kranich; `/ads/explorer/search-term-analysis` und
+    `/admin/connections` → „Kein Zugriff“; Handy (375 px, hell) und Tablet ohne waagerechtes Scrollen, Konsole ohne
+    Fehler außer den erwarteten 401 beim Abmelden. Zugang über die Oberfläche wieder entzogen; das Audit-Log zeigt
+    die drei Ereignisse. Nicht geprüft: 1440 px (Pane schmaler), „Link kopieren“ (Zwischenablage), „Neuer Link“ im
+    Browser (per Test abgedeckt).
+  - **Reste in der Dev-DB:** Nutzer `pruefung-6-3@kunde.test` (ohne Mitgliedschaft, mit Passwort), leere Kunden-Org
+    „Kranich (Demo)“ (Typ `client`, verknüpft mit dem Client, zwei Entitlements), Audit-Events
+    `client_access.org_create`, `.create`, `.remove` bei der Agentur und `member.password_set` der Kunden-Org.
+  - **Bewusst nicht:** Kunden-Org wieder lösen oder löschen (bleibt leer bestehen), Entitlements je Kunden-Org
+    ändern (6.4), Kunden-Nutzer umbenennen. Der Name der Kunden-Org folgt einer späteren Umbenennung des Clients nicht.
 
 ### 6.4 Plattform-Admin (`/admin/platform`, F5)
 - [ ] API hinter `requireSuperadmin()`: Organisationen (Liste mit Typ, Mitgliederzahl, verknüpftem Client; anlegen,
