@@ -9,11 +9,14 @@ import {
   redeemPasswordLink,
   regeneratePasswordLink,
   removeMember,
+  setMemberClientGrants,
   updateMemberRole,
 } from './members';
 import {
   accounts,
   auditEvents,
+  clients,
+  memberClientGrants,
   memberPasswordLinks,
   members,
   savedViews,
@@ -392,5 +395,80 @@ describe('Einmal-Link', () => {
         regeneratePasswordLink(testDb.db, { ...admin(), memberId: member.id, now: NOW }),
       ),
     ).toBe('OTHER_ORGANIZATION');
+  });
+});
+
+describe('Freigaben je Client (6.2)', () => {
+  async function client(orgId: string, slug: string) {
+    const [row] = await testDb.db
+      .insert(clients)
+      .values({ organizationId: orgId, name: slug, slug })
+      .onConflictDoUpdate({ target: [clients.organizationId, clients.slug], set: { name: slug } })
+      .returning({ id: clients.id });
+    return row!.id;
+  }
+
+  it('setzt, ersetzt und löst die Freigaben, mit Audit (vorher/nachher) und in der Liste', async () => {
+    const [nord, sued] = [await client(ids.org, 'nord'), await client(ids.org, 'sued')];
+    const { member } = await newMember('emil@muuv.test');
+    expect(member.clientIds).toEqual([]);
+    const set = (clientIds: string[]) =>
+      setMemberClientGrants(testDb.db, { ...admin(), memberId: member.id, clientIds, now: NOW });
+
+    expect((await set([nord, sued])).clientIds.sort()).toEqual([nord, sued].sort());
+    expect((await set([sued])).clientIds).toEqual([sued]);
+    const list = await listMembers(testDb.db, { ...admin(), now: NOW });
+    expect(list.find((m) => m.id === member.id)!.clientIds).toEqual([sued]);
+    const events = await testDb.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'member.grants_update'));
+    expect(events).toHaveLength(2);
+    expect(events.map((e) => e.target)).toContainEqual(
+      expect.objectContaining({ id: member.id, after: [sued] }),
+    );
+
+    // Unverändert: kein weiteres Audit-Event.
+    await set([sued]);
+    expect(
+      await testDb.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.action, 'member.grants_update')),
+    ).toHaveLength(2);
+
+    expect((await set([])).clientIds).toEqual([]);
+    expect(await testDb.db.select().from(memberClientGrants)).toEqual([]);
+  });
+
+  it('lehnt fremde Clients und fremde Mitglieder ab', async () => {
+    const theirs = await client(ids.otherOrg, 'fremd');
+    const ours = await client(ids.org, 'nord');
+    const { member } = await newMember('emil@muuv.test');
+    expect(
+      await errorCode(
+        setMemberClientGrants(testDb.db, {
+          ...admin(),
+          memberId: member.id,
+          clientIds: [ours, theirs],
+          now: NOW,
+        }),
+      ),
+    ).toBe('UNKNOWN_CLIENT');
+    expect(await testDb.db.select().from(memberClientGrants)).toEqual([]);
+    const [foreign] = await testDb.db
+      .select({ id: members.id })
+      .from(members)
+      .where(eq(members.userId, ids.outsider));
+    expect(
+      await errorCode(
+        setMemberClientGrants(testDb.db, {
+          ...admin(),
+          memberId: foreign!.id,
+          clientIds: [ours],
+          now: NOW,
+        }),
+      ),
+    ).toBe('NOT_FOUND');
   });
 });
