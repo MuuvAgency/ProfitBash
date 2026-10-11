@@ -11940,6 +11940,189 @@
           "ids"
         ],
         "additionalProperties": false
+      },
+      "AutomationChecks": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/CheckSettings"
+          },
+          "canEditSettings": {
+            "type": "boolean"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckFinding"
+            }
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "settings",
+          "canEditSettings",
+          "findings",
+          "total"
+        ]
+      },
+      "CheckSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "object",
+            "properties": {
+              "vcpm": {
+                "type": "boolean"
+              },
+              "placement": {
+                "type": "boolean"
+              },
+              "spendNoOrders": {
+                "type": "boolean"
+              },
+              "noGoal": {
+                "type": "boolean"
+              },
+              "noCap": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "vcpm",
+              "placement",
+              "spendNoOrders",
+              "noGoal",
+              "noCap"
+            ],
+            "additionalProperties": false
+          },
+          "placementMinPercent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 900
+          },
+          "spendNoOrdersMinEur": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "placementMinPercent",
+          "spendNoOrdersMinEur"
+        ],
+        "additionalProperties": false
+      },
+      "CheckFinding": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "vcpm",
+              "placement",
+              "spendNoOrders",
+              "noGoal",
+              "noCap"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "warning",
+              "info"
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "campaign",
+              "target",
+              "profile"
+            ]
+          },
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "campaignName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "keywordText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "firstSeenAt": {
+            "type": "string"
+          },
+          "acknowledgedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "accountName",
+          "currencyCode",
+          "kind",
+          "severity",
+          "entityType",
+          "entityId",
+          "campaignName",
+          "keywordText",
+          "key",
+          "detail",
+          "firstSeenAt",
+          "acknowledgedAt"
+        ]
+      },
+      "AcknowledgeFindingsRequest": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -18680,6 +18863,191 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AutomationProposalIdsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationProposalActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/checks": {
+      "get": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Einstellungen der Prüfungen und Befunde der sichtbaren Profile (offen oder quittiert)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "acknowledged"
+              ],
+              "default": "open"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prüfungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationChecks"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/checks/settings": {
+      "put": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Einstellungen der Prüfungen speichern (nur Org-Admins); sie wirken mit dem nächsten Lauf",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prüfungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationChecks"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/checks/acknowledge": {
+      "post": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Offene Befunde quittieren (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeFindingsRequest"
               }
             }
           }

@@ -1,7 +1,10 @@
 import { createRoute, z, type OpenAPIHono } from '@hono/zod-openapi';
 import {
+  acknowledgeAutomationFindings,
   AutomationError,
   dismissAutomationProposals,
+  getAutomationChecks,
+  saveCheckSettings,
   getAutomationRules,
   getAutomationSettings,
   listAutomationProposals,
@@ -14,6 +17,10 @@ import {
   setClientAutomation,
 } from '@profitbash/db';
 import {
+  acknowledgeFindingsRequestSchema,
+  automationChecksSchema,
+  CHECK_FINDING_FILTERS,
+  checkSettingsSchema,
   automationProposalActionResponseSchema,
   automationProposalIdsRequestSchema,
   automationProposalsQuerySchema,
@@ -171,6 +178,40 @@ const dismissProposalsRoute = proposalAction(
   'Vorschläge verwerfen, auch im Warenkorb liegende (Recht „write“)',
 );
 
+const checksResponse = { description: 'Prüfungen.', content: json(automationChecksSchema) };
+const checksQuerySchema = z.object({ status: z.enum(CHECK_FINDING_FILTERS).default('open') });
+
+const checksRoute = createRoute({
+  method: 'get',
+  path: '/ads/automations/checks',
+  tags: ['Automationen'],
+  summary: 'Einstellungen der Prüfungen und Befunde der sichtbaren Profile (offen oder quittiert)',
+  request: { query: checksQuerySchema },
+  responses: { 200: checksResponse, ...errors },
+});
+
+const checkSettingsRoute = createRoute({
+  method: 'put',
+  path: '/ads/automations/checks/settings',
+  tags: ['Automationen'],
+  summary:
+    'Einstellungen der Prüfungen speichern (nur Org-Admins); sie wirken mit dem nächsten Lauf',
+  request: { body: { content: json(checkSettingsSchema), required: true } },
+  responses: { 200: checksResponse, ...errors },
+});
+
+const acknowledgeRoute = createRoute({
+  method: 'post',
+  path: '/ads/automations/checks/acknowledge',
+  tags: ['Automationen'],
+  summary: 'Offene Befunde quittieren (Recht „write“)',
+  request: { body: { content: json(acknowledgeFindingsRequestSchema), required: true } },
+  responses: {
+    200: { description: 'Ergebnis.', content: json(automationProposalActionResponseSchema) },
+    ...errors,
+  },
+});
+
 const STATUS_BY_CODE = {
   FORBIDDEN: [403, 'AUTOMATION_DEFAULTS_FORBIDDEN'],
   NOT_FOUND: [404, 'CLIENT_NOT_FOUND'],
@@ -275,7 +316,7 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
           ...row,
           entityType: row.entityType as 'target' | 'campaign',
           field: row.field as 'bid' | 'budget' | 'state',
-          source: row.source as 'rule' | 'optimizer',
+          source: row.source as 'rule' | 'optimizer' | 'budget_cap',
           createdAt: row.createdAt.toISOString(),
         })),
       },
@@ -293,6 +334,37 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
   app.openapi({ ...dismissProposalsRoute, middleware: guard('write') }, async (c) =>
     c.json(
       await run(() => dismissAutomationProposals(db, { ...actor(c), ...c.req.valid('json') })),
+      200,
+    ),
+  );
+
+  const checksView = async (
+    input: { userId: string; orgId: string },
+    status: (typeof CHECK_FINDING_FILTERS)[number],
+  ) => {
+    const checks = await run(() => getAutomationChecks(db, { ...input, status }));
+    return {
+      ...checks,
+      findings: checks.findings.map((row) => ({
+        ...row,
+        firstSeenAt: row.firstSeenAt.toISOString(),
+        acknowledgedAt: row.acknowledgedAt?.toISOString() ?? null,
+      })),
+    };
+  };
+
+  app.openapi({ ...checksRoute, middleware: guard('view') }, async (c) =>
+    c.json(await checksView(actor(c), c.req.valid('query').status), 200),
+  );
+
+  app.openapi({ ...checkSettingsRoute, middleware: guard('write') }, async (c) => {
+    await run(() => saveCheckSettings(db, { ...actor(c), settings: c.req.valid('json') }));
+    return c.json(await checksView(actor(c), 'open'), 200);
+  });
+
+  app.openapi({ ...acknowledgeRoute, middleware: guard('write') }, async (c) =>
+    c.json(
+      await run(() => acknowledgeAutomationFindings(db, { ...actor(c), ...c.req.valid('json') })),
       200,
     ),
   );
