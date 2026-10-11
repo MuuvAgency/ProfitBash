@@ -1,5 +1,6 @@
-import { foreignKey, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
-import { clients } from './app';
+import { foreignKey, index, integer, jsonb, pgTable, text, uuid } from 'drizzle-orm/pg-core';
+import { amazonAdsCampaigns } from './amazon-ads-data';
+import { amazonAdsProfiles, clients } from './app';
 import { organizations, users } from './auth';
 import { createdAt, updatedAt } from './columns';
 
@@ -35,5 +36,35 @@ export const clientPresets = pgTable(
       columns: [t.clientId, t.organizationId],
       foreignColumns: [clients.id, clients.organizationId],
     }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * Von Hand bestätigter Baustein einer Kampagne (`phase-5.md` 5.11a). Kampagnen aus einem Setup kennen ihren Baustein
+ * über den Entwurf (`campaign_setup_items`); eine Zeile hier geht dem vor. Zugriffe nur über `campaign-blocks.ts`.
+ */
+export const campaignBlocks = pgTable(
+  'campaign_blocks',
+  {
+    campaignId: uuid('campaign_id').primaryKey(),
+    organizationId: uuid('organization_id').notNull(),
+    profileId: uuid('profile_id').notNull(),
+    /** Schlüssel aus dem Katalog; ein gelöschter Baustein zählt nicht mehr. */
+    blockKey: text('block_key').notNull(),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'campaign_blocks_campaign_fk',
+      columns: [t.campaignId, t.profileId],
+      foreignColumns: [amazonAdsCampaigns.id, amazonAdsCampaigns.profileId],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'campaign_blocks_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    index('campaign_blocks_profile_idx').on(t.profileId),
   ],
 );

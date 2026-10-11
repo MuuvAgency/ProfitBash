@@ -830,6 +830,50 @@ export const setClientPresetRequestSchema = z
   .strictObject({ presetKey: presetKeySchema.nullable() })
   .meta({ id: 'SetClientPresetRequest' });
 
+// Baustein je Kampagne (5.11a)
+
+export const MAX_CAMPAIGN_BLOCK_ASSIGNMENTS = 500;
+
+export const campaignBlocksResponseSchema = z
+  .object({
+    /** Nicht archivierte Kampagnen des Profils nach Name. */
+    campaigns: z.array(
+      z.object({
+        campaignId: z.uuid(),
+        amazonCampaignId: z.string(),
+        name: z.string().nullable(),
+        adProduct: z.enum(CATALOG_AD_PRODUCTS),
+        state: z.string().nullable(),
+        /** Geltender Baustein; `null`, solange nichts bestätigt ist. */
+        blockKey: z.string().nullable(),
+        /** `setup`: aus dem Setup, das die Kampagne angelegt hat; `manual`: von Hand bestätigt. */
+        source: z.enum(['manual', 'setup']).nullable(),
+        /** Vorschlag aus dem Kampagnennamen (Kürzel des Bausteins). */
+        suggestedBlockKey: z.string().nullable(),
+      }),
+    ),
+    /** Das Profil hat mehr Kampagnen, als die Liste zeigt. */
+    truncated: z.boolean(),
+  })
+  .meta({ id: 'CampaignBlocksResponse' });
+export type CampaignBlocksResponse = z.infer<typeof campaignBlocksResponseSchema>;
+
+/** `blockKey: null` nimmt die Bestätigung von Hand zurück (dann gilt wieder das Setup bzw. nichts). */
+export const setCampaignBlocksRequestSchema = z
+  .strictObject({
+    profileId: z.uuid(),
+    assignments: z
+      .array(
+        z.strictObject({
+          campaignId: z.uuid(),
+          blockKey: z.string().max(32).regex(KEY).nullable(),
+        }),
+      )
+      .min(1)
+      .max(MAX_CAMPAIGN_BLOCK_ASSIGNMENTS),
+  })
+  .meta({ id: 'SetCampaignBlocksRequest' });
+
 /** Wirksames Preset: Produktgruppe vor Client vor Standard; unbekannte Schlüssel (gelöschte Presets) zählen nicht. */
 export function effectivePreset(
   catalog: StructureCatalog,

@@ -92,3 +92,29 @@ export function uniqueCampaignName(
     if (!used.has(candidate.toLowerCase())) return candidate;
   }
 }
+
+/**
+ * Baustein einer bestehenden Kampagne aus ihrem Namen (`phase-5.md` 5.11a): das vorderste Kürzel eines Bausteins des
+ * Anzeigentyps, das als eigenes Wort im Namen steht (ohne Groß/Klein; bei gleicher Stelle das längere, `PAT-EXP` vor
+ * `PAT`). Nur ein Vorschlag, den ein Mensch bestätigt.
+ */
+export function suggestBlockFromName(
+  name: string | null,
+  adProduct: string,
+  blocks: readonly { key: string; code: string; adProduct: string }[],
+): string | null {
+  if (!name) return null;
+  // shortcut: sucht das Kürzel irgendwo im Namen statt an der Stelle von `{block}` im Muster; reicht, solange der
+  // Vorschlag bestätigt wird. Genauer erst, wenn Namen ohne Bestätigung zählen sollen.
+  let best: { key: string; index: number; length: number } | null = null;
+  for (const block of blocks) {
+    if (block.adProduct !== adProduct) continue;
+    const code = block.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const index = name.search(new RegExp(`(?<![\\p{L}\\p{N}])${code}(?![\\p{L}\\p{N}])`, 'iu'));
+    if (index < 0) continue;
+    if (!best || index < best.index || (index === best.index && block.code.length > best.length)) {
+      best = { key: block.key, index, length: block.code.length };
+    }
+  }
+  return best?.key ?? null;
+}

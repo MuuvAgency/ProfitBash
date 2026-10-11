@@ -10407,6 +10407,127 @@
         ],
         "additionalProperties": false
       },
+      "CampaignBlocksResponse": {
+        "type": "object",
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campaignId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "amazonCampaignId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "adProduct": {
+                  "type": "string",
+                  "enum": [
+                    "SP",
+                    "SB",
+                    "SD"
+                  ]
+                },
+                "state": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "blockKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "manual",
+                    "setup",
+                    null
+                  ]
+                },
+                "suggestedBlockKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "campaignId",
+                "amazonCampaignId",
+                "name",
+                "adProduct",
+                "state",
+                "blockKey",
+                "source",
+                "suggestedBlockKey"
+              ]
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "campaigns",
+          "truncated"
+        ]
+      },
+      "SetCampaignBlocksRequest": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "campaignId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "blockKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 32,
+                  "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
+                }
+              },
+              "required": [
+                "campaignId",
+                "blockKey"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "profileId",
+          "assignments"
+        ],
+        "additionalProperties": false
+      },
       "SetClientPresetRequest": {
         "type": "object",
         "properties": {
@@ -17606,6 +17727,153 @@
           },
           "409": {
             "description": "Veraltete Version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/tools/campaign-blocks": {
+      "get": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Kampagnen eines Profils mit ihrem Baustein und einem Vorschlag aus dem Namen",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kampagnen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignBlocksResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Tools"
+        ],
+        "summary": "Baustein von Kampagnen bestätigen oder die Bestätigung zurücknehmen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCampaignBlocksRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Zahl der geänderten Zuordnungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "changed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "changed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profil nicht gefunden.",
             "content": {
               "application/json": {
                 "schema": {

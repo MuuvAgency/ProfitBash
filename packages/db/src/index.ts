@@ -41,3 +41,4 @@ export * from './campaign-setup-processing';
 export * from './portfolios';
 export * from './budget-caps';
 export * from './automation-checks';
+export * from './campaign-blocks';

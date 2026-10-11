@@ -5502,6 +5502,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/tools/campaign-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kampagnen eines Profils mit ihrem Baustein und einem Vorschlag aus dem Namen */
+        get: {
+            parameters: {
+                query: {
+                    profileId: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Kampagnen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CampaignBlocksResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /** Baustein von Kampagnen bestätigen oder die Bestätigung zurücknehmen (Recht „write“) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SetCampaignBlocksRequest"];
+                };
+            };
+            responses: {
+                /** @description Zahl der geänderten Zuordnungen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            changed: number;
+                        };
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/tools/client-presets/{clientId}": {
         parameters: {
             query?: never;
@@ -9416,6 +9552,31 @@ export interface components {
         SaveStructureCatalogRequest: {
             catalog: components["schemas"]["StructureCatalog"];
             version: number;
+        };
+        CampaignBlocksResponse: {
+            campaigns: {
+                /** Format: uuid */
+                campaignId: string;
+                amazonCampaignId: string;
+                name: string | null;
+                /** @enum {string} */
+                adProduct: "SP" | "SB" | "SD";
+                state: string | null;
+                blockKey: string | null;
+                /** @enum {string|null} */
+                source: "manual" | "setup" | null;
+                suggestedBlockKey: string | null;
+            }[];
+            truncated: boolean;
+        };
+        SetCampaignBlocksRequest: {
+            /** Format: uuid */
+            profileId: string;
+            assignments: {
+                /** Format: uuid */
+                campaignId: string;
+                blockKey: string | null;
+            }[];
         };
         SetClientPresetRequest: {
             presetKey: string | null;

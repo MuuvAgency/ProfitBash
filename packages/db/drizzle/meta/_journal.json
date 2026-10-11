@@ -316,6 +316,13 @@
       "when": 1791702101423,
       "tag": "0044_automation_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791705683538,
+      "tag": "0045_campaign_blocks",
+      "breakpoints": true
     }
   ]
 }

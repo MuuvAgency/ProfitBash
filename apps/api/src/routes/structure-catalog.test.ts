@@ -189,3 +189,58 @@ describe('Preset je Produktgruppe', () => {
     expect(unknown.body.error.code).toBe('PRODUCT_GROUP_UNKNOWN_PRESET');
   });
 });
+
+describe('Baustein je Kampagne (/api/ads/tools/campaign-blocks)', () => {
+  type List = { campaigns: { campaignId: string; blockKey: string | null }[]; truncated: boolean };
+  const list = (cookie: string | undefined, profileId = f.profile) =>
+    call<List>('GET', `/ads/tools/campaign-blocks?profileId=${profileId}`, cookie);
+  const set = (cookie: string | undefined, blockKey: string | null, profileId = f.profile) =>
+    call<{ changed: number }>('PUT', '/ads/tools/campaign-blocks', cookie, {
+      profileId,
+      assignments: [{ campaignId: f.campaign, blockKey }],
+    });
+
+  beforeEach(async () => {
+    await ctx.testDb.db.delete(schema.campaignBlocks);
+  });
+
+  it('listet für alle Mitglieder, bestätigt nur mit „write“ und schreibt Audit', async () => {
+    expect((await list(undefined)).status).toBe(401);
+    const before = await list(viewer);
+    expect(before.status).toBe(200);
+    expect(before.body.campaigns).toMatchObject([{ campaignId: f.campaign, blockKey: null }]);
+    expect((await set(viewer, 'SP-AUTO')).status).toBe(403);
+    const saved = await set(editor, 'SP-AUTO');
+    expect(saved.status).toBe(200);
+    expect(saved.body).toEqual({ changed: 1 });
+    expect((await list(viewer)).body.campaigns[0]).toMatchObject({
+      blockKey: 'SP-AUTO',
+      source: 'manual',
+    });
+    const audits = await ctx.testDb.db.select().from(auditEvents);
+    expect(audits.map((event) => event.action)).toEqual(['campaign_blocks.update']);
+  });
+
+  it('meldet unbekannte Bausteine und Kampagnen mit 400', async () => {
+    const block = await set(admin, 'SD-PAT');
+    expect(block.status).toBe(400);
+    expect(block.body.error.code).toBe('CAMPAIGN_BLOCK_UNKNOWN_BLOCK');
+    const campaign = await call('PUT', '/ads/tools/campaign-blocks', admin, {
+      profileId: f.profile,
+      assignments: [{ campaignId: other.campaign, blockKey: 'SP-AUTO' }],
+    });
+    expect(campaign.status).toBe(400);
+    expect(campaign.body.error.code).toBe('CAMPAIGN_BLOCK_UNKNOWN_CAMPAIGN');
+  });
+
+  it('kennt weder Profile fremder Organisationen noch ausgeblendete', async () => {
+    expect((await list(foreign)).status).toBe(404);
+    expect((await set(foreign, 'SP-AUTO')).status).toBe(404);
+    await ctx.testDb.db
+      .update(schema.amazonAdsProfiles)
+      .set({ isHidden: true })
+      .where(eq(schema.amazonAdsProfiles.id, f.fileProfile));
+    expect((await list(editor, f.fileProfile)).status).toBe(404);
+    expect((await set(editor, 'SP-AUTO', f.fileProfile)).status).toBe(404);
+  });
+});
