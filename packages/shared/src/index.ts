@@ -28,3 +28,4 @@ export * from './goals';
 export * from './automation';
 export * from './automation-rules';
 export * from './automation-runs';
+export * from './budgets';

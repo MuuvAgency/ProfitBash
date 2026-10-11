@@ -14,3 +14,4 @@ export * from './campaign-setup';
 export * from './notifications';
 export * from './goals';
 export * from './automation';
+export * from './budgets';
