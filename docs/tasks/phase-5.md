@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a. Als Nächstes: 5.11b.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a, 5.11b. Als Nächstes: 5.12 (frühestens nach einigen Wochen mit Daten), dann 5.13.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -792,11 +792,69 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     (5.1) über die ASINs der Gruppe; wirksames Preset über `effectivePreset`.
 
 ### 5.11b Graduation- und Preset-Vorschläge
-- [ ] Graduation: Suchbegriffe (Zeitraumsummen, Phase 2b) in Kampagnen eines Bausteins mit ausgehender Kante, die die
+- [x] Graduation: Suchbegriffe (Zeitraumsummen, Phase 2b) in Kampagnen eines Bausteins mit ausgehender Kante, die die
       Kriterien erfüllen, als Vorschlag; Annehmen legt sie wie in 4.6 auf die Merkliste (das Preset der Produktgruppe
       verteilt im Setup), Negativ in der Quelle wie dort.
-- [ ] Preset-Wechsel: Kriterien auf die Kennzahlen der Produktgruppe; Annehmen ändert das Preset (Audit), nie automatisch.
-- [ ] Abschnitt „Vorschläge“, Benachrichtigung bei neuen Vorschlägen.
+- [x] Preset-Wechsel: Kriterien auf die Kennzahlen der Produktgruppe; Annehmen ändert das Preset (Audit), nie automatisch.
+- [x] Abschnitt „Vorschläge“, Benachrichtigung bei neuen Vorschlägen.
+- [x] Umsetzung (2026-10-11, Stand für 5.12 und 5.13):
+  - **Engine** `packages/engine/src/structure-proposals.ts`: `graduationProposals` summiert die Suchbegriff-Zeilen
+    des Datei-Zeitraums je Begriff und Baustein der Kampagne und prüft die ausgehenden Kanten (Bestellungen ab
+    `minOrders` bzw. Harvest-Regel; ACoS höchstens `maxAcosPercentOfGoal` des Ziels, ohne Angabe oder ohne Ziel der
+    ACoS der Harvest-Regel; ohne Umsatz kein Vorschlag). ASIN-Suchbegriffe gehen nur in Produkt-Bausteine, Begriffe
+    nur in Keyword-Bausteine. **Je Begriff ein Vorschlag** (aus dem Baustein mit den meisten Bestellungen) mit allen
+    Ziel-Bausteinen, deren Kante passt. Eine Kante zählt nicht, wenn der Begriff im Ziel, in einem Baustein dahinter
+    oder in einer Kampagne ohne Baustein schon exakt gebucht ist; Begriffe auf der Merkliste bleiben außen vor.
+    `presetSwitchProposals`: je Produktgruppe der erste Wechsel aus ihrem wirksamen Preset, dessen gesetzte
+    Bedingungen alle zutreffen (Mindest-Ausgaben in EUR mit dem Kurs umgerechnet; ACoS-Bedingung nur mit Ziel;
+    Ausgaben ohne Umsatz liegen über jeder Schwelle).
+  - **Tabelle** `automation_structure_proposals` (Migration `0046_structure_proposals`): aktuelle Vorschläge je Profil,
+    eindeutig je Art, `subject` (Begriff in Vergleichsform bzw. Produktgruppe) und `key` (Baustein der Quelle bzw.
+    Ziel-Preset), mit `detail`, erstem und letztem Auftreten und „verworfen“.
+  - **Lauf** (`packages/db/src/structure-proposals.ts`): `planStructure` lädt Katalog, Harvest-Regel des Profils,
+    Bausteine der Kampagnen (5.11a) und die wirksamen Presets der Produktgruppen in den Plan; Kanten, Wechsel,
+    Harvest-Regel, Zuordnungen und Presets stehen im `fingerprint` (nach dem Deploy gibt es deshalb je Profil einmal
+    einen neuen Lauf). `loadStructureProposals` rechnet: Suchbegriffe mit **genau dem Zeitraum des Datenstands**,
+    Ziel von Profil bzw. Client; Kennzahlen der Gruppe = Summen der Anzeigen (Ebene `productAd`) ihrer ASINs, Ziel
+    der Gruppe über `effectiveGoal`. `syncStructureProposals` gleicht wie bei den Befunden ab (bestehende behalten
+    ID und „verworfen“, neue kommen dazu, alles Übrige wird gelöscht), `saveAutomationRun` zählt `counts.structure`
+    und meldet **nur neue** (`structure_proposals`, an alle, die das Profil sehen, Link
+    `/ads/automations?tab=proposals`). Der Job zählt `structure` in `job_runs`.
+  - **Annehmen und Verwerfen** (über `visibleProfilesScope`): `acceptStructureProposals` legt Graduation-Begriffe
+    mit `markSearchTermsForHarvest` auf die Merkliste (Kennzahlen des Datei-Zeitraums; das Setup verteilt nach dem
+    Preset und schlägt das Negativ in der Quelle vor, 4.6) bzw. setzt das Preset mit `updateProductGroup` (Audit
+    `product_group.update`); Angenommenes verlässt die Liste, Audit `automation_structure_proposals.accept`. Was
+    sich nicht mehr annehmen lässt (Begriff nicht mehr im Zeitraum, Preset oder Gruppe gelöscht), bleibt stehen und
+    zählt als übersprungen. `dismissStructureProposals` (Audit `…dismiss`).
+  - **API** (Feature `automations`): `GET /ads/automations/structure-proposals?status=open|dismissed` (`view`),
+    `POST …/structure-proposals/accept` und `…/dismiss` (`write`, bis zu 500 IDs, Antwort `{ changed, skipped }`).
+  - **Seite:** Abschnitt „Graduation und Presets“ oben im Tab „Vorschläge“ (`automations/StructureProposals.vue`):
+    Begriff bzw. Produktgruppe, Art, Profil, Kennzahlen, „Baustein → Bausteine“ bzw. „Preset → Preset“ (Namen aus
+    dem Katalog), „Auf die Merkliste“ bzw. „Preset ändern“ und Verwerfen je Zeile; Filter offen/verworfen; Viewer
+    lesen nur. Eigener Lade-, Leer- und Fehlerzustand (ein Fehler hier lässt die übrigen Vorschläge stehen).
+  - **Festlegungen (Claude, Dominik kann widersprechen):**
+    - Verworfen bleibt ein Vorschlag, **solange er in jedem Lauf wieder auftritt** (wie quittierte Befunde, nicht
+      wie Gebots-Vorschläge, die mit einer neuen Datei wiederkommen): Ein Begriff, den man nicht graduieren will,
+      meldet sich sonst jede Woche neu.
+    - Im Modus „Schatten“ und „Warenkorb“ gleich; im Modus „aus“ gibt es keine (der Lauf fällt aus).
+    - Annehmen braucht `write` im Feature `automations`; Merkliste und Preset gehören sonst zu `sp-explorer` bzw.
+      `tools` (dieselben Rollen, nur das Entitlement der Organisation unterscheidet sich).
+  - **Grenzen, bewusst so:**
+    - Graduation gibt es nur für Kampagnen mit Baustein (aus dem Setup oder im Struktur-Katalog bestätigt) und nur,
+      wenn die Datei die Suchbegriff-Blätter enthält.
+    - Die Merkliste merkt sich als Quelle die Zeile mit den höchsten Ausgaben des Begriffs, nicht unbedingt die
+      Kampagne des Vorschlags; das Ziel bestimmt weiter das Preset der Produktgruppe im Setup, nicht die Kante.
+    - Ein Preset-Wechsel wird beim Annehmen nicht erneut gegen das aktuelle Preset der Gruppe geprüft (wer das
+      Preset inzwischen von Hand geändert hat, bekommt den Vorschlag bis zum nächsten Lauf noch angeboten).
+    - Annehmen läuft nicht in einer Transaktion mit dem Löschen des Vorschlags (`shortcut:` im Code; der nächste
+      Lauf räumt auf).
+    - Kein Markieren mehrerer Vorschläge (je Zeile annehmen oder verwerfen).
+  - **Review (ponytail-review):** Bausteine „dahinter“ werden je Ziel-Baustein nur einmal bestimmt. Sonst keine
+    Befunde, die eine Änderung brauchten.
+  - **Browser-Pane (2026-10-11):** Abschnitt mit Filter und leerem Zustand geprüft (Desktop dunkel, kein
+    waagerechtes Scrollen). **Nicht mit echten Vorschlägen geprüft:** Die Dev-DB hat keine Datei mit Kennzahlen
+    (wie 5.8–5.10). Dev-DB migriert bis `0046_structure_proposals`.
+  - **Nach TDD:** Engine, Zugriffe, Job, API und Abschnitt liefen vorher rot.
 
 ### 5.12 Schatten-Auswertung (frühestens nach einigen Wochen mit Daten)
 - [ ] Je Client: Vorschläge neben dem, was tatsächlich übermittelt wurde, und Kennzahlen nur aus nicht überlappenden
