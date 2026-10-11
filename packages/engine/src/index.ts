@@ -79,3 +79,4 @@ export * from './guardrails';
 export * from './optimizer';
 export * from './rules';
 export * from './pipeline';
+export * from './pacing';
