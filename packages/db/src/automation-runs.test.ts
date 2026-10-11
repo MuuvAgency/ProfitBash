@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seedAdChangeFixture, type AdChangeFixture } from './ad-change-fixture';
 import {
   dismissAutomationProposals,
+  listAutomationDatasets,
   listAutomationProposals,
   listAutomationRunProfiles,
   listAutomationRuns,
@@ -24,6 +25,7 @@ import {
   adChanges,
   amazonAdsEntityPeriodMetrics,
   amazonAdsProfiles,
+  amazonAdsSearchTermPeriodMetrics,
   auditEvents,
   automationCheckSettings,
   automationFindings,
@@ -669,6 +671,65 @@ describe('Läufe und Vorschläge für Nutzer (5.8)', () => {
     ]);
     expect(await listAutomationRuns(testDb.db, as(other.emil, other.org))).toEqual([]);
     expect(await listAutomationRuns(testDb.db, as(other.emil))).toBeNull();
+  });
+
+  it('Datensätze je sichtbarem Profil: Datenstand mit Alter, Anzeigentypen mit Kennzahlen und Suchbegriffen des Zeitraums, erwartete Anzeigentypen', async () => {
+    const later = new Date('2026-10-19T09:00:00Z');
+    const datasets = async () =>
+      (await listAutomationDatasets(testDb.db, as(f.emil), later))!.find(
+        (x) => x.profileId === f.profile,
+      );
+    expect(await datasets()).toEqual({
+      profileId: f.profile,
+      accountName: 'Nordwind DE',
+      expectedAdProducts: ['SPONSORED_PRODUCTS'],
+      metrics: null,
+    });
+
+    await standardMetrics();
+    const term = {
+      organizationId: f.org,
+      profileId: f.profile,
+      adProduct: 'SPONSORED_PRODUCTS',
+      periodStart: OCTOBER.startDate,
+      periodEnd: OCTOBER.endDate,
+      amazonCampaignId: '1001',
+      amazonAdGroupId: '2001',
+      amazonTargetId: '3001',
+      searchTerm: 'regenjacke',
+      currencyCode: 'EUR',
+      impressions: 10,
+      clicks: 1,
+      cost: '1.00',
+      sales: '0',
+      purchases: 0,
+      units: 0,
+      importedAt: NOW,
+    };
+    // Suchbegriffe eines anderen Zeitraums zählen nicht: Die Graduation rechnet nur auf dem Datenstand.
+    await testDb.db
+      .insert(amazonAdsSearchTermPeriodMetrics)
+      .values({ ...term, adProduct: 'SPONSORED_BRANDS', periodEnd: '2026-10-06' });
+    const withMetrics = {
+      periodStart: OCTOBER.startDate,
+      periodEnd: OCTOBER.endDate,
+      periodDays: 30,
+      importedAt: NOW,
+      ageDays: 9,
+      adProducts: ['SPONSORED_PRODUCTS'],
+      searchTermAdProducts: [],
+    };
+    expect(await datasets()).toMatchObject({ metrics: withMetrics });
+    await testDb.db.insert(amazonAdsSearchTermPeriodMetrics).values(term);
+    expect(await datasets()).toMatchObject({
+      metrics: { ...withMetrics, searchTermAdProducts: ['SPONSORED_PRODUCTS'] },
+    });
+
+    const foreign = (await listAutomationDatasets(testDb.db, as(other.emil, other.org), later))!;
+    expect(foreign.map((x) => x.profileId)).not.toContain(f.profile);
+    expect(foreign).toContainEqual(expect.objectContaining({ profileId: other.profile }));
+    expect(await listAutomationDatasets(testDb.db, as(other.emil), later)).toBeNull();
+    await testDb.db.delete(amazonAdsSearchTermPeriodMetrics);
   });
 
   it('listet Vorschläge je Status mit Namen der Entity, Kampagne und Ad Group', async () => {

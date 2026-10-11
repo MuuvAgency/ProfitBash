@@ -7,7 +7,7 @@ import {
   type AutomationRule,
   type Guardrails,
 } from '@profitbash/shared';
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { visibleProfilesScope } from './access';
 import { chunks, valueColumns } from './ad-change-entities';
 import { recordAuditEvent } from './audit';
@@ -30,6 +30,7 @@ import {
   amazonAdsEntityPeriodMetrics,
   amazonAdsProductAds,
   amazonAdsProfiles,
+  amazonAdsSearchTermPeriodMetrics,
   amazonAdsTargets,
   automationProposals,
   automationRuns,
@@ -882,6 +883,99 @@ export async function listAutomationRuns(
     .where(inArray(r.profileId, scope.ids))
     .orderBy(desc(r.createdAt))
     .limit(AUTOMATION_RUN_LIST_LIMIT);
+}
+
+export interface AutomationDatasetRecord {
+  profileId: string;
+  accountName: string;
+  /** Anzeigentypen mit nicht archivierten Kampagnen: Für sie erwartet die Automatik Kennzahlen. */
+  expectedAdProducts: string[];
+  /** Datenstand (zuletzt hochgeladene Datei mit Kennzahlen), `null` ohne jede solche Datei. */
+  metrics: {
+    periodStart: string;
+    periodEnd: string;
+    periodDays: number;
+    importedAt: Date;
+    /** Volle Tage seit dem Upload. */
+    ageDays: number;
+    adProducts: string[];
+    /** Anzeigentypen mit Suchbegriff-Zeilen genau dieses Zeitraums (Grundlage der Graduation, 5.11b). */
+    searchTermAdProducts: string[];
+  } | null;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Welche Datensätze der Automatik je sichtbarem Profil vorliegen (`phase-5.md` 5.13b). `null` für Nicht-Mitglieder.
+ */
+export async function listAutomationDatasets(
+  db: Db,
+  access: AutomationRunAccess,
+  now = new Date(),
+): Promise<AutomationDatasetRecord[] | null> {
+  const scope = await visibleProfilesScope(db, access);
+  if (scope === null) return null;
+  const profiles = await db
+    .select({ profileId: amazonAdsProfiles.id, accountName: amazonAdsProfiles.accountName })
+    .from(amazonAdsProfiles)
+    .where(inArray(amazonAdsProfiles.id, scope.ids))
+    .orderBy(amazonAdsProfiles.accountName, amazonAdsProfiles.id);
+  const c = amazonAdsCampaigns;
+  const m = amazonAdsEntityPeriodMetrics;
+  const st = amazonAdsSearchTermPeriodMetrics;
+  const result: AutomationDatasetRecord[] = [];
+  // shortcut: drei kleine Abfragen je Profil; bei sehr vielen Profilen zu einer Abfrage zusammenfassen.
+  for (const profile of profiles) {
+    const expected = await db
+      .selectDistinct({ adProduct: c.adProduct })
+      .from(c)
+      .where(
+        and(
+          eq(c.profileId, profile.profileId),
+          isNull(c.removedAt),
+          sql`${c.state} is distinct from 'ARCHIVED'`,
+        ),
+      )
+      .orderBy(c.adProduct);
+    const state = await findProfileMetricsState(db, {
+      organizationId: access.orgId,
+      profileId: profile.profileId,
+    });
+    const adProductsOf = async (table: typeof m | typeof st) =>
+      state === null
+        ? []
+        : (
+            await db
+              .selectDistinct({ adProduct: table.adProduct })
+              .from(table)
+              .where(
+                and(
+                  eq(table.profileId, profile.profileId),
+                  eq(table.periodStart, state.period.startDate),
+                  eq(table.periodEnd, state.period.endDate),
+                ),
+              )
+              .orderBy(table.adProduct)
+          ).map((row) => row.adProduct);
+    result.push({
+      ...profile,
+      expectedAdProducts: expected.map((row) => row.adProduct),
+      metrics: state && {
+        periodStart: state.period.startDate,
+        periodEnd: state.period.endDate,
+        periodDays:
+          Math.round(
+            (Date.parse(state.period.endDate) - Date.parse(state.period.startDate)) / DAY_MS,
+          ) + 1,
+        importedAt: state.importedAt,
+        ageDays: Math.floor((now.getTime() - state.importedAt.getTime()) / DAY_MS),
+        adProducts: await adProductsOf(m),
+        searchTermAdProducts: await adProductsOf(st),
+      },
+    });
+  }
+  return result;
 }
 
 /** Filter der Vorschlagsliste; abgelöste Vorschläge (`superseded`) erscheinen nie. */

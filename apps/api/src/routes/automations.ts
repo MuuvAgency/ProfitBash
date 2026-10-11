@@ -11,6 +11,7 @@ import {
   getAutomationRules,
   getAutomationSettings,
   listAutomationProposals,
+  listAutomationDatasets,
   listAutomationRuns,
   previewAutomationRules,
   saveAutomationRules,
@@ -30,6 +31,7 @@ import {
   automationProposalsResponseSchema,
   automationRulesPreviewSchema,
   automationRulesResponseSchema,
+  automationDatasetsResponseSchema,
   automationRunsResponseSchema,
   automationSettingsSchema,
   errorResponseSchema,
@@ -146,6 +148,18 @@ const runsRoute = createRoute({
   summary: 'Die letzten Läufe der Automatik in den sichtbaren Profilen, neueste zuerst',
   responses: {
     200: { description: 'Läufe.', content: json(automationRunsResponseSchema) },
+    401: errors[401],
+    403: errors[403],
+  },
+});
+
+const datasetsRoute = createRoute({
+  method: 'get',
+  path: '/ads/automations/datasets',
+  tags: ['Automationen'],
+  summary: 'Je sichtbarem Profil: Datensätze, die die Automatik erwartet, und was davon vorliegt',
+  responses: {
+    200: { description: 'Datensätze.', content: json(automationDatasetsResponseSchema) },
     401: errors[401],
     403: errors[403],
   },
@@ -327,6 +341,22 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
       200,
     ),
   );
+
+  app.openapi({ ...datasetsRoute, middleware: guard('view') }, async (c) => {
+    const profiles = await run(() => listAutomationDatasets(db, actor(c)));
+    return c.json(
+      {
+        profiles: profiles.map((row) => ({
+          ...row,
+          metrics: row.metrics && {
+            ...row.metrics,
+            importedAt: row.metrics.importedAt.toISOString(),
+          },
+        })),
+      },
+      200,
+    );
+  });
 
   app.openapi({ ...runsRoute, middleware: guard('view') }, async (c) => {
     const runs = await run(() => listAutomationRuns(db, actor(c)));
