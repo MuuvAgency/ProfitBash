@@ -452,3 +452,59 @@ export type JobRun = z.infer<typeof jobRunSchema>;
 export const jobRunListSchema = z
   .object({ jobRuns: z.array(jobRunSchema) })
   .meta({ id: 'JobRunList' });
+
+// ---------------------------------------------------------------------------
+// Audit-Log (6.1)
+// ---------------------------------------------------------------------------
+
+/** So viele Ereignisse liefert eine Seite des Audit-Logs. */
+export const AUDIT_EVENT_PAGE_SIZE = 50;
+
+export const auditEventListQuerySchema = z.object({
+  /** Ab diesem Zeitpunkt (einschließlich). */
+  from: timestamp.optional(),
+  /** Bis zu diesem Zeitpunkt (ausschließlich). */
+  to: timestamp.optional(),
+  actorUserId: z.uuid().optional(),
+  /** Teil der Aktion vor dem Punkt, z. B. `member`. */
+  area: z
+    .string()
+    .regex(/^[a-z_]{1,64}$/)
+    .optional(),
+  /** `nextCursor` der vorigen Seite. */
+  cursor: z.uuid().optional(),
+});
+export type AuditEventListQuery = z.infer<typeof auditEventListQuerySchema>;
+
+const auditActorSchema = z
+  .object({ id: z.uuid(), name: z.string(), email: z.string() })
+  .meta({ id: 'AuditActor' });
+export type AuditActor = z.infer<typeof auditActorSchema>;
+
+export const auditEventSchema = z
+  .object({
+    id: z.uuid(),
+    createdAt: timestamp,
+    /** `<bereich>.<aktion>`; neue Aktionen erscheinen unverändert. */
+    action: z.string(),
+    /** `null`: kein Nutzer (Seed, Job) oder der Nutzer wurde gelöscht. */
+    actor: auditActorSchema.nullable(),
+    /** Betroffenes Objekt: `{ type, id, …Details }`, ohne Secrets. */
+    target: z.record(z.string(), z.unknown()),
+  })
+  .meta({ id: 'AuditEvent' });
+export type AuditEvent = z.infer<typeof auditEventSchema>;
+
+export const auditEventListSchema = z
+  .object({
+    events: z.array(auditEventSchema),
+    /** `cursor` für die nächste Seite, `null` am Ende. */
+    nextCursor: z.uuid().nullable(),
+  })
+  .meta({ id: 'AuditEventList' });
+export type AuditEventList = z.infer<typeof auditEventListSchema>;
+
+export const auditEventFiltersSchema = z
+  .object({ areas: z.array(z.string()), actors: z.array(auditActorSchema) })
+  .meta({ id: 'AuditEventFilters' });
+export type AuditEventFilters = z.infer<typeof auditEventFiltersSchema>;
