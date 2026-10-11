@@ -11867,6 +11867,88 @@
         ],
         "additionalProperties": false
       },
+      "AutomationDatasetsResponse": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationDataset"
+            }
+          }
+        },
+        "required": [
+          "profiles"
+        ]
+      },
+      "AutomationDataset": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "expectedAdProducts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metrics": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "periodStart": {
+                "type": "string"
+              },
+              "periodEnd": {
+                "type": "string"
+              },
+              "periodDays": {
+                "type": "integer"
+              },
+              "importedAt": {
+                "type": "string"
+              },
+              "ageDays": {
+                "type": "integer"
+              },
+              "adProducts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "searchTermAdProducts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "periodStart",
+              "periodEnd",
+              "periodDays",
+              "importedAt",
+              "ageDays",
+              "adProducts",
+              "searchTermAdProducts"
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "accountName",
+          "expectedAdProducts",
+          "metrics"
+        ]
+      },
       "AutomationRunsResponse": {
         "type": "object",
         "properties": {
@@ -19090,6 +19172,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/automations/datasets": {
+      "get": {
+        "tags": [
+          "Automationen"
+        ],
+        "summary": "Je sichtbarem Profil: Datensätze, die die Automatik erwartet, und was davon vorliegt",
+        "responses": {
+          "200": {
+            "description": "Datensätze.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomationDatasetsResponse"
                 }
               }
             }

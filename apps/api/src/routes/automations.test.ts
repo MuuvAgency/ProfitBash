@@ -14,6 +14,7 @@ import {
   type AutomationChecks,
   type AutomationProposalsResponse,
   type AutomationRulesResponse,
+  type AutomationDatasetsResponse,
   type AutomationRunsResponse,
   type AutomationSettings,
   type ErrorResponse,
@@ -332,6 +333,25 @@ describe('Läufe und Vorschläge (/api/ads/automations/runs, /proposals)', () =>
         },
       ],
     });
+  });
+
+  it('liefert je sichtbarem Profil die Datensätze der Automatik, auch für Viewer', async () => {
+    const response = await call<AutomationDatasetsResponse>('GET', '/datasets', viewer);
+    expect(response.status).toBe(200);
+    expect(response.body.profiles.find((x) => x.profileId === f.profile)).toMatchObject({
+      accountName: 'Nordwind DE',
+      expectedAdProducts: ['SPONSORED_PRODUCTS'],
+      metrics: {
+        periodStart: '2026-09-08',
+        periodEnd: '2026-10-07',
+        periodDays: 30,
+        importedAt: NOW.toISOString(),
+        adProducts: ['SPONSORED_PRODUCTS'],
+        searchTermAdProducts: [],
+      },
+    });
+    expect(response.body.profiles.map((x) => x.profileId)).not.toContain(other.profile);
+    expect((await call('GET', '/datasets')).status).toBe(401);
   });
 
   it('liefert Läufe und Vorschläge der sichtbaren Profile, auch für Viewer', async () => {

@@ -31,6 +31,38 @@ export const automationRunsResponseSchema = z
   .meta({ id: 'AutomationRunsResponse' });
 export type AutomationRunsResponse = z.infer<typeof automationRunsResponseSchema>;
 
+/**
+ * Datensätze der Automatik je Profil (`phase-5.md` 5.13b): was erwartet wird, was vorliegt. Anzeigentypen in
+ * API-Schreibweise (`SPONSORED_PRODUCTS` …).
+ */
+export const automationDatasetSchema = z
+  .object({
+    profileId: z.uuid(),
+    accountName: z.string(),
+    /** Anzeigentypen mit nicht archivierten Kampagnen. */
+    expectedAdProducts: z.array(z.string()),
+    /** Datenstand: zuletzt hochgeladene Bulk-Datei mit Kennzahlen; `null` ohne jede. */
+    metrics: z
+      .object({
+        periodStart: z.string(),
+        periodEnd: z.string(),
+        periodDays: z.number().int(),
+        importedAt: z.string(),
+        ageDays: z.number().int(),
+        adProducts: z.array(z.string()),
+        /** Anzeigentypen mit Suchbegriff-Zeilen genau dieses Zeitraums. */
+        searchTermAdProducts: z.array(z.string()),
+      })
+      .nullable(),
+  })
+  .meta({ id: 'AutomationDataset' });
+export type AutomationDataset = z.infer<typeof automationDatasetSchema>;
+
+export const automationDatasetsResponseSchema = z
+  .object({ profiles: z.array(automationDatasetSchema) })
+  .meta({ id: 'AutomationDatasetsResponse' });
+export type AutomationDatasetsResponse = z.infer<typeof automationDatasetsResponseSchema>;
+
 /** Filter der Vorschlagsliste. `dismissed` auch, wenn die Änderung im Warenkorb gelöscht wurde. */
 export const AUTOMATION_PROPOSAL_FILTERS = ['open', 'staged', 'dismissed'] as const;
 export type AutomationProposalFilter = (typeof AUTOMATION_PROPOSAL_FILTERS)[number];
