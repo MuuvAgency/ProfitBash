@@ -344,6 +344,13 @@
       "when": 1791746933541,
       "tag": "0048_member_client_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791749030915,
+      "tag": "0049_client_organization",
+      "breakpoints": true
     }
   ]
 }
