@@ -7,7 +7,7 @@
 > `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-10), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei), Plan nach einem
-> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10. Als Nächstes: 5.11a.**
+> unabhängigen Review überarbeitet (Festlegungen unter „Aufgaben“). Fertig: 5.1, 5.2a, 5.2b, 5.3, 5.4, 5.5, 5.6a, 5.6b, 5.7, 5.8, 5.9a, 5.9b, 5.10, 5.11a. Als Nächstes: 5.11b.**
 >
 > **Ausgangslage:** Es gibt weiterhin keinen Ads-API-Zugang. Daten kommen nur aus der **Bulk-Datei**, die Dominik
 > wöchentlich je Profil lädt (`phase-1.md` 1.11); Tagesberichte sind entfallen (1.11e, 2026-10-07). Datei-Profile haben
@@ -720,12 +720,76 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **Weiter offen aus 5.8:** Gründe ohne Vorschlag je Lauf anzeigen (`automation_runs.counts`, jetzt auch
     `budgetCap` und `findings`).
 
+- **Entschieden (Dominik, 2026-10-11, zu Beginn der zweiten Session; für 5.11a, 5.11b und 5.13):**
+  - **Kriterien je Graduation-Kante:** Mindest-Bestellungen und höchster ACoS in % des Ziels, je Feld leer = die
+    Harvest-Regel der Suchbegriff-Einstufung (2b, je Organisation bzw. Profil); ohne wirksames Ziel gilt deren ACoS.
+    Startwerte: Kanten nach Exakt bzw. Produkte leer, Exakt → Exakt einzeln ab 8 Bestellungen und ACoS ≤ 100 % des
+    Ziels, Exakt einzeln → SB ab 15 Bestellungen und ACoS ≤ 100 %.
+  - **Preset-Wechsel als Kanten** „von Preset → nach Preset“ mit Bedingungen auf die Kennzahlen der Produktgruppe.
+    Startwerte: Launch → Muuv-Standard ab 30 Bestellungen; Muuv-Standard → Kontrolle ab 100 Bestellungen und ACoS ≤
+    Ziel; Muuv-Standard → Profit und Verteidigung ab 200 € Ausgaben und ACoS ≥ 150 % des Ziels.
+  - **Meldung „neue Graduation-/Preset-Vorschläge“ (5.11b):** an alle, die das Profil sehen; je Lauf höchstens eine,
+    nur bei neuen Vorschlägen.
+  - **Modus „aus“ (für 5.13):** schaltet nur die Vorschläge ab (Gebote, Budgets, Graduation, Presets);
+    **Cap-Meldungen und Prüfungen laufen trotzdem.** Heute läuft bei „aus“ nichts; umbauen in 5.13.
+  - **Frage von Dominik:** „Gibt es die Automatik, die auf Uploads funktioniert? Ich würde fest vorgeschriebene
+    Datensätze hochladen; sie muss flexibel funktionieren, wenn manche fehlen.“ Antwort: Ja, der Lauf startet nach
+    jedem Import mit Kennzahlen und überspringt, wofür Daten fehlen (ADR 006). **Offen (Idee, nicht gebaut):** eine
+    Übersicht je Profil „diese Datensätze erwartet die Automatik, das liegt vor, das fehlt“ (Bulk-Datei mit
+    Kennzahlen, Suchbegriff-Blätter, Zeitraum, Alter). Mit Dominik klären, ob sie in 5.13 oder später kommt.
+
 ### 5.11a Katalog: Kriterien und Zuordnung (Vorarbeit für 5.11b)
-- [ ] Graduation-Kanten und Presets im Struktur-Katalog um Kriterien erweitern (Schwellen auf einen Datei-Zeitraum, z. B.
+- [x] Graduation-Kanten und Presets im Struktur-Katalog um Kriterien erweitern (Schwellen auf einen Datei-Zeitraum, z. B.
       Bestellungen und ACoS gegen Ziel; Preset-Wechsel nach Kennzahlen der Produktgruppe), mit Migration der gespeicherten
       Kataloge.
-- [ ] Zuordnung Kampagne → Baustein speichern: beim Übermitteln eines Setups (Phase 4), für Bestand über das Namensschema
+- [x] Zuordnung Kampagne → Baustein speichern: beim Übermitteln eines Setups (Phase 4), für Bestand über das Namensschema
       vorgeschlagen und von Hand bestätigt.
+- [x] Umsetzung (2026-10-11, Stand für 5.11b):
+  - **Katalog** (`packages/shared/src/structure-catalog.ts`): Kanten tragen `minOrders` und `maxAcosPercentOfGoal`
+    (je `null` = Harvest-Regel); neu `presetSwitches` (`from`, `to`, `minOrders`, `minSpend` in EUR, `acos` mit
+    `comparison` `lte` | `gte` und `percentOfGoal`; alle gesetzten Bedingungen müssen zutreffen, ohne Ziel passt die
+    ACoS-Bedingung nicht). Prüfung: bekannte, verschiedene Presets, keine Dublette, mindestens eine Bedingung
+    (`switchUnknownPreset`, `switchSamePreset`, `duplicateSwitch`, `switchNoCondition`); Wechsel im Kreis sind
+    erlaubt (hin und zurück ist sinnvoll). Über die Startwerte hinaus hat auch Produkte → Produkt einzeln 8 / 100 %.
+  - **Migration der gespeicherten Kataloge:** beim Lesen, ohne SQL-Migration. `upgradeStructureCatalog` (in
+    `loadStructureCatalog`) gibt Kanten ohne Kriterien die Startwerte der gleichen Start-Kante und einem Dokument
+    ohne `presetSwitches` die Start-Wechsel zwischen Presets, die es noch gibt; Dokumente mit eigenen (auch leeren)
+    Angaben bleiben. Das nächste Speichern schreibt die neue Form.
+  - **Zuordnung Kampagne → Baustein** (`packages/db/src/campaign-blocks.ts`): Kampagnen aus einem Setup kennen den
+    Baustein über ihren Entwurf, sobald die Kampagne ihre Amazon-ID hat (`campaign_setup_items.amazon_entity_id`,
+    Plan des Entwurfs über den Namen); **dafür wird beim Übermitteln nichts Zusätzliches gespeichert.** Von Hand
+    bestätigte Bausteine stehen in `campaign_blocks` (Migration `0045_campaign_blocks`, je Kampagne eine Zeile,
+    fällt mit der Kampagne) und gehen dem Setup vor. `listCampaignBlocks` (sichtbares Profil, nicht archivierte
+    Kampagnen, höchstens 5000, mit `suggestedBlockKey`), `setCampaignBlocks` (Baustein muss im Katalog stehen und
+    zum Anzeigentyp passen; `null` nimmt die Bestätigung zurück; Audit `campaign_blocks.update` nur bei Änderung),
+    **`loadCampaignBlocks(db, orgId, profileId)` für den Lauf in 5.11b** (Amazon-Kampagnen-ID → Baustein, nur
+    Bausteine, die es noch gibt).
+  - **Vorschlag aus dem Namen** (`suggestBlockFromName` in `packages/engine/src/naming.ts`): das vorderste Kürzel
+    eines Bausteins des Anzeigentyps, das als eigenes Wort im Namen steht (ohne Groß/Klein, bei gleicher Stelle das
+    längere). `shortcut:` Es sucht im ganzen Namen, nicht an der Stelle von `{block}` im Muster. Namen ohne Kürzel
+    (z. B. „… - Manuell - Exakt - …“ der Demo-Profile) bekommen keinen Vorschlag.
+  - **API** (Feature `tools`): `GET /ads/tools/campaign-blocks?profileId=` (`view`), `PUT /ads/tools/campaign-blocks`
+    (`write`, bis zu 500 Zuordnungen; 404 `PROFILE_NOT_FOUND`, 400 `CAMPAIGN_BLOCK_UNKNOWN_BLOCK` bzw.
+    `…_UNKNOWN_CAMPAIGN`).
+  - **Seite** `/ads/tools/catalog`: Reiter „Graduation“ mit zwei Feldern je Kante (leer zeigt „Harvest“), neuer
+    Reiter „Preset-Wechsel“ (Liste, Bedingungen, hinzufügen, entfernen; ein gelöschtes Preset nimmt seine Wechsel
+    mit) und neuer Reiter „Kampagnen“ (Profil wählen, je Kampagne Baustein, Herkunft „aus dem Setup“/„bestätigt“,
+    Vorschlag mit „Bestätigen“, „Alle Vorschläge bestätigen“; speichert sofort wie die Presets je Client; Viewer
+    lesen nur).
+  - **Review (ponytail-review):** Der Plan eines Entwurfs wurde je Kampagnen-Zeile geladen (jetzt einmal je
+    Entwurf). Zurückgewiesen: Suchmuster der Kürzel je Aufruf vorbereiten (bei 5000 Kampagnen unkritisch).
+  - **Browser-Pane (2026-10-11):** die drei Reiter am Desktop (dunkel) und am Handy (hell, kein waagerechtes
+    Scrollen), Konsole ohne Fehler; im Profil „Browser-Prüfung (Datei)“ einen Baustein gesetzt und wieder
+    zurückgenommen. In der Dev-DB bleiben davon zwei Audit-Events `campaign_blocks.update`; am Katalog wurde nichts
+    gespeichert. Dev-DB migriert bis `0045_campaign_blocks`.
+  - **Nicht gebaut:** Filter „nur ohne Baustein“ und Suche im Reiter „Kampagnen“; eine Zuordnung Kampagne →
+    Produktgruppe (5.11b rechnet die Gruppe über die ASINs der Anzeigen); „kein Baustein“ für eine Kampagne aus
+    dem Setup (nur ein anderer Baustein überschreibt).
+  - **Nicht nach TDD im strengen Sinn:** Die Tests des Reiters „Kampagnen“ liefen erst mit der Komponente; alle
+    übrigen (Schema, Anheben, Engine, Zugriffe, API, Kanten und Wechsel in der Seite) liefen vorher rot.
+  - **Für 5.11b:** Kriterien einer Kante mit `null` über `resolveSearchTermRules` des Profils auflösen
+    (`harvestMinPurchases`, `harvestMaxAcos` als Bruch); Kennzahlen der Produktgruppe aus der Ebene `productAd`
+    (5.1) über die ASINs der Gruppe; wirksames Preset über `effectivePreset`.
 
 ### 5.11b Graduation- und Preset-Vorschläge
 - [ ] Graduation: Suchbegriffe (Zeitraumsummen, Phase 2b) in Kampagnen eines Bausteins mit ausgehender Kante, die die
