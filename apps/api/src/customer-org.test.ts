@@ -34,6 +34,11 @@ const OPEN_FOR_CUSTOMERS = [
   'PUT /api/settings',
   'GET /api/settings/ui-state/:scope/:key',
   'PUT /api/settings/ui-state/:scope/:key',
+  // Dashboard und Explorer (6.3b), je Endpunkt mit zweitem Client geprüft in `routes/analytics-customer.test.ts`.
+  'POST /api/ads/filter-options',
+  'POST /api/ads/dashboard',
+  'POST /api/ads/explorer/rows',
+  'POST /api/ads/timeseries',
 ];
 
 let ctx: TestContext;

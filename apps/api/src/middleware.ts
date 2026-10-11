@@ -58,9 +58,19 @@ function toPlatformRole(role: string | null | undefined): PlatformRole {
  * lehnt `requireSession` ab, auch jede neue Route (fail-closed). Welche Daten eine freigegebene Route zeigt,
  * entscheidet weiter der Access-Layer.
  */
-function isOpenForCustomerOrgs(path: string): boolean {
+const CUSTOMER_ORG_PATHS: readonly string[] = [
+  '/api/me',
   // Eigene Einstellungen des Nutzers (Darstellung), keine Daten der Agentur.
-  return path === '/api/me' || path === '/api/settings' || path.startsWith('/api/settings/');
+  '/api/settings',
+  // Dashboard und Explorer (F1); die ASIN-Suche ist ein Quick-Tool und bleibt zu.
+  '/api/ads/filter-options',
+  '/api/ads/dashboard',
+  '/api/ads/explorer/rows',
+  '/api/ads/timeseries',
+];
+
+function isOpenForCustomerOrgs(path: string): boolean {
+  return CUSTOMER_ORG_PATHS.includes(path) || path.startsWith('/api/settings/');
 }
 
 /**
