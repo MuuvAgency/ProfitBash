@@ -551,6 +551,21 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   - **Offen (Aufräumen von Hand):** In der Dev-DB liegt aus der Prüfung von 5.6b eine Zeile in `automation_rules`
     (Version 1, vier Regeln, darunter „Teure Klicks“) und ein Audit-Event `automation_rules.update`.
 
+- **Entschieden (Dominik, 2026-10-11, zu Beginn der Session; für 5.9a, 5.9b und 5.10):**
+  - **Caps:** mehrere je Profil, je Umfang einer (ganzes Profil, Portfolios oder Tags); eine Kampagne kann unter
+    mehrere fallen, jeder Cap wird einzeln gerechnet und gemeldet. Ein Cap gilt **jeden Monat**; für einzelne Monate
+    kann ein abweichender Betrag gesetzt werden, der dort gewinnt.
+  - **Warnschwellen:** Startwerte 80 % und 100 % des Caps, gemessen am geschätzten Ist im Monat, je Cap änderbar;
+    je Cap, Monat und Schwelle eine Meldung. „Prognose über Cap“ meldet zusätzlich der Enforcer.
+  - **Empfänger der Cap-Meldungen:** alle, die das Profil sehen.
+  - **Vorrang (5.9b):** Liegt die Prognose eines Caps über dem Betrag, gilt für dessen Kampagnen der Vorschlag des
+    Enforcers (Herkunft `budget_cap`), Budget-Regeln ruhen dort; sonst gilt die Regel wie bisher.
+  - **Prüfungen (5.10):** Ein quittierter Befund bleibt quittiert, solange er in jedem Lauf wieder auftritt;
+    verschwindet er und kommt zurück, ist er neu und wird wieder gemeldet. Startwerte: Platzierungs-Anpassung ab
+    +50 % bei ACoS über Ziel, Target mit Ausgaben ab 20 € ohne Bestellung; „ohne Ziel“ und „ohne Cap“ als Hinweis,
+    die übrigen als Warnung.
+  - **ADR 006, Punkt 7 bestätigt:** Angewendete Änderungen zählen nur 7 Tage als Ausgangswert der Leitplanken.
+
 ### 5.9a Budgets: Caps und Pacing (`/ads/budgets`)
 - [ ] Tabelle Caps: Profil, Monat (einmalig oder jeden Monat), Betrag in der Währung des Profils, Umfang (ganzes Profil,
       Portfolios oder Tags), Warnschwellen.
