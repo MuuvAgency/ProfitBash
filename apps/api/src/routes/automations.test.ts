@@ -3,11 +3,14 @@ import {
   replaceEntityPeriodMetrics,
   saveAutomationRun,
   schema,
+  syncAutomationFindings,
 } from '@profitbash/db';
 import { seedAdChangeFixture, type AdChangeFixture } from '@profitbash/db/testing';
 import {
   DEFAULT_AUTOMATION_RULES,
+  DEFAULT_CHECK_SETTINGS,
   DEFAULT_GUARDRAILS,
+  type AutomationChecks,
   type AutomationProposalsResponse,
   type AutomationRulesResponse,
   type AutomationRunsResponse,
@@ -405,5 +408,96 @@ describe('Läufe und Vorschläge (/api/ads/automations/runs, /proposals)', () =>
         (event) => event.action,
       ),
     ).toEqual(['automation_proposals.stage', 'automation_proposals.dismiss']);
+  });
+});
+
+describe('Prüfungen (/api/ads/automations/checks)', () => {
+  const checks = (cookie?: string, status?: string) =>
+    call<AutomationChecks>('GET', `/checks${status ? `?status=${status}` : ''}`, cookie);
+  const acknowledge = (cookie: string | undefined, ids: string[]) =>
+    call<{ changed: number; skipped: number }>('POST', '/checks/acknowledge', cookie, { ids });
+  const putSettings = (cookie: string | undefined, body: unknown = DEFAULT_CHECK_SETTINGS) =>
+    call<AutomationChecks>('PUT', '/checks/settings', cookie, body);
+
+  beforeEach(async () => {
+    const { db } = ctx.testDb;
+    await db.delete(schema.automationFindings);
+    await db.delete(schema.automationCheckSettings);
+    await hide(false);
+    await syncAutomationFindings(db, {
+      organizationId: f.org,
+      profileId: f.profile,
+      now: new Date('2026-10-10T08:00:00Z'),
+      findings: [
+        {
+          kind: 'spendNoOrders',
+          entityType: 'target',
+          entityId: f.keyword,
+          campaignId: f.campaign,
+          key: '',
+          detail: { spend: '40', clicks: 80 },
+        },
+      ],
+    });
+  });
+
+  it('liefert Einstellungen und Befunde der sichtbaren Profile, auch für Viewer', async () => {
+    const res = await checks(viewer);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      settings: DEFAULT_CHECK_SETTINGS,
+      canEditSettings: false,
+      total: 1,
+      findings: [
+        {
+          kind: 'spendNoOrders',
+          severity: 'warning',
+          profileId: f.profile,
+          campaignName: 'Kampagne 1001',
+          detail: { spend: '40' },
+          firstSeenAt: '2026-10-10T08:00:00.000Z',
+          acknowledgedAt: null,
+        },
+      ],
+    });
+    expect((await checks(admin)).body.canEditSettings).toBe(true);
+    expect((await checks(viewer, 'acknowledged')).body.findings).toEqual([]);
+    expect((await checks(viewer, 'alle')).status).toBe(400);
+    expect((await checks(foreign)).body.findings).toEqual([]);
+    await hide(true);
+    expect((await checks(editor)).body.total).toBe(0);
+    expect((await checks()).status).toBe(401);
+  });
+
+  it('Editoren quittieren; Viewer und Fremde nicht', async () => {
+    const { id } = (await checks(editor)).body.findings[0]!;
+    expect((await acknowledge(viewer, [id])).status).toBe(403);
+    expect((await acknowledge(undefined, [id])).status).toBe(401);
+    expect((await acknowledge(editor, [])).status).toBe(400);
+    expect((await acknowledge(foreign, [id])).body).toEqual({ changed: 0, skipped: 1 });
+
+    expect((await acknowledge(editor, [id])).body).toEqual({ changed: 1, skipped: 0 });
+    expect((await checks(editor)).body.total).toBe(0);
+    expect((await checks(editor, 'acknowledged')).body.findings).toMatchObject([
+      { id, acknowledgedAt: expect.any(String) },
+    ]);
+  });
+
+  it('die Einstellungen ändern nur Admins; ungültige Werte werden abgelehnt', async () => {
+    const settings = { ...DEFAULT_CHECK_SETTINGS, spendNoOrdersMinEur: '35,50' };
+    const denied = await putSettings(editor, settings);
+    expect(denied.status).toBe(403);
+    expect(denied.body.error.code).toBe('AUTOMATION_DEFAULTS_FORBIDDEN');
+    expect((await putSettings(viewer, settings)).status).toBe(403);
+
+    const saved = await putSettings(admin, settings);
+    expect(saved.status).toBe(200);
+    expect(saved.body.settings.spendNoOrdersMinEur).toBe('35.50');
+    expect((await checks(viewer)).body.settings.spendNoOrdersMinEur).toBe('35.50');
+    expect((await checks(foreign)).body.settings).toEqual(DEFAULT_CHECK_SETTINGS);
+
+    expect((await putSettings(admin, { ...settings, placementMinPercent: 0 })).status).toBe(400);
+    expect((await putSettings(admin, { ...settings, spendNoOrdersMinEur: '0' })).status).toBe(400);
+    expect((await putSettings(admin, { placementMinPercent: 50 })).status).toBe(400);
   });
 });
