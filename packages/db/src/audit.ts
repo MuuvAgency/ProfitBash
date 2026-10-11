@@ -53,6 +53,22 @@ export interface ListAuditEventsInput {
   limit: number;
 }
 
+const SECRET_KEY = /token|password|secret/i;
+
+/**
+ * Zweites Netz für die Anzeige: Aufrufer von `recordAuditEvent` schreiben keine Secrets ins `target`; rutscht
+ * doch eines hinein, verlässt es die DB hier nicht (Felder nach Namen, auch verschachtelt).
+ */
+function withoutSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutSecrets);
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !SECRET_KEY.test(key))
+      .map(([key, inner]) => [key, withoutSecrets(inner)]),
+  );
+}
+
 /** Bereich einer Aktion: der Teil vor dem ersten Punkt. */
 const auditArea = sql<string>`split_part(${auditEvents.action}, '.', 1)`;
 
@@ -98,6 +114,7 @@ export async function listAuditEvents(
     .limit(input.limit + 1);
   const events = rows.slice(0, input.limit).map(({ actorId, actorName, actorEmail, ...row }) => ({
     ...row,
+    target: withoutSecrets(row.target) as Record<string, unknown>,
     actor:
       actorId !== null && actorName !== null && actorEmail !== null
         ? { id: actorId, name: actorName, email: actorEmail }
