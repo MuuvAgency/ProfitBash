@@ -3,7 +3,7 @@ import MultiSelect from 'primevue/multiselect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExplorerRowsData, TimeSeriesData } from '../api/client';
 import { json, stubFetch, type RecordedRequest } from '../test/fetch-stub';
-import { meFixture } from '../test/fixtures';
+import { customerMeFixture, isOpenForCustomers, meFixture } from '../test/fixtures';
 import { cleanupMounted, mountWithApp } from '../test/mount';
 
 vi.mock('ag-charts-vue3', async () => {
@@ -750,6 +750,20 @@ describe('Gespeicherte Ansichten im Explorer (F8)', () => {
         state: { explorer: { level: 'campaign' } },
       }),
     );
+  });
+
+  it('Kunden-Login: nur freigegebene Anfragen, keine Ansichten, Glocke, Quick-Tools oder Suchbegriff-Analyse', async () => {
+    const { requests } = stubFetch({ ...routes(), 'GET /api/me': json(customerMeFixture()) });
+    const { wrapper } = await mountExplorer('/ads/explorer/campaigns');
+    await waitForRow('SP Waldkauz Nistkasten');
+    await flushPromises();
+    expect(requests.map((r) => r.path).filter((path) => !isOpenForCustomers(path))).toEqual([]);
+    expect(wrapper.find('[data-saved-views]').exists()).toBe(false);
+    expect(wrapper.find('[data-notification-bell]').exists()).toBe(false);
+    expect(wrapper.find('[data-quick-tools]').exists()).toBe(false);
+    expect(wrapper.find('a[href="/notifications"]').exists()).toBe(false);
+    expect(wrapper.find('a[href="/ads/explorer/search-term-analysis"]').exists()).toBe(false);
+    expect(wrapper.find('a[href="/ads/explorer/search-terms"]').exists()).toBe(true);
   });
 
   it('Viewer speichern nur persönlich', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteMeta } from 'vue-router';
-import { meFixture } from '../test/fixtures';
+import { customerMeFixture, meFixture } from '../test/fixtures';
 import { resolveGuard, safeRedirect, type GuardSession } from './guard';
 
 function target(meta: RouteMeta, fullPath = '/ads/budgets', query: Record<string, string> = {}) {
@@ -82,6 +82,12 @@ describe('resolveGuard', () => {
       name: 'forbidden',
     });
     expect(resolveGuard(target(meta), as(meFixture({ orgRole: 'admin' })))).toBe(true);
+  });
+
+  it('sperrt Seiten der Agentur für Kunden-Orgs', () => {
+    const meta = { requiresAuth: true, agencyOnly: true, feature: 'sp-explorer' as const };
+    expect(resolveGuard(target(meta), as(customerMeFixture()))).toEqual({ name: 'forbidden' });
+    expect(resolveGuard(target(meta), as(meFixture({ orgRole: 'viewer' })))).toBe(true);
   });
 
   it('sperrt Plattform-Seiten für Nicht-Superadmins', () => {

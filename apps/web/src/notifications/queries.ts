@@ -2,7 +2,7 @@ import type { NotificationKind } from '@profitbash/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onScopeDispose, type Ref } from 'vue';
 import { api } from '../api';
-import { useActiveOrgId } from '../stores/session';
+import { useActiveOrgId, useIsCustomerOrg } from '../stores/session';
 import { connectNotificationStream } from './live';
 
 /**
@@ -69,8 +69,11 @@ export function useMarkNotificationsRead() {
 /** Hält den Live-Kanal offen, solange die aufrufende Komponente lebt (App-Shell). */
 export function useNotificationStream() {
   const queryClient = useQueryClient();
+  const orgId = useActiveOrgId();
+  const customer = useIsCustomerOrg();
   const stop = connectNotificationStream({
-    orgId: useActiveOrgId(),
+    // Kunden-Orgs haben keine Benachrichtigungen (die API lehnt den Kanal ab).
+    orgId: computed(() => (customer.value ? null : orgId.value)),
     onChange: () => void queryClient.invalidateQueries({ queryKey: [KEY] }),
     EventSourceImpl: typeof EventSource === 'undefined' ? undefined : EventSource,
   });

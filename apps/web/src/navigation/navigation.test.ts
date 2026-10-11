@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { meFixture } from '../test/fixtures';
+import { customerMeFixture, meFixture } from '../test/fixtures';
 import { canAccess, homePath, NAVIGATION, visibleNavigation } from './navigation';
 
 const ids = (groups: ReturnType<typeof visibleNavigation>) =>
@@ -56,6 +56,16 @@ describe('visibleNavigation', () => {
     expect(groups.map((group) => group.id)).not.toContain('profit');
     expect(ids(groups)).toContain('explorer');
     expect(ids(groups)).not.toContain('budgets');
+  });
+});
+
+describe('Kunden-Org', () => {
+  it('zeigt nur gebuchte Einträge: keine Benachrichtigungen, keine Admin-Seiten', () => {
+    const me = customerMeFixture();
+    expect(ids(visibleNavigation(me))).toEqual(['dashboard', 'explorer']);
+    expect(canAccess('agency', me)).toBe(false);
+    expect(canAccess('agency', meFixture({ orgRole: 'viewer' }))).toBe(true);
+    expect(homePath(me)).toBe('/dashboard');
   });
 });
 

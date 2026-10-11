@@ -16,6 +16,8 @@ export interface MeFixtureOptions {
   features?: readonly FeatureKey[];
   /** `false`: Nutzer ohne Organisation. */
   withOrganization?: boolean;
+  /** Typ der aktiven Organisation; `client` = Kunden-Org (Phase 6). */
+  orgType?: 'internal' | 'client';
 }
 
 /** `/api/me`-Antwort für Tests. Standard: Org-Admin von Muuv mit allen Features. */
@@ -25,12 +27,13 @@ export function meFixture(options: MeFixtureOptions = {}): MeResponse {
     orgRole = 'admin',
     features = FEATURE_KEYS,
     withOrganization = true,
+    orgType = 'internal',
   } = options;
   const visible = new Set<string>(features);
   return {
     user: { id: 'user-1', email: 'dominik@muuv.test', name: 'Dominik', role: platformRole },
     organizations: withOrganization
-      ? [{ id: 'org-1', name: 'Muuv', slug: 'muuv', type: 'internal', role: orgRole }]
+      ? [{ id: 'org-1', name: 'Muuv', slug: 'muuv', type: orgType, role: orgRole }]
       : [],
     activeOrganizationId: withOrganization ? 'org-1' : null,
     features: Object.fromEntries(
@@ -45,6 +48,24 @@ export function meFixture(options: MeFixtureOptions = {}): MeResponse {
     ) as MeResponse['features'],
     preferences: { theme: 'system', locale: 'de-DE', density: 'comfortable' },
   };
+}
+
+/** Kunden-Login (`phase-6.md` F1): Kunden-Org, immer `viewer`, gebucht sind Dashboard und Explorer. */
+export const customerMeFixture = () =>
+  meFixture({ orgType: 'client', orgRole: 'viewer', features: ['dashboard', 'sp-explorer'] });
+
+/** Was die API einem Kunden-Login erlaubt (`CUSTOMER_ORG_PATHS` in `apps/api/src/middleware.ts`). */
+export function isOpenForCustomers(path: string): boolean {
+  return (
+    [
+      '/api/me',
+      '/api/settings',
+      '/api/ads/filter-options',
+      '/api/ads/dashboard',
+      '/api/ads/explorer/rows',
+      '/api/ads/timeseries',
+    ].includes(path) || path.startsWith('/api/settings/')
+  );
 }
 
 export const CONNECTION_ID = '0b9e1c7e-5a1d-4f3e-9c1a-2f6d8e4b7a01';
