@@ -1039,6 +1039,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audit-Log der aktiven Organisation, je Seite 50 Ereignisse (nur Admin) */
+        get: {
+            parameters: {
+                query?: {
+                    from?: string;
+                    to?: string;
+                    actorUserId?: string;
+                    area?: string;
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ereignisse, neueste zuerst. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuditEventList"];
+                    };
+                };
+                /** @description Ungültiger Filter. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit-events/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bereiche und Handelnde, die im Audit-Log der aktiven Organisation vorkommen (nur Admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Auswahl für die Filter. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuditEventFilters"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{id}/file-imports": {
         parameters: {
             query?: never;
@@ -7769,6 +7892,32 @@ export interface components {
             counters: {
                 [key: string]: number;
             };
+        };
+        AuditEventList: {
+            events: components["schemas"]["AuditEvent"][];
+            /** Format: uuid */
+            nextCursor: string | null;
+        };
+        AuditEvent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            action: string;
+            actor: components["schemas"]["AuditActor"];
+            target: {
+                [key: string]: unknown;
+            };
+        };
+        AuditActor: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            email: string;
+        } | null;
+        AuditEventFilters: {
+            areas: string[];
+            actors: components["schemas"]["AuditActor"][];
         };
         FileImport: {
             /** Format: uuid */

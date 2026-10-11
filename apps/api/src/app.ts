@@ -16,6 +16,7 @@ import { registerAutomationRoutes } from './routes/automations';
 import { registerGoalRoutes } from './routes/goals';
 import { registerBudgetRoutes } from './routes/budgets';
 import { registerHealthRoutes } from './routes/health';
+import { registerAuditEventRoutes } from './routes/audit-events';
 import { registerJobRunRoutes } from './routes/job-runs';
 import { registerMemberRoutes } from './routes/members';
 import { registerMeRoutes } from './routes/me';
@@ -104,6 +105,7 @@ export function createApp(options: CreateAppOptions) {
   registerConnectionRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerJobRunRoutes(app, deps);
+  registerAuditEventRoutes(app, deps);
   registerFileImportRoutes(app, deps);
   registerAnalyticsRoutes(app, deps);
   registerSavedViewRoutes(app, deps);
