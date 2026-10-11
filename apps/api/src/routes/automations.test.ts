@@ -398,9 +398,15 @@ describe('Läufe und Vorschläge (/api/ads/automations/runs, /proposals)', () =>
   it('zeigt fremden Organisationen und bei ausgeblendetem Profil nichts; ohne Anmeldung 401', async () => {
     expect((await call<AutomationRunsResponse>('GET', '/runs', foreign)).body.runs).toEqual([]);
     expect((await proposals(foreign)).body).toEqual({ proposals: [], total: 0 });
+    const { id } = (await proposals(editor)).body.proposals[0]!;
     await hide(true);
     expect((await call<AutomationRunsResponse>('GET', '/runs', editor)).body.runs).toEqual([]);
     expect((await proposals(editor)).body.total).toBe(0);
+    const datasets = await call<AutomationDatasetsResponse>('GET', '/datasets', editor);
+    expect(datasets.body.profiles.map((x) => x.profileId)).not.toContain(f.profile);
+    for (const action of ['stage', 'dismiss'] as const) {
+      expect((await act(action, editor, [id])).body).toEqual({ changed: 0, skipped: 1 });
+    }
     expect((await call('GET', '/runs')).status).toBe(401);
     expect((await proposals()).status).toBe(401);
   });
@@ -485,8 +491,10 @@ describe('Prüfungen (/api/ads/automations/checks)', () => {
     expect((await checks(viewer, 'acknowledged')).body.findings).toEqual([]);
     expect((await checks(viewer, 'alle')).status).toBe(400);
     expect((await checks(foreign)).body.findings).toEqual([]);
+    const { id } = (await checks(editor)).body.findings[0]!;
     await hide(true);
     expect((await checks(editor)).body.total).toBe(0);
+    expect((await acknowledge(editor, [id])).body).toEqual({ changed: 0, skipped: 1 });
     expect((await checks()).status).toBe(401);
   });
 
@@ -601,8 +609,12 @@ describe('Graduation- und Preset-Vorschläge (/api/ads/automations/structure-pro
     expect((await list(viewer, 'dismissed')).body.proposals).toEqual([]);
     expect((await list(viewer, 'alle')).status).toBe(400);
     expect((await list(foreign)).body.proposals).toEqual([]);
+    const { id } = (await list(editor)).body.proposals[0]!;
     await hide(true);
     expect((await list(editor)).body.total).toBe(0);
+    for (const action of ['accept', 'dismiss'] as const) {
+      expect((await act(action, editor, [id])).body).toEqual({ changed: 0, skipped: 1 });
+    }
     expect((await list()).status).toBe(401);
   });
 
