@@ -83,7 +83,9 @@ export async function listAuditEvents(
         inOrg,
         input.from && gte(auditEvents.createdAt, input.from),
         input.to && lt(auditEvents.createdAt, input.to),
-        input.actorUserId && eq(auditEvents.actorUserId, input.actorUserId),
+        input.actorUserId !== undefined
+          ? eq(auditEvents.actorUserId, input.actorUserId)
+          : undefined,
         input.area !== undefined ? eq(auditArea, input.area) : undefined,
         // Der Cursor wird in der DB aufgelöst (volle Zeitauflösung) und gilt nur in derselben Organisation;
         // ein unbekannter Cursor liefert nichts.
@@ -94,15 +96,13 @@ export async function listAuditEvents(
     )
     .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id))
     .limit(input.limit + 1);
-  const events = rows
-    .slice(0, input.limit)
-    .map(({ actorId, actorName, actorEmail, ...row }) => ({
-      ...row,
-      actor:
-        actorId !== null && actorName !== null && actorEmail !== null
-          ? { id: actorId, name: actorName, email: actorEmail }
-          : null,
-    }));
+  const events = rows.slice(0, input.limit).map(({ actorId, actorName, actorEmail, ...row }) => ({
+    ...row,
+    actor:
+      actorId !== null && actorName !== null && actorEmail !== null
+        ? { id: actorId, name: actorName, email: actorEmail }
+        : null,
+  }));
   return { events, nextCursor: rows.length > input.limit ? (events.at(-1)?.id ?? null) : null };
 }
 
