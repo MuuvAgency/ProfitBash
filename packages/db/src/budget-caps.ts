@@ -1,4 +1,9 @@
-import { computePacing, monthInTimeZone, type Pacing, type PacingCampaign } from '@profitbash/engine';
+import {
+  computePacing,
+  monthInTimeZone,
+  type Pacing,
+  type PacingCampaign,
+} from '@profitbash/engine';
 import {
   compareDecimal,
   MAX_BUDGET_CAPS_PER_PROFILE,

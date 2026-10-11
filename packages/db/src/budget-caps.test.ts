@@ -242,7 +242,10 @@ describe('saveBudgetCap und getBudgetsOverview', () => {
 
   it('ändert einen Cap (Audit mit vorher/nachher), ohne Änderung kein Audit', async () => {
     const created = (await cap())!;
-    const updated = (await cap({ id: created.id, amount: '1200', warnPercents: [90] }, as(f.emil)))!;
+    const updated = (await cap(
+      { id: created.id, amount: '1200', warnPercents: [90] },
+      as(f.emil),
+    ))!;
     expect(updated.id).toBe(created.id);
     await cap({ id: created.id, amount: '1200', warnPercents: [90] });
     expect(await capsOf()).toMatchObject([{ amount: '1200.00', warnPercents: [90] }]);

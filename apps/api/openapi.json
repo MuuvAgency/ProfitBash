@@ -10796,6 +10796,388 @@
         ],
         "additionalProperties": false
       },
+      "BudgetsOverview": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "accountName": {
+                  "type": "string"
+                },
+                "countryCode": {
+                  "type": "string"
+                },
+                "currencyCode": {
+                  "type": "string"
+                },
+                "month": {
+                  "type": "string"
+                },
+                "dataState": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "periodStart": {
+                      "type": "string"
+                    },
+                    "periodEnd": {
+                      "type": "string"
+                    },
+                    "importedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "periodStart",
+                    "periodEnd",
+                    "importedAt"
+                  ]
+                },
+                "portfolios": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ]
+                  }
+                },
+                "caps": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BudgetCap"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "accountName",
+                "countryCode",
+                "currencyCode",
+                "month",
+                "dataState",
+                "portfolios",
+                "caps"
+              ]
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "profiles",
+          "tags"
+        ]
+      },
+      "BudgetCap": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "profile",
+                  "portfolios",
+                  "tags"
+                ]
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "required": [
+              "type",
+              "ids"
+            ]
+          },
+          "scopeLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "amount": {
+            "type": "string"
+          },
+          "monthAmounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "effectiveAmount": {
+            "type": "string"
+          },
+          "warnPercents": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "pacing": {
+            "$ref": "#/components/schemas/Pacing"
+          },
+          "campaignCount": {
+            "type": "integer"
+          },
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dailyBudget": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actual": {
+                  "type": "string"
+                },
+                "exact": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "state",
+                "dailyBudget",
+                "actual",
+                "exact"
+              ]
+            }
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "scope",
+          "scopeLabels",
+          "amount",
+          "monthAmounts",
+          "effectiveAmount",
+          "warnPercents",
+          "pacing",
+          "campaignCount",
+          "campaigns",
+          "updatedAt"
+        ]
+      },
+      "Pacing": {
+        "type": "object",
+        "properties": {
+          "daysInMonth": {
+            "type": "integer"
+          },
+          "elapsedDays": {
+            "type": "integer"
+          },
+          "dataThrough": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exact": {
+            "type": "boolean"
+          },
+          "actual": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "low": {
+                "type": "string"
+              },
+              "high": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "value",
+              "low",
+              "high"
+            ]
+          },
+          "planned": {
+            "type": "string"
+          },
+          "forecast": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "low": {
+                "type": "string"
+              },
+              "high": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "value",
+              "low",
+              "high"
+            ]
+          },
+          "warnLevel": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "forecastOver": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "daysInMonth",
+          "elapsedDays",
+          "dataThrough",
+          "exact",
+          "actual",
+          "planned",
+          "forecast",
+          "warnLevel",
+          "forecastOver"
+        ]
+      },
+      "BudgetCapInput": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "profile",
+                  "portfolios",
+                  "tags"
+                ]
+              },
+              "ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "maxItems": 50
+              }
+            },
+            "required": [
+              "type",
+              "ids"
+            ],
+            "additionalProperties": false
+          },
+          "amount": {
+            "type": "string"
+          },
+          "monthAmounts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {}
+          },
+          "warnPercents": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxItems": 3,
+            "default": [
+              80,
+              100
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "scope",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
       "AutomationSettings": {
         "type": "object",
         "properties": {
@@ -17474,6 +17856,287 @@
           },
           "403": {
             "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/budgets": {
+      "get": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Sichtbare Profile mit ihren Caps und dem Pacing im laufenden Monat",
+        "responses": {
+          "200": {
+            "description": "Übersicht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetsOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/budgets/caps": {
+      "post": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Cap anlegen (Recht „write“)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetCapInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeichert.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe oder Umfang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cap oder Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Zu viele Caps im Profil.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ads/budgets/caps/{id}": {
+      "put": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Cap ändern (Recht „write“); das Profil eines Caps bleibt",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetCapInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gespeichert.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe oder Umfang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cap oder Profil nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Budgets"
+        ],
+        "summary": "Cap löschen (Recht „write“)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Gelöscht."
+          },
+          "400": {
+            "description": "Ungültige Eingabe oder Umfang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cap oder Profil nicht gefunden.",
             "content": {
               "application/json": {
                 "schema": {
