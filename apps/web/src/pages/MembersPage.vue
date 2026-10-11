@@ -220,6 +220,7 @@ function askRemove(member: Member) {
         {{ t('members.empty') }}
       </p>
       <template v-else>
+        <p class="text-body-sm text-ink-secondary">{{ t('members.grants.hint') }}</p>
         <div
           class="hidden grid-cols-[minmax(0,2fr)_11rem_minmax(0,1.4fr)_auto] gap-space-md border-b border-line px-space-sm pb-space-sm text-label-eyebrow uppercase text-ink-tertiary md:grid"
           aria-hidden="true"
@@ -229,7 +230,6 @@ function askRemove(member: Member) {
           <span>{{ t('members.column.status') }}</span>
           <span class="sr-only">{{ t('members.column.actions') }}</span>
         </div>
-        <p class="text-body-sm text-ink-secondary">{{ t('members.grants.hint') }}</p>
         <ul :aria-label="t('nav.members')" class="flex flex-col">
           <li
             v-for="member in members.data.value"
