@@ -28,6 +28,14 @@ export const memberCreateSchema = z
 
 export const memberPatchSchema = z.object({ role: orgRole }).meta({ id: 'MemberPatch' });
 
+/** So viele Clients lassen sich einem Mitglied höchstens freigeben. */
+export const MAX_MEMBER_CLIENT_GRANTS = 200;
+
+/** Freigaben eines Mitglieds (6.2): leer = alle Clients. */
+export const memberClientGrantsSchema = z
+  .object({ clientIds: z.array(z.uuid()).max(MAX_MEMBER_CLIENT_GRANTS) })
+  .meta({ id: 'MemberClientGrants' });
+
 /** `active`: Passwort gesetzt; `pending`: gültiger Link offen; `expired`: Link abgelaufen oder keiner offen. */
 export const MEMBER_STATUSES = ['active', 'pending', 'expired'] as const;
 export type MemberStatus = (typeof MEMBER_STATUSES)[number];
@@ -45,6 +53,8 @@ export const memberSchema = z
     linkExpiresAt: z.union([z.iso.datetime(), z.null()]),
     /** Angemeldeter Admin selbst. */
     isSelf: z.boolean(),
+    /** Clients, auf die das Mitglied eingeschränkt ist; leer = alle. Bei Admins ohne Wirkung. */
+    clientIds: z.array(z.uuid()),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: 'Member' });

@@ -4127,6 +4127,93 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/members/{id}/client-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Freigaben ersetzen: Clients, auf die das Mitglied eingeschränkt ist; leer = alle (nur Admin) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["MemberClientGrants"];
+                };
+            };
+            responses: {
+                /** @description Mitglied mit den neuen Freigaben. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Member"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Mitglied nicht gefunden (auch: andere Organisation). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description E-Mail vergeben, letzter Admin, eigenes Konto oder Mitglied einer anderen Organisation. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/members/{id}/password-link": {
         parameters: {
             query?: never;
@@ -9163,6 +9250,7 @@ export interface components {
             status: "active" | "pending" | "expired";
             linkExpiresAt: string | null;
             isSelf: boolean;
+            clientIds: string[];
             /** Format: date-time */
             createdAt: string;
         };
@@ -9185,6 +9273,9 @@ export interface components {
         MemberPatch: {
             /** @enum {string} */
             role: "admin" | "editor" | "viewer";
+        };
+        MemberClientGrants: {
+            clientIds: string[];
         };
         PasswordLinkInfo: {
             email: string;

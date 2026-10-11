@@ -250,4 +250,58 @@ describe('/api/members', () => {
     ).toBe(410);
     expect((await call('POST', '/password-links/inspect', '', { token: 'kurz' })).status).toBe(400);
   });
+
+  it('Freigaben je Client: nur Admins setzen sie; das Mitglied sieht danach nur diese Clients (6.2)', async () => {
+    const { db } = ctx.testDb;
+    const { clients, amazonAdsProfiles, organizations } = schema;
+    const [nord, sued] = await db
+      .insert(clients)
+      .values([
+        { organizationId: orgId, name: 'Nordwind', slug: 'nordwind' },
+        { organizationId: orgId, name: 'Südhang', slug: 'suedhang' },
+      ])
+      .returning({ id: clients.id });
+    await db.insert(amazonAdsProfiles).values(
+      [nord!.id, sued!.id].map((clientId, n) => ({
+        organizationId: orgId,
+        clientId,
+        accountName: `Konto ${n}`,
+        countryCode: 'DE',
+        currencyCode: 'EUR',
+        timezone: 'Europe/Berlin',
+        accountType: 'seller',
+      })),
+    );
+    const [otherOrg] = await db
+      .insert(organizations)
+      .values({ name: 'Fremd', slug: 'fremd-grants', type: 'internal', createdAt: new Date() })
+      .returning({ id: organizations.id });
+    const [theirs] = await db
+      .insert(clients)
+      .values({ organizationId: otherOrg!.id, name: 'Fremd', slug: 'fremd' })
+      .returning({ id: clients.id });
+
+    const list = await call<{ members: Member[] }>('GET', '/members', admin);
+    const target = list.body.members.find((m) => m.email === 'editor@muuv.test')!;
+    expect(target.clientIds).toEqual([]);
+    const path = `/members/${target.id}/client-grants`;
+    const visibleClients = async () =>
+      (
+        await call<{ clients: { name: string }[] }>('POST', '/ads/filter-options', editor, {})
+      ).body.clients.map((c) => c.name);
+    expect(await visibleClients()).toEqual(['Nordwind', 'Südhang']);
+
+    const forbidden = await call<ErrorResponse>('PUT', path, editor, { clientIds: [nord!.id] });
+    expect(forbidden.status).toBe(403);
+    const unknown = await call<ErrorResponse>('PUT', path, admin, { clientIds: [theirs!.id] });
+    expect([unknown.status, unknown.body.error.code]).toEqual([409, 'MEMBER_UNKNOWN_CLIENT']);
+    expect((await call('PUT', path, admin, { clientIds: ['nord'] })).status).toBe(400);
+
+    const granted = await call<Member>('PUT', path, admin, { clientIds: [nord!.id] });
+    expect([granted.status, granted.body.clientIds]).toEqual([200, [nord!.id]]);
+    expect(await visibleClients()).toEqual(['Nordwind']);
+
+    expect((await call<Member>('PUT', path, admin, { clientIds: [] })).body.clientIds).toEqual([]);
+    expect(await visibleClients()).toEqual(['Nordwind', 'Südhang']);
+  });
 });
