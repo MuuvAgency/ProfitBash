@@ -26,6 +26,11 @@ export const memberCreateSchema = z
   })
   .meta({ id: 'MemberCreate' });
 
+/** Kunden-Nutzer am Client (6.3c): immer `viewer`, deshalb ohne Rolle. */
+export const clientAccessCreateSchema = memberCreateSchema
+  .omit({ role: true })
+  .meta({ id: 'ClientAccessCreate' });
+
 export const memberPatchSchema = z.object({ role: orgRole }).meta({ id: 'MemberPatch' });
 
 /** So viele Clients lassen sich einem Mitglied höchstens freigeben. */

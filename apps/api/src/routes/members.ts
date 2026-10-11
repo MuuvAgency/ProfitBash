@@ -1,6 +1,7 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 import {
   addMember,
+  clientAccessScope,
   findUserByEmail,
   inspectPasswordLink,
   listMembers,
@@ -13,6 +14,7 @@ import {
   type MemberRecord,
 } from '@profitbash/db';
 import {
+  clientAccessCreateSchema,
   errorResponseSchema,
   idParamSchema,
   memberCreateSchema,
@@ -29,6 +31,7 @@ import {
   type Member,
 } from '@profitbash/shared';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { z } from 'zod';
 import type { AppDeps, AppEnv } from '../context';
 import { ApiError } from '../errors';
 import { orgAdminOnly } from '../middleware';
@@ -137,6 +140,67 @@ const linkRoute = createRoute({
   },
 });
 
+// Kundenzugang am Client (`phase-6.md` 6.3c, F3): dieselbe Verwaltung für die Kunden-Org des Clients.
+const clientAccessTags = ['Kundenzugang'];
+const clientNotFound = { 404: error('Client oder Kunden-Nutzer nicht gefunden.') };
+const clientAccessMemberParams = z.object({ id: z.uuid(), memberId: z.uuid() });
+
+const clientAccessListRoute = createRoute({
+  method: 'get',
+  path: '/clients/{id}/access',
+  tags: clientAccessTags,
+  summary: 'Kunden-Nutzer eines Clients (nur Admin der Agentur)',
+  request: { params: idParamSchema },
+  responses: {
+    200: { description: 'Nach Name; leer ohne Kundenzugang.', content: json(memberListSchema) },
+    ...adminErrors,
+    ...clientNotFound,
+  },
+});
+
+const clientAccessCreateRoute = createRoute({
+  method: 'post',
+  path: '/clients/{id}/access',
+  tags: clientAccessTags,
+  summary:
+    'Kunden-Nutzer anlegen (nur lesend, sieht nur diesen Client); die Kunden-Org entsteht beim ersten',
+  request: {
+    params: idParamSchema,
+    body: { required: true, content: json(clientAccessCreateSchema) },
+  },
+  responses: {
+    201: {
+      description: 'Angelegt; der Link ist nur jetzt sichtbar.',
+      content: json(memberWithLinkSchema),
+    },
+    ...adminErrors,
+    ...clientNotFound,
+    409: error('E-Mail gehört schon zu einem Mitglied (Agentur oder anderer Kunde).'),
+  },
+});
+
+const clientAccessLinkRoute = createRoute({
+  method: 'post',
+  path: '/clients/{id}/access/{memberId}/password-link',
+  tags: clientAccessTags,
+  summary: 'Link zum Setzen des Passworts für einen Kunden-Nutzer neu erzeugen',
+  request: { params: clientAccessMemberParams },
+  responses: {
+    201: { description: 'Neuer Link (nur jetzt sichtbar).', content: json(passwordLinkSchema) },
+    ...adminErrors,
+    ...clientNotFound,
+  },
+});
+
+const clientAccessDeleteRoute = createRoute({
+  method: 'delete',
+  path: '/clients/{id}/access/{memberId}',
+  tags: clientAccessTags,
+  summary: 'Kundenzugang entziehen: Mitgliedschaft und Sessions enden, Links verfallen',
+  request: { params: clientAccessMemberParams },
+  responses: { 204: { description: 'Entzogen.' }, ...adminErrors, ...clientNotFound },
+});
+
 const invalidLink = { 410: error('Link unbekannt, benutzt, ungültig gemacht oder abgelaufen.') };
 
 const inspectRoute = createRoute({
@@ -211,6 +275,78 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
   };
   const linkUrl = (token: string) => `${new URL(SET_PASSWORD_PATH, deps.appUrl).href}#${token}`;
 
+  const emailTaken = () =>
+    new ApiError(409, 'MEMBER_EMAIL_TAKEN', 'Diese E-Mail-Adresse gehört schon zu einem Mitglied.');
+
+  /**
+   * Nutzer zur E-Mail, neu angelegt, falls es ihn nicht gibt; wer schon irgendwo Mitglied ist → 409. Ohne Passwort
+   * (kein Login möglich, bis der Link benutzt ist) und ohne Session: better-auth prüft dann keine
+   * Superadmin-Rechte; die Admin-Prüfung für diese Organisation macht `orgAdminOnly`.
+   */
+  async function findOrCreateUser(email: string, name: string): Promise<string> {
+    const existing = await findUserByEmail(db, email);
+    if (existing?.hasMemberships) throw emailTaken();
+    if (existing) return existing.id;
+    try {
+      return (await auth.api.createUser({ body: { email, name, role: 'user' } })).user.id;
+    } catch (err) {
+      // Gleichzeitig mit derselben E-Mail angelegt: wie vergeben behandeln.
+      if (await findUserByEmail(db, email)) throw emailTaken();
+      throw err;
+    }
+  }
+
+  /** Verwaltung der Kunden-Org des Clients; ohne Kunden-Org `null` (bzw. mit `create` neu angelegt). */
+  const customerScope = (
+    c: { get(key: 'auth'): AppEnv['Variables']['auth'] },
+    clientId: string,
+    create = false,
+  ) => mapErrors(() => clientAccessScope(db, { ...adminOf(c), clientId, create }));
+  const clientAccessNotFound = () =>
+    new ApiError(404, 'MEMBER_NOT_FOUND', 'Kunden-Nutzer nicht gefunden.');
+
+  app.openapi({ ...clientAccessListRoute, middleware }, async (c) => {
+    const scope = await customerScope(c, c.req.valid('param').id);
+    const records = scope ? await listMembers(db, { ...scope, now: new Date() }) : [];
+    return c.json({ members: records.map(toMember) }, 200);
+  });
+
+  app.openapi({ ...clientAccessCreateRoute, middleware }, async (c) => {
+    const { email, name } = c.req.valid('json');
+    // Erst den Client prüfen: Für einen fremden Client entsteht kein Nutzer.
+    await customerScope(c, c.req.valid('param').id);
+    const userId = await findOrCreateUser(email, name);
+    const scope = (await customerScope(c, c.req.valid('param').id, true))!;
+    const { member, token, expiresAt } = await mapErrors(() =>
+      addMember(db, { ...scope, userId, role: 'viewer', now: new Date() }),
+    );
+    return c.json(
+      {
+        member: toMember(member),
+        link: { url: linkUrl(token), expiresAt: expiresAt.toISOString() },
+      },
+      201,
+    );
+  });
+
+  app.openapi({ ...clientAccessLinkRoute, middleware }, async (c) => {
+    const { id, memberId } = c.req.valid('param');
+    const scope = await customerScope(c, id);
+    if (!scope) throw clientAccessNotFound();
+    const { token, expiresAt } = await mapErrors(() =>
+      regeneratePasswordLink(db, { ...scope, memberId, now: new Date() }),
+    );
+    return c.json({ url: linkUrl(token), expiresAt: expiresAt.toISOString() }, 201);
+  });
+
+  app.openapi({ ...clientAccessDeleteRoute, middleware }, async (c) => {
+    const { id, memberId } = c.req.valid('param');
+    const scope = await customerScope(c, id);
+    if (!scope) throw clientAccessNotFound();
+    await mapErrors(() => removeMember(db, { ...scope, memberId }));
+    return c.body(null, 204);
+  });
+
   app.openapi({ ...listRoute, middleware }, async (c) => {
     const records = await listMembers(db, { ...adminOf(c), now: new Date() });
     return c.json({ members: records.map(toMember) }, 200);
@@ -218,33 +354,7 @@ export function registerMemberRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
 
   app.openapi({ ...createMemberRoute, middleware }, async (c) => {
     const { email, name, role } = c.req.valid('json');
-    const existing = await findUserByEmail(db, email);
-    if (existing?.hasMemberships) {
-      throw new ApiError(
-        409,
-        'MEMBER_EMAIL_TAKEN',
-        'Diese E-Mail-Adresse gehört schon zu einem Mitglied.',
-      );
-    }
-    // Ohne Passwort (kein Login möglich, bis der Link benutzt ist) und ohne Session: better-auth prüft dann keine
-    // Superadmin-Rechte; die Admin-Prüfung für diese Organisation macht `orgAdminOnly`.
-    let userId = existing?.id;
-    if (!userId) {
-      try {
-        userId = (await auth.api.createUser({ body: { email, name, role: 'user' } })).user.id;
-      } catch (err) {
-        // Gleichzeitig mit derselben E-Mail angelegt: wie vergeben behandeln.
-        if (await findUserByEmail(db, email)) {
-          throw new ApiError(
-            409,
-            'MEMBER_EMAIL_TAKEN',
-            'Diese E-Mail-Adresse gehört schon zu einem Mitglied.',
-          );
-        }
-        throw err;
-      }
-    }
-    const newUserId = userId;
+    const newUserId = await findOrCreateUser(email, name);
     const { member, token, expiresAt } = await mapErrors(() =>
       addMember(db, { ...adminOf(c), userId: newUserId, role, now: new Date() }),
     );
