@@ -16,10 +16,10 @@ const noUiState = { 'GET /api/settings/ui-state/shell/sidebar': json({ value: nu
 describe('AppShell', () => {
   it('zeigt die Sidebar mit den sichtbaren Einträgen und die Seite', async () => {
     stubFetch({ 'GET /api/me': json(meFixture({ orgRole: 'viewer' })), ...noUiState });
-    const { wrapper } = await mountWithApp(undefined, { path: '/ads/budgets' });
+    const { wrapper } = await mountWithApp(undefined, { path: '/profit/pnl' });
     await vi.waitFor(() => expect(wrapper.find('h1').exists()).toBe(true));
-    expect(wrapper.get('h1').text()).toBe('Budgets');
-    expect(wrapper.text()).toContain('Kommt in Phase 5');
+    expect(wrapper.get('h1').text()).toBe('Profitabilität (P&L)');
+    expect(wrapper.text()).toContain('Kommt in Phase 7');
     expect(wrapper.find('a[href="/admin/connections"]').exists()).toBe(false);
   });
 
@@ -32,7 +32,7 @@ describe('AppShell', () => {
         check: { violations: [], largeChanges: [], tooMany: null },
       }),
     });
-    const { wrapper } = await mountWithApp(undefined, { path: '/ads/budgets' });
+    const { wrapper } = await mountWithApp(undefined, { path: '/profit/pnl' });
     await vi.waitFor(() =>
       expect(wrapper.find('aside a[href="/ads/changes"] [data-nav-badge]').exists()).toBe(true),
     );
@@ -44,17 +44,17 @@ describe('AppShell', () => {
 
   it('zeigt keinen Zähler bei leerem Warenkorb, ohne das Feature und wenn die Abfrage scheitert', async () => {
     const { requests } = stubFetch({
-      'GET /api/me': json(meFixture({ features: ['budgets'] })),
+      'GET /api/me': json(meFixture({ features: ['profit'] })),
       ...noUiState,
     });
-    const { wrapper } = await mountWithApp(undefined, { path: '/ads/budgets' });
+    const { wrapper } = await mountWithApp(undefined, { path: '/profit/pnl' });
     await vi.waitFor(() => expect(wrapper.find('h1').exists()).toBe(true));
     await flushPromises();
     expect(requests.some((request) => request.path === '/api/ads/changes/pending')).toBe(false);
 
     cleanupMounted();
     stubFetch({ 'GET /api/me': json(meFixture()), ...noUiState });
-    const second = await mountWithApp(undefined, { path: '/ads/budgets' });
+    const second = await mountWithApp(undefined, { path: '/profit/pnl' });
     await vi.waitFor(() => expect(second.wrapper.find('h1').exists()).toBe(true));
     await flushPromises();
     expect(second.wrapper.find('[data-nav-badge]').exists()).toBe(false);
