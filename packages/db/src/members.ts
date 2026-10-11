@@ -3,7 +3,16 @@ import { and, asc, count, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
-import { accounts, memberPasswordLinks, members, savedViews, sessions, users } from './schema';
+import {
+  accounts,
+  clients,
+  memberClientGrants,
+  memberPasswordLinks,
+  members,
+  savedViews,
+  sessions,
+  users,
+} from './schema';
 
 /**
  * Mitgliederverwaltung der Eigentümer-Org (`phase-2.md` F9, 2.10; ADR 002 „Verwaltung der Eigentümer-Org“): Die Routen
@@ -13,7 +22,13 @@ import { accounts, memberPasswordLinks, members, savedViews, sessions, users } f
  */
 
 export type MemberErrorCode =
-  'NOT_FOUND' | 'LAST_ADMIN' | 'SELF' | 'EMAIL_TAKEN' | 'OTHER_ORGANIZATION' | 'PROTECTED';
+  | 'NOT_FOUND'
+  | 'LAST_ADMIN'
+  | 'SELF'
+  | 'EMAIL_TAKEN'
+  | 'OTHER_ORGANIZATION'
+  | 'PROTECTED'
+  | 'UNKNOWN_CLIENT';
 
 export class MemberError extends Error {
   constructor(
@@ -34,6 +49,8 @@ export interface MemberRecord {
   status: MemberStatus;
   linkExpiresAt: Date | null;
   isSelf: boolean;
+  /** Freigaben (6.2): Clients, auf die das Mitglied eingeschränkt ist; leer = alle. Bei Admins ohne Wirkung. */
+  clientIds: string[];
   createdAt: Date;
 }
 
@@ -89,6 +106,10 @@ async function loadMembers(
           and ${memberPasswordLinks.usedAt} is null
           and ${memberPasswordLinks.revokedAt} is null
           and ${memberPasswordLinks.expiresAt} > ${input.now.toISOString()}::timestamptz)`,
+      clientIds: sql<string[]>`coalesce((
+        select array_agg(${memberClientGrants.clientId}::text order by ${memberClientGrants.clientId})
+        from ${memberClientGrants}
+        where ${memberClientGrants.memberId} = ${members.id}), '{}')`,
     })
     .from(members)
     .innerJoin(users, eq(users.id, members.userId))
@@ -111,6 +132,7 @@ async function loadMembers(
       status: linkExpiresAt ? 'pending' : row.hasPassword ? 'active' : 'expired',
       linkExpiresAt,
       isSelf: row.userId === input.actorUserId,
+      clientIds: row.clientIds,
       createdAt: row.createdAt,
     };
   });
@@ -270,6 +292,57 @@ export async function updateMemberRole(
           previousRole: member.role,
           role: input.role,
         },
+      });
+    }
+    const [record] = await loadMembers(tx, input);
+    return record!;
+  });
+}
+
+/**
+ * Freigaben eines Mitglieds ersetzen (6.2): `clientIds` leer = alle Clients. Nur Clients der Organisation
+ * (`UNKNOWN_CLIENT`). Audit `member.grants_update` nur bei einer Änderung.
+ */
+export async function setMemberClientGrants(
+  db: Db,
+  input: MemberAdminInput & { memberId: string; clientIds: string[]; now: Date },
+): Promise<MemberRecord> {
+  return db.transaction(async (tx) => {
+    const member = await lockMember(tx, input, input.memberId);
+    const after = [...new Set(input.clientIds)].sort();
+    if (after.length > 0) {
+      const known = await tx
+        .select({ id: clients.id })
+        .from(clients)
+        .where(and(eq(clients.organizationId, input.orgId), inArray(clients.id, after)));
+      if (known.length !== after.length) {
+        throw new MemberError('UNKNOWN_CLIENT', 'Ein Client gehört nicht zur Organisation.');
+      }
+    }
+    const before = (
+      await tx
+        .select({ clientId: memberClientGrants.clientId })
+        .from(memberClientGrants)
+        .where(eq(memberClientGrants.memberId, member.id))
+    )
+      .map((row) => row.clientId)
+      .sort();
+    if (before.join() !== after.join()) {
+      await tx.delete(memberClientGrants).where(eq(memberClientGrants.memberId, member.id));
+      if (after.length > 0) {
+        await tx.insert(memberClientGrants).values(
+          after.map((clientId) => ({
+            organizationId: input.orgId,
+            memberId: member.id,
+            clientId,
+          })),
+        );
+      }
+      await recordAuditEvent(tx, {
+        organizationId: input.orgId,
+        actorUserId: input.actorUserId,
+        action: 'member.grants_update',
+        target: { type: 'member', id: member.id, userId: member.userId, before, after },
       });
     }
     const [record] = await loadMembers(tx, input);
