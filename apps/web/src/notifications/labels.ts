@@ -49,7 +49,7 @@ export function notificationTexts(
       ? num('failed')
       : kind === 'submission_finished'
         ? num('applied')
-        : kind === 'automation_proposals'
+        : kind === 'automation_proposals' || kind === 'automation_findings'
           ? num('count')
           : num('days');
   return { title: t(`${key}.title`), text: t(`${key}.text`, named, plural) };
