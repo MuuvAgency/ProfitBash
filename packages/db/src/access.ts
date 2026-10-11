@@ -1,7 +1,14 @@
 import { isOrgRole, type OrgRole } from '@profitbash/shared';
-import { and, asc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
-import { amazonAdsProfiles, clients, members, orgEntitlements, organizations } from './schema';
+import {
+  amazonAdsProfiles,
+  clients,
+  memberClientGrants,
+  members,
+  orgEntitlements,
+  organizations,
+} from './schema';
 
 /**
  * Zentraler Access-Layer. ALLE Profil-Abfragen laufen hierüber (siehe CLAUDE.md).
@@ -9,7 +16,9 @@ import { amazonAdsProfiles, clients, members, orgEntitlements, organizations } f
  * Regel Phase 0: Ein Mitglied sieht alle Profile seiner Organisation, die Amazon noch liefert
  * (`removed_at IS NULL`). Ausgeblendete Profile nur mit `includeHidden`, entfernte nur mit
  * `includeRemoved`, beides nur für Admins (Verwaltung unter Admin → Clients & Connections).
- * Profil-Freigaben pro Mitglied (Phase 6) werden hier ergänzt, ohne die Signaturen zu ändern.
+ *
+ * Freigaben (Phase 6, 6.2): Ein Mitglied mit Einträgen in `member_client_grants` sieht nur Profile dieser Clients
+ * (also auch keine ohne Client), eines ohne Einträge alle. Admins sehen immer alle.
  */
 
 export class AccessDeniedError extends Error {
@@ -28,15 +37,45 @@ export interface ProfileVisibilityInput {
   includeRemoved?: boolean;
 }
 
-/** Rolle des Nutzers in der Organisation oder `null`, wenn er kein Mitglied ist. */
-export async function getOrgRole(db: Db, userId: string, orgId: string): Promise<OrgRole | null> {
+async function getMembership(
+  db: Db,
+  userId: string,
+  orgId: string,
+): Promise<{ id: string; role: OrgRole } | null> {
   const [membership] = await db
-    .select({ role: members.role })
+    .select({ id: members.id, role: members.role })
     .from(members)
     .where(and(eq(members.userId, userId), eq(members.organizationId, orgId)))
     .limit(1);
-  if (!membership) return null;
-  return isOrgRole(membership.role) ? membership.role : null;
+  if (!membership || !isOrgRole(membership.role)) return null;
+  return { id: membership.id, role: membership.role };
+}
+
+/** Rolle des Nutzers in der Organisation oder `null`, wenn er kein Mitglied ist. */
+export async function getOrgRole(db: Db, userId: string, orgId: string): Promise<OrgRole | null> {
+  return (await getMembership(db, userId, orgId))?.role ?? null;
+}
+
+/** Clients, auf die das Mitglied eingeschränkt ist (Unterabfrage). */
+const grantedClientIds = (db: Db, memberId: string) =>
+  db
+    .select({ clientId: memberClientGrants.clientId })
+    .from(memberClientGrants)
+    .where(eq(memberClientGrants.memberId, memberId));
+
+/**
+ * Clients, die der Nutzer sehen darf: `null` = alle der Organisation (Admin oder keine Freigaben), sonst die
+ * freigegebenen. Kein Mitglied: leere Liste. Für Client-Daten ohne Profil (Presets, Regeln je Client).
+ */
+export async function visibleClientIds(
+  db: Db,
+  input: { userId: string; orgId: string },
+): Promise<string[] | null> {
+  const membership = await getMembership(db, input.userId, input.orgId);
+  if (membership === null) return [];
+  if (membership.role === 'admin') return null;
+  const rows = await grantedClientIds(db, membership.id);
+  return rows.length === 0 ? null : rows.map((row) => row.clientId);
 }
 
 export interface Membership {
@@ -82,8 +121,9 @@ export async function listEnabledFeatures(db: Db, orgId: string): Promise<string
  * oder `null`, wenn der Nutzer kein Mitglied der Organisation ist.
  */
 async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Promise<SQL[] | null> {
-  const role = await getOrgRole(db, input.userId, input.orgId);
-  if (role === null) return null;
+  const membership = await getMembership(db, input.userId, input.orgId);
+  if (membership === null) return null;
+  const { role } = membership;
   if (input.includeHidden && role !== 'admin') {
     throw new AccessDeniedError('Nur Org-Admins dürfen ausgeblendete Profile sehen.');
   }
@@ -94,6 +134,12 @@ async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Prom
   const conditions: SQL[] = [eq(amazonAdsProfiles.organizationId, input.orgId)];
   if (!input.includeRemoved) conditions.push(isNull(amazonAdsProfiles.removedAt));
   if (!input.includeHidden) conditions.push(eq(amazonAdsProfiles.isHidden, false));
+  if (role !== 'admin') {
+    const granted = grantedClientIds(db, membership.id);
+    conditions.push(
+      sql`(not exists (${granted}) or ${amazonAdsProfiles.clientId} in (${granted}))`,
+    );
+  }
   return conditions;
 }
 

@@ -1,6 +1,15 @@
 import { sql } from 'drizzle-orm';
-import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { users } from './auth';
+import {
+  foreignKey,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { clients } from './app';
+import { members, users } from './auth';
 import { createdAt, id, organizationId } from './columns';
 
 /**
@@ -30,5 +39,33 @@ export const memberPasswordLinks = pgTable(
     index('member_password_links_org_user_idx')
       .on(t.organizationId, t.userId)
       .where(sql`used_at is null and revoked_at is null`),
+  ],
+);
+
+/**
+ * Freigaben je Mitglied und Client (`phase-6.md` 6.2, F2). Ein Mitglied **mit** Freigaben sieht nur die Profile dieser
+ * Clients, eines ohne Freigaben alle; Admins immer alle. Ausgewertet nur im Access-Layer (`access.ts`), gepflegt über
+ * `members.ts`. Der Client lässt sich nicht löschen, solange Freigaben auf ihn zeigen (kein `cascade`): Sonst sähe ein
+ * eingeschränktes Mitglied nach dem Löschen seines letzten Clients alles.
+ */
+export const memberClientGrants = pgTable(
+  'member_client_grants',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    memberId: uuid('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('member_client_grants_member_client_uq').on(t.memberId, t.clientId),
+    // Client derselben Organisation (wie bei den Profilen).
+    foreignKey({
+      name: 'member_client_grants_client_org_fk',
+      columns: [t.clientId, t.organizationId],
+      foreignColumns: [clients.id, clients.organizationId],
+    }),
   ],
 );
