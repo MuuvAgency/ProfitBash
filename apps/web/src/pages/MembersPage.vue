@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
+import MultiSelect from 'primevue/multiselect';
 import Select from 'primevue/select';
 import { computed, ref, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -11,6 +12,7 @@ import { api, ApiError } from '../api';
 import InlineError from '../components/common/InlineError.vue';
 import PageHeader from '../components/common/PageHeader.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
+import { useClientsQuery } from '../connections/queries';
 import { errorMessageKey } from '../i18n';
 import { useSessionStore } from '../stores/session';
 
@@ -59,6 +61,21 @@ const changeRole = useMutation({
   onError: (error, { member }) => {
     rowError.value = { memberId: member.id, message: errorText(error) };
     // Auswahl zurück auf den gespeicherten Stand.
+    void invalidate();
+  },
+});
+
+// Freigaben je Client (6.2). Scheitert die Client-Liste, bleibt die Auswahl leer; die Seite funktioniert weiter.
+const clients = useClientsQuery();
+const changeGrants = useMutation({
+  mutationFn: ({ member, clientIds }: { member: Member; clientIds: string[] }) =>
+    api.members.setClientGrants(member.id, clientIds),
+  onSuccess: () => {
+    rowError.value = null;
+    return invalidate();
+  },
+  onError: (error, { member }) => {
+    rowError.value = { memberId: member.id, message: errorText(error) };
     void invalidate();
   },
 });
@@ -212,6 +229,7 @@ function askRemove(member: Member) {
           <span>{{ t('members.column.status') }}</span>
           <span class="sr-only">{{ t('members.column.actions') }}</span>
         </div>
+        <p class="text-body-sm text-ink-secondary">{{ t('members.grants.hint') }}</p>
         <ul :aria-label="t('nav.members')" class="flex flex-col">
           <li
             v-for="member in members.data.value"
@@ -230,7 +248,7 @@ function askRemove(member: Member) {
                 member.email
               }}</span>
             </div>
-            <div>
+            <div class="flex flex-col gap-space-xs">
               <Select
                 :model-value="member.role"
                 :options="roleOptions"
@@ -241,6 +259,25 @@ function askRemove(member: Member) {
                 :aria-label="t('members.roleOf', { name: member.name })"
                 :disabled="changeRole.isPending.value"
                 @update:model-value="(role: OrgRole) => onRole(member, role)"
+              />
+              <MultiSelect
+                v-if="member.role !== 'admin'"
+                :model-value="member.clientIds"
+                :options="clients.data.value ?? []"
+                option-label="name"
+                option-value="id"
+                :placeholder="t('members.grants.all')"
+                :max-selected-labels="1"
+                :selected-items-label="t('members.grants.count', { count: '{0}' })"
+                :show-toggle-all="false"
+                :loading="clients.isPending.value"
+                size="small"
+                fluid
+                :aria-label="t('members.grants.label', { name: member.name })"
+                :disabled="changeGrants.isPending.value"
+                @update:model-value="
+                  (clientIds: string[]) => changeGrants.mutate({ member, clientIds })
+                "
               />
             </div>
             <span class="flex items-center gap-space-sm text-body-sm text-ink">

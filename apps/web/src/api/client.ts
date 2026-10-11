@@ -635,6 +635,14 @@ export function createApi(options: ApiOptions = {}) {
       async remove(id: string): Promise<void> {
         await unwrap(client.DELETE('/api/members/{id}', { params: { path: { id } } }));
       },
+      /** Freigaben ersetzen (6.2): leer = alle Clients. */
+      setClientGrants: (id: string, clientIds: string[]): Promise<Member> =>
+        unwrap(
+          client.PUT('/api/members/{id}/client-grants', {
+            params: { path: { id } },
+            body: { clientIds },
+          }),
+        ),
       renewLink: (id: string) =>
         unwrap(client.POST('/api/members/{id}/password-link', { params: { path: { id } } })),
     },

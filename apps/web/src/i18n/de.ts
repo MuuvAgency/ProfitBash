@@ -444,6 +444,7 @@ export const de = {
       'member:password_set': 'Passwort gesetzt',
       'member:remove': 'Mitglied entfernt',
       'member:role_update': 'Rolle geändert',
+      'member:grants_update': 'Zugriff auf Clients geändert',
       'notification:read': 'Benachrichtigungen gelesen',
       'organization:create': 'Organisation angelegt',
       'organization:update': 'Organisation geändert',
@@ -705,6 +706,13 @@ export const de = {
     renewLink: 'Neuer Link',
     renewLinkFor: 'Neuen Link zum Passwort-Setzen für {name} erzeugen',
     removeFor: '{name} entfernen',
+    /** Freigaben je Client (6.2): leer = alle; Admins sehen immer alles. */
+    grants: {
+      label: 'Zugriff von {name}',
+      all: 'Alle Clients',
+      count: '{count} Clients',
+      hint: 'Ohne Auswahl sieht das Mitglied alle Clients, mit Auswahl nur deren Profile. Admins sehen immer alles.',
+    },
     column: {
       member: 'Mitglied',
       role: 'Rolle',
@@ -3053,6 +3061,7 @@ export const de = {
       'Dieses Mitglied gehört auch zu einer anderen Organisation; sein Passwort lässt sich hier nicht setzen.',
     MEMBER_PROTECTED: 'Dieses Konto können nur Plattform-Admins ändern.',
     MEMBER_NOT_FOUND: 'Das Mitglied gibt es nicht mehr.',
+    MEMBER_UNKNOWN_CLIENT: 'Einen der Clients gibt es nicht mehr. Bitte die Seite neu laden.',
     PASSWORD_LINK_INVALID:
       'Dieser Link gilt nicht (mehr). Bitte frag bei der Administration nach einem neuen Link.',
     SAVED_VIEW_NAME_TAKEN: 'Eine Ansicht mit diesem Namen gibt es beim Besitzer schon.',
