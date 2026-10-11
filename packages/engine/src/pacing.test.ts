@@ -101,7 +101,9 @@ describe('computePacing', () => {
     expect(at('800').warnLevel).toBe(80);
     expect(at('1000')).toMatchObject({ warnLevel: 100, forecastOver: false });
     expect(at('1000.01').forecastOver).toBe(true);
-    expect(computePacing({ month: '2026-10', cap: '1000', warnPercents: [], campaigns: [] })).toMatchObject({
+    expect(
+      computePacing({ month: '2026-10', cap: '1000', warnPercents: [], campaigns: [] }),
+    ).toMatchObject({
       warnLevel: null,
       actual: { value: '0' },
       forecast: { value: '0' },

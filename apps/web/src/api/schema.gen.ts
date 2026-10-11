@@ -6027,6 +6027,285 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ads/budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sichtbare Profile mit ihren Caps und dem Pacing im laufenden Monat */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Übersicht. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["BudgetsOverview"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/budgets/caps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cap anlegen (Recht „write“) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BudgetCapInput"];
+                };
+            };
+            responses: {
+                /** @description Gespeichert. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Ungültige Eingabe oder Umfang. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Cap oder Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Zu viele Caps im Profil. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ads/budgets/caps/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Cap ändern (Recht „write“); das Profil eines Caps bleibt */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BudgetCapInput"];
+                };
+            };
+            responses: {
+                /** @description Gespeichert. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                        };
+                    };
+                };
+                /** @description Ungültige Eingabe oder Umfang. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Cap oder Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Cap löschen (Recht „write“) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Gelöscht. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Ungültige Eingabe oder Umfang. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht oder kein Recht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Cap oder Profil nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ads/automations/settings": {
         parameters: {
             query?: never;
@@ -9021,6 +9300,102 @@ export interface components {
             unitCost: string;
             fees: string;
             margin: string;
+        };
+        BudgetsOverview: {
+            profiles: {
+                /** Format: uuid */
+                id: string;
+                accountName: string;
+                countryCode: string;
+                currencyCode: string;
+                month: string;
+                dataState: {
+                    periodStart: string;
+                    periodEnd: string;
+                    importedAt: string;
+                } | null;
+                portfolios: {
+                    /** Format: uuid */
+                    id: string;
+                    name: string;
+                }[];
+                caps: components["schemas"]["BudgetCap"][];
+            }[];
+            tags: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+        };
+        BudgetCap: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            profileId: string;
+            scope: {
+                /** @enum {string} */
+                type: "profile" | "portfolios" | "tags";
+                ids: string[];
+            };
+            scopeLabels: string[];
+            amount: string;
+            monthAmounts: {
+                [key: string]: string;
+            };
+            effectiveAmount: string;
+            warnPercents: number[];
+            pacing: components["schemas"]["Pacing"];
+            campaignCount: number;
+            campaigns: {
+                /** Format: uuid */
+                id: string;
+                name: string | null;
+                state: string | null;
+                dailyBudget: string | null;
+                actual: string;
+                exact: boolean;
+            }[];
+            updatedAt: string;
+        };
+        Pacing: {
+            daysInMonth: number;
+            elapsedDays: number;
+            dataThrough: string | null;
+            exact: boolean;
+            actual: {
+                value: string;
+                low: string;
+                high: string;
+            };
+            planned: string;
+            forecast: {
+                value: string;
+                low: string;
+                high: string;
+            };
+            warnLevel: number | null;
+            forecastOver: boolean;
+        };
+        BudgetCapInput: {
+            /** Format: uuid */
+            profileId: string;
+            scope: {
+                /** @enum {string} */
+                type: "profile" | "portfolios" | "tags";
+                ids: string[];
+            };
+            amount: string;
+            /** @default {} */
+            monthAmounts: {
+                [key: string]: string;
+            };
+            /**
+             * @default [
+             *       80,
+             *       100
+             *     ]
+             */
+            warnPercents: number[];
         };
         AutomationSettings: {
             defaults: components["schemas"]["Guardrails"];
