@@ -4,8 +4,8 @@ import {
   type StructureCatalog,
   upgradeStructureCatalog,
 } from '@profitbash/shared';
-import { and, asc, count, eq, isNotNull, notInArray } from 'drizzle-orm';
-import { getOrgRole } from './access';
+import { and, asc, count, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
+import { getOrgRole, visibleClientIds } from './access';
 import { recordAuditEvent } from './audit';
 import type { Db } from './client';
 import { clientPresets, clients, productGroups, structureCatalogs } from './schema';
@@ -76,16 +76,28 @@ export async function getStructureCatalog(
   input: { userId: string; orgId: string },
 ): Promise<StructureCatalogView | null> {
   if ((await getOrgRole(db, input.userId, input.orgId)) === null) return null;
+  // Freigaben je Client (6.2): Eingeschränkte sehen nur ihre Clients und deren Presets.
+  const granted = await visibleClientIds(db, input);
   const stored = await loadStructureCatalog(db, input.orgId);
   const presets = await db
     .select({ clientId: clientPresets.clientId, presetKey: clientPresets.presetKey })
     .from(clientPresets)
-    .where(eq(clientPresets.organizationId, input.orgId))
+    .where(
+      and(
+        eq(clientPresets.organizationId, input.orgId),
+        granted ? inArray(clientPresets.clientId, granted) : undefined,
+      ),
+    )
     .orderBy(asc(clientPresets.clientId));
   const orgClients = await db
     .select({ id: clients.id, name: clients.name })
     .from(clients)
-    .where(eq(clients.organizationId, input.orgId))
+    .where(
+      and(
+        eq(clients.organizationId, input.orgId),
+        granted ? inArray(clients.id, granted) : undefined,
+      ),
+    )
     .orderBy(asc(clients.name), asc(clients.id));
   const groupPresets = await db
     .select({ presetKey: productGroups.presetKey, productGroups: count() })
@@ -255,12 +267,14 @@ export async function setClientPreset(
   input: { userId: string; orgId: string; clientId: string; presetKey: string | null },
 ): Promise<true | null> {
   if ((await getOrgRole(db, input.userId, input.orgId)) === null) return null;
+  const granted = await visibleClientIds(db, input);
   return db.transaction(async (tx) => {
     const [owned] = await tx
       .select({ id: clients.id })
       .from(clients)
       .where(and(eq(clients.id, input.clientId), eq(clients.organizationId, input.orgId)));
-    if (!owned) throw new StructureCatalogError('NOT_FOUND', 'Client nicht gefunden.');
+    if (!owned || (granted && !granted.includes(input.clientId)))
+      throw new StructureCatalogError('NOT_FOUND', 'Client nicht gefunden.');
     await assertPresetKnown(tx, input.orgId, input.presetKey);
     const [before] = await tx
       .select({ presetKey: clientPresets.presetKey })
