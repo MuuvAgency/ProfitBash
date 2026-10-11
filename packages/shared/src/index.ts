@@ -29,3 +29,4 @@ export * from './automation';
 export * from './automation-rules';
 export * from './automation-runs';
 export * from './budgets';
+export * from './automation-checks';
