@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1.**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2.**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -153,14 +153,38 @@ Plattform-Rolle `superadmin`.
     (`distinct`), bei sehr großen Logs eigene Tabelle oder Cache.
 
 ### 6.2 Profil-Freigaben je Mitglied (F2)
-- [ ] Tabelle `member_client_grants` (Mitglied, Client, Organisation; zusammengesetzte Fremdschlüssel wie üblich).
+- [x] Tabelle `member_client_grants` (Mitglied, Client, Organisation; zusammengesetzte Fremdschlüssel wie üblich).
       Migration. `plan.md` §4 anpassen (Freigaben je Client statt je Profil, F2).
-- [ ] Access-Layer: Hat ein Mitglied (nicht Admin) Freigaben, begrenzt `visibilityConditions` auf Profile dieser
+- [x] Access-Layer: Hat ein Mitglied (nicht Admin) Freigaben, begrenzt `visibilityConditions` auf Profile dieser
       Clients. Tests in `access.test.ts` (ohne Freigabe alles, mit Freigabe nur diese, Admin immer alles, Profil ohne
       Client für Eingeschränkte unsichtbar).
-- [ ] Prüfen, welche nutzerseitigen Abfragen Profildaten **ohne** Profil-Scope lesen (nur nach Organisation): Befunde
+- [x] Prüfen, welche nutzerseitigen Abfragen Profildaten **ohne** Profil-Scope lesen (nur nach Organisation): Befunde
       beheben oder als Ausnahme in ADR 002 begründen. Benachrichtigungen mit Profil folgen schon dem Scope.
-- [ ] API und Oberfläche in der Mitgliederverwaltung: „Zugriff: alle Clients / ausgewählte“, Audit `member.grants_update`.
+- [x] API und Oberfläche in der Mitgliederverwaltung: „Zugriff: alle Clients / ausgewählte“, Audit `member.grants_update`.
+- **Umsetzung (2026-10-11):**
+  - Migration `0048_member_client_grants`: Mitglied (`members.id`, mit der Mitgliedschaft gelöscht), Client
+    (zusammengesetzter FK mit der Organisation, **ohne** `cascade`: Ein Client mit Freigaben lässt sich nicht löschen,
+    sonst sähe ein Mitglied nach dem Löschen seines letzten Clients plötzlich alles).
+  - Access-Layer: `visibilityConditions` hängt für Nicht-Admins eine Bedingung an („keine Freigaben oder Client
+    freigegeben“), damit gilt sie in allen Abfragen über `visibleProfilesScope()`, `canSeeProfile()` und
+    `listVisibleClientsAndProfiles()`. Neu `visibleClientIds()` (`null` = alle) für Client-Daten ohne Profil.
+  - **Abfragen ohne Profil-Scope geprüft** (alle direkten Zugriffe auf `clients`): Der Struktur-Katalog listete alle
+    Clients und ließ Presets fremder Clients setzen → behoben (`getStructureCatalog`, `setClientPreset`, mit Test).
+    Bewusst org-weit (ADR 002 ergänzt): Regeln der Automatik (Clients nur als ID), Katalog, Tags, Zähler
+    „Produktgruppen je Preset“, Benachrichtigungen ohne Profil. Clients, Connections, Sync-Status und Audit-Log sind
+    ohnehin nur für Admins.
+  - `setMemberClientGrants` (ersetzt die Liste, leer = alle; `UNKNOWN_CLIENT` für fremde Clients; Audit
+    `member.grants_update` mit vorher/nachher nur bei Änderung), `PUT /api/members/{id}/client-grants` hinter
+    `orgAdminOnly`, `Member.clientIds`.
+  - Mitgliederverwaltung: Auswahl „Zugriff“ je Zeile unter der Rolle (nur bei Editor und Viewer; Platzhalter „Alle
+    Clients“), speichert bei jeder Änderung. Freigaben eines Admins bleiben gespeichert, wirken aber nicht.
+  - Browser-Pane geprüft: Test-Mitglied angelegt, Client über das echte Auswahlfeld freigegeben (API zeigt die
+    Freigabe), Handy ohne waagerechtes Scrollen, Dunkel; Mitglied über die Oberfläche wieder entfernt. **Reste in der
+    Dev-DB:** Nutzer `pruefung-6-2@muuv.test` (ohne Mitgliedschaft) und drei Audit-Events (`member.create`,
+    `member.grants_update`, `member.remove`). Nicht geprüft: Anmeldung als eingeschränktes Mitglied im Browser (per
+    API-Test abgedeckt: Filterauswahl zeigt nur den freigegebenen Client).
+  - Review (ponytail): keine Befunde zum Beheben. Bekannte Grenze: Legt ein Admin einen neuen Client an, sehen ihn
+    Eingeschränkte nicht, bis er freigegeben wird (gewollt).
 
 ### 6.3a Kunden-Org: Modell und Access-Layer
 - [ ] `clients.client_organization_id` (eindeutig, FK auf `organizations`), Migration; ADR 002 ergänzen

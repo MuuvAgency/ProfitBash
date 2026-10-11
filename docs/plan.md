@@ -100,8 +100,9 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 
 - **Plattform:** `user` | `superadmin` (better-auth Admin-Plugin). Superadmin = Muuv-intern, sieht Plattform-Admin.
 - **Organisation:** `admin` | `editor` | `viewer`.
-- **Profil-Freigaben (Phase 6):** Mitglieder können auf einzelne Profile eingeschränkt werden.
-  Phase 0: Jedes Mitglied sieht alle nicht ausgeblendeten Profile seiner Org. Die Regel steckt bereits im Access-Layer.
+- **Freigaben je Client (Phase 6, 6.2; `phase-6.md` F2):** Editoren und Viewer lassen sich in der Mitgliederverwaltung
+  auf einzelne Clients einschränken und sehen dann nur deren Profile. Ohne Freigaben sieht ein Mitglied alle nicht
+  ausgeblendeten Profile seiner Org, Admins immer alle. Die Regel steckt im Access-Layer.
 - **Kundenzugang (Phase 6):** Die Agentur-Org besitzt alle Daten. Kunden-Orgs bekommen Lesezugriff auf die Profile
   ihres Clients (siehe `docs/decisions/002-tenancy.md`).
 
