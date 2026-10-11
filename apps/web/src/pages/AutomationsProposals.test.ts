@@ -82,6 +82,7 @@ async function mountTab(
     }),
     'GET /api/ads/automations/proposals': json({ proposals: [proposal(), pause], total: 2 }),
     'GET /api/ads/automations/runs': json({ runs: [run] }),
+    'GET /api/ads/automations/datasets': json({ profiles: [] }),
     'GET /api/ads/automations/structure-proposals': json({ proposals: [], total: 0 }),
     ...overrides,
   });
@@ -292,6 +293,128 @@ describe('Seite „Automationen“: Läufe', () => {
     expect(content).toContain('50 im Warenkorb');
     expect(content).toContain('Der Zeitraum endet vor dem des vorigen Laufs');
     expect(content).toContain('Zuständiger fehlt');
+  });
+
+  it('nennt je Lauf die Gründe ohne Vorschlag, Befunde und Graduation-/Preset-Vorschläge (5.13b)', async () => {
+    await mountTab('runs', {
+      'GET /api/ads/automations/runs': json({
+        runs: [
+          {
+            ...run,
+            counts: {
+              ...run.counts,
+              insufficientData: 900,
+              manualPending: 2,
+              budgetCap: 1,
+              unbekannt: 7,
+              findings: 4,
+              structure: 1,
+            },
+          },
+        ],
+      }),
+    });
+    await vi.waitFor(() => expect($(`[data-run-row="${RUN}"]`)).not.toBeNull());
+    const content = text($(`[data-run-row="${RUN}"]`)!);
+    expect(content).toContain('Ohne Vorschlag:');
+    expect(content).toContain('900 zu wenig Daten');
+    expect(content).toContain('2 händische Änderung offen');
+    expect(content).toContain('1 unter Budget-Cap');
+    expect(content).not.toContain('unbekannt');
+    expect(content).toContain('4 Befunde');
+    expect(content).toContain('1 Graduation-/Preset-Vorschlag');
+  });
+
+  it('Lauf im Modus „aus“: nur Prüfungen und Cap-Meldungen statt der Zähler', async () => {
+    await mountTab('runs', {
+      'GET /api/ads/automations/runs': json({
+        runs: [{ ...run, mode: 'off', counts: { targets: 0, campaigns: 0, proposals: 0 } }],
+      }),
+    });
+    await vi.waitFor(() => expect($(`[data-run-row="${RUN}"]`)).not.toBeNull());
+    const content = text($(`[data-run-row="${RUN}"]`)!);
+    expect(content).toContain('Aus');
+    expect(content).toContain('Nur Prüfungen und Cap-Meldungen');
+    expect(content).not.toContain('0 Targets');
+  });
+
+  it('Datensätze je Profil: was vorliegt, was fehlt, Alter und Zeitraum; auch ohne Lauf (5.13b)', async () => {
+    const OTHER = '00000000-0000-4000-8000-0000000000c2';
+    await mountTab('runs', {
+      'GET /api/ads/automations/runs': json({ runs: [] }),
+      'GET /api/ads/automations/datasets': json({
+        profiles: [
+          {
+            profileId: PROFILE,
+            accountName: 'Nordwind DE',
+            expectedAdProducts: ['SPONSORED_BRANDS', 'SPONSORED_PRODUCTS'],
+            metrics: {
+              periodStart: '2026-09-29',
+              periodEnd: '2026-10-07',
+              periodDays: 9,
+              importedAt: '2026-10-08T06:30:00.000Z',
+              ageDays: 10,
+              adProducts: ['SPONSORED_PRODUCTS'],
+              searchTermAdProducts: [],
+            },
+          },
+          { profileId: OTHER, accountName: 'Ohne Datei', expectedAdProducts: [], metrics: null },
+        ],
+      }),
+    });
+    await vi.waitFor(() => expect($(`[data-dataset-row="${PROFILE}"]`)).not.toBeNull());
+    const content = text($(`[data-dataset-row="${PROFILE}"]`)!);
+    expect(content).toContain('Nordwind DE');
+    expect(content).toContain('Sponsored Products');
+    expect(content).toContain('Fehlt: Sponsored Brands');
+    expect(content).toContain('Suchbegriff-Blätter fehlen');
+    expect(content).toContain('29.09.2026');
+    expect(content).toContain('9 Tage');
+    expect(content).toContain('empfohlen sind 30');
+    expect(content).toContain('vor 10 Tagen');
+    expect(content).toContain('älter als 8 Tage');
+    expect(text($(`[data-dataset-row="${OTHER}"]`)!)).toContain(
+      'Noch keine Bulk-Datei mit Kennzahlen',
+    );
+    expect(document.body.textContent).toContain('Noch kein Lauf');
+  });
+
+  it('Datensätze: vollständig ohne Warnungen; ein Ladefehler lässt die Läufe stehen', async () => {
+    await mountTab('runs', {
+      'GET /api/ads/automations/datasets': json({
+        profiles: [
+          {
+            profileId: PROFILE,
+            accountName: 'Nordwind DE',
+            expectedAdProducts: ['SPONSORED_PRODUCTS'],
+            metrics: {
+              periodStart: '2026-09-08',
+              periodEnd: '2026-10-07',
+              periodDays: 30,
+              importedAt: '2026-10-08T06:30:00.000Z',
+              ageDays: 2,
+              adProducts: ['SPONSORED_PRODUCTS'],
+              searchTermAdProducts: ['SPONSORED_PRODUCTS'],
+            },
+          },
+        ],
+      }),
+    });
+    await vi.waitFor(() => expect($(`[data-dataset-row="${PROFILE}"]`)).not.toBeNull());
+    const content = text($(`[data-dataset-row="${PROFILE}"]`)!);
+    expect(content).not.toContain('Fehlt');
+    expect(content).not.toContain('fehlen');
+    expect(content).not.toContain('empfohlen');
+    expect(content).not.toContain('älter als');
+    cleanupMounted();
+
+    await mountTab('runs', {
+      'GET /api/ads/automations/datasets': json({ error: { code: 'INTERNAL', message: 'x' } }, 500),
+    });
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('Die Datensätze konnten nicht geladen werden'),
+    );
+    expect($(`[data-run-row="${RUN}"]`)).not.toBeNull();
   });
 
   it('leerer Zustand und Ladefehler', async () => {
