@@ -9,6 +9,7 @@
     "./analytics": "./src/analytics.ts",
     "./ad-changes": "./src/ad-changes.ts",
     "./automation-rules": "./src/automation-rules.ts",
+    "./automation-checks": "./src/automation-checks.ts",
     "./structure-catalog": "./src/structure-catalog.ts",
     "./campaign-setup": "./src/campaign-setup.ts",
     "./env": "./src/env.ts",
