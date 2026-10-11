@@ -2776,6 +2776,11 @@ export const de = {
         title: 'Neue Befunde der Prüfungen',
         text: '{profileName}: {count} neuer Befund unter Automationen, Prüfungen. | {profileName}: {count} neue Befunde unter Automationen, Prüfungen.',
       },
+      structure_proposals: {
+        label: 'Neue Graduation- und Preset-Vorschläge',
+        title: 'Neue Vorschläge zur Struktur',
+        text: '{profileName}: {count} neuer Graduation- oder Preset-Vorschlag unter Automationen, Vorschläge. | {profileName}: {count} neue Graduation- und Preset-Vorschläge unter Automationen, Vorschläge.',
+      },
       automation_responsible_missing: {
         label: 'Automatik ohne Zuständigen',
         title: 'Automatik ohne Zuständigen',

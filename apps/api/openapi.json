@@ -10589,7 +10589,8 @@
               "automation_responsible_missing",
               "budget_cap_threshold",
               "budget_cap_forecast",
-              "automation_findings"
+              "automation_findings",
+              "structure_proposals"
             ]
           },
           "severity": {
@@ -17992,7 +17993,8 @@
                 "automation_responsible_missing",
                 "budget_cap_threshold",
                 "budget_cap_forecast",
-                "automation_findings"
+                "automation_findings",
+                "structure_proposals"
               ]
             },
             "required": false,

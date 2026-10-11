@@ -17,6 +17,7 @@ import {
   DEFAULT_AUTOMATION_RULES,
   DEFAULT_CHECK_SETTINGS,
   DEFAULT_GUARDRAILS,
+  DEFAULT_STRUCTURE_CATALOG,
 } from '@profitbash/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -270,6 +271,45 @@ describe('runAutomation mit Prüfungen (5.10)', () => {
   });
 });
 
+describe('runAutomation mit Graduation-Vorschlägen (5.11b)', () => {
+  it('hält Suchbegriffe fest, die die Kante ihres Bausteins erfüllen, und zählt sie am Lauf', async () => {
+    await testDb.db.insert(schema.campaignBlocks).values({
+      campaignId: f.campaign,
+      organizationId: f.org,
+      profileId: f.profile,
+      blockKey: 'SP-AUTO',
+    });
+    await testDb.db.insert(schema.amazonAdsSearchTermPeriodMetrics).values({
+      organizationId: f.org,
+      profileId: f.profile,
+      adProduct: 'SPONSORED_PRODUCTS',
+      periodStart: PERIOD.startDate,
+      periodEnd: PERIOD.endDate,
+      amazonCampaignId: '1001',
+      amazonAdGroupId: '2001',
+      amazonTargetId: '3001',
+      searchTerm: 'trinkflasche 1l',
+      currencyCode: 'EUR',
+      impressions: 500,
+      clicks: 40,
+      cost: '10.00',
+      sales: '100.00',
+      purchases: 3,
+      units: 3,
+      importedAt: NOW,
+    });
+    await run();
+
+    expect(await testDb.db.select().from(schema.automationStructureProposals)).toMatchObject([
+      { kind: 'graduation', subject: 'trinkflasche 1l', key: 'SP-AUTO' },
+    ]);
+    const [jobRun] = await testDb.db.select().from(jobRuns);
+    expect(jobRun!.counters).toMatchObject({ structure: 1 });
+    await testDb.db.delete(schema.campaignBlocks);
+    await testDb.db.delete(schema.amazonAdsSearchTermPeriodMetrics);
+  });
+});
+
 describe('computeAutomationProposals', () => {
   const metrics = { impressions: 9000, clicks: 100, orders: 0, spend: '1600.00', sales: '0' };
   const plan = (patch: Partial<AutomationRunPlan> = {}): AutomationRunPlan => ({
@@ -285,6 +325,12 @@ describe('computeAutomationProposals', () => {
     state: { period: PERIOD, importedAt: NOW, source: 'file' },
     caps: [],
     checks: DEFAULT_CHECK_SETTINGS,
+    structure: {
+      catalog: DEFAULT_STRUCTURE_CATALOG,
+      harvest: { minOrders: 3, maxAcos: '0.25' },
+      campaignBlocks: new Map(),
+      groups: [],
+    },
     fingerprint: 'x',
     warnings: [],
     ...patch,
