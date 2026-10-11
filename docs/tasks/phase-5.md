@@ -952,7 +952,11 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
   SD-Spalten und SB-Kennzahlen ansehen (5.1).
 - **Off-Amazon-Spalte** einlesen, sobald eine US-Datei vorliegt (5.10).
 - **Konstanten ohne Einstellung:** Glättung des Optimizers (12 Klicks), Spanne der Pacing-Schätzung; Runden auf zwei
-  Stellen (JPY bräuchte null, 5.4).
+  Stellen (JPY bräuchte null, 5.4). **Entschieden (Dominik, 2026-10-11): Konstanten lassen**, bis 5.12 zeigt, ob sie passen.
+- **Modus „aus“** löscht beim nächsten Lauf die offenen Warenkorb-Zeilen der Automatik (5.13a).
+  **Entschieden (Dominik, 2026-10-11): so lassen.**
+- **Stand 2026-10-11 (Beginn Phase 6):** weiterhin keine Datei mit Kennzahlen und keine Läufe in der Dev-DB; 5.12 und
+  die Prüfung mit echten Daten bleiben offen.
 - **Nicht gebaut, je Aufgabe notiert:** Profile nur mit Tageswerten bekommen keinen Lauf (5.9b); Vorschau der Regeln
   rechnet vereinfacht (5.6a); Client kann Boden/Höchstgebot nicht auf „keiner“ setzen (5.4); Profilfilter der
   Benachrichtigungen kennt nur geladene Profile (5.2b); Markieren mehrerer Graduation-/Preset-Vorschläge (5.11b).
