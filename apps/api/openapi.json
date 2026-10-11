@@ -10831,15 +10831,11 @@
                     },
                     "periodEnd": {
                       "type": "string"
-                    },
-                    "importedAt": {
-                      "type": "string"
                     }
                   },
                   "required": [
                     "periodStart",
-                    "periodEnd",
-                    "importedAt"
+                    "periodEnd"
                   ]
                 },
                 "portfolios": {

@@ -123,10 +123,8 @@ export const budgetsOverviewSchema = z
         currencyCode: z.string(),
         /** Laufender Monat in der Zeitzone des Profils (`YYYY-MM`). */
         month: z.string(),
-        /** Zuletzt hochgeladene Datei mit Kennzahlen. */
-        dataState: z
-          .object({ periodStart: z.string(), periodEnd: z.string(), importedAt: z.string() })
-          .nullable(),
+        /** Zeitraum der zuletzt hochgeladenen Datei mit Kennzahlen, sonst die Tageswerte des Monats. */
+        dataState: z.object({ periodStart: z.string(), periodEnd: z.string() }).nullable(),
         portfolios: z.array(z.object({ id: z.uuid(), name: z.string() })),
         caps: z.array(budgetCapSchema),
       }),

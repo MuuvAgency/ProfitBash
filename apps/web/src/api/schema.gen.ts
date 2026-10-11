@@ -9312,7 +9312,6 @@ export interface components {
                 dataState: {
                     periodStart: string;
                     periodEnd: string;
-                    importedAt: string;
                 } | null;
                 portfolios: {
                     /** Format: uuid */

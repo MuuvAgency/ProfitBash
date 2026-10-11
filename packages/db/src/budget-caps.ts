@@ -10,12 +10,13 @@ import {
   type BudgetCapInput as CapValues,
   type BudgetCapScopeType,
 } from '@profitbash/shared';
-import { and, asc, count, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, isNull, max, sql, sum } from 'drizzle-orm';
 import { canSeeProfile, listVisibleClientsAndProfiles, visibleProfilesScope } from './access';
 import { recordAuditEvent, type DbOrTx } from './audit';
 import type { Db } from './client';
 import { findProfileMetricsState, listLatestEntityPeriodMetrics } from './entity-period-metrics';
 import {
+  amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
   amazonAdsPortfolios,
   budgetCaps,
@@ -85,7 +86,8 @@ export interface BudgetsOverviewRecord {
     countryCode: string;
     currencyCode: string;
     month: string;
-    dataState: { periodStart: string; periodEnd: string; importedAt: Date } | null;
+    /** Zeitraum der letzten Datei mit Kennzahlen, sonst die Tageswerte des Monats. */
+    dataState: { periodStart: string; periodEnd: string } | null;
     portfolios: { id: string; name: string }[];
     caps: BudgetCapRecord[];
   }[];
@@ -100,8 +102,39 @@ const snapshot = (row: CapRow) => ({
   warnPercents: row.warnPercents,
 });
 
+interface DailyMonth {
+  /** Letzter Tag des Monats mit Tageswerten. */
+  lastDay: string | null;
+  /** Ausgaben im Monat je Kampagne (interne ID). */
+  costs: ReadonlyMap<string, string>;
+}
+
+/** Tageswerte eines Profils im Monat (Profile mit API-Reports); Datei-Profile haben keine. */
+async function loadDailyMonth(db: DbOrTx, profileId: string, month: string): Promise<DailyMonth> {
+  const d = amazonAdsCampaignDailyMetrics;
+  const monthStart = `${month}-01`;
+  const rows = await db
+    .select({ campaignId: d.campaignId, cost: sum(d.cost), lastDay: max(d.date) })
+    .from(d)
+    .where(
+      and(
+        eq(d.profileId, profileId),
+        gte(d.date, monthStart),
+        sql`${d.date} < ${monthStart}::date + interval '1 month'`,
+      ),
+    )
+    .groupBy(d.campaignId);
+  return {
+    lastDay: rows.reduce<string | null>(
+      (last, row) => (row.lastDay && (last === null || row.lastDay > last) ? row.lastDay : last),
+      null,
+    ),
+    costs: new Map(rows.map((row) => [row.campaignId, row.cost ?? '0'])),
+  };
+}
+
 /**
- * Caps eines Profils mit Pacing im Monat `month`. Jede Kampagne zählt mit dem Zeitraum ihres eigenen Datenstands;
+ * Caps eines Profils mit Pacing im Monat `month`. Tageswerte des Monats zählen exakt und gehen vor. Jede Kampagne zählt mit dem Zeitraum ihres eigenen Datenstands;
  * Kampagnen ohne Kennzahlen stehen im Umfang, tragen aber nichts bei.
  */
 async function withPacing(
@@ -110,6 +143,7 @@ async function withPacing(
   month: string,
   rows: readonly CapRow[],
   labels: ReadonlyMap<string, string>,
+  daily: DailyMonth,
 ): Promise<BudgetCapRecord[]> {
   if (rows.length === 0) return [];
   const c = amazonAdsCampaigns;
@@ -151,7 +185,11 @@ async function withPacing(
           );
 
   const entries = campaigns.map((campaign) => {
-    const sums = metrics.get(campaign.amazonCampaignId);
+    const dailyCost = daily.lastDay === null ? undefined : daily.costs.get(campaign.id);
+    const sums =
+      dailyCost === undefined
+        ? metrics.get(campaign.amazonCampaignId)
+        : { cost: dailyCost, periodStart: `${month}-01`, periodEnd: daily.lastDay! };
     const dailyBudget = campaign.budgetType === 'DAILY' ? campaign.budgetAmount : null;
     const input: PacingCampaign | null = sums
       ? {
@@ -258,17 +296,18 @@ export async function getBudgetsOverview(
     const scope = { organizationId: input.orgId, profileId: profile.id };
     const state = await findProfileMetricsState(db, scope);
     const month = monthInTimeZone(input.now, profile.timezone);
+    const daily = await loadDailyMonth(db, profile.id, month);
     result.push({
       id: profile.id,
       accountName: profile.accountName,
       countryCode: profile.countryCode,
       currencyCode: profile.currencyCode,
       month,
-      dataState: state && {
-        periodStart: state.period.startDate,
-        periodEnd: state.period.endDate,
-        importedAt: state.importedAt,
-      },
+      dataState: state
+        ? { periodStart: state.period.startDate, periodEnd: state.period.endDate }
+        : daily.lastDay === null
+          ? null
+          : { periodStart: `${month}-01`, periodEnd: daily.lastDay },
       portfolios: portfolios
         .filter((p) => p.profileId === profile.id)
         .map((p) => ({ id: p.id, name: p.name ?? p.amazonPortfolioId })),
@@ -278,6 +317,7 @@ export async function getBudgetsOverview(
         month,
         caps.filter((cap) => cap.profileId === profile.id),
         labels,
+        daily,
       ),
     });
   }

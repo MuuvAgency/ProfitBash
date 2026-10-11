@@ -58,11 +58,7 @@ const overview = (caps: unknown[] = [cap()]) => ({
       countryCode: 'DE',
       currencyCode: 'EUR',
       month: '2026-10',
-      dataState: {
-        periodStart: '2026-09-11',
-        periodEnd: '2026-10-10',
-        importedAt: '2026-10-11T08:00:00.000Z',
-      },
+      dataState: { periodStart: '2026-09-11', periodEnd: '2026-10-10' },
       portfolios: [{ id: PF1, name: 'Marke' }],
       caps,
     },
