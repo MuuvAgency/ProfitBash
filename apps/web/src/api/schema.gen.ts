@@ -7904,20 +7904,24 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             action: string;
-            actor: components["schemas"]["AuditActor"];
+            actor: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                email: string;
+            } | null;
             target: {
                 [key: string]: unknown;
             };
         };
-        AuditActor: {
-            /** Format: uuid */
-            id: string;
-            name: string;
-            email: string;
-        } | null;
         AuditEventFilters: {
             areas: string[];
-            actors: components["schemas"]["AuditActor"][];
+            actors: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                email: string;
+            }[];
         };
         FileImport: {
             /** Format: uuid */

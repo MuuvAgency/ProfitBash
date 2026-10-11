@@ -964,7 +964,27 @@
             "type": "string"
           },
           "actor": {
-            "$ref": "#/components/schemas/AuditActor"
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "email"
+            ]
           },
           "target": {
             "type": "object",
@@ -979,29 +999,6 @@
           "target"
         ]
       },
-      "AuditActor": {
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "email"
-        ]
-      },
       "AuditEventFilters": {
         "type": "object",
         "properties": {
@@ -1014,7 +1011,24 @@
           "actors": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AuditActor"
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "email"
+              ]
             }
           }
         },
