@@ -254,23 +254,31 @@ const textArray = (values: readonly string[]) => sql`${sql.param([...values])}::
 // Tags (3.7)
 // ---------------------------------------------------------------------------
 
-const tagFilterIds = (selection: AnalyticsSelection) =>
-  selection.tagIds && selection.tagIds.length > 0 ? selection.tagIds : null;
+/** Tags gehören der aktiven Organisation: Kunden-Orgs (Phase 6) filtern und sehen keine Tags der Agentur. */
+interface TagFilter {
+  ids: readonly string[];
+  orgId: string;
+}
+
+const tagFilterIds = (selection: AnalyticsSelection): TagFilter | null =>
+  selection.tagIds && selection.tagIds.length > 0
+    ? { ids: selection.tagIds, orgId: selection.orgId }
+    : null;
 
 /**
  * Die Entity `idSql` der Art `entityType` trägt eines der Tags. Tags fremder Organisationen treffen nichts: Ihre
  * Zuweisungen zeigen auf Entities außerhalb der sichtbaren Profile der Auswahl.
  */
-const taggedSql = (tagIds: readonly string[], entityType: string, idSql: SQL) =>
-  sql`exists (select 1 from tag_assignments ta where ta.tag_id = any(${uuidArray(tagIds)})
-    and ta.entity_type = ${entityType} and ta.entity_id = ${idSql})`;
+const taggedSql = (tagIds: TagFilter, entityType: string, idSql: SQL) =>
+  sql`exists (select 1 from tag_assignments ta where ta.tag_id = any(${uuidArray(tagIds.ids)})
+    and ta.organization_id = ${tagIds.orgId} and ta.entity_type = ${entityType} and ta.entity_id = ${idSql})`;
 
 const anyOf = (conditions: SQL[]) => sql`(${sql.join(conditions, sql` or `)})`;
 
 /** Filter der Entity `e` einer Ebene: Tag an ihr selbst oder an Ad Group bzw. Kampagne darüber. */
 function tagEntityWhere(
   level: AnalyticsLevel | 'negative',
-  tagIds: readonly string[],
+  tagIds: TagFilter,
   includeRemoved = false,
 ): SQL {
   const campaign = (idSql: SQL) => taggedSql(tagIds, 'campaign', idSql);
@@ -309,12 +317,13 @@ const TAG_ENTITY_TYPE: Partial<Record<AnalyticsLevel, string>> = {
  * Attribute einer Zeile `f` samt `tagIds` (eigene Tags der Entity, sortiert). Erst an den gelieferten Zeilen (nach
  * `limit`) gelesen, nicht für jede Entity der Ebene.
  */
-function attributesWithTags(level: AnalyticsLevel): SQL {
+function attributesWithTags(level: AnalyticsLevel, orgId: string): SQL {
   const entityType = TAG_ENTITY_TYPE[level];
   if (!entityType) return sql`f.attributes`;
   return sql`(f.attributes::jsonb || jsonb_build_object('tagIds', (
     select coalesce(jsonb_agg(ta.tag_id order by ta.tag_id), '[]'::jsonb) from tag_assignments ta
-    where ta.entity_type = ${entityType} and ta.entity_id = f.row_id::uuid)))::json as attributes`;
+    where ta.organization_id = ${orgId} and ta.entity_type = ${entityType}
+      and ta.entity_id = f.row_id::uuid)))::json as attributes`;
 }
 
 /** Sichtbare Profile der Auswahl als Unterabfrage (`id`, `currency_code`, `account_type`, …). */
@@ -984,7 +993,7 @@ export async function queryExplorerRows(
         'missing_fx', missing_fx) from tot) as totals,
       (select coalesce(json_agg(r), '[]'::json) from (
         select f.row_id, f.row_ad_product, f.name, f.state, f.amazon_id, f.removed, f.placeholder,
-          ${attributesWithTags(input.level)}, f.profile_id, f.account_name, f.country_code, f.currency_code, f.account_type,
+          ${attributesWithTags(input.level, input.orgId)}, f.profile_id, f.account_name, f.country_code, f.currency_code, f.account_type,
           ${sumsJson('cur', portfolio)} as cur${periods.comparison ? sql`, ${sumsJson('cmp', portfolio)} as cmp` : sql``}
         from filtered f
         order by f.curx_cost desc nulls last, f.name asc nulls last, f.row_id asc
@@ -1477,19 +1486,20 @@ export async function queryDashboardStatus(
       group by ad_product
     ),
     last_success as (
+      -- Läufe der Eigentümer-Org des Profils (nicht der aktiven Organisation: Kunden-Orgs haben keine Läufe).
       -- Je Quelle der letzte Erfolg: Report-Sync je Connection, Datei-Import je Profil ohne Connection (1.11c).
       select c.connection_id::text as source, max(j.finished_at) as finished_at
-      from (select distinct p.connection_id from amazon_ads_profiles p
+      from (select distinct p.connection_id, p.organization_id from amazon_ads_profiles p
         where p.id in (select id from sel) and p.connection_id is not null) c
       left join job_runs j
-        on j.organization_id = ${selection.orgId} and j.job = 'reports-sync' and j.status = 'success'
+        on j.organization_id = c.organization_id and j.job = 'reports-sync' and j.status = 'success'
           and j.scope = c.connection_id::text
       group by c.connection_id
       union all
       select p.id::text as source, max(j.finished_at) as finished_at
       from amazon_ads_profiles p
       left join job_runs j
-        on j.organization_id = ${selection.orgId} and j.job = 'file-import' and j.status = 'success'
+        on j.organization_id = p.organization_id and j.job = 'file-import' and j.status = 'success'
           and coalesce((j.counters->>'imported')::int, 0) > 0
           and j.scope = p.id::text
       where p.id in (select id from sel) and p.connection_id is null
