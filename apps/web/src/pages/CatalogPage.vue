@@ -19,6 +19,7 @@ import CatalogBlocks from '../tools/catalog/CatalogBlocks.vue';
 import CatalogEdges from '../tools/catalog/CatalogEdges.vue';
 import CatalogNaming from '../tools/catalog/CatalogNaming.vue';
 import CatalogPresets from '../tools/catalog/CatalogPresets.vue';
+import CatalogSwitches from '../tools/catalog/CatalogSwitches.vue';
 import { CATALOG_DRAFT } from '../tools/catalog/draft';
 import { describeCatalogIssues } from '../tools/catalog/issues';
 import { useSaveStructureCatalog, useStructureCatalog, useToolRights } from '../tools/queries';
@@ -100,7 +101,7 @@ const issues = computed(() =>
       ),
 );
 
-const TABS = ['presets', 'blocks', 'edges', 'naming', 'assignments'] as const;
+const TABS = ['presets', 'blocks', 'edges', 'switches', 'naming', 'assignments'] as const;
 const tab = ref<(typeof TABS)[number]>('presets');
 const tabId = (name: string) => `catalog-tab-${name}`;
 function moveTab(step: number) {
@@ -254,6 +255,7 @@ function loadDefaults() {
         <CatalogPresets v-if="tab === 'presets'" />
         <CatalogBlocks v-else-if="tab === 'blocks'" />
         <CatalogEdges v-else-if="tab === 'edges'" />
+        <CatalogSwitches v-else-if="tab === 'switches'" />
         <CatalogNaming v-else-if="tab === 'naming'" />
         <CatalogAssignments v-else :data="data" />
       </div>

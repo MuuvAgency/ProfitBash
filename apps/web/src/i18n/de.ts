@@ -2109,6 +2109,7 @@ export const de = {
       presets: 'Presets',
       blocks: 'Bausteine',
       edges: 'Graduation',
+      switches: 'Preset-Wechsel',
       naming: 'Namensschema',
       assignments: 'Zuordnung',
     },
@@ -2128,6 +2129,7 @@ export const de = {
     where: {
       naming: 'Namensschema',
       edges: 'Graduation',
+      presetSwitches: 'Preset-Wechsel',
       catalog: 'Katalog',
     },
     field: {
@@ -2145,6 +2147,10 @@ export const de = {
       pattern: 'Muster',
       blocks: 'Bausteine',
       presets: 'Presets',
+      minOrders: 'Bestellungen ab',
+      maxAcosPercentOfGoal: 'ACoS höchstens',
+      minSpend: 'Ausgaben ab',
+      percentOfGoal: 'ACoS in % des Ziels',
     },
     issue: {
       field: '{where}: {field} ist ungültig',
@@ -2181,6 +2187,10 @@ export const de = {
       presetLookbackNotAllowed:
         '{preset}: {block} Rückblick nur 7, 14, 30, 60, 90, 180 oder 365 Tage',
       oneDefault: 'Genau ein Preset muss der Standard sein',
+      duplicateSwitch: 'Wechsel {from} → {to} gibt es zweimal',
+      switchUnknownPreset: 'Wechsel {from} → {to}: unbekanntes Preset',
+      switchSamePreset: 'Wechsel {from} → {to}: Start und Ziel sind gleich',
+      switchNoCondition: 'Wechsel {from} → {to}: mindestens eine Bedingung',
       namingNoPlaceholder: 'Das Namensschema braucht mindestens einen Platzhalter',
       namingUnknownPlaceholder: 'Unbekannter Platzhalter {name} im Namensschema',
     },
@@ -2267,12 +2277,33 @@ export const de = {
     },
     edges: {
       description:
-        'Gewinner aus einem Baustein kommen in den nächsten (beim Graduieren wird in der Quelle negiert). Marken-Bausteine graduieren nie. Vorschläge dazu kommen in Phase 5.',
+        'Gewinner aus einem Baustein kommen in den nächsten (beim Graduieren wird in der Quelle negiert). Marken-Bausteine graduieren nie. Die Kriterien gelten je Suchbegriff im Zeitraum der Datei; ein leeres Feld übernimmt die Harvest-Regel der Suchbegriff-Analyse. Ohne Ziel gilt deren ACoS.',
+      minOrders: 'Bestellungen ab',
+      maxAcos: 'ACoS ≤ % vom Ziel',
+      inherit: 'Harvest',
+      minOrdersLabel: 'Bestellungen ab für {from} → {to}',
+      maxAcosLabel: 'ACoS höchstens in Prozent des Ziels für {from} → {to}',
       from: 'Von',
       to: 'Nach',
       add: 'Kante hinzufügen',
       remove: 'Kante {from} → {to} entfernen',
       empty: 'Noch keine Kanten.',
+    },
+    switches: {
+      description:
+        'Wann die Automatik vorschlägt, das Preset einer Produktgruppe zu wechseln. Es zählen die Kennzahlen der Gruppe im Zeitraum der Datei; alle ausgefüllten Bedingungen müssen zutreffen. Gewechselt wird nie automatisch.',
+      eur: 'Ausgaben in EUR.',
+      from: 'Von',
+      to: 'Nach',
+      minOrders: 'Bestellungen ab',
+      minSpend: 'Ausgaben ab',
+      comparison: 'ACoS',
+      comparisonValue: { none: 'egal', lte: 'höchstens', gte: 'mindestens' },
+      acos: '% vom Ziel',
+      label: '{field} für {from} → {to}',
+      add: 'Wechsel hinzufügen',
+      remove: 'Wechsel {from} → {to} entfernen',
+      empty: 'Noch keine Wechsel.',
     },
     naming: {
       pattern: 'Muster',

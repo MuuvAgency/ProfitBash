@@ -9374,6 +9374,10 @@ export interface components {
             edges: {
                 from: string;
                 to: string;
+                /** @default null */
+                minOrders: number | null;
+                /** @default null */
+                maxAcosPercentOfGoal: number | null;
             }[];
             presets: {
                 key: string;
@@ -9389,6 +9393,21 @@ export interface components {
                 }[];
                 /** @default false */
                 isDefault: boolean;
+            }[];
+            /** @default [] */
+            presetSwitches: {
+                from: string;
+                to: string;
+                /** @default null */
+                minOrders: number | null;
+                /** @default null */
+                minSpend: string | null;
+                /** @default null */
+                acos: {
+                    /** @enum {string} */
+                    comparison: "lte" | "gte";
+                    percentOfGoal: number;
+                } | null;
             }[];
             naming: {
                 pattern: string;

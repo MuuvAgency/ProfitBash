@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_STRUCTURE_CATALOG,
   structureCatalogSchema,
-  type StructureCatalog,
+  type StructureCatalogInput,
+  upgradeStructureCatalog,
 } from './structure-catalog';
 
-const clone = (): StructureCatalog => structuredClone(DEFAULT_STRUCTURE_CATALOG);
+/** Als Eingabe typisiert: Tests lassen Felder mit Standardwert weg. */
+const clone = (): StructureCatalogInput => structuredClone(DEFAULT_STRUCTURE_CATALOG);
 const issues = (catalog: unknown) => {
   const result = structureCatalogSchema.safeParse(catalog);
   return result.success ? [] : result.error.issues;
@@ -238,5 +240,135 @@ describe('effectivePreset', () => {
     expect(effectivePreset(catalog, { client: 'launch', productGroup: 'geloescht' }).key).toBe(
       'launch',
     );
+  });
+});
+
+describe('Kriterien an Graduation-Kanten und Preset-Wechsel (5.11a)', () => {
+  const edge = (from: string, to: string) =>
+    DEFAULT_STRUCTURE_CATALOG.edges.find((entry) => entry.from === from && entry.to === to)!;
+
+  it('Startwerte: Kanten nach Exakt erben die Harvest-Regel, Einzel-Kampagnen und SB haben eigene Schwellen', () => {
+    expect(edge('SP-AUTO', 'SP-KW-EXACT')).toMatchObject({
+      minOrders: null,
+      maxAcosPercentOfGoal: null,
+    });
+    expect(edge('SP-KW-EXACT', 'SP-KW-EXACT-SINGLE')).toMatchObject({
+      minOrders: 8,
+      maxAcosPercentOfGoal: 100,
+    });
+    expect(edge('SP-KW-EXACT-SINGLE', 'SB-VIDEO-KW')).toMatchObject({
+      minOrders: 15,
+      maxAcosPercentOfGoal: 100,
+    });
+  });
+
+  it('Startwerte: drei Preset-Wechsel', () => {
+    expect(DEFAULT_STRUCTURE_CATALOG.presetSwitches).toEqual([
+      { from: 'launch', to: 'muuv-standard', minOrders: 30, minSpend: null, acos: null },
+      {
+        from: 'muuv-standard',
+        to: 'control',
+        minOrders: 100,
+        minSpend: null,
+        acos: { comparison: 'lte', percentOfGoal: 100 },
+      },
+      {
+        from: 'muuv-standard',
+        to: 'profit-defend',
+        minOrders: null,
+        minSpend: '200',
+        acos: { comparison: 'gte', percentOfGoal: 150 },
+      },
+    ]);
+  });
+
+  it('eine Kante ohne Kriterien und ein Katalog ohne Wechsel sind gültig (leer = Harvest-Regel bzw. keine)', () => {
+    const { presetSwitches: _switches, ...rest } = clone();
+    const parsed = structureCatalogSchema.parse({
+      ...rest,
+      edges: [{ from: 'SP-AUTO', to: 'SP-KW-EXACT' }],
+    });
+    expect(parsed.edges).toEqual([
+      { from: 'SP-AUTO', to: 'SP-KW-EXACT', minOrders: null, maxAcosPercentOfGoal: null },
+    ]);
+    expect(parsed.presetSwitches).toEqual([]);
+  });
+
+  it('prüft Preset-Wechsel: bekannte, verschiedene Presets, keine Dublette, mindestens eine Bedingung', () => {
+    const base = { minOrders: 5, minSpend: null, acos: null };
+    const unknown = clone();
+    unknown.presetSwitches = [{ ...base, from: 'launch', to: 'gibt-es-nicht' }];
+    expect(found(unknown)).toContainEqual({
+      issue: 'switchUnknownPreset',
+      from: 'launch',
+      to: 'gibt-es-nicht',
+    });
+    const same = clone();
+    same.presetSwitches = [{ ...base, from: 'launch', to: 'launch' }];
+    expect(found(same)).toContainEqual({ issue: 'switchSamePreset', from: 'launch', to: 'launch' });
+    const twice = clone();
+    twice.presetSwitches = [
+      { ...base, from: 'launch', to: 'control' },
+      { ...base, from: 'launch', to: 'control' },
+    ];
+    expect(found(twice)).toContainEqual({
+      issue: 'duplicateSwitch',
+      from: 'launch',
+      to: 'control',
+    });
+    const empty = clone();
+    empty.presetSwitches = [{ ...base, minOrders: null, from: 'launch', to: 'control' }];
+    expect(found(empty)).toContainEqual({
+      issue: 'switchNoCondition',
+      from: 'launch',
+      to: 'control',
+    });
+  });
+});
+
+describe('upgradeStructureCatalog: gespeicherte Kataloge von vor 5.11a', () => {
+  const old = () => {
+    const { presetSwitches: _switches, ...rest } = clone();
+    return {
+      ...rest,
+      edges: rest.edges.map(({ from, to }) => ({ from, to })),
+      // Ein Preset wurde gelöscht: Wechsel dorthin dürfen nicht dazukommen.
+      presets: rest.presets.filter((preset) => preset.key !== 'control'),
+    };
+  };
+
+  it('ergänzt die Startwerte der Kriterien an bekannten Kanten und die Wechsel zwischen vorhandenen Presets', () => {
+    const custom = { from: 'SP-CAT', to: 'SP-KW-EXACT' };
+    const doc = old();
+    doc.edges.push(custom);
+    const upgraded = structureCatalogSchema.parse(upgradeStructureCatalog(doc));
+    expect(
+      upgraded.edges.find((e) => e.from === 'SP-KW-EXACT' && e.to === 'SP-KW-EXACT-SINGLE'),
+    ).toMatchObject({ minOrders: 8, maxAcosPercentOfGoal: 100 });
+    expect(upgraded.edges.at(-1)).toEqual({
+      ...custom,
+      minOrders: null,
+      maxAcosPercentOfGoal: null,
+    });
+    expect(upgraded.presetSwitches.map((entry) => `${entry.from}>${entry.to}`)).toEqual([
+      'launch>muuv-standard',
+      'muuv-standard>profit-defend',
+    ]);
+  });
+
+  it('lässt ein Dokument mit eigenen (auch leeren) Angaben unverändert', () => {
+    const doc = clone();
+    doc.presetSwitches = [];
+    doc.edges = doc.edges.map((entry) => ({
+      ...entry,
+      minOrders: null,
+      maxAcosPercentOfGoal: null,
+    }));
+    expect(upgradeStructureCatalog(doc)).toEqual(doc);
+  });
+
+  it('reicht Unlesbares durch (die Prüfung des Schemas entscheidet)', () => {
+    expect(upgradeStructureCatalog(null)).toBeNull();
+    expect(upgradeStructureCatalog({ edges: 'kaputt' })).toMatchObject({ edges: 'kaputt' });
   });
 });

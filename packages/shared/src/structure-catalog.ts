@@ -54,6 +54,7 @@ export const MAX_CATALOG_BLOCKS = 60;
 export const MAX_CATALOG_EDGES = 200;
 export const MAX_CATALOG_PRESETS = 30;
 export const MAX_PRESET_BLOCKS = 30;
+export const MAX_PRESET_SWITCHES = 100;
 export const MAX_PLACEMENT_PERCENT = 900;
 export const MAX_NAMING_PATTERN_LENGTH = 120;
 
@@ -105,9 +106,19 @@ export const catalogBlockSchema = z.strictObject({
 });
 export type CatalogBlock = z.output<typeof catalogBlockSchema>;
 
+/** Schwelle in Prozent des wirksamen ACoS-Ziels (100 = genau das Ziel). */
+const percentOfGoal = z.number().int().min(1).max(1000);
+const minOrders = z.number().int().min(1).max(100_000);
+
+/**
+ * Kriterien (5.11a) gelten für einen Suchbegriff im Datei-Zeitraum. Leer (`null`) gilt je Feld die Harvest-Regel der
+ * Suchbegriff-Einstufung (`search-terms.ts`, Dominik 2026-10-11); ohne wirksames Ziel deren ACoS.
+ */
 export const catalogEdgeSchema = z.strictObject({
   from: z.string().regex(KEY),
   to: z.string().regex(KEY),
+  minOrders: minOrders.nullable().default(null),
+  maxAcosPercentOfGoal: percentOfGoal.nullable().default(null),
 });
 export type CatalogEdge = z.output<typeof catalogEdgeSchema>;
 
@@ -130,6 +141,24 @@ export const catalogPresetSchema = z.strictObject({
   isDefault: z.boolean().default(false),
 });
 export type CatalogPreset = z.output<typeof catalogPresetSchema>;
+
+/**
+ * Preset-Wechsel (5.11a): Erfüllen die Kennzahlen einer Produktgruppe im Datei-Zeitraum **alle** gesetzten
+ * Bedingungen, schlägt die Automatik vor, von `from` auf `to` zu wechseln (5.11b, nie automatisch).
+ */
+export const presetSwitchSchema = z.strictObject({
+  from: z.string().max(32).regex(PRESET_KEY),
+  to: z.string().max(32).regex(PRESET_KEY),
+  minOrders: minOrders.nullable().default(null),
+  /** Mindest-Ausgaben in EUR, Decimal-String. */
+  minSpend: money.nullable().default(null),
+  /** ACoS der Gruppe gegen das wirksame Ziel; ohne Ziel passt die Bedingung nicht. */
+  acos: z
+    .strictObject({ comparison: z.enum(['lte', 'gte']), percentOfGoal })
+    .nullable()
+    .default(null),
+});
+export type PresetSwitch = z.output<typeof presetSwitchSchema>;
 
 const PLACEHOLDER = /\{([^{}]*)\}/g;
 
@@ -182,6 +211,7 @@ export const structureCatalogSchema = z
     blocks: z.array(catalogBlockSchema).min(1).max(MAX_CATALOG_BLOCKS),
     edges: z.array(catalogEdgeSchema).max(MAX_CATALOG_EDGES),
     presets: z.array(catalogPresetSchema).min(1).max(MAX_CATALOG_PRESETS),
+    presetSwitches: z.array(presetSwitchSchema).max(MAX_PRESET_SWITCHES).default([]),
     naming: namingSchema,
   })
   .superRefine((catalog, ctx) => {
@@ -269,6 +299,18 @@ export const structureCatalogSchema = z
       }
     }
     if (catalog.presets.filter((preset) => preset.isDefault).length !== 1) add('oneDefault');
+
+    const switches = new Set<string>();
+    for (const entry of catalog.presetSwitches) {
+      const { from, to } = entry;
+      if (switches.has(`${from}>${to}`)) add('duplicateSwitch', { from, to });
+      switches.add(`${from}>${to}`);
+      if (!presets.has(from) || !presets.has(to)) add('switchUnknownPreset', { from, to });
+      if (from === to) add('switchSamePreset', { from, to });
+      if (entry.minOrders === null && entry.minSpend === null && entry.acos === null) {
+        add('switchNoCondition', { from, to });
+      }
+    }
   })
   .meta({ id: 'StructureCatalog' });
 export type StructureCatalog = z.output<typeof structureCatalogSchema>;
@@ -575,18 +617,44 @@ const DEFAULT_BLOCKS: CatalogBlock[] = [
   }),
 ];
 
+/** Ohne Angabe gilt die Harvest-Regel; eigene Kampagnen und SB brauchen mehr Bestellungen (eigene Werte). */
+const edge = (from: string, to: string, minOrders: number | null = null): CatalogEdge => ({
+  from,
+  to,
+  minOrders,
+  maxAcosPercentOfGoal: minOrders === null ? null : 100,
+});
 const DEFAULT_EDGES: CatalogEdge[] = [
-  { from: 'SP-AUTO', to: 'SP-KW-BROAD-CLUSTER' },
-  { from: 'SP-AUTO', to: 'SP-KW-EXACT' },
-  { from: 'SP-AUTO', to: 'SP-PAT' },
-  { from: 'SP-KW-BROAD-CLUSTER', to: 'SP-KW-EXACT' },
-  { from: 'SP-KW-PHRASE', to: 'SP-KW-EXACT' },
-  { from: 'SP-KW-EXACT', to: 'SP-KW-EXACT-SINGLE' },
-  { from: 'SP-KW-EXACT-SINGLE', to: 'SB-VIDEO-KW' },
-  { from: 'SP-KW-EXACT-SINGLE', to: 'SB-HEADER-KW' },
-  { from: 'SP-CAT', to: 'SP-PAT' },
-  { from: 'SP-PAT', to: 'SP-PAT-SINGLE-ASIN' },
-  { from: 'SD-CAT', to: 'SD-PAT' },
+  edge('SP-AUTO', 'SP-KW-BROAD-CLUSTER'),
+  edge('SP-AUTO', 'SP-KW-EXACT'),
+  edge('SP-AUTO', 'SP-PAT'),
+  edge('SP-KW-BROAD-CLUSTER', 'SP-KW-EXACT'),
+  edge('SP-KW-PHRASE', 'SP-KW-EXACT'),
+  edge('SP-KW-EXACT', 'SP-KW-EXACT-SINGLE', 8),
+  edge('SP-KW-EXACT-SINGLE', 'SB-VIDEO-KW', 15),
+  edge('SP-KW-EXACT-SINGLE', 'SB-HEADER-KW', 15),
+  edge('SP-CAT', 'SP-PAT'),
+  edge('SP-PAT', 'SP-PAT-SINGLE-ASIN', 8),
+  edge('SD-CAT', 'SD-PAT'),
+];
+
+/** Eigene Startwerte (Dominik, 2026-10-11). */
+const DEFAULT_PRESET_SWITCHES: PresetSwitch[] = [
+  { from: 'launch', to: 'muuv-standard', minOrders: 30, minSpend: null, acos: null },
+  {
+    from: 'muuv-standard',
+    to: 'control',
+    minOrders: 100,
+    minSpend: null,
+    acos: { comparison: 'lte', percentOfGoal: 100 },
+  },
+  {
+    from: 'muuv-standard',
+    to: 'profit-defend',
+    minOrders: null,
+    minSpend: '200',
+    acos: { comparison: 'gte', percentOfGoal: 150 },
+  },
 ];
 
 const blocks = (...keys: (string | PresetBlock)[]): PresetBlock[] =>
@@ -694,8 +762,41 @@ export const DEFAULT_STRUCTURE_CATALOG: StructureCatalog = {
   blocks: DEFAULT_BLOCKS,
   edges: DEFAULT_EDGES,
   presets: DEFAULT_PRESETS,
+  presetSwitches: DEFAULT_PRESET_SWITCHES,
   naming: { pattern: '{adType} | {block} | {group} | {target}' },
 };
+
+/**
+ * Hebt ein gespeichertes Dokument von vor 5.11a an (beim Lesen, vor der Prüfung mit dem Schema): Kanten ohne
+ * Kriterien bekommen die Startwerte der gleichen Start-Kante, ein Dokument ohne `presetSwitches` die Start-Wechsel
+ * zwischen Presets, die es noch gibt. Was schon Angaben trägt (auch leere), bleibt unverändert.
+ */
+export function upgradeStructureCatalog(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw;
+  const doc = raw as { edges?: unknown; presets?: unknown; presetSwitches?: unknown };
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    value !== null && typeof value === 'object';
+  const edges = Array.isArray(doc.edges)
+    ? doc.edges.map((entry: unknown) => {
+        if (!isRecord(entry) || 'minOrders' in entry || 'maxAcosPercentOfGoal' in entry) {
+          return entry;
+        }
+        const seed = DEFAULT_EDGES.find((e) => e.from === entry.from && e.to === entry.to);
+        return seed ? { ...seed, ...entry } : entry;
+      })
+    : doc.edges;
+  if (doc.presetSwitches !== undefined || !Array.isArray(doc.presets)) return { ...doc, edges };
+  const keys = new Set(
+    doc.presets.map((preset: unknown) => (isRecord(preset) ? preset.key : null)),
+  );
+  return {
+    ...doc,
+    edges,
+    presetSwitches: DEFAULT_PRESET_SWITCHES.filter(
+      ({ from, to }) => keys.has(from) && keys.has(to),
+    ),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // API

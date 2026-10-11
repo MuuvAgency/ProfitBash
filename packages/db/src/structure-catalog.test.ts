@@ -184,6 +184,17 @@ describe('Struktur-Katalog lesen und speichern', () => {
     expect(result).toMatchObject({ version: 4 });
     expect(result!.catalog).toEqual(DEFAULT_STRUCTURE_CATALOG);
   });
+
+  it('hebt ein Dokument von vor 5.11a beim Lesen an (Kriterien der Kanten, Preset-Wechsel) und behält dessen Inhalt', async () => {
+    const { presetSwitches: _switches, ...old } = changed();
+    await testDb.db.insert(structureCatalogs).values({
+      organizationId: f.org,
+      catalog: { ...old, edges: old.edges.map(({ from, to }) => ({ from, to })) },
+      version: 2,
+    });
+    const result = await getStructureCatalog(testDb.db, as(f.ada));
+    expect(result!.catalog).toEqual(changed());
+  });
 });
 
 describe('Preset je Client', () => {
