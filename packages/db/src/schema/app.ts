@@ -72,11 +72,19 @@ export const clients = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /**
+     * Kunden-Org (`organizations.type = client`), deren Mitglieder die Profile dieses Clients lesend sehen
+     * (ADR 002 Punkt 3). Eine Kunden-Org gehört zu genau einem Client.
+     */
+    clientOrganizationId: uuid('client_organization_id').references(() => organizations.id, {
+      onDelete: 'set null',
+    }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex('clients_org_slug_uq').on(t.organizationId, t.slug),
+    uniqueIndex('clients_client_organization_uq').on(t.clientOrganizationId),
     // Ziel der zusammengesetzten Fremdschlüssel (verhindert Zuordnungen über Org-Grenzen)
     unique('clients_id_org_uq').on(t.id, t.organizationId),
   ],

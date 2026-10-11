@@ -19,6 +19,10 @@ import {
  *
  * Freigaben (Phase 6, 6.2): Ein Mitglied mit Einträgen in `member_client_grants` sieht nur Profile dieser Clients
  * (also auch keine ohne Client), eines ohne Einträge alle. Admins sehen immer alle.
+ *
+ * Kunden-Org (Phase 6, 6.3a): Ist `orgId` über `clients.client_organization_id` mit einem Client verknüpft, sehen
+ * ihre Mitglieder genau dessen nicht ausgeblendete, nicht entfernte Profile, unabhängig von der Rolle. Die Daten
+ * tragen weiter die `organization_id` der Eigentümer-Org (ADR 002).
  */
 
 export class AccessDeniedError extends Error {
@@ -37,19 +41,42 @@ export interface ProfileVisibilityInput {
   includeRemoved?: boolean;
 }
 
-async function getMembership(
-  db: Db,
-  userId: string,
-  orgId: string,
-): Promise<{ id: string; role: OrgRole } | null> {
+interface MembershipRow {
+  id: string;
+  role: OrgRole;
+  /** Typ der Organisation (`internal` | `client`). */
+  orgType: string;
+  /** Nur Kunden-Org: der verknüpfte Client der Eigentümer-Org. */
+  customerOf: { clientId: string; ownerOrgId: string } | null;
+}
+
+async function getMembership(db: Db, userId: string, orgId: string): Promise<MembershipRow | null> {
   const [membership] = await db
-    .select({ id: members.id, role: members.role })
+    .select({
+      id: members.id,
+      role: members.role,
+      orgType: organizations.type,
+      clientId: clients.id,
+      ownerOrgId: clients.organizationId,
+    })
     .from(members)
+    .innerJoin(organizations, eq(organizations.id, members.organizationId))
+    .leftJoin(clients, eq(clients.clientOrganizationId, members.organizationId))
     .where(and(eq(members.userId, userId), eq(members.organizationId, orgId)))
     .limit(1);
   if (!membership || !isOrgRole(membership.role)) return null;
-  return { id: membership.id, role: membership.role };
+  const { id, role, orgType, clientId, ownerOrgId } = membership;
+  return {
+    id,
+    role,
+    orgType,
+    customerOf: clientId !== null && ownerOrgId !== null ? { clientId, ownerOrgId } : null,
+  };
 }
+
+/** Kunden-Org: nach Typ oder Verknüpfung, damit ein falsch gesetzter Wert allein nichts öffnet. */
+const isCustomerOrg = (membership: MembershipRow) =>
+  membership.orgType === 'client' || membership.customerOf !== null;
 
 /** Rolle des Nutzers in der Organisation oder `null`, wenn er kein Mitglied ist. */
 export async function getOrgRole(db: Db, userId: string, orgId: string): Promise<OrgRole | null> {
@@ -65,7 +92,8 @@ const grantedClientIds = (db: Db, memberId: string) =>
 
 /**
  * Clients, die der Nutzer sehen darf: `null` = alle der Organisation (Admin oder keine Freigaben), sonst die
- * freigegebenen. Kein Mitglied: leere Liste. Für Client-Daten ohne Profil (Presets, Regeln je Client).
+ * freigegebenen. Kein Mitglied: leere Liste. Kunden-Org: nur der verknüpfte Client. Für Client-Daten ohne Profil
+ * (Presets, Regeln je Client).
  */
 export async function visibleClientIds(
   db: Db,
@@ -73,6 +101,8 @@ export async function visibleClientIds(
 ): Promise<string[] | null> {
   const membership = await getMembership(db, input.userId, input.orgId);
   if (membership === null) return [];
+  if (isCustomerOrg(membership))
+    return membership.customerOf ? [membership.customerOf.clientId] : [];
   if (membership.role === 'admin') return null;
   const rows = await grantedClientIds(db, membership.id);
   return rows.length === 0 ? null : rows.map((row) => row.clientId);
@@ -124,6 +154,20 @@ async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Prom
   const membership = await getMembership(db, input.userId, input.orgId);
   if (membership === null) return null;
   const { role } = membership;
+  if (isCustomerOrg(membership)) {
+    if (input.includeHidden || input.includeRemoved) {
+      throw new AccessDeniedError(
+        'Kunden-Orgs sehen keine ausgeblendeten oder entfernten Profile.',
+      );
+    }
+    if (membership.customerOf === null) return [sql`false`];
+    return [
+      eq(amazonAdsProfiles.organizationId, membership.customerOf.ownerOrgId),
+      eq(amazonAdsProfiles.clientId, membership.customerOf.clientId),
+      isNull(amazonAdsProfiles.removedAt),
+      eq(amazonAdsProfiles.isHidden, false),
+    ];
+  }
   if (input.includeHidden && role !== 'admin') {
     throw new AccessDeniedError('Nur Org-Admins dürfen ausgeblendete Profile sehen.');
   }
@@ -235,7 +279,8 @@ export async function listVisibleClientsAndProfiles(
       : await db
           .select({ id: clients.id, name: clients.name, slug: clients.slug })
           .from(clients)
-          .where(and(eq(clients.organizationId, input.orgId), inArray(clients.id, clientIds)))
+          // Ohne Filter nach `orgId`: Die IDs stammen aus dem Scope, bei Kunden-Orgs gehört der Client der Eigentümer-Org.
+          .where(inArray(clients.id, clientIds))
           .orderBy(asc(clients.name), asc(clients.id));
   return { clients: visibleClients, profiles };
 }
