@@ -1,0 +1,200 @@
+# Phase 6 – Steuern
+
+> Vor Beginn lesen: `CLAUDE.md`, `docs/plan.md` (§2 Roadmap, §3 Navigation, §4 Rollen, §5), `docs/decisions/002-tenancy.md`
+> (Entscheidung Punkte 3–5, „Offen für Phase 6“), `docs/tasks/phase-0.md` (0.4: better-auth-Allowlist, Audit-Hooks; 0.6
+> „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
+> („Offen nach Phase 5“), `design/DESIGN.md`.
+>
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei).**
+>
+> **Ausgangslage (Stand Code, 2026-10-11):**
+> - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
+> - Der Access-Layer (`packages/db/src/access.ts`) entscheidet über sichtbare Profile nur nach Mitgliedschaft, `is_hidden`
+>   und `removed_at`; rund 90 Aufrufe in `packages/db` und `apps/api` laufen darüber. Viele Abfragen filtern daneben
+>   eigene Tabellen nach `organization_id = aktive Organisation` (zulässig nach ADR 002, „Geltungsbereich“).
+> - `audit_events` wird seit Phase 0 von jeder schreibenden Aktion gefüllt (Index `organization_id, created_at desc`),
+>   eine Oberfläche gibt es nicht. `target` ist freies JSON (`{ type, id, … }`).
+> - Das Admin-Plugin von better-auth ist eingerichtet (`superadmin`), per HTTP aber gesperrt (Allowlist in `app.ts`);
+>   `requireSuperadmin()` existiert, wird aber von keiner Route benutzt. Der Seed-Admin ist Superadmin.
+> - `/admin/audit` und `/admin/platform` sind Platzhalterseiten; der Wechsel der Organisation im Account-Menü existiert.
+> - Mitgliederverwaltung (2.10) kennt nur die eigene Organisation; Nutzer mit Mitgliedschaft in einer zweiten Organisation
+>   sind dort gesperrt (`OTHER_ORGANIZATION`).
+
+## Ziel
+
+Die Agentur behält die Kontrolle darüber, **wer was sieht und wer was getan hat**:
+- **Audit-Log** (`/admin/audit`): Org-Admins sehen, wer wann was geändert hat, filterbar.
+- **Profil-Freigaben je Mitglied**: Mitglieder der Agentur lassen sich auf einzelne Clients bzw. Profile einschränken.
+- **Kundenzugang**: Ein Kunde bekommt einen eigenen Login (Kunden-Org, `type = client`) und sieht **nur lesend** die
+  Profile seines Clients. Die Daten bleiben bei der Agentur-Org (ADR 002).
+- **Plattform-Admin** (`/admin/platform`, nur Superadmin): Organisationen, Entitlements, Staff.
+- **Impersonation**: Ein Superadmin sieht die App als ein bestimmter Nutzer, sichtbar gekennzeichnet und protokolliert.
+
+## Definition of Done
+
+- [ ] Sichtbarkeit entscheidet weiter **nur** der Access-Layer (ADR 002 Punkt 5); seine Signaturen (`userId`, `orgId`)
+      bleiben. Keine Route prüft Freigaben oder Kunden-Orgs selbst.
+- [ ] **Fail-closed:** Ein Kunden-Login sieht ausschließlich Daten der Profile seines Clients, ein eingeschränktes
+      Mitglied nur seine Freigaben. Test je freigegebenem Endpunkt (fremder Client, fremde Organisation, ausgeblendetes
+      Profil, entzogene Freigabe) und ein Test über **alle** registrierten Routen: Für einen Kunden-Login antwortet jede
+      schreibende Route und jede nicht freigegebene lesende Route mit 403 oder liefert nichts.
+- [ ] Kunden-Orgs sind lesend: keine schreibende Aktion, unabhängig von der Rolle des Mitglieds.
+- [ ] Entitlements gelten je Organisation (ADR 002 Punkt 4): Der Kunde sieht nur, was für seine Org gebucht ist.
+- [ ] Jede schreibende Aktion dieser Phase erzeugt ein `audit_event` (Freigaben, Kundenzugang anlegen und entziehen,
+      Organisationen, Entitlements, Staff, Beginn und Ende einer Impersonation). Aktionen während einer Impersonation
+      nennen den handelnden Superadmin.
+- [ ] Das Audit-Log zeigt nie Secrets (Tokens, Passwörter, Links) und nur Ereignisse der eigenen Organisation;
+      plattformweite Ereignisse sieht nur der Superadmin.
+- [ ] Better-auth-Endpunkte des Admin-Plugins bleiben per HTTP gesperrt; die App nutzt eigene Routen mit Audit
+      (`phase-0.md` 0.4).
+- [ ] Ein Superadmin kann sich nicht selbst die Rolle nehmen, wenn er der letzte ist; Impersonation eines anderen
+      Superadmins ist nicht möglich.
+- [ ] Jede neue Datenansicht hat Loading-, Empty- und Error-Zustand; Texte über i18n; Formularfelder mit Label.
+- [ ] Browser-Pane geprüft wie in Phase 2–5 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole), mit echten Bedienelementen;
+      angelegte Testdaten über die Oberfläche wieder entfernt oder genau benannt.
+- [ ] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
+
+## Fragen an Dominik
+
+Gestellt zu Beginn der Session (2026-10-11), jede mit Empfehlung.
+
+- **F1 – Was sieht ein Kunde?** Empfehlung: Dashboard und Explorer, nur lesend (Kennzahlen, Drill-Down, Chart, Grid).
+  Weitere Bereiche (Budgets/Pacing, Ziele) erst, wenn sie gebraucht werden: Jede Seite muss einzeln „kundensicher“
+  gemacht werden, weil ihre Einstellungen der Agentur gehören. Alternativen: zusätzlich Budgets und Ziele lesend; oder
+  je Kunden-Org frei wählbar aus allen Features.
+  **Entschieden (Dominik, 2026-10-11): Dashboard und Explorer, wie empfohlen.**
+- **F2 – Profil-Freigaben für Agentur-Mitglieder: wie fein?** Empfehlung: je **Client** (ein eingeschränktes Mitglied
+  sieht alle Profile der ihm zugeordneten Clients, neue Profile des Clients automatisch). Alternativen: je einzelnem
+  Profil (`plan.md` §4 nennt Profile; mehr Pflege) oder jetzt gar nicht (Muuv hat heute nur wenige Mitglieder).
+  **Entschieden (Dominik, 2026-10-11): je Client, wie empfohlen.** `plan.md` §4 wird in 6.2 angepasst.
+- **F3 – Wer legt Kundenzugänge an?** Empfehlung: der Org-Admin der Agentur unter „Clients & Connections“ am Client
+  („Kundenzugang“: Nutzer mit E-Mail anlegen, Link zum Passwortsetzen wie in 2.10). Die Kunden-Org entsteht dabei
+  automatisch. Alternative: nur der Superadmin im Plattform-Admin.
+  **Entschieden (Dominik, 2026-10-11): der Org-Admin am Client, wie empfohlen.**
+- **F4 – Impersonation: was darf sie?** Empfehlung: Der Superadmin sieht die App als der Nutzer, **nur lesend**
+  (schreibende Anfragen werden abgelehnt), höchstens eine Stunde, mit Banner „Du siehst die App als …“ und „Beenden“,
+  Beginn und Ende im Audit-Log. Alternative: volle Rechte des Nutzers, jede Aktion im Audit mit dem Superadmin.
+  **Entschieden (Dominik, 2026-10-11): volle Rechte des Nutzers** (abweichend von der Empfehlung). Folgen in 6.5:
+  Jedes Audit-Event während einer Impersonation nennt den Superadmin als Handelnden und den Nutzer, als der er
+  gehandelt hat; Banner und Zeitgrenze bleiben.
+- **F5 – Plattform-Admin: Umfang.** Empfehlung: Organisationen (Liste, anlegen, umbenennen), Entitlements je
+  Organisation (Schalter je Feature-Key), Staff (Superadmin-Rolle vergeben und entziehen), dazu „Als Nutzer ansehen“.
+  Nicht: Organisation löschen, Nutzer sperren, Abrechnung. Alternative: zusätzlich Nutzer sperren (Ban des Admin-Plugins).
+  **Entschieden (Dominik, 2026-10-11): Orgs, Entitlements, Staff, wie empfohlen.**
+- **F6 – Modus „aus“ der Automatik** löscht beim nächsten Lauf die offenen Warenkorb-Zeilen der Automatik (Festlegung
+  von Claude in 5.13a). Empfehlung: so lassen („aus“ heißt: nichts von der Automatik liegt herum; von Hand gelegte
+  Zeilen bleiben). Alternative: Zeilen behalten.
+  **Entschieden (Dominik, 2026-10-11): so lassen.**
+- **F7 – Glättung des Optimizers (12 Klicks) und Spanne der Pacing-Schätzung** sind Konstanten. Empfehlung: Konstanten
+  lassen, bis 5.12 zeigt, ob sie passen. Alternative: als Einstellung je Organisation (eigene Aufgabe vor 6.1).
+  **Entschieden (Dominik, 2026-10-11): Konstanten lassen.**
+
+**Ohne Frage geklärt (Dev-DB, 2026-10-11, nur Zähler gelesen):** `amazon_ads_entity_period_metrics` und
+`automation_runs` sind leer, der einzige Import ist vom 2026-10-07. Damit bleiben **5.12** und die **Prüfung mit echten
+Daten** offen (`phase-5.md` „Offen nach Phase 5“); ProfitBash ist noch nicht live, Wochen mit Läufen kann es nicht geben.
+
+## Aufgaben (nach F1–F7, 2026-10-11)
+
+**Begriffe:** **Eigentümer-Org** = die Agentur-Org, der Profile und Daten gehören. **Kunden-Org** = Organisation mit
+`type = client`, verknüpft mit genau einem Client der Eigentümer-Org. **Freigabe** = Zuordnung eines Agentur-Mitglieds
+zu Clients (bzw. Profilen, F2); ein Mitglied ohne Freigaben sieht wie bisher alles. **Staff** = Nutzer mit der
+Plattform-Rolle `superadmin`.
+
+**Festlegungen von Claude (2026-10-11; Dominik kann widersprechen):**
+- **Kunden-Org ↔ Client:** Spalte `clients.client_organization_id` (ADR 002 Punkt 3), eindeutig: eine Kunden-Org gehört zu
+  genau einem Client. Mehrere Clients für einen Kunden oder Freigaben einzelner Profile an Kunden
+  (`profile_grants(grantee_organization_id, profile_id)` aus ADR 002) kommen erst bei Bedarf.
+- **Regel im Access-Layer:** Für eine Kunden-Org liefert `visibleProfilesScope()` die nicht ausgeblendeten, nicht
+  entfernten Profile des verknüpften Clients; `includeHidden`/`includeRemoved` sind dort nie erlaubt. Abfragen, die
+  daneben nach `organization_id = aktive Organisation` filtern, liefern für Kunden nichts (fail-closed) und werden je
+  freigegebener Seite (F1) einzeln umgestellt, mit Test.
+- **Kunden-Mitglieder** haben immer die Rolle `viewer`; `write` ist für Kunden-Orgs zusätzlich in
+  `resolveFeatureAccess` bzw. `requireFeature` gesperrt, damit ein falsch gesetzter Rollenwert nichts öffnet.
+  Admin-Seiten (Connections, Mitglieder, Sync, Audit) gibt es für Kunden-Orgs nicht.
+- **Was Kunden nie sehen:** Regeln, Leitplanken, Vorschläge, Warenkorb, Tags, gespeicherte Ansichten und Benachrichtigungen
+  der Agentur, geschützte Begriffe, andere Clients. Eigene gespeicherte Ansichten der Kunden-Org sind erlaubt (gehören
+  der Kunden-Org, der Access-Layer filtert ihren Inhalt schon heute).
+- **Eingeschränkte Mitglieder** (F2): gilt für `editor` und `viewer`; Admins sehen immer alles. Schreibrechte bleiben
+  an der Rolle, nur die Menge der Profile schrumpft. Org-weite Daten (Regeln, Katalog, Tags) bleiben für sie lesbar.
+- **Audit-Log:** keine Löschfrist, kein Export, keine Volltextsuche im `target`; Filter nach Zeitraum, Nutzer und
+  Bereich (Präfix der Aktion). Seitenweise per Cursor (`created_at`, `id`), nie alles laden.
+- **Impersonation:** eigene Routen statt der gesperrten better-auth-Endpunkte; die Session trägt `impersonated_by`
+  (Spalte des Admin-Plugins; beim Bau prüfen, ob sie im Schema steht). Audit-Events aus einer solchen Session nennen
+  den Superadmin als `actor_user_id` und den Nutzer im `target` (`impersonatedUserId`); das Audit-Log (6.1) zeigt beides.
+
+### 6.1 Audit-Log (`/admin/audit`)
+- [ ] `packages/db/src/audit.ts`: `listAuditEvents(db, { orgId, from, to, actorUserId, area, cursor, limit })` mit Name
+      und E-Mail des Handelnden (auch „System“ bei `actor_user_id` leer, „gelöschter Nutzer“), neueste zuerst, Cursor.
+      Liste der Bereiche und Handelnden für die Filter aus den vorhandenen Ereignissen.
+- [ ] `GET /api/audit-events` hinter `orgAdminOnly` (nur aktive Organisation; fremde Organisation, Editor → 403), zod für
+      Query und Antwort, `pnpm api:generate`.
+- [ ] Seite: Tabelle (Zeit in der Zeitzone des Browsers, Nutzer, Aktion als lesbarer Text über i18n mit Rückfall auf den
+      Schlüssel, Objekt), Details des `target` aufklappbar, Filterleiste, „Mehr laden“; Loading, Empty, Error.
+- [ ] Test, dass kein bekanntes Secret-Feld im `target` landet (Stichprobe über die vorhandenen Aufrufer von
+      `recordAuditEvent`: Token, Passwort, Link).
+
+### 6.2 Profil-Freigaben je Mitglied (F2)
+- [ ] Tabelle `member_client_grants` (Mitglied, Client, Organisation; zusammengesetzte Fremdschlüssel wie üblich).
+      Migration. `plan.md` §4 anpassen (Freigaben je Client statt je Profil, F2).
+- [ ] Access-Layer: Hat ein Mitglied (nicht Admin) Freigaben, begrenzt `visibilityConditions` auf Profile dieser
+      Clients. Tests in `access.test.ts` (ohne Freigabe alles, mit Freigabe nur diese, Admin immer alles, Profil ohne
+      Client für Eingeschränkte unsichtbar).
+- [ ] Prüfen, welche nutzerseitigen Abfragen Profildaten **ohne** Profil-Scope lesen (nur nach Organisation): Befunde
+      beheben oder als Ausnahme in ADR 002 begründen. Benachrichtigungen mit Profil folgen schon dem Scope.
+- [ ] API und Oberfläche in der Mitgliederverwaltung: „Zugriff: alle Clients / ausgewählte“, Audit `member.grants_update`.
+
+### 6.3a Kunden-Org: Modell und Access-Layer
+- [ ] `clients.client_organization_id` (eindeutig, FK auf `organizations`), Migration; ADR 002 ergänzen
+      („Offen für Phase 6“ auflösen).
+- [ ] Access-Layer nach der Festlegung oben; `listVisibleClientsAndProfiles` liefert für Kunden genau ihren Client
+      (`phase-2.md` 2.4). Tests: Kunde sieht nur seinen Client, nie Ausgeblendetes, nie mit `includeHidden`.
+- [ ] `resolveFeatureAccess`/`requireFeature`: Kunden-Org nie `write`; `/api/me` nennt den Typ der aktiven Organisation
+      (steht schon in `organizations[].type`).
+- [ ] Test über alle registrierten Routen mit einem Kunden-Login (Definition of Done, fail-closed).
+
+### 6.3b Kunden-Org: freigegebene Seiten (F1)
+- [ ] Dashboard und Explorer (Auswertungs-Endpunkte, Filteroptionen, Währungen) für Kunden-Logins: Abfragen, die nach
+      der aktiven Organisation filtern, auf den Profil-Scope umstellen; je Endpunkt Test mit zweitem Client.
+- [ ] Web: Shell für Kunden-Orgs (nur gebuchte Einträge, keine Platzhalter späterer Phasen, kein Warenkorb, keine
+      Quick-Tools, keine Glocke); Bedienelemente zum Bearbeiten im Explorer hängen bereits an `write`.
+- [ ] Browser-Prüfung als Kunde.
+
+### 6.3c Kundenzugang verwalten (F3)
+- [ ] `packages/db`: Kunden-Org zu einem Client anlegen (Typ `client`, Entitlements nach F1), Kunden-Nutzer anlegen
+      (Rolle `viewer`, Passwort-Link aus 2.10 wiederverwenden), entziehen (Mitgliedschaft und Sessions beenden),
+      Audit `client_access.*`. Ein Nutzer, der schon Mitglied der Agentur ist, kann kein Kunden-Nutzer werden.
+- [ ] API hinter `orgAdminOnly` der Eigentümer-Org; Oberfläche am Client unter „Clients & Connections“.
+
+### 6.4 Plattform-Admin (`/admin/platform`, F5)
+- [ ] API hinter `requireSuperadmin()`: Organisationen (Liste mit Typ, Mitgliederzahl, verknüpftem Client; anlegen,
+      umbenennen), Entitlements je Organisation (Feature-Keys aus `FEATURE_KEYS`), Staff (Liste, Rolle vergeben und
+      entziehen, letzter Superadmin geschützt). Audit je Aktion (`platform.*`, `organization_id` der betroffenen Org).
+- [ ] Seite mit den Reitern Orgs · Entitlements · Staff (`plan.md` §3).
+
+### 6.5 Impersonation (F4)
+- [ ] `POST /api/platform/impersonation` (Superadmin, Ziel kein Superadmin) und `DELETE` (beenden); Ablauf nach
+      höchstens einer Stunde; Audit für Beginn und Ende.
+- [ ] Volle Rechte des Nutzers (F4): Der Handelnde im Audit kommt an **einer** Stelle aus der Session (Superadmin als
+      `actor_user_id`, Nutzer im `target`), nicht je Aufrufer; Test über eine schreibende Route je Bereich und über die
+      better-auth-Hooks. Plattform-Routen und Mitgliederverwaltung sind während einer Impersonation gesperrt (sonst
+      ließe sich über den fremden Nutzer die eigene Spur verwischen oder ein Passwort-Link ziehen).
+- [ ] Web: Banner über der Shell mit „Beenden“, Start aus dem Plattform-Admin.
+
+### 6.6 Abschluss
+- [ ] Definition of Done prüfen und belegen, ADR 002 und `plan.md` (§3, §4) auf den Stand bringen, „Offen nach Phase 6“.
+
+## Bewusst nicht in Phase 6
+
+- Alles mit SP-API: Bestellungen, Kosten, P&L, TACoS (Phase 7); Rechner Deal & Coupon, LTV, B2B-Inkrementalität
+  (Ideen-Dokument G, dort Phase 7).
+- Schreibrechte für Kunden, Freigaben oder Kommentare von Kunden zu Vorschlägen.
+- Selbstregistrierung, Einladungen per E-Mail, Passwort-Reset per E-Mail, SSO, Zwei-Faktor (kein Mail-Dienst, keine
+  zusätzlichen Konten).
+- Abrechnung, Pläne, Preise; Organisation löschen; White-Label je Kunde (Logo, Farben).
+- Export des Audit-Logs, Löschfristen, Benachrichtigungen an Kunden.
+- 5.12 und die Prüfung mit echten Daten aus Phase 5 (bleiben in `phase-5.md` offen, bis Daten vorliegen).
+
+## Reihenfolge für Claude Code
+
+6.1 → 6.2 → 6.3a → 6.3b → 6.3c → 6.4 → 6.5 → 6.6. 6.1 hängt an nichts; 6.3b braucht 6.3a; 6.5 braucht 6.4. Bis zu drei
+Aufgaben je Session (`CLAUDE.md`), nach jedem Schritt Tests grün, Commit, Häkchen und „Umsetzung“-Notiz.
