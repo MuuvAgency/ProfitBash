@@ -647,6 +647,36 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/members/{id}/password-link', { params: { path: { id } } })),
     },
 
+    /** Kundenzugang am Client (6.3c, nur Org-Admins der Agentur): Nutzer der Kunden-Org, immer nur lesend. */
+    clientAccess: {
+      list: async (clientId: string): Promise<Member[]> =>
+        (
+          await unwrap(
+            client.GET('/api/clients/{id}/access', { params: { path: { id: clientId } } }),
+          )
+        ).members,
+      create: (clientId: string, input: { email: string; name: string }) =>
+        unwrap(
+          client.POST('/api/clients/{id}/access', {
+            params: { path: { id: clientId } },
+            body: input,
+          }),
+        ),
+      renewLink: (clientId: string, memberId: string) =>
+        unwrap(
+          client.POST('/api/clients/{id}/access/{memberId}/password-link', {
+            params: { path: { id: clientId, memberId } },
+          }),
+        ),
+      async remove(clientId: string, memberId: string): Promise<void> {
+        await unwrap(
+          client.DELETE('/api/clients/{id}/access/{memberId}', {
+            params: { path: { id: clientId, memberId } },
+          }),
+        );
+      },
+    },
+
     /** Öffentlich (ohne Session): Link zum Passwort-Setzen prüfen und einlösen, Token im Body. */
     passwordLinks: {
       inspect: (token: string) =>
