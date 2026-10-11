@@ -1,4 +1,5 @@
 import { flushPromises } from '@vue/test-utils';
+import MultiSelect from 'primevue/multiselect';
 import Select from 'primevue/select';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { json, stubFetch } from '../test/fetch-stub';
@@ -17,6 +18,7 @@ const member = (patch: Record<string, unknown>) => ({
   status: 'active',
   linkExpiresAt: null,
   isSelf: true,
+  clientIds: [],
   createdAt: '2026-09-01T08:00:00.000Z',
   ...patch,
 });
@@ -37,6 +39,17 @@ const list = () => ({
   ],
 });
 
+const NORD = '00000000-0000-4000-8000-0000000000c1';
+const CLIENTS = [
+  { id: NORD, name: 'Nordwind', slug: 'nordwind', protectedTerms: [] },
+  {
+    id: '00000000-0000-4000-8000-0000000000c2',
+    name: 'Südhang',
+    slug: 'suedhang',
+    protectedTerms: [],
+  },
+];
+
 const LINK = 'http://localhost:3000/set-password#' + 'a'.repeat(43);
 
 function routes(extra: Record<string, Response | ((r: never) => Response)> = {}) {
@@ -44,6 +57,7 @@ function routes(extra: Record<string, Response | ((r: never) => Response)> = {})
     'GET /api/me': json(meFixture()),
     'GET /api/settings/ui-state/shell/sidebar': json({ value: null }),
     'GET /api/members': json(list()),
+    'GET /api/clients': json({ clients: CLIENTS }),
     ...extra,
   };
 }
@@ -206,5 +220,25 @@ describe('MembersPage', () => {
     const { router } = await mountWithApp(undefined, { path: '/admin/members' });
     await flushPromises();
     expect(router.currentRoute.value.name).toBe('forbidden');
+  });
+
+  it('Zugriff je Client: Auswahl nur bei Nicht-Admins, speichert die Freigaben (6.2)', async () => {
+    const { requests } = stubFetch(
+      routes({
+        'PUT /api/members/{id}/client-grants': json(member({ id: EMIL, clientIds: [NORD] })),
+      }),
+    );
+    const { wrapper } = await mountWithApp(undefined, { path: '/admin/members' });
+    await vi.waitFor(() => expect(wrapper.text()).toContain('emil@muuv.test'));
+    const grants = wrapper.findAllComponents(MultiSelect);
+    // Admins sehen immer alles: kein Auswahlfeld in der eigenen Zeile.
+    expect(grants.map((g) => g.props('ariaLabel'))).toEqual(['Zugriff von Emil']);
+    expect(grants[0]!.props('placeholder')).toBe('Alle Clients');
+    await vi.waitFor(() => expect(grants[0]!.props('options')).toHaveLength(2));
+    grants[0]!.vm.$emit('update:modelValue', [NORD]);
+    await flushPromises();
+    const put = requests.find((r) => r.method === 'PUT')!;
+    expect(put.path).toBe(`/api/members/${EMIL}/client-grants`);
+    expect(put.body).toEqual({ clientIds: [NORD] });
   });
 });
