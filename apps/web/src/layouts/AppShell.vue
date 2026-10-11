@@ -12,12 +12,13 @@ import SidebarPanel from '../components/shell/SidebarPanel.vue';
 import { errorMessageKey } from '../i18n';
 import NotificationBell from '../notifications/NotificationBell.vue';
 import { useNotificationStream } from '../notifications/queries';
-import { useSessionStore } from '../stores/session';
+import { useIsCustomerOrg, useSessionStore } from '../stores/session';
 import { useSidebarState } from './useSidebarState';
 
 const { t } = useI18n();
 const session = useSessionStore();
 const { collapsed, toggle } = useSidebarState();
+const customer = useIsCustomerOrg();
 // Live-Kanal der Benachrichtigungen für die ganze Sitzung (je aktiver Organisation, 5.2b).
 useNotificationStream();
 const mobileNavOpen = ref(false);
@@ -89,9 +90,12 @@ async function retry() {
         @click="mobileNavOpen = true"
       />
       <RouterLink :to="{ name: 'home' }" class="text-ink"><BrandMark /></RouterLink>
+      <!-- Bleibt für Kunden-Logins leer stehen, damit das Logo mittig bleibt. -->
       <div class="flex items-center gap-space-xs">
-        <NotificationBell variant="bar" />
-        <QuickTools variant="bar" collapsed />
+        <template v-if="!customer">
+          <NotificationBell variant="bar" />
+          <QuickTools variant="bar" collapsed />
+        </template>
       </div>
     </header>
     <Drawer

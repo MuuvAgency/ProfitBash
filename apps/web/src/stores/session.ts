@@ -2,6 +2,7 @@ import { DEFAULT_SETTINGS, type MeResponse, type Settings, type Theme } from '@p
 import { defineStore } from 'pinia';
 import { computed, ref, shallowRef } from 'vue';
 import { api, ApiError, type SignInInput } from '../api';
+import { isCustomerOrg } from '../navigation/navigation';
 import type { GuardSession } from '../router/guard';
 import { readCachedTheme, writeCachedTheme } from '../theme/mode';
 
@@ -194,6 +195,12 @@ export const useSessionStore = defineStore('session', () => {
     markSignedOut,
   };
 });
+
+/** Kunden-Login (`phase-6.md` F1): Shell und Seiten lassen weg, was der Agentur gehört. */
+export function useIsCustomerOrg() {
+  const session = useSessionStore();
+  return computed(() => session.me !== null && isCustomerOrg(session.me));
+}
 
 /** Aktive Organisation (`null` ohne Organisation). Gehört in jeden Query-Key mit Org-Daten. */
 export function useActiveOrgId() {

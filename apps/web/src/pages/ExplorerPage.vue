@@ -75,7 +75,7 @@ import { downloadCsv } from '../grid/csv';
 import { errorMessageKey } from '../i18n';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
 import { explorerTarget, filtersFromView, viewState } from '../saved-views/view-state';
-import { useSessionStore } from '../stores/session';
+import { useIsCustomerOrg, useSessionStore } from '../stores/session';
 import { simulatorLink } from '../tools/bid-simulator/link';
 import { useToolRights } from '../tools/queries';
 import type { SavedView } from '@profitbash/shared';
@@ -89,6 +89,8 @@ const { t, te } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const session = useSessionStore();
+// Kunden-Logins: keine gespeicherten Ansichten, keine Suchbegriff-Analyse (`phase-6.md` 6.3b).
+const customer = useIsCustomerOrg();
 const queryClient = useQueryClient();
 const locale = computed(() => session.preferences.locale);
 const filters = useAnalyticsFilters();
@@ -129,11 +131,15 @@ const tabs = computed(() => [
     to: link(pathForLevel(tab.level), withoutSearch(route.query, tab.level)) as RouteLocationRaw,
   })),
   // Eigene Seite mit eigener Auswahl (Profil und Datei-Zeitraum statt Filterleiste).
-  {
-    key: SEARCH_TERM_ANALYSIS_TAB,
-    label: t('searchTerms.tab'),
-    to: SEARCH_TERM_ANALYSIS_PATH as RouteLocationRaw,
-  },
+  ...(customer.value
+    ? []
+    : [
+        {
+          key: SEARCH_TERM_ANALYSIS_TAB,
+          label: t('searchTerms.tab'),
+          to: SEARCH_TERM_ANALYSIS_PATH as RouteLocationRaw,
+        },
+      ]),
 ]);
 
 const historyVersion = ref(0);
@@ -568,6 +574,7 @@ const truncatedText = computed(() => {
           {{ t('explorer.pendingLink', { count: formatNumber(String(pendingCount), locale) }) }}
         </RouterLink>
         <SavedViewsMenu
+          v-if="!customer"
           area="explorer"
           :current="currentView"
           link-path="/ads/explorer"

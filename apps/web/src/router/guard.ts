@@ -12,6 +12,8 @@ declare module 'vue-router' {
     home?: boolean;
     /** Verlangt `view` auf diesem Feature-Key. */
     feature?: FeatureKey;
+    /** Nicht für Kunden-Orgs (die API lehnt die Anfragen der Seite ab). */
+    agencyOnly?: boolean;
     requiresOrgAdmin?: boolean;
     requiresSuperadmin?: boolean;
   }
@@ -58,6 +60,7 @@ export function resolveGuard(to: GuardTarget, session: GuardSession): true | Rou
   const { me } = session;
   if (meta.guestOnly) return { path: safeRedirect(to.query.redirect) ?? homePath(me) };
   if (meta.home) return { path: homePath(me) };
+  if (meta.agencyOnly && !canAccess('agency', me)) return FORBIDDEN;
   if (meta.requiresSuperadmin && !canAccess('superadmin', me)) return FORBIDDEN;
   if (meta.requiresOrgAdmin && !canAccess('orgAdmin', me)) return FORBIDDEN;
   if (meta.feature && !canAccess({ feature: meta.feature }, me)) return FORBIDDEN;

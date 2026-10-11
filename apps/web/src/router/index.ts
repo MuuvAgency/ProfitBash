@@ -23,6 +23,7 @@ declare module 'vue-router' {
 
 function accessMeta(access: Access): RouteMeta {
   if (access === 'all') return {};
+  if (access === 'agency') return { agencyOnly: true };
   if (access === 'orgAdmin') return { requiresOrgAdmin: true };
   if (access === 'superadmin') return { requiresSuperadmin: true };
   return { feature: access.feature };
@@ -92,7 +93,13 @@ const routes: RouteRecordRaw[] = [
         path: 'ads/explorer/search-term-analysis',
         name: 'search-term-analysis',
         component: () => import('../pages/SearchTermAnalysisPage.vue'),
-        meta: { feature: 'sp-explorer', navItemId: 'explorer', titleKey: 'searchTerms.title' },
+        meta: {
+          feature: 'sp-explorer',
+          // Regeln und geschützte Begriffe gehören der Agentur.
+          agencyOnly: true,
+          navItemId: 'explorer',
+          titleKey: 'searchTerms.title',
+        },
       },
       // Tools (Phase 4): Produktgruppen (4.1) sind die Einstiegsseite; weitere Unterseiten folgen mit ihren Aufgaben.
       { path: 'ads/tools', redirect: '/ads/tools/product-groups' },

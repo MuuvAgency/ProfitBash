@@ -2,7 +2,7 @@ import { flushPromises } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData, TimeSeriesData } from '../api/client';
 import { json, stubFetch, type RecordedRequest } from '../test/fetch-stub';
-import { meFixture } from '../test/fixtures';
+import { customerMeFixture, isOpenForCustomers, meFixture } from '../test/fixtures';
 import { cleanupMounted, mountWithApp } from '../test/mount';
 
 // AG Charts zeichnet auf Canvas (fehlt in happy-dom); geprüft werden die übergebenen Optionen.
@@ -182,6 +182,15 @@ afterEach(() => {
 const text = (wrapper: { text(): string }) => wrapper.text().replace(/\u00a0/g, ' ');
 
 describe('DashboardPage', () => {
+  it('Kunden-Login: nur freigegebene Anfragen, keine gespeicherten Ansichten', async () => {
+    const { requests } = stubFetch(routes({ 'GET /api/me': json(customerMeFixture()) }));
+    const { wrapper } = await mountDashboard();
+    await flushPromises();
+    expect(requests.map((r) => r.path).filter((path) => !isOpenForCustomers(path))).toEqual([]);
+    expect(wrapper.find('[data-saved-views]').exists()).toBe(false);
+    expect(wrapper.find('[data-notification-bell]').exists()).toBe(false);
+  });
+
   it('KPI-Kacheln nach F11 mit Veränderung und „≈“ bei umgerechneten Beträgen', async () => {
     stubFetch(routes());
     const { wrapper } = await mountDashboard();

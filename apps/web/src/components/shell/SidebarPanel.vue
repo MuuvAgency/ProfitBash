@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { usePendingCount } from '../../changes/queries';
 import { visibleNavigation } from '../../navigation/navigation';
 import NotificationBell from '../../notifications/NotificationBell.vue';
-import { useSessionStore } from '../../stores/session';
+import { useIsCustomerOrg, useSessionStore } from '../../stores/session';
 import BrandMark from '../brand/BrandMark.vue';
 import AccountMenu from './AccountMenu.vue';
 import QuickTools from './QuickTools.vue';
@@ -24,6 +24,7 @@ const emit = defineEmits<{ toggleCollapsed: []; navigate: []; showShortcuts: [];
 
 const { t } = useI18n();
 const session = useSessionStore();
+const customer = useIsCustomerOrg();
 const groups = computed(() => (session.me ? visibleNavigation(session.me) : []));
 /** Warenkorb am Eintrag „Änderungen“ (3.5); ohne Zahl bei leerem Warenkorb oder wenn sie nicht bekannt ist. */
 const pendingCount = usePendingCount();
@@ -60,7 +61,7 @@ const toggleLabel = computed(() =>
       </RouterLink>
       <!-- In der mobilen Schublade nicht: Die Kopfzeile hat ihre eigene Glocke. -->
       <NotificationBell
-        v-if="!closable"
+        v-if="!closable && !customer"
         :collapsed="collapsed"
         :class="collapsed ? '' : 'ml-auto'"
       />
@@ -100,7 +101,7 @@ const toggleLabel = computed(() =>
     </div>
 
     <div class="flex flex-col gap-space-xs">
-      <QuickTools :collapsed="collapsed" />
+      <QuickTools v-if="!customer" :collapsed="collapsed" />
       <AccountMenu
         :id-prefix="idPrefix"
         :collapsed="collapsed"

@@ -20,7 +20,7 @@ import { useDashboardQueries } from '../dashboard/queries';
 import { canAccess } from '../navigation/navigation';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
 import { filtersFromView, viewState } from '../saved-views/view-state';
-import { useSessionStore } from '../stores/session';
+import { useIsCustomerOrg, useSessionStore } from '../stores/session';
 import type { SavedView } from '@profitbash/shared';
 
 /**
@@ -29,6 +29,8 @@ import type { SavedView } from '@profitbash/shared';
  */
 const { t } = useI18n();
 const session = useSessionStore();
+// Gespeicherte Ansichten gibt es für Kunden-Logins nicht (`phase-6.md` 6.3b).
+const customer = useIsCustomerOrg();
 const locale = computed(() => session.preferences.locale);
 const filters = useAnalyticsFilters();
 
@@ -77,6 +79,7 @@ const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
     >
       <template #actions>
         <SavedViewsMenu
+          v-if="!customer"
           area="dashboard"
           :current="currentView"
           link-path="/dashboard"

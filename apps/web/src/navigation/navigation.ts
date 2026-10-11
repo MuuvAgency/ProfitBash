@@ -5,8 +5,8 @@ import type { FeatureKey, MeResponse } from '@profitbash/shared';
  * dieselbe Regel (`canAccess`), damit ein Eintrag nie sichtbar ist, dessen Seite gesperrt wäre.
  */
 
-/** `all` = jeder angemeldete Nutzer. */
-export type Access = 'all' | 'orgAdmin' | 'superadmin' | { feature: FeatureKey };
+/** `all` = jeder angemeldete Nutzer; `agency` = nicht für Kunden-Orgs (Phase 6: Kunden sehen nur Gebuchtes). */
+export type Access = 'all' | 'agency' | 'orgAdmin' | 'superadmin' | { feature: FeatureKey };
 
 export interface NavItem {
   id: string;
@@ -172,7 +172,7 @@ export const NAVIGATION: readonly NavGroup[] = [
         labelKey: 'nav.notifications',
         path: '/notifications',
         icon: 'bell',
-        access: 'all',
+        access: 'agency',
         phase: 5,
       },
       {
@@ -233,8 +233,14 @@ export function activeOrgRole(me: MeResponse) {
   return me.organizations.find((org) => org.id === me.activeOrganizationId)?.role ?? null;
 }
 
+/** Die aktive Organisation ist eine Kunden-Org (`type = client`): nur lesend, nur Dashboard und Explorer. */
+export function isCustomerOrg(me: MeResponse): boolean {
+  return me.organizations.find((org) => org.id === me.activeOrganizationId)?.type === 'client';
+}
+
 export function canAccess(access: Access, me: MeResponse): boolean {
   if (access === 'all') return true;
+  if (access === 'agency') return !isCustomerOrg(me);
   if (access === 'orgAdmin') return activeOrgRole(me) === 'admin';
   if (access === 'superadmin') return me.user.role === 'superadmin';
   return me.features[access.feature]?.view === true;

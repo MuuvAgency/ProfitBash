@@ -16,7 +16,7 @@ const asinTool = computed(() => session.me?.features['sp-explorer']?.view ?? fal
 </script>
 
 <template>
-  <div>
+  <div data-quick-tools>
     <button
       v-tooltip.right="collapsed ? t('quickTools.button') : undefined"
       type="button"
