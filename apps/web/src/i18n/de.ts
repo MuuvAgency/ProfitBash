@@ -1318,6 +1318,27 @@ export const de = {
         offAmazon: 'Ausspielung außerhalb von Amazon (die Spalte gibt es nur in US-Dateien).',
       },
     },
+    structure: {
+      title: 'Graduation und Presets',
+      text: 'Suchbegriffe, die nach den Kanten des Struktur-Katalogs in den nächsten Baustein gehören, und Produktgruppen, für die ein anderes Preset passt. Annehmen legt den Begriff auf die Harvest-Merkliste des Kampagnen-Setups bzw. ändert das Preset der Gruppe; an Amazon geht dabei nichts.',
+      loadFailed: 'Die Graduation- und Preset-Vorschläge konnten nicht geladen werden.',
+      empty: {
+        open: 'Keine offenen Graduation- oder Preset-Vorschläge. Graduation braucht Kampagnen mit Baustein (Tools, Struktur-Katalog, Kampagnen) und Suchbegriffe im Zeitraum der Datei.',
+        dismissed: 'Keine verworfenen Graduation- oder Preset-Vorschläge.',
+      },
+      kind: { graduation: 'Graduation', presetSwitch: 'Preset-Wechsel' },
+      acos: 'ACoS {value} %',
+      accept: { graduation: 'Auf die Merkliste', presetSwitch: 'Preset ändern' },
+      acceptOne: {
+        graduation: '{name} auf die Merkliste setzen ({change})',
+        presetSwitch: 'Preset von {name} ändern ({change})',
+      },
+      accepted: '{n} Vorschlag angenommen. | {n} Vorschläge angenommen.',
+      dismissed: '{n} Vorschlag verworfen. | {n} Vorschläge verworfen.',
+      notAccepted:
+        ' {n} ließ sich nicht annehmen (Begriff nicht mehr im Zeitraum, Preset oder Produktgruppe geändert); der nächste Lauf räumt auf.',
+      skipped: ' {n} übersprungen.',
+    },
     proposals: {
       title: 'Vorschläge',
       text: 'Was die Automatik ändern würde, mit Begründung. An Amazon geht nichts: Übernommene Vorschläge liegen als ausstehende Änderungen in deinem Warenkorb. Verworfenes kommt erst mit neuen Kennzahlen wieder.',
