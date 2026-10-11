@@ -20,6 +20,8 @@ export const NOTIFICATION_KINDS = [
   'budget_cap_forecast',
   // Prüfungen (5.10): neue Befunde.
   'automation_findings',
+  // Graduation- und Preset-Vorschläge (5.11b).
+  'structure_proposals',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

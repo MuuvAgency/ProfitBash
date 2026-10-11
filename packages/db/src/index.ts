@@ -42,3 +42,4 @@ export * from './portfolios';
 export * from './budget-caps';
 export * from './automation-checks';
 export * from './campaign-blocks';
+export * from './structure-proposals';

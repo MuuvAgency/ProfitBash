@@ -323,6 +323,13 @@
       "when": 1791705683538,
       "tag": "0045_campaign_blocks",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791706518778,
+      "tag": "0046_structure_proposals",
+      "breakpoints": true
     }
   ]
 }

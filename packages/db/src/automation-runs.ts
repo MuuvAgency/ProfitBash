@@ -40,6 +40,13 @@ import {
   productGroupItems,
   productGroups,
 } from './schema';
+import {
+  planStructure,
+  structureFingerprint,
+  syncStructureProposals,
+  type StructureProposalInput,
+  type StructurePlan,
+} from './structure-proposals';
 
 /**
  * Läufe der Automatik (`docs/tasks/phase-5.md` 5.7), Systemzugriff für den Job `automation-run` (ohne Nutzer, an
@@ -76,6 +83,8 @@ export interface AutomationRunPlan {
   caps: ProfileCapPacing[];
   /** Einstellungen der Prüfungen (5.10). */
   checks: CheckSettings;
+  /** Katalog, Harvest-Regel, Bausteine der Kampagnen und Presets der Produktgruppen (5.11b). */
+  structure: StructurePlan;
   fingerprint: string;
   /** `olderPeriod`: Der Zeitraum endet vor dem des vorigen Laufs (ältere Datei nachträglich hochgeladen). */
   warnings: string[];
@@ -187,6 +196,7 @@ export async function planAutomationRun(
 
   const caps = await loadProfileCapPacing(db, scope, now);
   const checks = await loadCheckSettings(db, scope.organizationId);
+  const structure = await planStructure(db, scope, profile.clientId);
   // Der Tageskurs gehört nicht dazu: Er ändert sich täglich und löste sonst jeden Tag einen Lauf aus.
   const fingerprint = createHash('sha256')
     .update(
@@ -199,6 +209,7 @@ export async function planAutomationRun(
         mode,
         responsibleUserId,
         checks,
+        structure: structureFingerprint(structure),
         // Betrag, Schwellen, Monat und Umfang; ohne Caps bleibt der Hash der alte.
         ...(caps.length > 0 && {
           caps: caps.map((cap) => ({
@@ -234,6 +245,7 @@ export async function planAutomationRun(
     state,
     caps,
     checks,
+    structure,
     fingerprint,
     warnings: previous && state.period.endDate < previous.periodEnd ? ['olderPeriod'] : [],
   };
@@ -527,6 +539,8 @@ export interface SaveAutomationRunInput extends AutomationRunScope {
   proposals: readonly AutomationProposalInput[];
   /** Befunde der Prüfungen (5.10); ohne Angabe bleiben die bestehenden unberührt. */
   findings?: readonly CheckResult[];
+  /** Graduation- und Preset-Vorschläge (5.11b); ohne Angabe bleiben die bestehenden unberührt. */
+  structure?: readonly StructureProposalInput[];
 }
 
 export interface SaveAutomationRunResult {
@@ -636,10 +650,19 @@ export async function saveAutomationRun(
         findings: input.findings,
         now: new Date(),
       }));
+    const structure =
+      input.structure &&
+      (await syncStructureProposals(tx, {
+        organizationId: input.organizationId,
+        profileId: input.profileId,
+        proposals: input.structure,
+        now: new Date(),
+      }));
     const ruleNames = new Map(plan.rules.map((rule) => [rule.id, rule.name]));
     const counts = {
       ...input.counts,
       ...(findings && { findings: findings.total }),
+      ...(structure && { structure: structure.total }),
       proposals: proposals.length,
       staged: staged.size,
       dismissed: input.proposals.length - proposals.length,
@@ -726,6 +749,19 @@ export async function saveAutomationRun(
         params: { count: findings.addedWarnings },
         link: '/ads/automations?tab=checks',
         dedupeKey: `automation_findings:${runId}`,
+      });
+    }
+    // Graduation und Presets (5.11b): je Lauf eine Meldung, nur bei neuen Vorschlägen (Dominik, 2026-10-11).
+    if (structure && structure.added > 0) {
+      await createNotification(tx, {
+        organizationId: input.organizationId,
+        profileId: input.profileId,
+        audience: 'members',
+        kind: 'structure_proposals',
+        severity: 'info',
+        params: { count: structure.added },
+        link: '/ads/automations?tab=proposals',
+        dedupeKey: `structure_proposals:${runId}`,
       });
     }
     // Caps (5.9b): je Cap, Monat und Schwelle eine Meldung an alle, die das Profil sehen.
