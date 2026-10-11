@@ -10,6 +10,7 @@ import {
 } from './budget-caps';
 import { replaceEntityPeriodMetrics } from './entity-period-metrics';
 import {
+  amazonAdsCampaignDailyMetrics,
   amazonAdsCampaigns,
   amazonAdsPortfolios,
   amazonAdsProfiles,
@@ -138,6 +139,7 @@ beforeEach(async () => {
   const { db } = testDb;
   await db.delete(budgetCaps);
   await db.delete(auditEvents);
+  await db.delete(amazonAdsCampaignDailyMetrics);
   await db.update(amazonAdsProfiles).set({ isHidden: false });
 });
 
@@ -257,6 +259,38 @@ describe('saveBudgetCap und getBudgetsOverview', () => {
     expect(events[1]!.target).toMatchObject({
       before: { amount: '1000.00', warnPercents: [80, 100] },
       after: { amount: '1200.00', warnPercents: [90] },
+    });
+  });
+
+  it('Tageswerte im Monat: Ist exakt bis zum letzten importierten Tag', async () => {
+    await testDb.db.insert(amazonAdsCampaignDailyMetrics).values(
+      ['2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03'].map((date) => ({
+        organizationId: f.org,
+        profileId: f.fileProfile,
+        campaignId: f.fileCampaign,
+        adProduct: 'SPONSORED_PRODUCTS',
+        date,
+        currencyCode: 'EUR',
+        impressions: 100,
+        clicks: 10,
+        cost: '10',
+        importedAt: NOW,
+      })),
+    );
+    await cap({ profileId: f.fileProfile });
+    const profile = (await getBudgetsOverview(testDb.db, as(f.emil)))!.profiles.find(
+      (p) => p.id === f.fileProfile,
+    )!;
+    expect(profile.dataState).toEqual({ periodStart: '2026-10-01', periodEnd: '2026-10-03' });
+    expect(profile.caps[0]).toMatchObject({
+      // 10 je Tag (unter dem Tagesbudget 20) für die übrigen 28 Tage.
+      pacing: {
+        exact: true,
+        dataThrough: '2026-10-03',
+        actual: { value: '30', low: '30', high: '30' },
+        forecast: { value: '310' },
+      },
+      campaigns: [{ id: f.fileCampaign, actual: '30', exact: true }],
     });
   });
 

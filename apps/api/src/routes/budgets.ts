@@ -108,10 +108,6 @@ export function registerBudgetRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
         tags: overview.tags,
         profiles: overview.profiles.map((profile) => ({
           ...profile,
-          dataState: profile.dataState && {
-            ...profile.dataState,
-            importedAt: profile.dataState.importedAt.toISOString(),
-          },
           caps: profile.caps.map((cap) => ({ ...cap, updatedAt: cap.updatedAt.toISOString() })),
         })),
       },
