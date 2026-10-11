@@ -39,6 +39,7 @@ import {
   setClientAutomationRequestSchema,
   STRUCTURE_PROPOSAL_FILTERS,
   structureProposalsResponseSchema,
+  type AutomationRun,
 } from '@profitbash/shared';
 import type { AppDeps, AppEnv } from '../context';
 import { ApiError } from '../errors';
@@ -333,7 +334,7 @@ export function registerAutomationRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
       {
         runs: runs.map((row) => ({
           ...row,
-          mode: row.mode as 'shadow' | 'cart',
+          mode: row.mode as AutomationRun['mode'],
           metricsImportedAt: row.metricsImportedAt.toISOString(),
           createdAt: row.createdAt.toISOString(),
         })),

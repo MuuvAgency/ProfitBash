@@ -888,6 +888,9 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
     Hinweistext des Modus in den Einstellungen angepasst.
   - **Grenze:** Profile ohne Datei mit Kennzahlen bekommen weiter keinen Lauf (`noMetrics`), also auch im Modus
     „aus“ keine Cap-Meldung (wie 5.9b).
+  - **Review (ponytail-review):** veralteter Typ-Cast des Modus in der Route der Läufe (`'shadow' | 'cart'`).
+  - **Nach TDD:** Tests für Plan, Speichern und Job liefen vorher rot. **Nicht im Browser geprüft** (kein Lauf
+    ohne Datei mit Kennzahlen in der Dev-DB; folgt in 5.13c). Dev-DB auf `0047` migrieren (`pnpm db:migrate`).
 
 #### 5.13b Läufe: Gründe ohne Vorschlag und erwartete Datensätze
 - [ ] Gründe ohne Vorschlag je Lauf im Tab „Läufe“ (`automation_runs.counts`, auch `budgetCap`, `findings`, `structure`).
