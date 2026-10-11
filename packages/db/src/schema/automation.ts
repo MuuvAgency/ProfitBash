@@ -10,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { adChanges } from './ad-changes';
@@ -181,5 +182,54 @@ export const automationProposals = pgTable(
     index('automation_proposals_run_idx').on(t.runId),
     index('automation_proposals_profile_status_idx').on(t.profileId, t.status),
     index('automation_proposals_ad_change_idx').on(t.adChangeId),
+  ],
+);
+
+/**
+ * Einstellungen der Prüfungen je Organisation (`phase-5.md` 5.10): ein Dokument nach `checkSettingsSchema`. Ohne
+ * Zeile gelten die Startwerte. Zugriffe nur über `automation-checks.ts`.
+ */
+export const automationCheckSettings = pgTable('automation_check_settings', {
+  organizationId: uuid('organization_id')
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: 'cascade' }),
+  settings: jsonb('settings').$type<unknown>().notNull(),
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * Aktuelle Befunde der Prüfungen je Profil: Jeder Lauf hält bestehende, legt neue an und löscht, was nicht mehr
+ * auftritt (mit der Quittung; kommt der Befund zurück, ist er neu). Entities ohne Fremdschlüssel wie in
+ * `automation_proposals`; bei Hinweisen je Profil ist `entity_id` das Profil.
+ */
+export const automationFindings = pgTable(
+  'automation_findings',
+  {
+    id: id(),
+    organizationId: organizationId(),
+    profileId: uuid('profile_id').notNull(),
+    /** `CHECK_KINDS`. */
+    kind: text('kind').notNull(),
+    /** `campaign` | `target` | `profile`. */
+    entityType: text('entity_type').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    campaignId: uuid('campaign_id'),
+    /** Unterscheidet Befunde einer Art an derselben Entity (Platzierung), sonst leer. */
+    key: text('key').notNull(),
+    detail: jsonb('detail').$type<Record<string, unknown>>().notNull(),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true, mode: 'date' }).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true, mode: 'date' }).notNull(),
+    acknowledgedBy: uuid('acknowledged_by').references(() => users.id, { onDelete: 'set null' }),
+    acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true, mode: 'date' }),
+  },
+  (t) => [
+    foreignKey({
+      name: 'automation_findings_profile_org_fk',
+      columns: [t.profileId, t.organizationId],
+      foreignColumns: [amazonAdsProfiles.id, amazonAdsProfiles.organizationId],
+    }).onDelete('cascade'),
+    uniqueIndex('automation_findings_key_uq').on(t.profileId, t.kind, t.entityId, t.key),
   ],
 );
