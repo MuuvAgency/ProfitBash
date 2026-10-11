@@ -1,4 +1,5 @@
 import { DEFAULT_STRUCTURE_CATALOG, type StructureCatalog } from '@profitbash/shared';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { seedAdChangeFixture, type AdChangeFixture } from './ad-change-fixture';
 import { createProductGroup, ProductGroupError, updateProductGroup } from './product-groups';
@@ -6,6 +7,7 @@ import {
   auditEvents,
   clientPresets,
   clients,
+  memberClientGrants,
   members,
   productGroups,
   structureCatalogs,
@@ -251,5 +253,37 @@ describe('Preset je Produktgruppe', () => {
         updateProductGroup(testDb.db, { ...as(f.emil), id: group!.id, presetKey: 'gibt-es-nicht' }),
       ),
     ).toBe('UNKNOWN_PRESET');
+  });
+});
+
+describe('Freigaben je Client (6.2)', () => {
+  it('ein eingeschränktes Mitglied sieht und ändert nur Presets seiner Clients', async () => {
+    const { db } = testDb;
+    const [second] = await db
+      .insert(clients)
+      .values({ organizationId: f.org, name: 'Zweit', slug: 'zweit' })
+      .returning({ id: clients.id });
+    await setClientPreset(db, { ...as(f.ada), clientId: second!.id, presetKey: 'launch' });
+    const [emil] = await db
+      .select({ id: members.id })
+      .from(members)
+      .where(and(eq(members.userId, f.emil), eq(members.organizationId, f.org)));
+    await db
+      .insert(memberClientGrants)
+      .values({ organizationId: f.org, memberId: emil!.id, clientId: client });
+    try {
+      const view = await getStructureCatalog(db, as(f.emil));
+      expect(view!.clients.map((c) => c.name)).toEqual(['Waldkauz']);
+      expect(view!.clientPresets.map((p) => p.clientId)).not.toContain(second!.id);
+      expect(
+        await code(setClientPreset(db, { ...as(f.emil), clientId: second!.id, presetKey: null })),
+      ).toBe('NOT_FOUND');
+      // Der Admin sieht weiter alle.
+      expect((await getStructureCatalog(db, as(f.ada)))!.clients.map((c) => c.name)).toContain(
+        'Zweit',
+      );
+    } finally {
+      await db.delete(memberClientGrants);
+    }
   });
 });
