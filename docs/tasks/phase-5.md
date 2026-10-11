@@ -41,28 +41,28 @@ Schreiben nur mit Recht `write` (Admin, Editor); Leitplanken-Defaults der Organi
 
 ## Definition of Done
 
-- [ ] Nichts geht automatisch an Amazon: Jede Änderung der Automatik ist ein Vorschlag (Schattenmodus: nur Protokoll;
+- [x] Nichts geht automatisch an Amazon: Jede Änderung der Automatik ist ein Vorschlag (Schattenmodus: nur Protokoll;
       freigeschaltet: Warenkorb mit Herkunft `automation` bzw. `budget_cap`), übermittelt wird wie in Phase 3 von Hand.
-- [ ] Jeder Lauf der Pipeline läuft über `runJob` und schreibt `job_runs`; je Lauf steht fest, auf welchen Daten (Datei,
+- [x] Jeder Lauf der Pipeline läuft über `runJob` und schreibt `job_runs`; je Lauf steht fest, auf welchen Daten (Datei,
       Zeitraum) er gerechnet hat, welche Regel bzw. welcher Optimizer-Schritt je Vorschlag gegriffen hat und welche
       Leitplanke ihn begrenzt hat. Läufe ohne neue Daten tun nichts (idempotent je Datenstand).
-- [ ] Optimizer, Regeln, Leitplanken, Pacing, Prüfungen und Graduation-Kriterien liegen in `packages/engine` ohne I/O, mit
+- [x] Optimizer, Regeln, Leitplanken, Pacing, Prüfungen und Graduation-Kriterien liegen in `packages/engine` ohne I/O, mit
       Tests je Leitplanke, je Regelart und je Prüfung; Beträge nur mit `decimal.js`.
-- [ ] Ziele, Leitplanken, Regeln, Schwellen der Prüfungen und Caps sind **Daten** der Organisation (mit eigenen
+- [x] Ziele, Leitplanken, Regeln, Schwellen der Prüfungen und Caps sind **Daten** der Organisation (mit eigenen
       Startwerten, änderbar), nichts davon ist hart codiert und nichts 1:1 aus Drittprodukten übernommen.
-- [ ] Leitplanken halten in jedem Fall: Kein Vorschlag ändert ein Gebot stärker als erlaubt je 7 Tage (gezählt über alle
+- [x] Leitplanken halten in jedem Fall: Kein Vorschlag ändert ein Gebot stärker als erlaubt je 7 Tage (gezählt über alle
       Änderungen dieses Targets über ProfitBash in dem Fenster, auch von Hand gelegte), unterschreitet den Boden oder überschreitet die Grenzen
       von Amazon (`limits`, Phase 3); zu wenig Daten heißt kein Vorschlag.
-- [ ] Pacing kennzeichnet geschätzte Werte (Zeitraumsummen anteilig, „≈“), exakte nur aus Tageswerten.
-- [ ] Benachrichtigungen erreichen alle berechtigten Mitglieder live (SSE) und nach einem Neuladen; ein fehlender
+- [x] Pacing kennzeichnet geschätzte Werte (Zeitraumsummen anteilig, „≈“), exakte nur aus Tageswerten.
+- [x] Benachrichtigungen erreichen alle berechtigten Mitglieder live (SSE) und nach einem Neuladen; ein fehlender
       SSE-Kanal legt keine Seite lahm.
-- [ ] Beträge bleiben Decimal-Strings mit Währung; Amazon-IDs Strings.
-- [ ] Alle Zugriffe über den Access-Layer (ADR 002); Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
-- [ ] Jede schreibende Aktion erzeugt ein `audit_event` (Einstellungen, Regeln, Ziele, Caps, Freischalten, Annehmen und
+- [x] Beträge bleiben Decimal-Strings mit Währung; Amazon-IDs Strings.
+- [x] Alle Zugriffe über den Access-Layer (ADR 002); Test je Endpunkt (fremde Organisation, ausgeblendetes Profil, Recht `write`).
+- [x] Jede schreibende Aktion erzeugt ein `audit_event` (Einstellungen, Regeln, Ziele, Caps, Freischalten, Annehmen und
       Verwerfen von Vorschlägen).
-- [ ] Tests gegen den Mock-Anbieter bzw. synthetische Bulk-Dateien, keiner gegen echte Amazon-Endpunkte.
-- [ ] Browser-Pane geprüft wie in Phase 2–4 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole).
-- [ ] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
+- [x] Tests gegen den Mock-Anbieter bzw. synthetische Bulk-Dateien, keiner gegen echte Amazon-Endpunkte.
+- [x] Browser-Pane geprüft wie in Phase 2–4 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole).
+- [x] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
 
 ## Fragen an Dominik
 
@@ -922,6 +922,23 @@ eines Profils startet, wenn eine Datei mit Kennzahlen dazukommt.
 
 #### 5.13c Definition of Done, Browser-Pane, offene Punkte
 - [ ] Definition of Done prüfen, Browser-Pane (mit Dominiks Bulk-Datei), offene Punkte festhalten.
+- **Definition of Done geprüft (2026-10-11), je Punkt der Beleg:**
+  - *Nichts automatisch an Amazon:* Der Job `automation-run` kennt keinen Übermittlungsweg (einziger Import aus
+    `@profitbash/amazon-ads` ist `amazonAdsValueLimit`); Vorschläge enden in `automation_proposals` bzw. `ad_changes`.
+  - *`runJob`, Datenstand, Herkunft, Leitplanke je Vorschlag, idempotent:* `automation_runs` (Zeitraum, Upload,
+    `fingerprint`), `automation_proposals` (`source`, Regel, `limited_by`); Tests „tut ohne neue Daten nichts“.
+  - *Engine ohne I/O:* `packages/engine` importiert nur `decimal.js`, eigene Module und Einstiegspunkte von shared.
+  - *Daten statt Code:* Ziele, Leitplanken, Regeln, Schwellen der Prüfungen, Caps, Kriterien der Kanten und
+    Preset-Wechsel liegen je Organisation in der DB mit eigenen Startwerten. **Ausnahme, weiter Konstanten im Code:**
+    Glättung des Optimizers (`OPTIMIZER_PRIOR_CLICKS` = 12) und Spanne der Pacing-Schätzung (`PACING_SPREAD`).
+  - *Leitplanken, Pacing „≈“, Decimal-Strings, Audit, Mock-Tests:* wie in 5.4, 5.7, 5.9a und je Aufgabe notiert.
+  - *Access-Layer, Test je Endpunkt:* Für `GET /datasets` und die schreibenden Aktionen der Automatik (übernehmen,
+    verwerfen, quittieren, annehmen) fehlte der Fall „ausgeblendetes Profil“ auf API-Ebene; ergänzt (die Tests liefen
+    sofort grün, das Verhalten bestand schon).
+  - *Benachrichtigungen live:* 5.2a/5.2b; SSE hinter dem Proxy von Railway bleibt beim ersten Deploy zu prüfen.
+  - *Browser-Pane (2026-10-11):* `/notifications`, `/ads/goals`, `/ads/budgets`, alle fünf Tabs von
+    `/ads/automations` und `/ads/tools/catalog` bei 1440 px dunkel, Tablet hell und Handy dunkel: kein waagerechtes
+    Scrollen, kein Ladefehler, Konsole ohne Fehler.
 
 ## Offen vor dem Bau (nicht von Dominik zu entscheiden)
 
