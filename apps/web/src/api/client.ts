@@ -47,6 +47,7 @@ export type AutomationSettingsData = Schemas['AutomationSettings'];
 export type AutomationRulesData = Schemas['AutomationRulesResponse'];
 export type AutomationRulesPreviewData = Schemas['AutomationRulesPreview'];
 export type AutomationRunData = Schemas['AutomationRun'];
+export type AutomationDatasetData = Schemas['AutomationDataset'];
 export type AutomationProposalData = Schemas['AutomationProposal'];
 export type AutomationProposalsData = Schemas['AutomationProposalsResponse'];
 export type AutomationProposalActionData = Schemas['AutomationProposalActionResponse'];
@@ -485,6 +486,9 @@ export function createApi(options: ApiOptions = {}) {
       /** Läufe und Vorschläge (5.8). */
       runs: async (): Promise<AutomationRunData[]> =>
         (await unwrap(client.GET('/api/ads/automations/runs'))).runs,
+      /** Datensätze der Automatik je Profil (5.13b). */
+      datasets: async (): Promise<AutomationDatasetData[]> =>
+        (await unwrap(client.GET('/api/ads/automations/datasets'))).profiles,
       structureProposals: (
         status: 'open' | 'dismissed',
       ): Promise<Schemas['StructureProposalsResponse']> =>

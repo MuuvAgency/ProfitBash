@@ -1412,12 +1412,47 @@ export const de = {
       proposals: '{n} Vorschlag | {n} Vorschläge',
       staged: '{n} im Warenkorb',
       dismissed: '{n} schon verworfen',
+      off: 'Nur Prüfungen und Cap-Meldungen (Modus „Aus“: keine Vorschläge).',
+      withoutProposal: 'Ohne Vorschlag:',
+      reason: {
+        insufficientData: 'zu wenig Daten',
+        unchanged: 'schon am Zielwert',
+        noRule: 'keine Regel passt',
+        noGoal: 'ohne Ziel',
+        noBase: 'ohne Ausgangsgebot',
+        inactive: 'nicht aktiv',
+        vcpm: 'vCPM-Kampagne',
+        protectedTerm: 'geschützter Begriff',
+        manualPending: 'händische Änderung offen',
+        budgetCap: 'unter Budget-Cap, nichts zu senken',
+      },
+      findings: '{n} Befund | {n} Befunde',
+      structure: '{n} Graduation-/Preset-Vorschlag | {n} Graduation-/Preset-Vorschläge',
       warning: {
         olderPeriod:
           'Der Zeitraum endet vor dem des vorigen Laufs: Es wurde eine ältere Datei nachträglich hochgeladen.',
         responsibleMissing:
           'Zuständiger fehlt oder darf nicht mehr schreiben: Die Vorschläge blieben im Protokoll.',
       },
+    },
+    datasets: {
+      title: 'Datensätze je Profil',
+      text: 'Die Automatik rechnet auf der zuletzt hochgeladenen Bulk-Datei mit Kennzahlen (empfohlen: wöchentlich, letzte 30 Tage). Fehlt ein Datensatz, überspringt der Lauf nur den Teil, der ihn braucht.',
+      loadFailed: 'Die Datensätze konnten nicht geladen werden.',
+      empty: 'Kein sichtbares Profil.',
+      none: 'Noch keine Bulk-Datei mit Kennzahlen: Für dieses Profil gibt es keinen Lauf.',
+      metrics: 'Kennzahlen:',
+      missingMetrics:
+        'Fehlt: {adProducts}. Für diese Kampagnen gibt es keine Vorschläge und Prüfungen.',
+      searchTerms: 'Suchbegriffe:',
+      missingSearchTerms:
+        'Suchbegriff-Blätter fehlen für den Zeitraum der Datei: keine Graduation-Vorschläge.',
+      period: 'Zeitraum:',
+      days: '{n} Tag | {n} Tage',
+      shortPeriod: 'empfohlen sind {n} Tage',
+      uploaded: 'Hochgeladen:',
+      age: 'heute | vor {n} Tag | vor {n} Tagen',
+      stale: 'älter als {n} Tage, neue Datei hochladen',
     },
     rules: {
       title: 'Regeln',
