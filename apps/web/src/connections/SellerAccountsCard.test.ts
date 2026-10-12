@@ -131,6 +131,8 @@ describe('SellerAccountsCard', () => {
     await flushPromises();
     const form = dialog()!;
     expect(form.text()).toContain('Seller-ID');
+    // „|“ trennt in vue-i18n Pluralformen: Der Hinweis muss das Zeichen trotzdem zeigen.
+    expect(form.text()).toContain('Beginnt mit „Atzr|“.');
 
     // Leere Pflichtfelder: nichts wird gesendet.
     await form.get('form').trigger('submit');
@@ -219,6 +221,19 @@ describe('SellerAccountsCard', () => {
     await button(wrapper, 'Konten abgleichen').trigger('click');
     await flushPromises();
     expect(requests.some((r) => r.path.endsWith('/sync'))).toBe(true);
+
+    await wrapper
+      .get('[role="combobox"][aria-label="Client für Nordwind Shop (Deutschland)"]')
+      .trigger('click');
+    await flushPromises();
+    const option = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (o) => o.getAttribute('aria-label') === 'Nordwind',
+    );
+    // PrimeVue wählt Optionen auf `mousedown`.
+    option!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    await flushPromises();
+    expect(requests.find((r) => r.method === 'PATCH')!.body).toEqual({ clientId: nordwind.id });
+    requests.length = 0;
 
     await wrapper.get('input[role="switch"]').setValue(true);
     await flushPromises();

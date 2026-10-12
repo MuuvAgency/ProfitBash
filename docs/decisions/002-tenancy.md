@@ -8,7 +8,7 @@
   am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`),
   am 2026-10-10 um Benachrichtigungen (`notifications`, `notification_reads`),
   am 2026-10-11 um das Audit-Log, die Freigaben je Client (`member_client_grants`) und die Kunden-Org
-  (`clients.client_organization_id`), am 2026-10-12 um den Plattform-Admin und die Impersonation
+  (`clients.client_organization_id`), am 2026-10-12 um den Plattform-Admin, die Impersonation und die Seller-Konten (Phase 7)
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -137,6 +137,12 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   Es gelten dessen Mitgliedschaften, Freigaben und Grenzen, keine weiteren. Jedes Audit-Event nennt den Superadmin
   als Handelnden und den Nutzer im `target` (`runAsImpersonator` in `audit.ts`); Mitgliederverwaltung,
   Kundenzugang und Plattform-Routen sind währenddessen gesperrt.
+- **Seller-Konten** (ab Phase 7, 7.2): `amazon_sp_accounts` gehören der Organisation der SP-Connection. Nutzer sehen
+  sie nur über `visibleSellerAccountsScope()` bzw. `canSeeSellerAccount()` mit denselben Regeln wie Profile
+  (Freigaben je Client, Kunden-Org, ausgeblendet/entfernt nur für Admins). SP-Connections und ihre Zugangsdaten
+  (`amazon_sp_credentials`) verwaltet die Eigentümer-Org hinter `orgAdminOnly` (`seller-accounts.ts`,
+  `routes/seller-connections.ts`); der SP-Client liest die Zugangsdaten als Systemzugriff, gebunden an Organisation
+  und Connection.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

@@ -6,8 +6,8 @@
 > (1.3 Lease und Anfrage-Budget, 1.5 Report-Anfragen, 1.11 Datei-Import), `docs/tasks/phase-6.md` (6.3a/6.3b: Seiten
 > „kundensicher“ machen), `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` (Abschnitt G), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-12), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 7.1.
-> Nächste Aufgabe: 7.2.** Offen bei Dominik: F1 (Art des Zugangs) und F2 (Rollen prüfen); beides hält 7.1–7.4 nicht auf,
+> **Status: verfeinert (2026-10-12), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 7.1, 7.2 (ohne 7.2b).
+> Nächste Aufgabe: 7.3.** Offen bei Dominik: F1 (Art des Zugangs) und F2 (Rollen prüfen); beides hält 7.1–7.4 nicht auf,
 > weil bis dahin gegen Mocks gebaut wird.
 >
 > **Ausgangslage (Stand Code, 2026-10-12):**
@@ -211,16 +211,51 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
     Verdrahtung in 7.2), `getReports`/Zeitpläne, Marktplätze außerhalb von `@profitbash/shared` (JP, AU, MX …).
 
 ### 7.2 Connection und Seller-Konten
-- [ ] Migration: Provider `amazon_sp`; `amazon_sp_accounts` (Connection, Client, `amazon_seller_id`, `marketplace_id`,
+- [x] Migration: Provider `amazon_sp`; `amazon_sp_accounts` (Connection, Client, `amazon_seller_id`, `marketplace_id`,
       Währung, Zeitzone, ausgeblendet/entfernt wie bei Profilen); verschlüsselte Zugangsdaten je Connection (F1).
-- [ ] Access-Layer: `visibleSellerAccountsScope()`, `canSeeSellerAccount()`; Tests wie `access.test.ts`,
+- [x] Access-Layer: `visibleSellerAccountsScope()`, `canSeeSellerAccount()`; Tests wie `access.test.ts`,
       `access-grants.test.ts`, `access-client-org.test.ts`.
-- [ ] API hinter `orgAdminOnly`: Connection anlegen über **„Token eintragen“** (Zugangsdaten prüfen durch einen
-      Aufruf der Marktplatz-Teilnahmen, nie zurückgeben), Konten synchronisieren, Client zuordnen, ausblenden, trennen;
-      Audit je Aktion.
-- [ ] Oberfläche unter „Clients & Connections“: Kachel „Seller-Konten“ neben den Ads-Connections.
+- [x] API hinter `orgAdminOnly`: Connection anlegen über **„Token eintragen“** (Zugangsdaten prüfen durch einen
+      Aufruf der Marktplatz-Teilnahmen, nie zurückgeben), Konten synchronisieren, Client zuordnen, ausblenden;
+      Audit je Aktion. **Trennen ist nicht gebaut** (siehe Umsetzung).
+- [x] Oberfläche unter „Clients & Connections“: Kachel „Seller-Konten“ neben den Ads-Connections.
 - [ ] **7.2b OAuth-Weg der Public App** (Start in Seller Central, Rückkehr mit `spapi_oauth_code`, `state` signiert wie
       bei Ads): erst bauen, wenn F1 „Public App“ ergibt.
+- [x] Umsetzung (Stand für 7.3):
+  - **Schema** (Migration `0050_amazon_sp_accounts`, `schema/amazon-sp.ts`): `amazon_sp_accounts` (unique je
+    Organisation, Seller-ID und Marktplatz; unique (`id`, `organization_id`) als Ziel der FKs ab 7.3; Connection mit
+    `ON DELETE CASCADE`) und `amazon_sp_credentials` (Client-ID, Secret verschlüsselt mit eigener AAD
+    `spClientSecretAad`). Die Connection trägt die Seller-ID als `external_account_id`; dieselbe Seller-ID in
+    derselben Region verbindet neu (Upsert). Die Schlüsselrotation verschlüsselt auch das App-Secret neu.
+  - **DB** (`seller-accounts.ts`): `saveSpConnection` (Connection, Zugangsdaten, Konten und Audit
+    `connection.create`/`connection.reconnect` in einer Transaktion), `syncSellerAccounts` (Upsert; Client und
+    „ausgeblendet“ bleiben; was Amazon nicht mehr liefert, bekommt `removed_at`; unbekannte Marktplätze werden
+    übersprungen und genannt), `getSpCredentials`. Zeitzone und Währung kommen aus `AMAZON_MARKETPLACES`.
+  - **Access-Layer:** `visibilityConditions` nimmt die Tabelle als Parameter; Seller-Konten folgen exakt den Regeln
+    der Profile (Mitgliedschaft, Freigaben je Client, Kunden-Org, ausgeblendet/entfernt nur für Admins).
+  - **Abgrenzung zu Ads:** `listActiveConnections`, `listOtherActiveConnections`, `GET /api/connections`,
+    `findConnection` und die Erinnerung „Einwilligung läuft ab“ gelten nur für `amazon_ads`. **Für 7.3:** Jobs für
+    SP-Connections brauchen eine eigene Planung (nicht `listActiveConnections`).
+  - **API** (`routes/seller-connections.ts`, alle hinter `orgAdminOnly`, für Kunden-Logins geschlossen):
+    `GET /api/seller-connections` (mit Konten, nie mit Zugangsdaten), `POST /api/seller-connections` (prüft mit einem
+    Wegwerf-Client, speichert erst danach; 201 neu, 200 neu verbunden), `POST /api/seller-connections/{id}/sync`,
+    `PATCH /api/seller-accounts/{id}` (Audit `seller_account.update` mit vorher/nachher). Fehlercodes:
+    `SP_TOKEN_REJECTED`, `SP_CREDENTIALS_REJECTED`, `SP_ROLE_MISSING`, `AMAZON_ERROR`, `CONNECTION_REAUTH_REQUIRED`
+    (der Abgleich setzt dann `reauth_required`).
+  - **Verdrahtung:** `createAmazonSpDeps` (`apps/api/src/amazon-sp.ts`), `AppDeps.amazonSp`, `AMAZON_SP_USE_MOCK`
+    (`.env.example`, `docs/deploy.md`). Der Worker kennt die SP-API noch nicht (kommt mit 7.3).
+  - **Anfrage-Budget:** Option `burst` in `createProfileRateLimiter` (Ads unverändert 1), der SP-Client nutzt 10.
+  - **Oberfläche:** `SellerAccountsCard.vue` und `SellerConnectionDialog.vue`; eigene Abfrage mit Skeleton, leerem
+    Zustand und Fehler; „Entfernte anzeigen“ der Seite gilt mit. Geprüft im Browser gegen den Mock bei 1440 px,
+    Tablet, Handy und dunkel (Tabelle scrollt in der Kachel, Seite nicht), Konsole ohne Fehler außer dem erwarteten
+    400 beim abgelehnten Token. Die Pane war dabei verdeckt: Bedienung per DOM-Klick auf die echten Bedienelemente,
+    keine Screenshots.
+  - **Rest in der Dev-DB:** eine SP-Connection des Mock-Verkäufers `A1MOCKSELLER01` (Region Europa) mit den Konten
+    DE und FR; ohne „Trennen“ nicht über die Oberfläche entfernbar, als Demo für 7.3 brauchbar.
+  - **Nicht gebaut, offen:** „Trennen“ (auch Ads-Connections haben es nicht; Löschen nähme ab 7.3 alle Verkaufsdaten
+    mit – Frage an Dominik unter „Offen vor dem Bau“); der Abgleich läuft direkt in der Anfrage statt über `runJob`
+    (ein Aufruf; der tägliche Abgleich kommt mit den Jobs in 7.3); ob die eingetragene Seller-ID zum Token gehört,
+    kann die SP-API nicht bestätigen.
 
 ### 7.3 Bestellungen laden (Sales-Import)
 - [ ] Tabellen: Report-Anfragen (Zustand in der DB wie `amazon_ads_report_requests`; prüfen, ob die Tabelle
@@ -285,6 +320,9 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
 ## Offen vor dem Bau
 
 - **Dominik, vor 7.2b:** Art des Zugangs (F1). **Vor 7.12:** Rollen bestätigen (F2).
+- **Dominik, bei Gelegenheit:** Soll es „Trennen“ für Seller-Connections geben, und was passiert dann mit den Daten
+  (löschen oder behalten und nur den Abruf stoppen)? Empfehlung: nicht löschen, nur stoppen; bis dahin reicht
+  „Ausblenden“ je Konto.
 - **Dominik, vor 7.8:** Gehört das Honorar der Agentur in die OPEX des Clients (und damit in die Kundensicht)?
   Empfehlung: nein, OPEX enthält nur Kosten des Kunden; ein Honorar kann er selbst als Posten wollen.
 - **Dominik, vor 7.12:** Die App braucht zusätzlich die Rolle **„Selling Partner Insights“** (Marktplatz-Teilnahmen);
