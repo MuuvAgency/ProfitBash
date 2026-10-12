@@ -186,6 +186,7 @@ export const useSessionStore = defineStore('session', () => {
     preferences,
     guardSession,
     load,
+    reload,
     ensureLoaded,
     signIn,
     signOut,
