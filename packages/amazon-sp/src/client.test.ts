@@ -163,7 +163,7 @@ describe('createAmazonSpClient', () => {
     expect(calls).toBe(2);
     expect(forms).toHaveLength(2);
     expect(meter).toMatchObject({ requests: 2, retries: 1 });
-    // Der zweite Versuch wartet nicht auf das Budget der Operation (sonst rund eine Minute).
+    // Der zweite Versuch passt in den Burst der Operation.
     expect(sleeps).toEqual([]);
   });
 
@@ -182,10 +182,9 @@ describe('createAmazonSpClient', () => {
       dataEndTime: '2026-10-12T00:00:00Z',
     };
 
-    await client.createReport(connection, input);
-    await client.createReport(connection, input);
+    for (let i = 0; i < 11; i += 1) await client.createReport(connection, input);
 
-    // createReport: 0,0167 Anfragen/s, also rund eine Minute Abstand.
+    // createReport: Burst 10, danach 0,0167 Anfragen/s, also rund eine Minute Abstand.
     expect(sleeps).toHaveLength(1);
     expect(sleeps[0]).toBeGreaterThan(59_000);
   });

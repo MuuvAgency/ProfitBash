@@ -110,8 +110,6 @@ export interface AmazonSpClientOptions {
 /**
  * Standardraten je Operation (Anfragen/s) aus der API-Referenz, Stand 2026-10-12. Der Header
  * `x-amzn-RateLimit-Limit` ist laut Amazon nicht verlässlich und wird nicht ausgewertet.
- * shortcut: kein Burst (Amazon erlaubt 10–15 Anfragen am Stück), die zweite Anfrage wartet schon;
- * anpassen, wenn Jobs dadurch zu langsam werden.
  */
 const RATES = {
   'sellers.marketplace_participations': 0.016,
@@ -119,6 +117,8 @@ const RATES = {
   'reports.get': 2,
   'reports.get_document': 0.0167,
 } as const;
+/** Amazon nennt 15 je Operation; etwas darunter, weil der Bucket bei Amazon nicht bei uns beginnt. */
+const BURST = 10;
 type Operation = keyof typeof RATES;
 
 /**
@@ -207,6 +207,7 @@ export function createAmazonSpClient(options: AmazonSpClientOptions): AmazonSpCl
         requestsPerSecond: rate,
         minRequestsPerSecond: rate / 4,
         increasePerSuccess: rate / 20,
+        burst: BURST,
         now,
         ...(options.http?.sleep && { sleep: options.http.sleep }),
       });
@@ -233,7 +234,7 @@ export function createAmazonSpClient(options: AmazonSpClientOptions): AmazonSpCl
   ): Promise<z.output<S>> {
     const url = new URL(req.path, regions[connection.region].apiHost);
     const pacing = pacingFor(req.operation, connection);
-    const send = async (paced = true) => {
+    const send = async () => {
       const accessToken = await (await tokensFor(connection)).getAccessToken(connection);
       return http.send({
         operation: req.operation,
@@ -248,7 +249,7 @@ export function createAmazonSpClient(options: AmazonSpClientOptions): AmazonSpCl
         ...(req.body !== undefined && { body: req.body }),
         schema: req.schema,
         ...(req.meter && { meter: req.meter }),
-        ...(paced && { pacing }),
+        pacing,
       });
     };
 
@@ -269,8 +270,7 @@ export function createAmazonSpClient(options: AmazonSpClientOptions): AmazonSpCl
         (await tokensFor(connection)).invalidate(connection.id);
         if (req.meter) req.meter.retries += 1;
         try {
-          // Ohne Budget: Der eine Neuversand passt in Amazons Burst und soll nicht eine Minute warten.
-          return await send(false);
+          return await send();
         } catch (retryError) {
           throw asRoleMissing(retryError);
         }
