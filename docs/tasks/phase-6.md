@@ -390,7 +390,7 @@ Plattform-Rolle `superadmin`.
 
 ## Offen nach Phase 6 (Stand 2026-10-12)
 
-**Wartet auf Dominik (Festlegungen von Claude, weder bestätigt noch widersprochen):**
+**Bestätigt (Dominik, 2026-10-12: „alles so lassen“) – Festlegungen von Claude:**
 - **Gespeicherte Ansichten für Kunden** sind nicht freigegeben (die Festlegung hätte eigene Ansichten der Kunden-Org
   erlaubt; sie brauchen `write`, das Kunden nie haben; 6.3a/6.3b).
 - **Kunden-Org** lässt sich nicht lösen oder löschen und folgt einer Umbenennung des Clients nicht (6.3c). Seit 6.4
