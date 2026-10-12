@@ -55,6 +55,45 @@ Je Client sehen, **was nach allen Kosten übrig bleibt**:
       Oberfläche entfernt oder benannt.
 - [ ] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
 
+## Stand der SP-API (geprüft am 2026-10-12)
+
+Quellen: developer-docs.amazon.com/sp-api („Connect to the SP-API“, „Usage Plans and Rate Limits“, „SP-API Endpoints“,
+„Marketplace IDs“, „Seller Central URLs“, „Roles in the SP-API“, „Report Type Values – Order“, „Retrieve a report“)
+und Amazons OpenAPI-Modelle `reports_2021-06-30.json` und `sellers.json` (github.com/amzn/selling-partner-api-models).
+
+- **Aufruf:** kein AWS-SigV4 und kein IAM mehr. Header: `x-amz-access-token` (LwA-Access-Token), `x-amz-date`,
+  `user-agent`. Token: `POST https://api.amazon.com/auth/o2/token` mit `grant_type=refresh_token`, Client-ID und
+  Secret der App (ein Host für alle Regionen, anders als bei Ads).
+- **Hosts:** `sellingpartnerapi-eu.amazon.com`, `-na`, `-fe`. Ein Refresh-Token gilt für eine Region.
+- **Rate-Limits:** Token-Bucket je Operation und je Paar aus Verkäufer und App. `x-amzn-RateLimit-Limit` nennt die
+  Rate nur „when available“ (nur bei 20x, 400, 404; Amazon: „must not depend on this header“). Deshalb die
+  dokumentierten Standardraten als Budget je Operation, 429 halbiert (wie 1.3). Standard (Rate/s, Burst):
+  `createReport` 0,0167/15, `getReport` 2/15, `getReportDocument` 0,0167/15, `getReports` 0,0222/10,
+  `getMarketplaceParticipations` 0,016/15.
+- **Reports-API 2021-06-30:** `POST /reports/2021-06-30/reports` (`reportType`, `marketplaceIds` 1–25,
+  `dataStartTime`, `dataEndTime`) → `reportId`; `GET …/reports/{reportId}` → `processingStatus` (`IN_QUEUE`,
+  `IN_PROGRESS`, `DONE`, `FATAL`, `CANCELLED`) und `reportDocumentId`; `GET …/documents/{reportDocumentId}` → `url`
+  (signiert, **läuft nach 5 Minuten ab**) und optional `compressionAlgorithm: GZIP`. Der Zeichensatz der Datei steht
+  im `Content-Type` des Downloads. Fehlerformat: `{ errors: [{ code, message, details }] }`.
+- **Bericht „Alle Bestellungen“:** `GET_FLAT_FILE_ALL_ORDERS_DATA_BY_LAST_UPDATE_GENERAL` (nach Änderungsdatum) und
+  `…_BY_ORDER_DATE_GENERAL` (nach Kaufdatum). Rolle u. a. **„Inventory and Order Tracking“**, nur Seller, nur auf
+  Anfrage (nicht planbar), Tab-getrennt, MFN und FBA, **höchstens 30 Tage je Bericht**. Laut Doku ohne
+  Käufer-Identität; die Spalten `ship-city`, `ship-state`, `ship-postal-code`, `ship-country` sind aber enthalten und
+  werden beim Einlesen verworfen (7.3). Spalten u. a. `amazon-order-id`, `purchase-date`, `last-updated-date`,
+  `order-status`, `fulfillment-channel`, `sales-channel`, `sku`, `asin`, `item-status`, `quantity`, `currency`,
+  `item-price`, `item-tax`, `shipping-price`, `shipping-tax`, `gift-wrap-price`, `gift-wrap-tax`,
+  `item-promotion-discount`, `ship-promotion-discount`, `is-business-order`. Selbst versandte Bestellungen im Status
+  „Pending“ haben keinen Preis.
+- **Steuer je Position:** `item-tax` usw. sind Spalten des Berichts. **Nicht aus der Doku zu klären:** ob `item-price`
+  auf EU-Marktplätzen brutto ist und ob `item-tax` dort immer gefüllt ist (die Doku nennt `vat-exclusive-item-price`
+  nur für andere Berichte). Bleibt offen bis 7.12 (echte Datei); 7.3 speichert Preis und Steuer getrennt, wie geliefert.
+- **Marktplatz-Teilnahmen:** `GET /sellers/v1/marketplaceParticipations` → je Marktplatz `id`, `countryCode`,
+  `defaultCurrencyCode`, `domainName`, `storeName`, `isParticipating`. Rolle **„Selling Partner Insights“** (steht
+  nicht in F2). Die Antwort enthält **keine Seller-ID**: Bei „Token eintragen“ gibt der Nutzer sie mit an (bei OAuth
+  kommt sie als `selling_partner_id`).
+- **Nicht geprüft:** Host der Download-URL (die Doku nennt kein Beispiel; erlaubt sind S3-Hosts unter
+  `amazonaws.com`, ohne Zugangsdaten), Aufbewahrung fertiger Berichte.
+
 ## Fragen an Dominik
 
 Gestellt zu Beginn der Session (2026-10-12), jede mit Empfehlung.
@@ -95,7 +134,7 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
 **Festlegungen von Claude (2026-10-12; Dominik kann widersprechen):**
 - **Paket `packages/amazon-sp`** (`plan.md` §5 Punkt 3). LwA, Token-Cache, Rate-Limit und verlustfreies JSON werden aus
   `packages/amazon-ads` wiederverwendet (Import, kein drittes Paket; erst teilen, wenn es klemmt). Die SP-API braucht
-  seit 2023 keine AWS-Signatur mehr, nur das LwA-Token (beim Bau gegen die Doku bestätigen).
+  keine AWS-Signatur mehr, nur das LwA-Token (bestätigt, siehe „Stand der SP-API“).
 - **Provider `amazon_sp`** in `connection_provider` (Enum-Migration). Eigene Zugangsdaten je Connection (F1) liegen
   verschlüsselt in einer eigenen Tabelle neben der Connection, nicht in `.env`; die App-Zugangsdaten einer Public App
   kommen aus `.env` (`AMAZON_SP_CLIENT_ID`, `…_SECRET`, `…_APP_ID`, `AMAZON_SP_USE_MOCK`).
@@ -104,7 +143,8 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
   `visibleProfilesScope()` (Mitgliedschaft, Freigaben je Client, Kunden-Org, ausgeblendet/entfernt); keine Abfrage
   filtert selbst.
 - **Quelle des Umsatzes:** Bestellpositionen aus dem Bericht „Alle Bestellungen“ ohne Käuferdaten
-  (`GET_FLAT_FILE_ALL_ORDERS_DATA_BY_LAST_UPDATE_GENERAL`, Rolle „Bestand und Auftragsverfolgung“), verdichtet zu
+  (`GET_FLAT_FILE_ALL_ORDERS_DATA_BY_LAST_UPDATE_GENERAL`, Rolle „Bestand und Auftragsverfolgung“ = „Inventory and
+  Order Tracking“; höchstens 30 Tage je Bericht, Backfill nach Kaufdatum mit `…_BY_ORDER_DATE_GENERAL`), verdichtet zu
   Tageswerten je SKU. Kein Abruf einzelner Bestellungen (Rate-Limit, personenbezogene Daten). Der Bericht „Umsatz und
   Traffic“ (Sitzungen, Buy-Box) kommt erst in 7.10 dazu, falls die Rolle da ist.
 - **Quelle der Gebühren:** Finanzereignisse (Finances-API, Rolle „Finanzen und Buchhaltung“) je Bestellposition:
@@ -132,8 +172,8 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
 ### 7.1 Paket `packages/amazon-sp` und Mock
 - [ ] Paket anlegen: Regionen und Endpunkte (eu/na/fe), Marktplatz-Liste (ID, Land, Währung, Zeitzone, Seller-Central-
       Domain) – vorhandene Marktplatz-Daten aus `@profitbash/shared` wiederverwenden und nur ergänzen.
-- [ ] Client mit LwA-Token aus `packages/amazon-ads`, Rate-Limit je Operation aus den Antwort-Headern
-      (`x-amzn-RateLimit-Limit`), Fehlerabbildung (401/403 → Neu-Verbinden bzw. `SP_ROLE_MISSING`, 429 → Backoff),
+- [ ] Client mit LwA-Token aus `packages/amazon-ads`, Rate-Limit je Operation nach den dokumentierten Standardraten
+      (der Header `x-amzn-RateLimit-Limit` ist laut Amazon nicht verlässlich), Fehlerabbildung (401/403 → Neu-Verbinden bzw. `SP_ROLE_MISSING`, 429 → Backoff),
       zod an jeder Antwort, verlustfreies JSON.
 - [ ] Operationen: Marktplatz-Teilnahmen des Kontos (Sellers-API), Reports-API (anlegen, Status, Dokument laden und
       entpacken). Mock-Server (msw) mit kleinen, erfundenen Daten für beide.
@@ -216,9 +256,12 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
 - **Dominik, vor 7.2b:** Art des Zugangs (F1). **Vor 7.12:** Rollen bestätigen (F2).
 - **Dominik, vor 7.8:** Gehört das Honorar der Agentur in die OPEX des Clients (und damit in die Kundensicht)?
   Empfehlung: nein, OPEX enthält nur Kosten des Kunden; ein Honorar kann er selbst als Posten wollen.
-- **Claude, beim Bau gegen die Doku prüfen** (kein Zugang, Stand ist Erinnerung, nicht Messung): genaue Berichtsnamen
-  und ihre Rollen, Aufbewahrung und Höchstfenster der Berichte, Grenzen der Reports-API, ob „Alle Bestellungen“ die
-  Steuer je Position für alle EU-Marktplätze liefert, Version der Finances-API.
+- **Dominik, vor 7.12:** Die App braucht zusätzlich die Rolle **„Selling Partner Insights“** (Marktplatz-Teilnahmen);
+  ohne sie scheitert schon das Verbinden mit `SP_ROLE_MISSING`.
+- **Claude, erledigt am 2026-10-12** (siehe „Stand der SP-API“): Aufruf ohne SigV4, Rate-Limits, Reports-API,
+  Name, Rolle und Höchstfenster von „Alle Bestellungen“. **Weiter offen:** brutto/netto und Steuer je Position auf
+  EU-Marktplätzen (7.12, echte Datei), Host der Download-URL, Aufbewahrung der Berichte, Version der Finances-API
+  (7.6), Berichte für 7.5 und 7.7.
 - **Feature-Key `organic`** fehlt in `FEATURE_KEYS`, weil 2b.3–2b.5 (SQP, Organic) nie gebaut wurden
   (`phase-2b.md`). Er kommt mit 2b.3; kein Thema dieser Phase.
 
