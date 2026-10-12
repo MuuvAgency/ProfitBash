@@ -335,6 +335,44 @@ export const de = {
       required: 'Bitte einen Namen eingeben.',
     },
     /** Profile ohne Connection (`phase-1.md` 1.11a): Daten kommen per Datei-Import aus der Werbekonsole. */
+    sellerAccounts: {
+      title: 'Seller-Konten',
+      description:
+        'Verkäuferkonten über die Amazon SP-API: Grundlage für Bestellungen, Gebühren und Profit. Je Marktplatz ein Konto.',
+      connect: 'Seller-Konto verbinden',
+      sync: 'Konten abgleichen',
+      loadError: 'Die Seller-Konten konnten nicht geladen werden.',
+      empty: 'Noch kein Seller-Konto verbunden.',
+      noAccounts: 'Für diese Verbindung gibt es keine Konten auf bekannten Marktplätzen.',
+      noAccountsFiltered: 'Alle Konten sind entfernt. „Entfernte anzeigen“ blendet sie ein.',
+      sellerId: 'Seller-ID {id}',
+      tableLabel: 'Seller-Konten von {id}',
+      removedHint: 'Der Verkäufer nimmt an diesem Marktplatz nicht mehr teil.',
+      store: 'Shop-Name',
+      clientFor: 'Client für {store} ({country})',
+      hideFor: '{store} ({country}) ausblenden',
+      updateFailed: 'Das Seller-Konto konnte nicht geändert werden.',
+      /** `{count}` = Marktplätze, die ProfitBash noch nicht kennt. */
+      skipped:
+        'Kein Marktplatz übersprungen | Ein Marktplatz wird noch nicht unterstützt und wurde übersprungen. | {count} Marktplätze werden noch nicht unterstützt und wurden übersprungen.',
+      dialog: {
+        title: 'Seller-Konto verbinden',
+        reconnectTitle: 'Seller-Konto neu verbinden',
+        intro:
+          'Trage die Zugangsdaten der SP-API-App und den Refresh-Token des Verkäufers ein. ProfitBash prüft sie bei Amazon und speichert sie verschlüsselt.',
+        region: 'Region',
+        sellerId: 'Seller-ID',
+        sellerIdHint: 'Händler-Token aus Seller Central (Einstellungen → Kontoinformationen).',
+        clientId: 'Client-ID der App',
+        clientSecret: 'Client-Secret der App',
+        refreshToken: 'Refresh-Token',
+        refreshTokenHint:
+          'Beginnt mit „Atzr|“. Entsteht beim Autorisieren der App in Seller Central.',
+        required: 'Bitte fülle alle Felder aus.',
+        cancel: 'Abbrechen',
+        submit: 'Prüfen und verbinden',
+      },
+    },
     fileProfiles: {
       title: 'Profile ohne Connection',
       description:
@@ -3153,6 +3191,14 @@ export const de = {
     CONNECTION_NOT_FOUND: 'Die Connection gibt es nicht mehr. Bitte lade die Seite neu.',
     PROFILE_NOT_FOUND: 'Das Profil gibt es nicht mehr. Bitte lade die Seite neu.',
     CLIENT_NOT_FOUND: 'Den Client gibt es nicht mehr. Bitte lade die Seite neu.',
+    SP_TOKEN_REJECTED:
+      'Amazon hat den Refresh-Token abgelehnt. Bitte prüfe Token, Region und ob er zu dieser App gehört.',
+    SP_CREDENTIALS_REJECTED:
+      'Amazon hat die Zugangsdaten der App abgelehnt. Bitte prüfe Client-ID und Client-Secret.',
+    SP_ROLE_MISSING:
+      'Amazon verweigert den Zugriff: Der App fehlt eine Rolle. Zum Verbinden braucht sie „Selling Partner Insights“.',
+    AMAZON_ERROR: 'Amazon ist gerade nicht erreichbar. Bitte versuche es später erneut.',
+    SELLER_ACCOUNT_NOT_FOUND: 'Das Seller-Konto gibt es nicht mehr. Bitte lade die Seite neu.',
     CAMPAIGN_BLOCK_UNKNOWN_BLOCK:
       'Diesen Baustein gibt es für den Anzeigentyp der Kampagne nicht (mehr). Bitte lade die Seite neu.',
     CAMPAIGN_BLOCK_UNKNOWN_CAMPAIGN:

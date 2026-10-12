@@ -6,6 +6,7 @@ import type {
   FileProfileCreate,
   Profile,
   ProfilePatch,
+  SellerConnectionCreate,
 } from '@profitbash/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { computed, onBeforeUnmount, readonly, ref, toValue, type MaybeRefOrGetter } from 'vue';
@@ -26,6 +27,7 @@ export const connectionKeys = {
   clients: (orgId: string | null) => ['clients', orgId] as const,
   fileImports: (orgId: string | null, profileId: string) =>
     ['file-imports', orgId, profileId] as const,
+  sellerConnections: (orgId: string | null) => ['seller-connections', orgId] as const,
 };
 
 /** Abstand der Abfragen, solange ein Sync läuft (siehe `useSyncPolling`). */
@@ -249,3 +251,36 @@ export function useRefreshFileProfiles() {
       queryClient.invalidateQueries({ queryKey: ['search-terms', orgId.value] }),
     ]);
 }
+
+// --- Seller-Konten (Amazon SP-API, Phase 7) -------------------------------------------------
+
+export function useSellerConnectionsQuery() {
+  const orgId = useActiveOrgId();
+  return useQuery({
+    queryKey: computed(() => connectionKeys.sellerConnections(orgId.value)),
+    queryFn: () => api.listSellerConnections(),
+    enabled: computed(() => orgId.value !== null),
+  });
+}
+
+/** Verbinden, Abgleichen und Ändern laden danach die Liste neu (wenige Zeilen, kein optimistisches Update). */
+function useSellerMutation<Input, Output>(mutationFn: (input: Input) => Promise<Output>) {
+  const orgId = useActiveOrgId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: connectionKeys.sellerConnections(orgId.value) }),
+  });
+}
+
+export const useCreateSellerConnection = () =>
+  useSellerMutation((input: SellerConnectionCreate) => api.createSellerConnection(input));
+
+export const useSyncSellerConnection = () =>
+  useSellerMutation((connectionId: string) => api.syncSellerConnection(connectionId));
+
+export const useUpdateSellerAccount = () =>
+  useSellerMutation(({ id, patch }: { id: string; patch: ProfilePatch }) =>
+    api.updateSellerAccount(id, patch),
+  );
