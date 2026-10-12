@@ -6,8 +6,8 @@
 > (1.3 Lease und Anfrage-Budget, 1.5 Report-Anfragen, 1.11 Datei-Import), `docs/tasks/phase-6.md` (6.3a/6.3b: Seiten
 > „kundensicher“ machen), `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` (Abschnitt G), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-12), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei). Fertig: nichts.
-> Nächste Aufgabe: 7.1.** Offen bei Dominik: F1 (Art des Zugangs) und F2 (Rollen prüfen); beides hält 7.1–7.4 nicht auf,
+> **Status: verfeinert (2026-10-12), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 7.1.
+> Nächste Aufgabe: 7.2.** Offen bei Dominik: F1 (Art des Zugangs) und F2 (Rollen prüfen); beides hält 7.1–7.4 nicht auf,
 > weil bis dahin gegen Mocks gebaut wird.
 >
 > **Ausgangslage (Stand Code, 2026-10-12):**
@@ -170,14 +170,46 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
 - **Nicht in dieser Phase:** siehe „Bewusst nicht in Phase 7“.
 
 ### 7.1 Paket `packages/amazon-sp` und Mock
-- [ ] Paket anlegen: Regionen und Endpunkte (eu/na/fe), Marktplatz-Liste (ID, Land, Währung, Zeitzone, Seller-Central-
+- [x] Paket anlegen: Regionen und Endpunkte (eu/na/fe), Marktplatz-Liste (ID, Land, Währung, Zeitzone, Seller-Central-
       Domain) – vorhandene Marktplatz-Daten aus `@profitbash/shared` wiederverwenden und nur ergänzen.
-- [ ] Client mit LwA-Token aus `packages/amazon-ads`, Rate-Limit je Operation nach den dokumentierten Standardraten
+- [x] Client mit LwA-Token aus `packages/amazon-ads`, Rate-Limit je Operation nach den dokumentierten Standardraten
       (der Header `x-amzn-RateLimit-Limit` ist laut Amazon nicht verlässlich), Fehlerabbildung (401/403 → Neu-Verbinden bzw. `SP_ROLE_MISSING`, 429 → Backoff),
       zod an jeder Antwort, verlustfreies JSON.
-- [ ] Operationen: Marktplatz-Teilnahmen des Kontos (Sellers-API), Reports-API (anlegen, Status, Dokument laden und
+- [x] Operationen: Marktplatz-Teilnahmen des Kontos (Sellers-API), Reports-API (anlegen, Status, Dokument laden und
       entpacken). Mock-Server (msw) mit kleinen, erfundenen Daten für beide.
-- [ ] ADR 007 beginnen: Paketgrenzen, Wiederverwendung von LwA, Umgang mit Rollen, keine Käuferdaten.
+- [x] ADR 007 beginnen: Paketgrenzen, Wiederverwendung von LwA, Umgang mit Rollen, keine Käuferdaten.
+
+- [x] Umsetzung (Stand für 7.2 und 7.3):
+  - **Paket** `@profitbash/amazon-sp`: `AMAZON_SP_REGIONS` (API-Host je Region, Token immer `api.amazon.com`),
+    `spMarketplaceFor(marketplaceId)` (Marktplatz aus `@profitbash/shared` plus Region und Seller-Central-Adresse;
+    `undefined` für unbekannte Marktplätze, die 7.2 überspringt und meldet), `createAmazonSpClient`,
+    `createMockAmazonSpClient`, `AmazonSpRoleMissingError`. ADR 007 begonnen.
+  - **Client:** `createAmazonSpClient({ credentialsFor, store, logger, http })`; `ConnectionRef` und
+    `RefreshTokenStore` wie bei Ads (der Token-Store aus `@profitbash/db` passt unverändert). `credentialsFor`
+    liefert Client-ID und Secret je Connection (7.2 liest sie aus der verschlüsselten Tabelle bzw. aus `.env`); je
+    Connection ein eigener Token-Cache, `invalidateAccessToken(connectionId)` nach Neu-Verbinden und Trennen aufrufen.
+    Methoden: `getMarketplaceParticipations`, `createReport`, `getReport` (`IN_QUEUE`/`IN_PROGRESS`/`DONE` mit
+    `reportDocumentId`/`FATAL`/`CANCELLED`/`NOT_FOUND`), `getReportDocument`, `downloadReportDocument(document,
+    { maxBytes })` → Text (gzip entpackt, Zeichensatz aus dem `Content-Type`, ohne Angabe UTF-8) oder `expired`.
+    Alle nehmen `{ meter }` für `job_runs.counters`.
+  - **Für 7.2:** Die Teilnahmen nennen keine Seller-ID; „Token eintragen“ fragt sie ab. Das Budget der Teilnahmen ist
+    0,016/s ohne Burst: nach dem Prüfen beim Anlegen das Ergebnis für den ersten Sync verwenden, statt sofort erneut
+    abzufragen (sonst wartet der zweite Aufruf rund eine Minute).
+  - **Für 7.3:** `CANCELLED` meldet Amazon auch bei einem Bericht ohne Daten (als leer behandeln, nicht als Fehler).
+    Die Dokument-URL läuft nach 5 Minuten ab: erst unmittelbar vor dem Download holen, bei `expired` neu holen.
+    `createReport` hat 0,0167/s ohne Burst, also höchstens ein neuer Bericht je Minute und Connection.
+  - **Fehler:** 401/403 → einmal frisches Token (höchstens einmal je Minute und Connection), danach 403 →
+    `AmazonSpRoleMissingError` (`SP_ROLE_MISSING`, erbt von `AmazonAdsHttpError`); `invalid_grant` bei LwA →
+    `AmazonAdsReauthRequiredError`; 429 → Backoff und halbierte Rate.
+  - **Mock:** der echte Client mit `fetch` im Prozess. Refresh-Token `MOCK_AMAZON_SP_REFRESH_TOKEN`, jeder andere
+    gilt als widerrufen. Teilnahmen: eu DE und FR aktiv, UK inaktiv; na US. Bestellberichte (beide Typen) mit
+    erfundenen Positionen je Tag: zwei versendete (eine um 22:30 UTC), regelmäßig storniert, „Pending“ ohne Preis
+    (selbst versandt) und B2B; Datei gzip in Cp1252 mit Adressspalten. Die Bericht-ID kodiert den Auftrag
+    (Neustart-fest), fertig nach `processingMs` (5 s).
+  - **Im Ads-Paket geändert:** `parseErrorBody` liest `errors[0]`; `downloadFile` mit `allowedHosts` und
+    `contentType`; neu `collectDownload` (mit und ohne gzip, mit Deckel); Exporte für die Bausteine.
+  - **Nicht gebaut:** Auswertung von `x-amzn-RateLimit-Limit`, Burst, Env-Schema (`AMAZON_SP_*`, kommt mit der
+    Verdrahtung in 7.2), `getReports`/Zeitpläne, Marktplätze außerhalb von `@profitbash/shared` (JP, AU, MX …).
 
 ### 7.2 Connection und Seller-Konten
 - [ ] Migration: Provider `amazon_sp`; `amazon_sp_accounts` (Connection, Client, `amazon_seller_id`, `marketplace_id`,
