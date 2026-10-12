@@ -273,6 +273,29 @@ describe('Grenzen', () => {
     });
   });
 
+  it('Abmelden während der Impersonation schreibt das Ende ins Audit', async () => {
+    const stops = () =>
+      ctx.testDb.db
+        .select({ actorUserId: auditEvents.actorUserId, target: auditEvents.target })
+        .from(auditEvents)
+        .where(eq(auditEvents.action, 'platform.impersonation_stop'));
+    const { cookie } = await start(ids.ina);
+    const before = (await stops()).length;
+    const res = await request(ctx, '/api/auth/sign-out', { method: 'POST', cookie, json: {} });
+    expect(res.status).toBe(200);
+    expect((await request(ctx, '/api/me', { cookie })).status).toBe(401);
+    expect(await stops()).toHaveLength(before + 1);
+    expect(await lastAudit('platform.impersonation_stop')).toEqual({
+      organizationId: null,
+      actorUserId: ctx.seeded.userId,
+      target: { type: 'user', id: ids.ina, email: 'ina@muuv.test', impersonatedUserId: ids.ina },
+    });
+    // Ein gewöhnliches Abmelden schreibt kein Ende.
+    const plain = await signIn(ctx, 'ina@muuv.test');
+    await request(ctx, '/api/auth/sign-out', { method: 'POST', cookie: plain, json: {} });
+    expect(await stops()).toHaveLength(before + 1);
+  });
+
   it('als Kunden-Nutzer gelten dessen Grenzen; Beenden bleibt möglich', async () => {
     const { res, cookie } = await start(ids.kim);
     expect(res.status).toBe(204);

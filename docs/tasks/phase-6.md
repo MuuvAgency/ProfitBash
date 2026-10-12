@@ -376,8 +376,8 @@ Plattform-Rolle `superadmin`.
     geprüft: 1440 px, Ablauf nach einer Stunde und eine schreibende Aktion im Browser (per Test abgedeckt).
   - **Reste in der Dev-DB (2026-10-12):** `member.create`, `member.remove` (Muuv), `platform.impersonation_start`
     und `.impersonation_stop`, ein gesperrter Passwort-Link für `pruefung-6-2@muuv.test`.
-  - **Bekannte Grenzen:** Läuft die Session ab oder meldet sich der Superadmin während der Impersonation ab, gibt
-    es kein Ende-Ereignis (der Beginn nennt den Zeitpunkt, die Dauer ist auf eine Stunde begrenzt). Der Hook für
+  - **Bekannte Grenzen:** Läuft die Session ab, gibt es kein Ende-Ereignis (der Beginn nennt den Zeitpunkt, die
+    Dauer ist auf eine Stunde begrenzt); beim Abmelden seit 2026-10-12 schon („Offen nach Phase 6“). Der Hook für
     `/organization/leave` kennt die Impersonation nicht; der Endpunkt ist per HTTP gesperrt.
   - Review (ponytail): Kennzeichnung im Audit-Log ergänzt (Festlegung „zeigt beides“); sonst keine Befunde.
 
@@ -403,9 +403,11 @@ Plattform-Rolle `superadmin`.
 **Nicht gebaut oder nicht geprüft:**
 - **1440 px** in der Browser-Pane (Definition of Done): in keiner Session möglich, die Pane war schmaler. Nachholen
   in einem breiten Fenster: `/admin/audit`, `/admin/platform/*`, Kundenzugang-Dialog, Banner.
-- **Impersonation ohne Ende-Ereignis:** bei Ablauf nach einer Stunde und wenn sich der Superadmin währenddessen
-  abmeldet (der Cookie mit seiner eigenen Session bleibt dann bis zum Ablauf liegen). Nach dem Ablauf muss er sich neu
-  anmelden. Der Beginn steht immer im Protokoll.
+- **Impersonation ohne Ende-Ereignis:** nur noch bei Ablauf nach einer Stunde (kein Job dafür; der Beginn nennt den
+  Zeitpunkt, die Dauer ist begrenzt). Nach dem Ablauf muss sich der Superadmin neu anmelden.
+  **Nachgezogen (2026-10-12):** Abmelden während der Impersonation schreibt `platform.impersonation_stop`
+  (`hooks.before` für `/sign-out` in `auth.ts`, Test in `routes/impersonation.test.ts`). Der Cookie mit der eigenen
+  Session des Superadmins bleibt dabei bis zum Ablauf im Browser liegen; diese Session wird nicht beendet.
 - **Protokoll im Plattform-Admin** zeigt die letzten 50 plattformweiten Ereignisse ohne Blättern (6.4); die
   Filterauswahl des Audit-Logs liest alle Ereignisse der Organisation (6.1).
 - **Nutzerverwaltung über Organisationen hinweg** gibt es nicht: Nutzer ohne Mitgliedschaft (z. B. entfernte
