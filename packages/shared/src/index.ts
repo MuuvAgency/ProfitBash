@@ -13,6 +13,7 @@ export * from './format';
 export * from './logger';
 export * from './marketplaces';
 export * from './members';
+export * from './platform';
 export * from './roles';
 export * from './saved-views';
 export * from './slug';

@@ -23,6 +23,7 @@ export { runMigrations } from './migrate';
 export * from './fx-rates';
 export * from './saved-views';
 export * from './members';
+export * from './platform';
 export * from './search-terms';
 export * from './search-term-harvest';
 export * from './tags';

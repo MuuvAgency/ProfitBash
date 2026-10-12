@@ -1,4 +1,9 @@
-import { PASSWORD_LINK_VALID_DAYS, type MemberStatus, type OrgRole } from '@profitbash/shared';
+import {
+  CUSTOMER_ORG_FEATURES,
+  PASSWORD_LINK_VALID_DAYS,
+  type MemberStatus,
+  type OrgRole,
+} from '@profitbash/shared';
 import { and, asc, count, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { recordAuditEvent, type DbOrTx } from './audit';
@@ -449,9 +454,6 @@ export async function regeneratePasswordLink(
     return link;
   });
 }
-
-/** Was eine Kunden-Org bucht (`phase-6.md` F1): Dashboard und Explorer, nur lesend. */
-export const CUSTOMER_ORG_FEATURES = ['dashboard', 'sp-explorer'] as const;
 
 /**
  * Kundenzugang eines Clients (`phase-6.md` 6.3c, F3): liefert die Eingabe, mit der `listMembers`, `addMember` (immer
