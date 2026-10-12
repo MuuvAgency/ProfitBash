@@ -7,7 +7,7 @@ später ergänzt um Profitabilität (SP-API). Fokus jetzt: **nur Amazon Ads**.
 **Vor jeder Aufgabe lesen:**
 1. `docs/plan.md` – Roadmap, Navigation, Feature-Keys, Architektur-Leitplanken
 2. `docs/tasks/phase-N.md` – die aktuelle Phase (Häkchen zeigen den Stand)
-3. `docs/decisions/` – getroffene Entscheidungen (ADRs, u. a. 001 Stack, 002 Mandanten-Modell, 006 Automatik ohne API). Nicht stillschweigend davon abweichen.
+3. `docs/decisions/` – getroffene Entscheidungen (ADRs, u. a. 001 Stack, 002 Mandanten-Modell, 006 Automatik ohne API, 007 SP-API). Nicht stillschweigend davon abweichen.
 
 ## Struktur
 ```
@@ -16,6 +16,7 @@ apps/worker     pg-boss-Jobs (inline im API-Prozess oder separat, WORKER_MODE)
 apps/web        Vue 3 + PrimeVue + Tailwind
 packages/db     Drizzle-Schema, Migrationen, Access-Layer, Test-Datenbanken
 packages/amazon-ads  Amazon-Ads-API-Client (je externe API ein eigenes Paket)
+packages/amazon-sp   Amazon-SP-API-Client (nutzt LwA, HTTP und Rate-Limit aus amazon-ads, ADR 007)
 packages/engine Fachlogik ohne I/O (Regeln, Pacing, Berechnungen)
 packages/shared zod-Schemas, Feature-Keys, Rollen, Formatierung (Wurzel: browserfähig);
                 Server-only über /env, /crypto; better-auth-Zugriffskontrolle über /access-control
