@@ -449,7 +449,9 @@ describe('Zähler und Anfrage-Budget', () => {
     server.use(
       http.get(URL_, () =>
         HttpResponse.json(
-          { errors: [{ code: 'Unauthorized', message: 'Access to requested resource is denied.' }] },
+          {
+            errors: [{ code: 'Unauthorized', message: 'Access to requested resource is denied.' }],
+          },
           { status: 403 },
         ),
       ),
