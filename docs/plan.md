@@ -24,7 +24,7 @@ dass sie später ohne Umbau dazukommen (siehe §5).
 | **4 – Tools** | Produktgruppen, Kampagnen-Setup nach **eigenem, konfigurierbarem** Struktur-Katalog (Bausteine, Graduation-Kanten, sechs Presets je Client und ASIN) und Namensschema, Bulk-Datei-Export, Gebots-Stack-Simulator, Portfolio anlegen | – |
 | **5 – Automatisieren** | Budget-Caps mit Enforcer und Pacing, Notifications (SSE), Regeln und Bid-Optimizer als tägliche Pipeline mit Leitplanken und Schattenmodus, Graduation- und Preset-Vorschläge, Prüfungen „kein Geld verbrennen“, **Ziele** (ACoS/ROAS je Client mit Target-ACoS-Rechner, vorgezogen aus Phase 6) | – (Kennzahlen aus der Bulk-Datei) |
 | **6 – Steuern** | Kundenzugang (Kunden-Orgs, nur lesend: Dashboard und Explorer), Freigaben je Client für Mitglieder, Audit-Log-UI, Plattform-Admin, Impersonation (abgeschlossen 2026-10-12, `docs/tasks/phase-6.md`) | – |
-| **7 – Profit** | Bestellungen, Gebühren, Retouren, Einkaufspreise (COGS), Versand, OPEX, P&L, organische Umsätze → echtes TACoS und Netto-Profit | **Amazon SP-API** |
+| **7 – Profit** | Bestellungen, Gebühren, Retouren, Einkaufspreise (COGS), Versand, OPEX, P&L, organische Umsätze → echtes TACoS und Netto-Profit (verfeinert 2026-10-12, `docs/tasks/phase-7.md`: nur Seller, Sales-Import zuerst, netto/brutto umschaltbar, Kunden lesen mit) | **Amazon SP-API** (Mocks bis zum Test mit echtem Konto) |
 | später | **Dayparting** (Tagesbudget über den Tag verteilen; verschoben am 2026-10-10, `phase-5.md` F7), Otto, eBay, Shopify, DSP, KI-Assistent/MCP-Schnittstelle | Ads-API mit stündlichen Daten, jeweilige APIs |
 
 **Hinweis TACoS:** Echtes TACoS braucht organische Umsätze aus der SP-API. Bis Phase 7 zeigt das
