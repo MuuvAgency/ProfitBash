@@ -290,7 +290,10 @@ function parseRetryAfter(value: string | null, nowMs: number): number | null {
   return Math.max(0, date - nowMs);
 }
 
-/** Liest `code`/`details` (Ads-API) bzw. `error`/`error_description` (LWA) aus einer Fehlerantwort. */
+/**
+ * Liest `code`/`details` (Ads-API), `error`/`error_description` (LWA) bzw. den ersten Eintrag von `errors`
+ * (SP-API) aus einer Fehlerantwort.
+ */
 function parseErrorBody(text: string): { code: string | null; details: string | null } {
   let body: unknown;
   try {
@@ -299,7 +302,13 @@ function parseErrorBody(text: string): { code: string | null; details: string | 
     return { code: null, details: null };
   }
   if (typeof body !== 'object' || body === null) return { code: null, details: null };
-  const record = body as Record<string, unknown>;
+  const first = Array.isArray((body as { errors?: unknown }).errors)
+    ? (body as { errors: unknown[] }).errors[0]
+    : undefined;
+  const record = (typeof first === 'object' && first !== null ? first : body) as Record<
+    string,
+    unknown
+  >;
   const pick = (...keys: string[]) => {
     for (const key of keys) {
       const value = record[key];
