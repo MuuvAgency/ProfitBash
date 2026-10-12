@@ -154,7 +154,8 @@ describe('downloadFile', () => {
 });
 
 describe('downloadFile mit eigenen Hosts', () => {
-  const SP_URL = 'https://tortuga-prod-eu.s3-eu-west-1.amazonaws.com/doc?X-Amz-Signature=SECRET-SIG';
+  const SP_URL =
+    'https://tortuga-prod-eu.s3-eu-west-1.amazonaws.com/doc?X-Amz-Signature=SECRET-SIG';
   const options = {
     fetch: ((input, init) => globalThis.fetch(input, init)) as typeof fetch,
     logger: () => {},
