@@ -76,8 +76,7 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   (`packages/db/src/search-terms.ts`); lesen dürfen alle Mitglieder (`getOrgRole()`), schreiben mit Recht `write` im Feature
   `sp-explorer` (prüft die API). Die geschützten Begriffe eines Clients (`clients.protected_terms`) pflegen Org-Admins über
   die Clients-Verwaltung; die Suchbegriff-Analyse liest sie nur über ein sichtbares Profil dieses Clients mit
-  (`querySearchTermPeriod` nach `visibleProfilesScope()`). Für Kunden-Orgs (Phase 6) gilt dafür dieselbe offene Frage wie
-  für andere Client-Daten.
+  (`querySearchTermPeriod` nach `visibleProfilesScope()`). Kunden-Orgs sehen sie nicht (Phase 6, F1: die Suchbegriff-Analyse ist für sie gesperrt).
   Einen Datei-Zeitraum der Suchbegriffe löschen (2b.2d, `deleteSearchTermPeriod`) dürfen nur Org-Admins für ein
   sichtbares Profil (`orgAdminOnly` wie der Datei-Upload, dazu Feature `sp-explorer`), mit Audit-Event.
   Abweichende Regeln je Profil (2b.2g, `search_term_rule_overrides`) gehören der Organisation des Profils; gelesen

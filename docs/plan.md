@@ -23,7 +23,7 @@ dass sie später ohne Umbau dazukommen (siehe §5).
 | **3 – Ändern** | Pending-Changes-Warenkorb → Submit an Amazon, Submissions, History und Revert, Bulk-Dialoge, Tags, Suchbegriff-Aktionen aus 2b (Negativ, Harvest) | Ads-API (Write), bis dahin Bulk-Datei |
 | **4 – Tools** | Produktgruppen, Kampagnen-Setup nach **eigenem, konfigurierbarem** Struktur-Katalog (Bausteine, Graduation-Kanten, sechs Presets je Client und ASIN) und Namensschema, Bulk-Datei-Export, Gebots-Stack-Simulator, Portfolio anlegen | – |
 | **5 – Automatisieren** | Budget-Caps mit Enforcer und Pacing, Notifications (SSE), Regeln und Bid-Optimizer als tägliche Pipeline mit Leitplanken und Schattenmodus, Graduation- und Preset-Vorschläge, Prüfungen „kein Geld verbrennen“, **Ziele** (ACoS/ROAS je Client mit Target-ACoS-Rechner, vorgezogen aus Phase 6) | – (Kennzahlen aus der Bulk-Datei) |
-| **6 – Steuern** | Kundenzugang (Client-Orgs, Profil-Freigaben), Audit-Log-UI, Plattform-Admin, Impersonation | – |
+| **6 – Steuern** | Kundenzugang (Kunden-Orgs, nur lesend: Dashboard und Explorer), Freigaben je Client für Mitglieder, Audit-Log-UI, Plattform-Admin, Impersonation (abgeschlossen 2026-10-12, `docs/tasks/phase-6.md`) | – |
 | **7 – Profit** | Bestellungen, Gebühren, Retouren, Einkaufspreise (COGS), Versand, OPEX, P&L, organische Umsätze → echtes TACoS und Netto-Profit | **Amazon SP-API** |
 | später | **Dayparting** (Tagesbudget über den Tag verteilen; verschoben am 2026-10-10, `phase-5.md` F7), Otto, eBay, Shopify, DSP, KI-Assistent/MCP-Schnittstelle | Ads-API mit stündlichen Daten, jeweilige APIs |
 
@@ -78,7 +78,11 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 | Admin | Clients & Connections | `/admin/connections` | Org-Admin | **0** | `setup_wizard` |
 | | Mitglieder | `/admin/members` | Org-Admin | 2 | – |
 | | Audit-Log | `/admin/audit` | Org-Admin | 6 | – |
-| | Plattform (Orgs · Entitlements · Staff) | `/admin/platform/*` | Superadmin | 6 | – |
+| | Plattform (Orgs · Entitlements · Staff; „Als Nutzer ansehen“ je Mitglied) | `/admin/platform/*` | Superadmin | 6 | – |
+
+**Kunden-Logins (Phase 6):** sehen nur Dashboard und Explorer ihres Clients, ohne Benachrichtigungen, Quick-Tools,
+gespeicherte Ansichten und Suchbegriff-Analyse. Der Kundenzugang wird am Client unter „Clients & Connections“ verwaltet.
+**Impersonation (Phase 6):** Während „Als Nutzer ansehen“ zeigt die Shell einen Banner mit „Beenden“.
 
 **Account-Menü (Sidebar-Fuß):** Dark Mode · Einstellungen (`/settings`, Phase 0) · Tastenkürzel · Logout.
 **Quick-Tools (Popover):** Phase 0 Platzhalter, ASIN-Tool in Phase 2.
@@ -98,13 +102,19 @@ Einträge späterer Phasen werden schon in Phase 0 angezeigt und öffnen eine Pl
 
 ## 4. Rollen
 
-- **Plattform:** `user` | `superadmin` (better-auth Admin-Plugin). Superadmin = Muuv-intern, sieht Plattform-Admin.
+- **Plattform:** `user` | `superadmin` (better-auth Admin-Plugin). Superadmin = Muuv-intern, sieht Plattform-Admin:
+  Organisationen anlegen und umbenennen, Features je Organisation buchen, die Rolle an Mitglieder einer Agentur-Org
+  vergeben und entziehen (der letzte Superadmin behält sie).
+- **Impersonation (Phase 6, `phase-6.md` F4):** Ein Superadmin sieht und bedient die App als ein Nutzer (kein
+  Superadmin) mit dessen vollen Rechten, höchstens eine Stunde. Das Audit-Log nennt ihn als Handelnden; Mitglieder,
+  Kundenzugang und Plattform-Admin sind währenddessen gesperrt.
 - **Organisation:** `admin` | `editor` | `viewer`.
 - **Freigaben je Client (Phase 6, 6.2; `phase-6.md` F2):** Editoren und Viewer lassen sich in der Mitgliederverwaltung
   auf einzelne Clients einschränken und sehen dann nur deren Profile. Ohne Freigaben sieht ein Mitglied alle nicht
   ausgeblendeten Profile seiner Org, Admins immer alle. Die Regel steckt im Access-Layer.
-- **Kundenzugang (Phase 6):** Die Agentur-Org besitzt alle Daten. Kunden-Orgs bekommen Lesezugriff auf die Profile
-  ihres Clients (siehe `docs/decisions/002-tenancy.md`).
+- **Kundenzugang (Phase 6):** Die Agentur-Org besitzt alle Daten. Eine Kunden-Org gehört zu genau einem Client; ihre
+  Mitglieder sind immer `viewer` und lesen Dashboard und Explorer für die Profile dieses Clients (siehe
+  `docs/decisions/002-tenancy.md`). Org-Admins der Agentur legen Kunden-Nutzer am Client an und entziehen sie.
 
 ## 5. Architektur-Leitplanken für Erweiterbarkeit
 

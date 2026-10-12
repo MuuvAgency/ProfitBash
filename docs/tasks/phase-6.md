@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b, 6.3c, 6.4, 6.5.**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1–6.6; Phase 6 ist abgeschlossen (offene Punkte unter „Offen nach Phase 6“).**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -32,27 +32,45 @@ Die Agentur behält die Kontrolle darüber, **wer was sieht und wer was getan ha
 
 ## Definition of Done
 
-- [ ] Sichtbarkeit entscheidet weiter **nur** der Access-Layer (ADR 002 Punkt 5); seine Signaturen (`userId`, `orgId`)
+Geprüft in 6.6 (2026-10-12); hinter jedem Punkt der Beleg.
+
+- [x] Sichtbarkeit entscheidet weiter **nur** der Access-Layer (ADR 002 Punkt 5); seine Signaturen (`userId`, `orgId`)
       bleiben. Keine Route prüft Freigaben oder Kunden-Orgs selbst.
-- [ ] **Fail-closed:** Ein Kunden-Login sieht ausschließlich Daten der Profile seines Clients, ein eingeschränktes
+      *Beleg:* Freigaben und Kunden-Org stecken in `getMembership`/`visibilityConditions` (`access.ts`); in `apps/api`
+      kennt nur `requireSession` den Typ der Organisation (Pfad-Liste als zweites Netz, keine Sichtbarkeit) und
+      `routes/members.ts` reicht den Client an `clientAccessScope` weiter.
+- [x] **Fail-closed:** Ein Kunden-Login sieht ausschließlich Daten der Profile seines Clients, ein eingeschränktes
       Mitglied nur seine Freigaben. Test je freigegebenem Endpunkt (fremder Client, fremde Organisation, ausgeblendetes
       Profil, entzogene Freigabe) und ein Test über **alle** registrierten Routen: Für einen Kunden-Login antwortet jede
       schreibende Route und jede nicht freigegebene lesende Route mit 403 oder liefert nichts.
-- [ ] Kunden-Orgs sind lesend: keine schreibende Aktion, unabhängig von der Rolle des Mitglieds.
-- [ ] Entitlements gelten je Organisation (ADR 002 Punkt 4): Der Kunde sieht nur, was für seine Org gebucht ist.
-- [ ] Jede schreibende Aktion dieser Phase erzeugt ein `audit_event` (Freigaben, Kundenzugang anlegen und entziehen,
+      *Beleg:* `customer-org.test.ts` (alle Routen, auch die neuen aus 6.4/6.5), `routes/analytics-customer.test.ts`,
+      `access-client-org.test.ts`, `access-grants.test.ts`.
+- [x] Kunden-Orgs sind lesend: keine schreibende Aktion, unabhängig von der Rolle des Mitglieds.
+      *Beleg:* `getOrgRole()`/`listMemberships()` liefern immer `viewer`; `customer-org.test.ts` mit Rolle `admin`.
+- [x] Entitlements gelten je Organisation (ADR 002 Punkt 4): Der Kunde sieht nur, was für seine Org gebucht ist.
+      *Beleg:* `CUSTOMER_ORG_FEATURES` beim Anlegen (6.3c), Buchen im Plattform-Admin (6.4, für Kunden-Orgs begrenzt).
+- [x] Jede schreibende Aktion dieser Phase erzeugt ein `audit_event` (Freigaben, Kundenzugang anlegen und entziehen,
       Organisationen, Entitlements, Staff, Beginn und Ende einer Impersonation). Aktionen während einer Impersonation
       nennen den handelnden Superadmin.
-- [ ] Das Audit-Log zeigt nie Secrets (Tokens, Passwörter, Links) und nur Ereignisse der eigenen Organisation;
+      *Beleg:* `member.grants_update`, `client_access.*`, `platform.*`; `runAsImpersonator` (`audit.test.ts`,
+      `routes/impersonation.test.ts`). Ausnahme: kein Ende-Ereignis bei Ablauf oder Abmelden (siehe unten).
+- [x] Das Audit-Log zeigt nie Secrets (Tokens, Passwörter, Links) und nur Ereignisse der eigenen Organisation;
       plattformweite Ereignisse sieht nur der Superadmin.
-- [ ] Better-auth-Endpunkte des Admin-Plugins bleiben per HTTP gesperrt; die App nutzt eigene Routen mit Audit
+      *Beleg:* `withoutSecrets` (`audit.test.ts`), `routes/audit-events.test.ts`, `GET /api/platform/audit-events`.
+- [x] Better-auth-Endpunkte des Admin-Plugins bleiben per HTTP gesperrt; die App nutzt eigene Routen mit Audit
       (`phase-0.md` 0.4).
-- [ ] Ein Superadmin kann sich nicht selbst die Rolle nehmen, wenn er der letzte ist; Impersonation eines anderen
+      *Beleg:* Allowlist in `app.ts` unverändert, `middleware.test.ts` (`/api/auth/admin/set-role` → 404).
+- [x] Ein Superadmin kann sich nicht selbst die Rolle nehmen, wenn er der letzte ist; Impersonation eines anderen
       Superadmins ist nicht möglich.
-- [ ] Jede neue Datenansicht hat Loading-, Empty- und Error-Zustand; Texte über i18n; Formularfelder mit Label.
+      *Beleg:* `platform.test.ts` (`LAST_SUPERADMIN`), `routes/impersonation.test.ts` (`IMPERSONATION_SUPERADMIN`).
+- [x] Jede neue Datenansicht hat Loading-, Empty- und Error-Zustand; Texte über i18n; Formularfelder mit Label.
+      *Beleg:* `AuditLogPage`, `ClientAccessDialog`, `PlatformPage` samt Tests.
 - [ ] Browser-Pane geprüft wie in Phase 2–5 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole), mit echten Bedienelementen;
       angelegte Testdaten über die Oberfläche wieder entfernt oder genau benannt.
-- [ ] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
+      *Stand:* je Aufgabe geprüft und notiert (Handy, Tablet, Hell/Dunkel, Konsole, echte Bedienelemente, Reste
+      benannt). **Offen: 1440 px** – die Browser-Pane war in allen Sessions schmaler (siehe „Offen nach Phase 6“).
+- [x] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
+      *Beleg:* vor jedem PR gelaufen (zuletzt 3354 Tests), CI der PRs dieser Phase grün (zuletzt 110; 111 mit Auto-Merge).
 
 ## Fragen an Dominik
 
@@ -364,7 +382,43 @@ Plattform-Rolle `superadmin`.
   - Review (ponytail): Kennzeichnung im Audit-Log ergänzt (Festlegung „zeigt beides“); sonst keine Befunde.
 
 ### 6.6 Abschluss
-- [ ] Definition of Done prüfen und belegen, ADR 002 und `plan.md` (§3, §4) auf den Stand bringen, „Offen nach Phase 6“.
+- [x] Definition of Done prüfen und belegen, ADR 002 und `plan.md` (§3, §4) auf den Stand bringen, „Offen nach Phase 6“.
+- **Umsetzung (2026-10-12):** Definition of Done oben mit Belegen abgehakt (ein Punkt offen: 1440 px). `plan.md` §2
+  (Stand Phase 6), §3 (Plattform-Zeile, Kunden-Logins, „Als Nutzer ansehen“) und §4 (Plattform-Rolle, Kundenzugang,
+  Impersonation) angepasst; ADR 002 wurde je Aufgabe ergänzt (6.1–6.5) und nennt keine offene Frage zu Phase 6 mehr.
+  Nur Dokumente, kein Code.
+
+## Offen nach Phase 6 (Stand 2026-10-12)
+
+**Wartet auf Dominik (Festlegungen von Claude, weder bestätigt noch widersprochen):**
+- **Gespeicherte Ansichten für Kunden** sind nicht freigegeben (die Festlegung hätte eigene Ansichten der Kunden-Org
+  erlaubt; sie brauchen `write`, das Kunden nie haben; 6.3a/6.3b).
+- **Kunden-Org** lässt sich nicht lösen oder löschen und folgt einer Umbenennung des Clients nicht (6.3c). Seit 6.4
+  kann der Plattform-Admin sie von Hand umbenennen.
+- **Neue Organisation** (6.4): immer Agentur-Org, der anlegende Superadmin wird ihr Admin. Ein Superadmin kann damit
+  Mitglied mehrerer Organisationen sein; `removeMember` beendet dann alle seine Sessions, und „Link neu erzeugen“ ist
+  für ihn gesperrt (`OTHER_ORGANIZATION`, ohnehin `PROTECTED`).
+- **Staff** nur für Mitglieder einer Agentur-Org (6.4).
+
+**Nicht gebaut oder nicht geprüft:**
+- **1440 px** in der Browser-Pane (Definition of Done): in keiner Session möglich, die Pane war schmaler. Nachholen
+  in einem breiten Fenster: `/admin/audit`, `/admin/platform/*`, Kundenzugang-Dialog, Banner.
+- **Impersonation ohne Ende-Ereignis:** bei Ablauf nach einer Stunde und wenn sich der Superadmin währenddessen
+  abmeldet (der Cookie mit seiner eigenen Session bleibt dann bis zum Ablauf liegen). Nach dem Ablauf muss er sich neu
+  anmelden. Der Beginn steht immer im Protokoll.
+- **Protokoll im Plattform-Admin** zeigt die letzten 50 plattformweiten Ereignisse ohne Blättern (6.4); die
+  Filterauswahl des Audit-Logs liest alle Ereignisse der Organisation (6.1).
+- **Nutzerverwaltung über Organisationen hinweg** gibt es nicht: Nutzer ohne Mitgliedschaft (z. B. entfernte
+  Mitglieder) tauchen im Plattform-Admin nicht auf und lassen sich nicht ansehen oder löschen.
+- **Anmeldung als eingeschränktes Mitglied** im Browser (6.2, per API-Test abgedeckt); „Organisation anlegen“ und die
+  eigene Plattform-Rolle abgeben im Browser (6.4, per Test abgedeckt).
+- **Aus Phase 5 weiter offen:** 5.12 und die Prüfung mit echten Daten (`phase-5.md` „Offen nach Phase 5“).
+- **Aufgefallen, nicht geprüft:** `plan.md` §3 nennt den Feature-Key `organic`, `FEATURE_KEYS`
+  (`packages/shared/src/features.ts`) kennt ihn nicht; damit lässt er sich im Plattform-Admin nicht buchen.
+
+**Dev-DB (Reste, nicht per psql löschbar; migriert bis `0049_client_organization`, Phase 6.4–6.6 ohne Migration):**
+Nutzer `pruefung-6-2@muuv.test` (Plattform-Rolle `user`, ohne Mitgliedschaft) und `pruefung-6-3@kunde.test`, leere
+Kunden-Org „Kranich (Demo)“, dazu die je Aufgabe genannten Audit-Events (6.2, 6.3c, 6.4, 6.5).
 
 ## Bewusst nicht in Phase 6
 
