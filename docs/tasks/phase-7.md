@@ -193,11 +193,10 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
     { maxBytes })` → Text (gzip entpackt, Zeichensatz aus dem `Content-Type`, ohne Angabe UTF-8) oder `expired`.
     Alle nehmen `{ meter }` für `job_runs.counters`.
   - **Für 7.2:** Die Teilnahmen nennen keine Seller-ID; „Token eintragen“ fragt sie ab. Das Budget der Teilnahmen ist
-    0,016/s ohne Burst: nach dem Prüfen beim Anlegen das Ergebnis für den ersten Sync verwenden, statt sofort erneut
-    abzufragen (sonst wartet der zweite Aufruf rund eine Minute).
+    0,016/s mit Burst 10 (seit 7.2, Option `burst` im Anfrage-Budget): Die ersten zehn Aufrufe gehen sofort.
   - **Für 7.3:** `CANCELLED` meldet Amazon auch bei einem Bericht ohne Daten (als leer behandeln, nicht als Fehler).
     Die Dokument-URL läuft nach 5 Minuten ab: erst unmittelbar vor dem Download holen, bei `expired` neu holen.
-    `createReport` hat 0,0167/s ohne Burst, also höchstens ein neuer Bericht je Minute und Connection.
+    `createReport` hat 0,0167/s mit Burst 10: zehn Berichte sofort, danach einer je Minute und Connection.
   - **Fehler:** 401/403 → einmal frisches Token (höchstens einmal je Minute und Connection), danach 403 →
     `AmazonSpRoleMissingError` (`SP_ROLE_MISSING`, erbt von `AmazonAdsHttpError`); `invalid_grant` bei LwA →
     `AmazonAdsReauthRequiredError`; 429 → Backoff und halbierte Rate.
@@ -208,7 +207,7 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
     (Neustart-fest), fertig nach `processingMs` (5 s).
   - **Im Ads-Paket geändert:** `parseErrorBody` liest `errors[0]`; `downloadFile` mit `allowedHosts` und
     `contentType`; neu `collectDownload` (mit und ohne gzip, mit Deckel); Exporte für die Bausteine.
-  - **Nicht gebaut:** Auswertung von `x-amzn-RateLimit-Limit`, Burst, Env-Schema (`AMAZON_SP_*`, kommt mit der
+  - **Nicht gebaut:** Auswertung von `x-amzn-RateLimit-Limit`, Env-Schema (`AMAZON_SP_*`, kommt mit der
     Verdrahtung in 7.2), `getReports`/Zeitpläne, Marktplätze außerhalb von `@profitbash/shared` (JP, AU, MX …).
 
 ### 7.2 Connection und Seller-Konten

@@ -19,6 +19,11 @@ export interface ProfileRateLimiterOptions {
   minRequestsPerSecond?: number;
   /** Anstieg der Rate je erfolgreicher Anfrage. Standard 0,05 Anfragen/s. */
   increasePerSuccess?: number;
+  /**
+   * So viele Anfragen dürfen nach einer Ruhephase sofort hintereinander gehen (Kapazität des Buckets).
+   * Standard 1 (kein Burst, Ads-API). Die SP-API erlaubt je Operation 10–15 bei sehr niedriger Rate.
+   */
+  burst?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -73,6 +78,10 @@ export function createProfileRateLimiter(
   if (!(increase >= 0) || !Number.isFinite(increase)) {
     throw new RangeError('increasePerSuccess darf nicht negativ sein.');
   }
+  const burst = options.burst ?? 1;
+  if (!Number.isInteger(burst) || burst < 1) {
+    throw new RangeError('burst muss eine ganze Zahl ab 1 sein.');
+  }
   const now = options.now ?? Date.now;
   const sleep =
     options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
@@ -99,8 +108,10 @@ export function createProfileRateLimiter(
         if (pausedForMs > maxPauseMs) return { pausedForMs };
         // Den Schlitz synchron reservieren, damit gleichzeitige Aufrufe nicht denselben bekommen.
         const throttles = entry.throttles;
-        const slot = Math.max(entry.nextAt, entry.pausedUntil, t);
-        entry.nextAt = slot + interval(entry.rate);
+        // `nextAt` läuft je Anfrage ein Intervall weiter; senden darf, wer höchstens `burst` Intervalle voraus ist.
+        const step = interval(entry.rate);
+        entry.nextAt = Math.max(entry.nextAt, entry.pausedUntil, t) + step;
+        const slot = Math.max(entry.nextAt - burst * step, entry.pausedUntil, t);
         if (slot <= t) return null;
         await sleep(slot - t);
         if (entry.throttles === throttles) return null;
@@ -111,7 +122,8 @@ export function createProfileRateLimiter(
       entry.rate = Math.max(minRate, entry.rate / 2);
       entry.throttles += 1;
       const t = now();
-      entry.nextAt = Math.max(entry.nextAt, t + interval(entry.rate));
+      // Ein 429 verwirft den Burst: Die nächste Anfrage wartet ein volles Intervall.
+      entry.nextAt = Math.max(entry.nextAt, t + burst * interval(entry.rate));
       entry.pausedUntil = Math.max(entry.pausedUntil, t + (retryAfterMs ?? 0));
     },
     onSuccess(key) {

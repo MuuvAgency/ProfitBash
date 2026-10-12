@@ -22,7 +22,8 @@ Mocks.
 3. **Zugangsdaten je Connection** (F1): Der Client fragt Client-ID und Secret je Connection ab (`credentialsFor`).
    Das deckt private Apps, je Kunde eigene Apps und eine Public App (dann dieselben Werte für alle) ab.
 4. **Rate-Limits:** Budget je Operation und Connection nach den dokumentierten Standardraten; 429 halbiert die Rate.
-   Der Header `x-amzn-RateLimit-Limit` wird nicht ausgewertet (laut Amazon nicht verlässlich). Kein Burst.
+   Der Header `x-amzn-RateLimit-Limit` wird nicht ausgewertet (laut Amazon nicht verlässlich). Burst 10 (Amazon
+   nennt 15); das Anfrage-Budget aus `amazon-ads` kennt dafür die Option `burst` (7.2).
 5. **Rollen:** Ein 403 nach einem frischen Token wird zu `AmazonSpRoleMissingError` (Code `SP_ROLE_MISSING`); Importe
    melden das als eigenen Fehler. Ein widerrufener Refresh-Token scheitert vorher bei LwA (Neu-Verbinden).
    Gebraucht werden bisher „Selling Partner Insights“ (Marktplatz-Teilnahmen) und „Inventory and Order Tracking“
@@ -35,8 +36,6 @@ Mocks.
 
 - `packages/amazon-ads` exportiert seine Bausteine; `http.ts` liest zusätzlich das Fehlerformat der SP-API
   (`errors[0]`), `downloadFile` nimmt eigene Hosts und nennt den `Content-Type`.
-- Ohne Burst wartet schon die zweite Anfrage einer langsamen Operation (z. B. `createReport`: rund eine Minute). Jobs
-  fordern deshalb je Lauf wenige Berichte an (7.3).
 - Erlaubte Download-Hosts sind „S3 unter amazonaws.com“, weil die Doku keinen festen Host nennt; beim ersten echten
   Lauf (7.12) eingrenzen.
 

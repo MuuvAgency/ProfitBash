@@ -141,4 +141,35 @@ describe('createProfileRateLimiter', () => {
     ).toThrow(RangeError);
     expect(() => createProfileRateLimiter({ increasePerSuccess: -1 })).toThrow(RangeError);
   });
+
+  it('lässt mit `burst` so viele Anfragen sofort zu und füllt danach mit der Rate nach', async () => {
+    const { limiter, sleeps, advance } = setup({
+      requestsPerSecond: 0.1,
+      minRequestsPerSecond: 0.05,
+      increasePerSuccess: 0,
+      burst: 3,
+    });
+    for (let i = 0; i < 4; i += 1) await limiter.acquire('conn-1');
+    // Drei sofort, die vierte nach einem Intervall (10 s).
+    expect(sleeps).toEqual([10_000]);
+
+    // Nach 20 s Ruhe sind zwei Plätze nachgefüllt, der dritte fehlt noch 10 s.
+    advance(20_000);
+    await limiter.acquire('conn-1');
+    await limiter.acquire('conn-1');
+    await limiter.acquire('conn-1');
+    expect(sleeps).toEqual([10_000, 10_000]);
+  });
+
+  it('verwirft den Burst nach einem 429', async () => {
+    const { limiter, sleeps } = setup({
+      requestsPerSecond: 0.1,
+      minRequestsPerSecond: 0.1,
+      burst: 3,
+    });
+    await limiter.acquire('conn-1');
+    limiter.onThrottled('conn-1', null);
+    await limiter.acquire('conn-1');
+    expect(sleeps).toEqual([10_000]);
+  });
 });
