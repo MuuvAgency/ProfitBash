@@ -135,7 +135,7 @@ export interface SaveSpConnectionInput {
 export async function saveSpConnection(
   db: Db,
   input: SaveSpConnectionInput,
-): Promise<SellerAccountsSyncResult & { connectionId: string; created: boolean }> {
+): Promise<Omit<SellerAccountsSyncResult, 'created'> & { connectionId: string; created: boolean }> {
   const { keyring, organizationId } = input;
   const naturalKey = {
     organizationId,
