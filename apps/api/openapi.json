@@ -17761,7 +17761,7 @@
         "tags": [
           "Plattform"
         ],
-        "summary": "Plattform-Rolle superadmin an einen vorhandenen Nutzer vergeben",
+        "summary": "Plattform-Rolle superadmin an ein Mitglied einer Agentur-Org vergeben",
         "requestBody": {
           "required": true,
           "content": {
@@ -17808,6 +17808,16 @@
           },
           "404": {
             "description": "Kein Nutzer mit dieser E-Mail-Adresse.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Der Nutzer ist kein Mitglied einer Agentur-Org.",
             "content": {
               "application/json": {
                 "schema": {

@@ -8,7 +8,7 @@
   am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`),
   am 2026-10-10 um Benachrichtigungen (`notifications`, `notification_reads`),
   am 2026-10-11 um das Audit-Log, die Freigaben je Client (`member_client_grants`) und die Kunden-Org
-  (`clients.client_organization_id`)
+  (`clients.client_organization_id`), am 2026-10-12 um den Plattform-Admin
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -129,6 +129,10 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   Kunden-Org eines **eigenen** Clients (`clientAccessScope` in `members.ts` prüft `clients.organization_id` = aktive
   Organisation, Routen `/api/clients/{id}/access` hinter `orgAdminOnly`). Das ist der einzige Zugriff auf
   Mitgliedschaften einer anderen Organisation; das Audit dazu steht bei der Eigentümer-Org (`client_access.*`).
+- **Plattform-Admin** (ab Phase 6, 6.4): `packages/db/src/platform.ts` liest und schreibt Organisationen,
+  Entitlements und die Plattform-Rolle über alle Organisationen hinweg, ohne Org-Kontext; die Routen
+  (`/api/platform/*`) verlangen `requireSuperadmin()`. Profildaten liest er nicht. Audit `platform.*` trägt die
+  betroffene Organisation, Staff-Ereignisse keine (plattformweit, nur im Plattform-Admin sichtbar).
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

@@ -127,10 +127,16 @@ function toggleFeature(org: PlatformOrganization, feature: FeatureKey, enabled: 
 
 const staffKey = ['platform', 'staff'] as const;
 const eventsKey = ['platform', 'audit-events'] as const;
-const staff = useQuery({ queryKey: staffKey, queryFn: () => api.platform.staff() });
+const onStaffTab = computed(() => tab.value === 'staff');
+const staff = useQuery({
+  queryKey: staffKey,
+  queryFn: () => api.platform.staff(),
+  enabled: onStaffTab,
+});
 const events = useQuery({
   queryKey: eventsKey,
   queryFn: () => api.platform.auditEvents(),
+  enabled: onStaffTab,
   staleTime: 0,
 });
 const refreshStaff = () =>
