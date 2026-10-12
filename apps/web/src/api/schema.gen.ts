@@ -5048,7 +5048,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Plattform-Rolle superadmin an einen vorhandenen Nutzer vergeben */
+        /** Plattform-Rolle superadmin an ein Mitglied einer Agentur-Org vergeben */
         post: {
             parameters: {
                 query?: never;
@@ -5098,6 +5098,15 @@ export interface paths {
                 };
                 /** @description Kein Nutzer mit dieser E-Mail-Adresse. */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Der Nutzer ist kein Mitglied einer Agentur-Org. */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };

@@ -120,12 +120,13 @@ const grantStaffRoute = createRoute({
   method: 'post',
   path: '/platform/staff',
   tags,
-  summary: 'Plattform-Rolle superadmin an einen vorhandenen Nutzer vergeben',
+  summary: 'Plattform-Rolle superadmin an ein Mitglied einer Agentur-Org vergeben',
   request: { body: { required: true, content: json(platformStaffGrantSchema) } },
   responses: {
     204: { description: 'Vergeben (oder schon vorhanden).' },
     ...errors,
     404: error('Kein Nutzer mit dieser E-Mail-Adresse.'),
+    409: error('Der Nutzer ist kein Mitglied einer Agentur-Org.'),
   },
 });
 
@@ -159,6 +160,7 @@ const ERROR_STATUS: Record<PlatformError['code'], ContentfulStatusCode> = {
   INVALID_NAME: 400,
   SLUG_TAKEN: 409,
   FEATURE_NOT_FOR_CUSTOMERS: 409,
+  NOT_AGENCY_MEMBER: 409,
   LAST_SUPERADMIN: 409,
 };
 

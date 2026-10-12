@@ -186,7 +186,7 @@ export const de = {
       label: 'Plattform-Admins',
       loadError: 'Das Team konnte nicht geladen werden.',
       self: '(du)',
-      email: 'E-Mail-Adresse eines vorhandenen Nutzers',
+      email: 'E-Mail-Adresse eines Agentur-Mitglieds',
       grant: 'Zum Plattform-Admin ernennen',
       grantHint:
         'Plattform-Admins sehen alle Organisationen und können Features buchen und weitere Admins ernennen.',
@@ -3151,6 +3151,8 @@ export const de = {
     PLATFORM_SLUG_TAKEN: 'Eine Organisation mit diesem Namen gibt es schon.',
     PLATFORM_FEATURE_NOT_FOR_CUSTOMERS:
       'Kunden-Orgs lassen sich nur Dashboard und Explorer buchen.',
+    PLATFORM_NOT_AGENCY_MEMBER:
+      'Plattform-Admin kann nur werden, wer Mitglied einer Agentur-Org ist.',
     PLATFORM_LAST_SUPERADMIN: 'Die Plattform braucht mindestens einen Admin.',
     MEMBER_UNKNOWN_CLIENT: 'Einen der Clients gibt es nicht mehr. Bitte die Seite neu laden.',
     PASSWORD_LINK_INVALID:

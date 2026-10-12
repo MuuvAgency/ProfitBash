@@ -12,7 +12,12 @@ import { clients, members, orgEntitlements, organizations, users } from './schem
  */
 
 export type PlatformErrorCode =
-  'NOT_FOUND' | 'INVALID_NAME' | 'SLUG_TAKEN' | 'FEATURE_NOT_FOR_CUSTOMERS' | 'LAST_SUPERADMIN';
+  | 'NOT_FOUND'
+  | 'INVALID_NAME'
+  | 'SLUG_TAKEN'
+  | 'FEATURE_NOT_FOR_CUSTOMERS'
+  | 'NOT_AGENCY_MEMBER'
+  | 'LAST_SUPERADMIN';
 
 export class PlatformError extends Error {
   constructor(
@@ -67,6 +72,8 @@ async function loadOrganizations(db: DbOrTx, orgId?: string): Promise<PlatformOr
     .orderBy(asc(organizations.name), asc(organizations.id));
   return rows.map(({ clientId, clientName, ownerOrganizationId, ...row }) => ({
     ...row,
+    // Sortiert wie in JavaScript (der Vergleich vorher/nachher darf nicht an der Sortierung der DB hängen).
+    features: row.features.sort(),
     customerOrg: isCustomerOrg(row.type, clientId),
     client:
       clientId !== null && clientName !== null && ownerOrganizationId !== null
@@ -231,7 +238,9 @@ const staffTarget = (user: { id: string; email: string }) => ({
   email: user.email,
 });
 
-/** Superadmin-Rolle an einen vorhandenen Nutzer vergeben (über die E-Mail). Schon Superadmin: nichts zu tun. */
+/**
+ * Superadmin-Rolle an ein Mitglied einer Agentur-Org vergeben (über die E-Mail). Schon Superadmin: nichts zu tun.
+ */
 export async function grantPlatformStaff(
   db: Db,
   input: { email: string; actorUserId: string },
@@ -244,6 +253,20 @@ export async function grantPlatformStaff(
       .for('update');
     if (!user) throw new PlatformError('NOT_FOUND', 'Kein Nutzer mit dieser E-Mail-Adresse.');
     if (user.role === SUPERADMIN) return;
+    // Nur Mitglieder einer Agentur-Org: Ein Kunden-Login erreicht den Plattform-Admin nie, zählte aber als
+    // „weiterer Superadmin“ und höbe so den Schutz des letzten auf.
+    const memberships = await tx
+      .select({ type: organizations.type, linkedClientId: clients.id })
+      .from(members)
+      .innerJoin(organizations, eq(organizations.id, members.organizationId))
+      .leftJoin(clients, eq(clients.clientOrganizationId, organizations.id))
+      .where(eq(members.userId, user.id));
+    if (!memberships.some((m) => !isCustomerOrg(m.type, m.linkedClientId))) {
+      throw new PlatformError(
+        'NOT_AGENCY_MEMBER',
+        'Plattform-Admin kann nur werden, wer Mitglied einer Agentur-Org ist.',
+      );
+    }
     await tx.update(users).set({ role: SUPERADMIN }).where(eq(users.id, user.id));
     await recordAuditEvent(tx, {
       organizationId: null,

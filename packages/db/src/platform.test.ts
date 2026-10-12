@@ -272,6 +272,25 @@ describe('Staff', () => {
     ).toBe('NOT_FOUND');
   });
 
+  it('nur Mitglieder einer Agentur-Org werden Staff (kein Kunden-Nutzer, kein Konto ohne Mitgliedschaft)', async () => {
+    const { db } = testDb;
+    const kim = await user('Kim', 'kim@nordwind.test');
+    await user('Lose', 'lose@muuv.test');
+    await db.insert(members).values({
+      organizationId: ids.customerOrg,
+      userId: kim,
+      role: 'viewer',
+      createdAt: new Date(),
+    });
+    for (const email of ['kim@nordwind.test', 'lose@muuv.test']) {
+      expect(await errorCode(grantPlatformStaff(db, { email, actorUserId: ids.root })), email).toBe(
+        'NOT_AGENCY_MEMBER',
+      );
+    }
+    expect((await staff()).map((s) => s.email)).toEqual(['ada@muuv.test']);
+    await db.delete(members).where(eq(members.userId, kim));
+  });
+
   it('der letzte Superadmin behält die Rolle', async () => {
     expect(
       await errorCode(revokePlatformStaff(testDb.db, { userId: ids.root, actorUserId: ids.root })),

@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b, 6.3c.**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b, 6.3c, 6.4.**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -272,10 +272,46 @@ Plattform-Rolle `superadmin`.
     ändern (6.4), Kunden-Nutzer umbenennen. Der Name der Kunden-Org folgt einer späteren Umbenennung des Clients nicht.
 
 ### 6.4 Plattform-Admin (`/admin/platform`, F5)
-- [ ] API hinter `requireSuperadmin()`: Organisationen (Liste mit Typ, Mitgliederzahl, verknüpftem Client; anlegen,
+- [x] API hinter `requireSuperadmin()`: Organisationen (Liste mit Typ, Mitgliederzahl, verknüpftem Client; anlegen,
       umbenennen), Entitlements je Organisation (Feature-Keys aus `FEATURE_KEYS`), Staff (Liste, Rolle vergeben und
       entziehen, letzter Superadmin geschützt). Audit je Aktion (`platform.*`, `organization_id` der betroffenen Org).
-- [ ] Seite mit den Reitern Orgs · Entitlements · Staff (`plan.md` §3).
+- [x] Seite mit den Reitern Orgs · Entitlements · Staff (`plan.md` §3).
+- **Umsetzung (2026-10-12):**
+  - `packages/db/src/platform.ts` (kein Org-Kontext, nur hinter `requireSuperadmin()`): `listPlatformOrganizations`
+    (Typ, Kunden-Org nach Typ oder Verknüpfung, Mitgliederzahl, verknüpfter Client, gebuchte Features),
+    `createPlatformOrganization`, `renamePlatformOrganization`, `setPlatformEntitlements`, `listPlatformStaff`,
+    `grantPlatformStaff`, `revokePlatformStaff`.
+  - **API** (`routes/platform.ts`): `GET`/`POST /api/platform/organizations`, `PATCH …/{id}`,
+    `PUT …/{id}/entitlements`, `GET`/`POST /api/platform/staff`, `DELETE /api/platform/staff/{id}`,
+    `GET /api/platform/audit-events`. Org-Admins ohne Plattform-Rolle → 403, Kunden-Logins → 403
+    (`customer-org.test.ts` erfasst die neuen Routen von selbst). Die Endpunkte des Admin-Plugins bleiben gesperrt.
+  - **Audit:** `platform.organization_create`, `.organization_rename`, `.entitlements_update` (vorher/nachher) mit
+    der `organization_id` der betroffenen Org (stehen damit auch in deren Audit-Log); `platform.staff_grant`,
+    `.staff_revoke` ohne Organisation. Diese plattformweiten Ereignisse zeigt nur der Reiter „Staff“ (Protokoll,
+    die letzten 50; `listAuditEvents` nimmt dafür `orgId: null`).
+  - **Festlegungen von Claude (Dominik kann widersprechen):**
+    - Anlegen erzeugt eine **Agentur-Org** (`internal`; Kunden-Orgs entstehen weiter am Client, 6.3c), Slug aus dem
+      Namen (vergeben → 409), ohne Features. Der Anlegende wird ihr **Admin**, sonst käme niemand hinein; er wechselt
+      über das Account-Menü und legt dort Mitglieder an. Umbenennen lässt den Slug stehen.
+    - **Kunden-Orgs** lassen sich nur `CUSTOMER_ORG_FEATURES` buchen (Server: 409, Oberfläche bietet nur diese
+      beiden an); die Konstante liegt jetzt in `packages/shared/src/features.ts`.
+    - **Staff** wird nur, wer Mitglied einer Agentur-Org ist (sonst 409 `PLATFORM_NOT_AGENCY_MEMBER`): Ein
+      Kunden-Login oder ein Konto ohne Mitgliedschaft zählte sonst als „weiterer Superadmin“ und höbe den Schutz des
+      letzten auf. Die Rolle wirkt sofort (Rollen werden je Anfrage frisch gelesen), Sessions enden beim Entziehen nicht.
+  - **Seite** `pages/PlatformPage.vue`, Reiter im Pfad (`/admin/platform/orgs|entitlements|staff`): Liste, Dialog
+    zum Anlegen und Umbenennen, Häkchen je Feature (speichert sofort), Staff mit Formular, Rückfrage vor dem
+    Entziehen und Protokoll; Loading, Empty, Error je Bereich.
+  - **Browser-Pane geprüft** (echte Bedienelemente, als Seed-Admin): Kunden-Org umbenannt und zurück, Feature
+    „Explorer“ der Kunden-Org ab- und wieder angewählt, Rolle an `pruefung-6-2@muuv.test` vergeben (vor der
+    Einschränkung auf Agentur-Mitglieder) und nach Rückfrage entzogen, Protokoll zeigt beides; Handy (375 px, hell)
+    und Tablet ohne waagerechtes Scrollen, Dunkel, Konsole leer. Nicht geprüft: 1440 px (Pane schmaler),
+    „Organisation anlegen“ im Browser (lässt sich nicht zurücknehmen; per Test abgedeckt), die eigene Rolle abgeben.
+  - **Reste in der Dev-DB:** Audit-Events vom 2026-10-12: zweimal `platform.organization_rename` und zweimal
+    `platform.entitlements_update` bei der Kunden-Org „Kranich (Demo)“, `platform.staff_grant` und `.staff_revoke`
+    (plattformweit); `pruefung-6-2@muuv.test` hat die Plattform-Rolle `user` (vorher leer).
+  - Review (ponytail): Staff nur für Agentur-Mitglieder, Feature-Liste aus der DB in JavaScript nachsortiert
+    (Vergleich vorher/nachher), Staff-Abfragen nur auf dem Reiter „Staff“; alle drei behoben.
+  - **Bewusst nicht:** Organisation löschen, Typ ändern, Slug ändern, Nutzer sperren (F5); Blättern im Protokoll.
 
 ### 6.5 Impersonation (F4)
 - [ ] `POST /api/platform/impersonation` (Superadmin, Ziel kein Superadmin) und `DELETE` (beenden); Ablauf nach
