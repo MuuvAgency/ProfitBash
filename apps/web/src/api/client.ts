@@ -16,6 +16,7 @@ import type {
   Member,
   MeResponse,
   OrgRole,
+  PlatformMember,
   PlatformOrganization,
   PlatformStaff,
   Profile,
@@ -681,6 +682,21 @@ export function createApi(options: ApiOptions = {}) {
       },
       auditEvents: async (): Promise<AuditEvent[]> =>
         (await unwrap(client.GET('/api/platform/audit-events'))).events,
+      members: async (organizationId: string): Promise<PlatformMember[]> =>
+        (
+          await unwrap(
+            client.GET('/api/platform/organizations/{id}/members', {
+              params: { path: { id: organizationId } },
+            }),
+          )
+        ).members,
+      /** Als Nutzer ansehen (6.5): Die Antwort setzt dessen Session; danach `/api/me` neu laden. */
+      async startImpersonation(userId: string): Promise<void> {
+        await unwrap(client.POST('/api/platform/impersonation', { body: { userId } }));
+      },
+      async stopImpersonation(): Promise<void> {
+        await unwrap(client.DELETE('/api/platform/impersonation'));
+      },
     },
 
     /** Kundenzugang am Client (6.3c, nur Org-Admins der Agentur): Nutzer der Kunden-Org, immer nur lesend. */

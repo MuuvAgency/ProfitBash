@@ -134,6 +134,47 @@ describe('Seite „Plattform“', () => {
     expect(written(requests)[1]).toMatchObject({ method: 'PATCH', body: { name: 'Muuv GmbH' } });
   });
 
+  it('zeigt die Mitglieder einer Organisation und startet „Als Nutzer ansehen“', async () => {
+    let impersonating = false;
+    const { requests, router } = await mountPage('/admin/platform', {
+      'GET /api/me': () =>
+        json(
+          impersonating
+            ? { ...meFixture({ orgRole: 'editor' }), impersonatedBy: { id: ADA.id, name: 'Ada' } }
+            : meFixture({ platformRole: 'superadmin' }),
+        ),
+      [`GET /api/platform/organizations/${MUUV.id}/members`]: json({
+        members: [
+          { userId: ADA.id, name: 'Ada', email: ADA.email, role: 'admin', superadmin: true },
+          { userId: PIA.id, name: 'Pia', email: PIA.email, role: 'editor', superadmin: false },
+        ],
+      }),
+      'POST /api/platform/impersonation': () => {
+        impersonating = true;
+        return new Response(null, { status: 204 });
+      },
+    });
+    await vi.waitFor(() => expect(all('[data-platform-org]')).toHaveLength(2));
+    q('[data-platform-org="muuv"] [data-platform-org-members]').click();
+    await vi.waitFor(() => expect(all('[data-platform-member]')).toHaveLength(2));
+    // Superadmins lassen sich nicht ansehen.
+    expect(
+      document.querySelector('[data-platform-member="ada@muuv.test"] [data-platform-impersonate]'),
+    ).toBeNull();
+    q('[data-platform-member="pia@muuv.test"] [data-platform-impersonate]').click();
+    await vi.waitFor(() => expect(written(requests).length).toBeGreaterThan(0));
+    expect(written(requests)[0]).toMatchObject({
+      method: 'POST',
+      path: '/api/platform/impersonation',
+      body: { userId: PIA.id },
+    });
+    // Danach gilt die Session des Nutzers: Startseite statt Plattform-Admin, Banner in der Shell.
+    await vi.waitFor(() => expect(router.currentRoute.value.path).not.toContain('/admin/platform'));
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-impersonation-banner]')).not.toBeNull(),
+    );
+  });
+
   it('zeigt den Fehler der API im Dialog', async () => {
     await mountPage('/admin/platform', {
       'POST /api/platform/organizations': json(
