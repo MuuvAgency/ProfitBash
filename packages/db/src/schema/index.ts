@@ -15,3 +15,4 @@ export * from './notifications';
 export * from './goals';
 export * from './automation';
 export * from './budgets';
+export * from './amazon-sp';
