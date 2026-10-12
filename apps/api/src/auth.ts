@@ -16,7 +16,7 @@ import {
 import { MIN_PASSWORD_LENGTH } from '@profitbash/shared';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { createAuthMiddleware } from 'better-auth/api';
+import { createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { admin, organization } from 'better-auth/plugins';
 
 export interface CreateAuthOptions {
@@ -193,6 +193,23 @@ export function createAuth({ db, secret, baseURL, trustedOrigins = [] }: CreateA
     database: drizzleAdapter(db, { provider: 'pg', schema, usePlural: true }),
     advanced: { database: { generateId: 'uuid' } },
     hooks: {
+      // Abmelden während einer Impersonation (6.5) beendet sie: Das Ende steht wie beim Beenden im Audit-Log.
+      // Vor dem Abmelden, danach gibt es die Session nicht mehr.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== '/sign-out') return;
+        const current = await getSessionFromCtx(ctx);
+        const by = current?.session.impersonatedBy;
+        if (!current || !by) return;
+        const { id, email } = current.user;
+        await runAsImpersonator(by, () =>
+          recordAuditEvent(db, {
+            organizationId: null,
+            actorUserId: id,
+            action: 'platform.impersonation_stop',
+            target: { type: 'user', id, email },
+          }),
+        );
+      }),
       // `/organization/leave` löst keinen Organization-Hook aus. Die Antwort ist das entfernte
       // Mitglied; der Handelnde ist das Mitglied selbst.
       after: createAuthMiddleware(async (ctx) => {
