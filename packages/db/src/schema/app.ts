@@ -22,7 +22,7 @@ import { createdAt, id, organizationId, updatedAt } from './columns';
 // Enums (stabile Wertemengen; neue Werte = Migration mit ALTER TYPE … ADD VALUE)
 // ---------------------------------------------------------------------------
 
-export const connectionProvider = pgEnum('connection_provider', ['amazon_ads']);
+export const connectionProvider = pgEnum('connection_provider', ['amazon_ads', 'amazon_sp']);
 export const connectionRegion = pgEnum('connection_region', ['eu', 'na', 'fe']);
 export const connectionStatus = pgEnum('connection_status', ['active', 'reauth_required', 'error']);
 export const jobRunStatus = pgEnum('job_run_status', ['running', 'success', 'failed']);

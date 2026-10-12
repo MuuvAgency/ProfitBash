@@ -351,6 +351,13 @@
       "when": 1791749030915,
       "tag": "0049_client_organization",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791801887754,
+      "tag": "0050_amazon_sp_accounts",
+      "breakpoints": true
     }
   ]
 }

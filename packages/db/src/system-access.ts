@@ -185,11 +185,14 @@ export async function listJobProfiles(
 export async function listActiveConnections(
   db: DbOrTx,
 ): Promise<Array<{ id: string; organizationId: string }>> {
-  return db
-    .select({ id: connections.id, organizationId: connections.organizationId })
-    .from(connections)
-    .where(eq(connections.status, 'active'))
-    .orderBy(connections.createdAt, connections.id);
+  return (
+    db
+      .select({ id: connections.id, organizationId: connections.organizationId })
+      .from(connections)
+      // Nur Ads: Die Jobs dieser Planung rufen die Ads-API. SP-Connections plant 7.3 eigens.
+      .where(and(eq(connections.status, 'active'), eq(connections.provider, 'amazon_ads')))
+      .orderBy(connections.createdAt, connections.id)
+  );
 }
 
 /** Aktive Connections der Organisation außer `exceptConnectionId` (weitere Zugriffswege). */
@@ -204,6 +207,7 @@ export async function listOtherActiveConnections(
       and(
         eq(connections.organizationId, input.organizationId),
         eq(connections.status, 'active'),
+        eq(connections.provider, 'amazon_ads'),
         ne(connections.id, input.exceptConnectionId),
       ),
     );

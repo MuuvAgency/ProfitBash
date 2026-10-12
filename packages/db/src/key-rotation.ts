@@ -10,7 +10,8 @@ import {
 import { and, eq, sql } from 'drizzle-orm';
 import { recordAuditEvent } from './audit';
 import type { Db } from './client';
-import { connections } from './schema';
+import { amazonSpCredentials, connections } from './schema';
+import { spClientSecretAad } from './seller-accounts';
 
 /**
  * Schlüsselrotation (`docs/deploy.md`): Verschlüsselt alle Refresh-Tokens, die noch mit einem früheren
@@ -85,14 +86,35 @@ export async function reencryptConnectionTokens(
           .for('no key update');
         // Inzwischen gelöscht: nichts zu tun.
         if (!row) return null;
-        if (!needsReencryption(row.refreshTokenEncrypted, keyring)) return false;
+        // SP-Connections tragen zusätzlich das verschlüsselte App-Secret (Phase 7).
+        const [secret] = await tx
+          .select({ value: amazonSpCredentials.clientSecretEncrypted })
+          .from(amazonSpCredentials)
+          .where(eq(amazonSpCredentials.connectionId, ref.id));
+        const staleSecret = secret !== undefined && needsReencryption(secret.value, keyring);
+        const staleToken = needsReencryption(row.refreshTokenEncrypted, keyring);
+        if (!staleToken && !staleSecret) return false;
 
-        const aad = connectionTokenAad(row);
-        const plaintext = decrypt(row.refreshTokenEncrypted, { keyring, aad });
-        await tx
-          .update(connections)
-          .set({ refreshTokenEncrypted: encrypt(plaintext, { keyring, aad }) })
-          .where(eq(connections.id, ref.id));
+        if (staleSecret) {
+          const aad = spClientSecretAad(row);
+          await tx
+            .update(amazonSpCredentials)
+            .set({
+              clientSecretEncrypted: encrypt(decrypt(secret.value, { keyring, aad }), {
+                keyring,
+                aad,
+              }),
+            })
+            .where(eq(amazonSpCredentials.connectionId, ref.id));
+        }
+        if (staleToken) {
+          const aad = connectionTokenAad(row);
+          const plaintext = decrypt(row.refreshTokenEncrypted, { keyring, aad });
+          await tx
+            .update(connections)
+            .set({ refreshTokenEncrypted: encrypt(plaintext, { keyring, aad }) })
+            .where(eq(connections.id, ref.id));
+        }
         await recordAuditEvent(tx, {
           organizationId: ref.organizationId,
           actorUserId: null,

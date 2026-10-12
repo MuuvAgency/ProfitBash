@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
 import {
   amazonAdsProfiles,
+  amazonSpAccounts,
   clients,
   memberClientGrants,
   members,
@@ -153,7 +154,12 @@ export async function listEnabledFeatures(db: Db, orgId: string): Promise<string
  * Prüft Mitgliedschaft und Rechte und liefert die Filterbedingungen für sichtbare Profile,
  * oder `null`, wenn der Nutzer kein Mitglied der Organisation ist.
  */
-async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Promise<SQL[] | null> {
+async function visibilityConditions(
+  db: Db,
+  input: ProfileVisibilityInput,
+  // Seller-Konten (Phase 7) folgen denselben Regeln wie Profile.
+  table: typeof amazonAdsProfiles | typeof amazonSpAccounts = amazonAdsProfiles,
+): Promise<SQL[] | null> {
   const membership = await getMembership(db, input.userId, input.orgId);
   if (membership === null) return null;
   const { role } = membership;
@@ -165,10 +171,10 @@ async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Prom
     }
     if (membership.customerOf === null) return [sql`false`];
     return [
-      eq(amazonAdsProfiles.organizationId, membership.customerOf.ownerOrgId),
-      eq(amazonAdsProfiles.clientId, membership.customerOf.clientId),
-      isNull(amazonAdsProfiles.removedAt),
-      eq(amazonAdsProfiles.isHidden, false),
+      eq(table.organizationId, membership.customerOf.ownerOrgId),
+      eq(table.clientId, membership.customerOf.clientId),
+      isNull(table.removedAt),
+      eq(table.isHidden, false),
     ];
   }
   if (input.includeHidden && role !== 'admin') {
@@ -178,14 +184,12 @@ async function visibilityConditions(db: Db, input: ProfileVisibilityInput): Prom
     throw new AccessDeniedError('Nur Org-Admins dürfen entfernte Profile sehen.');
   }
 
-  const conditions: SQL[] = [eq(amazonAdsProfiles.organizationId, input.orgId)];
-  if (!input.includeRemoved) conditions.push(isNull(amazonAdsProfiles.removedAt));
-  if (!input.includeHidden) conditions.push(eq(amazonAdsProfiles.isHidden, false));
+  const conditions: SQL[] = [eq(table.organizationId, input.orgId)];
+  if (!input.includeRemoved) conditions.push(isNull(table.removedAt));
+  if (!input.includeHidden) conditions.push(eq(table.isHidden, false));
   if (role !== 'admin') {
     const granted = grantedClientIds(db, membership.id);
-    conditions.push(
-      sql`(not exists (${granted}) or ${amazonAdsProfiles.clientId} in (${granted}))`,
-    );
+    conditions.push(sql`(not exists (${granted}) or ${table.clientId} in (${granted}))`);
   }
   return conditions;
 }
@@ -286,4 +290,35 @@ export async function listVisibleClientsAndProfiles(
           .where(inArray(clients.id, clientIds))
           .orderBy(asc(clients.name), asc(clients.id));
   return { clients: visibleClients, profiles };
+}
+
+/**
+ * Sichtbarkeits-Scope für Seller-Konten (Phase 7), Gegenstück zu `visibleProfilesScope` mit denselben Regeln:
+ * Mitgliedschaft, Freigaben je Client, Kunden-Org, ausgeblendet/entfernt nur für Admins. `scope.ids` ist eine
+ * Unterabfrage der sichtbaren `amazon_sp_accounts.id`; `null`, wenn der Nutzer kein Mitglied ist.
+ */
+export async function visibleSellerAccountsScope(db: Db, input: ProfileVisibilityInput) {
+  const conditions = await visibilityConditions(db, input, amazonSpAccounts);
+  if (conditions === null) return null;
+  return {
+    ids: db
+      .select({ id: amazonSpAccounts.id })
+      .from(amazonSpAccounts)
+      .where(and(...conditions)),
+  };
+}
+
+/** Darf der Nutzer dieses Seller-Konto sehen? `sellerAccountId` ist die interne ID. */
+export async function canSeeSellerAccount(
+  db: Db,
+  input: ProfileVisibilityInput & { sellerAccountId: string },
+): Promise<boolean> {
+  const conditions = await visibilityConditions(db, input, amazonSpAccounts);
+  if (conditions === null) return false;
+  const [row] = await db
+    .select({ id: amazonSpAccounts.id })
+    .from(amazonSpAccounts)
+    .where(and(...conditions, eq(amazonSpAccounts.id, input.sellerAccountId)))
+    .limit(1);
+  return row !== undefined;
 }
