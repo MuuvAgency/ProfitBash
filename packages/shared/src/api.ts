@@ -149,6 +149,8 @@ export const meResponseSchema = z
     activeOrganizationId: z.string().nullable(),
     /** Rechte je Feature-Key in der aktiven Organisation. */
     features: featuresSchema,
+    /** Impersonation (Phase 6, 6.5): der Superadmin, der die App gerade als dieser Nutzer bedient. */
+    impersonatedBy: z.union([z.object({ id: z.string(), name: z.string() }), z.null()]),
     preferences: settingsSchema,
   })
   .meta({ id: 'Me' });

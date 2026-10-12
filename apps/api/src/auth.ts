@@ -2,6 +2,7 @@ import { tryGetCurrentAuthEndpointContext } from '@better-auth/core/context';
 import {
   listMemberships,
   recordAuditEvent,
+  runAsImpersonator,
   schema,
   type AuditEventInput,
   type Db,
@@ -48,18 +49,24 @@ const invitationTarget = (invitation: { id: string; email: string; role: string 
 });
 
 /**
- * Handelnder Nutzer der laufenden better-auth-Anfrage. `null` bei Server-Aufrufen ohne Session
+ * Handelnder Nutzer der laufenden better-auth-Anfrage (und wer ihn gerade impersoniert). `null` bei Server-Aufrufen ohne Session
  * (z. B. Seed). Die Organization-Hooks übergeben nur den *betroffenen* Nutzer, deshalb der Umweg
  * über den Endpoint-Kontext.
  *
  * Wichtig für eigenen Code: Serverseitige Aufrufe wie `auth.api.addMember(…)` immer mit den
  * `headers` der Anfrage ausführen, sonst fehlt der Handelnde im Audit-Log.
  */
-function currentActorId(): string | null {
-  const session: unknown = tryGetCurrentAuthEndpointContext()?.context.session;
-  if (session && typeof session === 'object' && 'user' in session) {
-    const user = (session as { user?: { id?: unknown } }).user;
-    if (typeof user?.id === 'string') return user.id;
+function currentActor(): { id: string; impersonatedBy: string | null } | null {
+  const context: unknown = tryGetCurrentAuthEndpointContext()?.context.session;
+  if (context && typeof context === 'object' && 'user' in context) {
+    const { user, session } = context as {
+      user?: { id?: unknown };
+      session?: { impersonatedBy?: unknown };
+    };
+    if (typeof user?.id === 'string') {
+      const by = session?.impersonatedBy;
+      return { id: user.id, impersonatedBy: typeof by === 'string' ? by : null };
+    }
   }
   return null;
 }
@@ -70,8 +77,12 @@ function currentActorId(): string | null {
  * Transaktion: Scheitert das Audit-Insert, bleibt die Änderung bestehen und die Anfrage endet mit 500.
  */
 function auditHooks(db: Db) {
-  const record = (event: Omit<AuditEventInput, 'actorUserId'>) =>
-    recordAuditEvent(db, { ...event, actorUserId: currentActorId() });
+  const record = (event: Omit<AuditEventInput, 'actorUserId'>) => {
+    const actor = currentActor();
+    const write = () => recordAuditEvent(db, { ...event, actorUserId: actor?.id ?? null });
+    // Impersonation (6.5): wie in `requireSession` nennt das Audit den Superadmin.
+    return actor?.impersonatedBy ? runAsImpersonator(actor.impersonatedBy, write) : write();
+  };
 
   return {
     afterCreateOrganization: async ({ organization }: { organization: OrganizationLike }) =>

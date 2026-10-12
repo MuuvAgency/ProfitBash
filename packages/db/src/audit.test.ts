@@ -1,5 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { listAuditEventFilters, listAuditEvents } from './audit';
+import { eq } from 'drizzle-orm';
+import {
+  listAuditEventFilters,
+  listAuditEvents,
+  recordAuditEvent,
+  runAsImpersonator,
+} from './audit';
 import { auditEvents, users } from './schema';
 import { createTestOrganization } from './test-fixtures';
 import { createTestDatabase, type TestDatabase } from './testing';
@@ -144,5 +150,44 @@ describe('listAuditEventFilters', () => {
       { id: ids.anna, name: 'Anna', email: 'anna@muuv.test' },
       { id: ids.ben, name: 'Ben', email: 'ben@muuv.test' },
     ]);
+  });
+});
+
+describe('recordAuditEvent während einer Impersonation (6.5, F4)', () => {
+  it('nennt den Superadmin als Handelnden und den Nutzer im target, auch in Transaktionen', async () => {
+    const orgId = await createTestOrganization(testDb.db, 'impersonation');
+    const event = (action: string, actorUserId: string | null) => ({
+      organizationId: orgId,
+      actorUserId,
+      action,
+      target: { type: 'tag', id: 't1' },
+    });
+    await runAsImpersonator(ids.anna, async () => {
+      await recordAuditEvent(testDb.db, event('tag.create', ids.ben));
+      await testDb.db.transaction((tx) => recordAuditEvent(tx, event('tag.update', ids.ben)));
+      // Ereignisse ohne Nutzer (System) bleiben ohne Nutzer.
+      await recordAuditEvent(testDb.db, event('tag.system', null));
+    });
+    // Außerhalb gilt wieder der übergebene Handelnde.
+    await recordAuditEvent(testDb.db, event('tag.delete', ids.ben));
+    const rows = await testDb.db
+      .select({
+        action: auditEvents.action,
+        actorUserId: auditEvents.actorUserId,
+        target: auditEvents.target,
+      })
+      .from(auditEvents)
+      .where(eq(auditEvents.organizationId, orgId));
+    const byAction = Object.fromEntries(rows.map(({ action, ...row }) => [action, row]));
+    const impersonated = {
+      actorUserId: ids.anna,
+      target: { type: 'tag', id: 't1', impersonatedUserId: ids.ben },
+    };
+    expect(byAction).toEqual({
+      'tag.create': impersonated,
+      'tag.update': impersonated,
+      'tag.system': { actorUserId: null, target: { type: 'tag', id: 't1' } },
+      'tag.delete': { actorUserId: ids.ben, target: { type: 'tag', id: 't1' } },
+    });
   });
 });

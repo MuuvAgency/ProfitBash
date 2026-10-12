@@ -34,6 +34,8 @@ export interface AppDeps {
 export interface AuthState {
   user: { id: string; email: string; name: string; role: PlatformRole };
   sessionId: string;
+  /** Impersonation (6.5): ID des Superadmins, der als dieser Nutzer handelt. */
+  impersonatedBy: string | null;
   memberships: Membership[];
   /** `null`, wenn der Nutzer keiner Organisation angehört. */
   activeOrganization: Membership | null;

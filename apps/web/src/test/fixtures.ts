@@ -46,6 +46,7 @@ export function meFixture(options: MeFixtureOptions = {}): MeResponse {
         },
       ]),
     ) as MeResponse['features'],
+    impersonatedBy: null,
     preferences: { theme: 'system', locale: 'de-DE', density: 'comfortable' },
   };
 }

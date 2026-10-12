@@ -57,3 +57,25 @@ export type PlatformStaffList = z.infer<typeof platformStaffListSchema>;
 export const platformStaffGrantSchema = z
   .object({ email: z.string().trim().toLowerCase().pipe(z.email().max(254)) })
   .meta({ id: 'PlatformStaffGrant' });
+
+/** Mitglieder einer Organisation im Plattform-Admin: Auswahl für „Als Nutzer ansehen“ (6.5). */
+export const platformMemberSchema = z
+  .object({
+    userId: z.uuid(),
+    name: z.string(),
+    email: z.string(),
+    role: z.string(),
+    /** Superadmins lassen sich nicht ansehen. */
+    superadmin: z.boolean(),
+  })
+  .meta({ id: 'PlatformMember' });
+export type PlatformMember = z.infer<typeof platformMemberSchema>;
+
+export const platformMemberListSchema = z
+  .object({ members: z.array(platformMemberSchema) })
+  .meta({ id: 'PlatformMemberList' });
+export type PlatformMemberList = z.infer<typeof platformMemberListSchema>;
+
+export const impersonationStartSchema = z
+  .object({ userId: z.uuid() })
+  .meta({ id: 'ImpersonationStart' });

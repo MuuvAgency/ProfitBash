@@ -1,8 +1,12 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
 import {
   createPlatformOrganization,
+  findImpersonationTarget,
   grantPlatformStaff,
   listAuditEvents,
+  listPlatformOrganizationMembers,
+  recordAuditEvent,
+  schema,
   listPlatformOrganizations,
   listPlatformStaff,
   PlatformError,
@@ -16,6 +20,8 @@ import {
   auditEventListSchema,
   errorResponseSchema,
   idParamSchema,
+  impersonationStartSchema,
+  platformMemberListSchema,
   platformEntitlementsSchema,
   platformOrganizationListSchema,
   platformOrganizationNameSchema,
@@ -24,10 +30,11 @@ import {
   platformStaffListSchema,
   type PlatformOrganization,
 } from '@profitbash/shared';
+import { eq } from 'drizzle-orm';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AppDeps, AppEnv } from '../context';
 import { ApiError } from '../errors';
-import { requireSession, requireSuperadmin } from '../middleware';
+import { IMPERSONATION_PATH, requireSession, requireSuperadmin } from '../middleware';
 
 /**
  * Plattform-Admin (`docs/tasks/phase-6.md` 6.4, F5): Organisationen, Entitlements, Staff. Nur Superadmins; eigene
@@ -155,6 +162,46 @@ const auditRoute = createRoute({
   },
 });
 
+const membersRoute = createRoute({
+  method: 'get',
+  path: '/platform/organizations/{id}/members',
+  tags,
+  summary: 'Mitglieder einer Organisation (Auswahl für „Als Nutzer ansehen“)',
+  request: { params: idParamSchema },
+  responses: {
+    200: { description: 'Nach Name.', content: json(platformMemberListSchema) },
+    ...errors,
+  },
+});
+
+const impersonationPath = IMPERSONATION_PATH.slice('/api'.length);
+
+const startImpersonationRoute = createRoute({
+  method: 'post',
+  path: impersonationPath,
+  tags,
+  summary: 'Als Nutzer ansehen: Session mit dessen vollen Rechten, höchstens eine Stunde (F4)',
+  request: { body: { required: true, content: json(impersonationStartSchema) } },
+  responses: {
+    204: { description: 'Begonnen; die Antwort setzt die Session des Nutzers.' },
+    ...errors,
+    404: error('Nutzer nicht gefunden.'),
+    409: error('Superadmins lassen sich nicht ansehen.'),
+  },
+});
+
+const stopImpersonationRoute = createRoute({
+  method: 'delete',
+  path: impersonationPath,
+  tags,
+  summary: 'Impersonation beenden; stellt die Session des Superadmins wieder her',
+  responses: {
+    204: { description: 'Beendet.' },
+    401: errors[401],
+    409: error('Keine Impersonation aktiv.'),
+  },
+});
+
 const ERROR_STATUS: Record<PlatformError['code'], ContentfulStatusCode> = {
   NOT_FOUND: 404,
   INVALID_NAME: 400,
@@ -241,6 +288,71 @@ export function registerPlatformRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
         actorUserId: c.get('auth').user.id,
       }),
     );
+    return c.body(null, 204);
+  });
+
+  app.openapi({ ...membersRoute, middleware }, async (c) =>
+    c.json({ members: await listPlatformOrganizationMembers(db, c.req.valid('param').id) }, 200),
+  );
+
+  // Impersonation (6.5, F4) über das Admin-Plugin von better-auth, serverseitig: Dessen HTTP-Endpunkte bleiben
+  // gesperrt (kein Audit). Es legt die Session an (eine Stunde) und merkt sich die des Superadmins in einem Cookie.
+  const forwardCookies = (
+    c: { header: (n: string, v: string, o: { append: true }) => void },
+    headers: Headers,
+  ) => {
+    for (const cookie of headers.getSetCookie()) c.header('Set-Cookie', cookie, { append: true });
+  };
+
+  app.openapi({ ...startImpersonationRoute, middleware }, async (c) => {
+    const target = await findImpersonationTarget(db, c.req.valid('json').userId);
+    if (!target) throw new ApiError(404, 'IMPERSONATION_USER_NOT_FOUND', 'Nutzer nicht gefunden.');
+    if (target.superadmin) {
+      throw new ApiError(
+        409,
+        'IMPERSONATION_SUPERADMIN',
+        'Plattform-Admins lassen sich nicht ansehen.',
+      );
+    }
+    // Erst das Audit: Scheitert danach die Session, steht ein Beginn zu viel im Log, nie einer zu wenig.
+    await recordAuditEvent(db, {
+      organizationId: null,
+      actorUserId: c.get('auth').user.id,
+      action: 'platform.impersonation_start',
+      target: { type: 'user', id: target.id, email: target.email },
+    });
+    const { headers } = await deps.auth.api.impersonateUser({
+      body: { userId: target.id },
+      headers: c.req.raw.headers,
+      returnHeaders: true,
+    });
+    forwardCookies(c, headers);
+    return c.body(null, 204);
+  });
+
+  app.openapi({ ...stopImpersonationRoute, middleware: [requireSession(deps)] }, async (c) => {
+    const { user, sessionId, impersonatedBy } = c.get('auth');
+    if (impersonatedBy === null) {
+      throw new ApiError(409, 'IMPERSONATION_NOT_ACTIVE', 'Keine Impersonation aktiv.');
+    }
+    try {
+      const { headers } = await deps.auth.api.stopImpersonating({
+        headers: c.req.raw.headers,
+        returnHeaders: true,
+      });
+      forwardCookies(c, headers);
+    } catch {
+      // Die gemerkte Session des Superadmins fehlt oder ist abgelaufen: wenigstens die des Nutzers beenden;
+      // der Superadmin meldet sich danach neu an.
+      await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
+    }
+    // Läuft in `runAsImpersonator` (`requireSession`): Handelnder wird der Superadmin.
+    await recordAuditEvent(db, {
+      organizationId: null,
+      actorUserId: user.id,
+      action: 'platform.impersonation_stop',
+      target: { type: 'user', id: user.id, email: user.email },
+    });
     return c.body(null, 204);
   });
 

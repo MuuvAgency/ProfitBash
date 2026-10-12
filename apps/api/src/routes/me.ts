@@ -1,6 +1,7 @@
 import { createRoute, type OpenAPIHono } from '@hono/zod-openapi';
-import { listEnabledFeatures } from '@profitbash/db';
+import { listEnabledFeatures, schema } from '@profitbash/db';
 import { errorResponseSchema, meResponseSchema, resolveFeatureAccess } from '@profitbash/shared';
+import { eq } from 'drizzle-orm';
 import type { AppDeps, AppEnv } from '../context';
 import { requireSession } from '../middleware';
 import { loadSettings } from './settings';
@@ -25,10 +26,16 @@ const meRoute = createRoute({
 export function registerMeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
   app.use('/me', requireSession(deps));
   app.openapi(meRoute, async (c) => {
-    const { user, memberships, activeOrganization, orgRole } = c.get('auth');
-    const [enabledFeatures, preferences] = await Promise.all([
+    const { user, memberships, activeOrganization, orgRole, impersonatedBy } = c.get('auth');
+    const [enabledFeatures, preferences, impersonators] = await Promise.all([
       activeOrganization ? listEnabledFeatures(deps.db, activeOrganization.organizationId) : [],
       loadSettings(deps.db, user.id),
+      impersonatedBy === null
+        ? []
+        : deps.db
+            .select({ id: schema.users.id, name: schema.users.name })
+            .from(schema.users)
+            .where(eq(schema.users.id, impersonatedBy)),
     ]);
     return c.json(
       {
@@ -39,6 +46,7 @@ export function registerMeRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) {
         })),
         activeOrganizationId: activeOrganization?.organizationId ?? null,
         features: resolveFeatureAccess(orgRole, enabledFeatures),
+        impersonatedBy: impersonators[0] ?? null,
         preferences,
       },
       200,
