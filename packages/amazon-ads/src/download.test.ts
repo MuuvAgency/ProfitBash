@@ -1,6 +1,6 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { decodeGzipJson } from './download';
+import { collectDownload, decodeGzipJson } from './download';
 import { AmazonAdsDownloadTooLargeError, AmazonAdsResponseError } from './errors';
 
 /** Liefert die Bytes in kleinen Stücken, wie ein HTTP-Body. */
@@ -71,5 +71,21 @@ describe('decodeGzipJson', () => {
 
     expect(error).toBeInstanceOf(AmazonAdsResponseError);
     expect((error as Error).message).not.toContain('geheim');
+  });
+});
+
+describe('collectDownload', () => {
+  it('liefert die Bytes unverändert, wenn die Datei nicht gepackt ist', async () => {
+    const bytes = new TextEncoder().encode('a\tb\n1\t2\n');
+    const result = await collectDownload(chunked(bytes), { maxBytes: 1024, gzip: false });
+    expect(result.toString('utf8')).toBe('a\tb\n1\t2\n');
+  });
+
+  it('entpackt gzip und hält den Deckel auch ohne gzip ein', async () => {
+    const result = await collectDownload(chunked(gzip('a\tb\n')), { maxBytes: 1024, gzip: true });
+    expect(result.toString('utf8')).toBe('a\tb\n');
+    await expect(
+      collectDownload(chunked(new Uint8Array(2048)), { maxBytes: 1024, gzip: false }),
+    ).rejects.toBeInstanceOf(AmazonAdsDownloadTooLargeError);
   });
 });

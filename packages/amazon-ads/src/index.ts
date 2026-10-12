@@ -36,10 +36,13 @@ export {
   type AmazonAdsCreateOperation,
   type ApplyCreatesInput,
 } from './creates';
+export { LWA_HTTP_DEFAULTS } from './client';
 export { createAmazonAdsClientFromConfig, type AmazonAdsClientConfig } from './configure';
 export {
   AMAZON_ADS_DOWNLOAD_HOST_PATTERNS,
+  collectDownload,
   decodeGzipJson,
+  downloadFile,
   isAllowedDownloadUrl,
   type AmazonAdsDownload,
   type DecodeGzipJsonOptions,
@@ -54,7 +57,9 @@ export {
   AmazonAdsResponseError,
 } from './errors';
 export {
+  createHttpClient,
   createRequestMeter,
+  type HttpClient,
   type HttpClientOptions,
   type HttpMethod,
   type RequestMeter,
@@ -64,6 +69,7 @@ export type { LogEntry, Logger } from './logger';
 export { amazonDecimalSchema, currencyCodeSchema, isKnownCurrencyCode } from './money';
 export {
   AMAZON_ADS_SCOPES,
+  createLwaClient,
   type AccountIdentity,
   type AmazonAdsCredentials,
   type RefreshedToken,
@@ -102,7 +108,11 @@ export {
   type RequestReportInput,
 } from './reports';
 export { amazonIdSchema, KNOWN_ACCOUNT_TYPES, type AmazonAdsProfile } from './profiles';
-export { DEFAULT_REQUESTS_PER_SECOND, type ProfileRateLimiterOptions } from './rate-limit';
+export {
+  createProfileRateLimiter,
+  DEFAULT_REQUESTS_PER_SECOND,
+  type ProfileRateLimiterOptions,
+} from './rate-limit';
 export {
   AMAZON_ADS_REGION_KEYS,
   AMAZON_ADS_REGIONS,

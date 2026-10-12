@@ -444,4 +444,21 @@ describe('Zähler und Anfrage-Budget', () => {
     await expect(client.send({ ...get(), pacing })).rejects.toBeInstanceOf(AmazonAdsHttpError);
     expect(events).toEqual(['acquire']);
   });
+
+  it('liest Code und Meldung aus dem Fehlerformat der SP-API (`errors[0]`)', async () => {
+    server.use(
+      http.get(URL_, () =>
+        HttpResponse.json(
+          { errors: [{ code: 'Unauthorized', message: 'Access to requested resource is denied.' }] },
+          { status: 403 },
+        ),
+      ),
+    );
+    const { client } = setup();
+    await expect(client.send(get())).rejects.toMatchObject({
+      status: 403,
+      code: 'Unauthorized',
+      details: 'Access to requested resource is denied.',
+    });
+  });
 });

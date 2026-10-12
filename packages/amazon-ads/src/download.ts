@@ -27,7 +27,10 @@ export const AMAZON_ADS_DOWNLOAD_HOST_PATTERNS: readonly RegExp[] = [
 ];
 
 /** Nur `https`, ohne Zugangsdaten in der URL und nur von den erlaubten Hosts. */
-export function isAllowedDownloadUrl(value: string): boolean {
+export function isAllowedDownloadUrl(
+  value: string,
+  allowedHosts: readonly RegExp[] = AMAZON_ADS_DOWNLOAD_HOST_PATTERNS,
+): boolean {
   let url: URL;
   try {
     url = new URL(value);
@@ -37,18 +40,21 @@ export function isAllowedDownloadUrl(value: string): boolean {
   if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || url.port !== '') {
     return false;
   }
-  return AMAZON_ADS_DOWNLOAD_HOST_PATTERNS.some((pattern) => pattern.test(url.hostname));
+  return allowedHosts.some((pattern) => pattern.test(url.hostname));
 }
 
 /** Ergebnis eines Downloads: der rohe (gzip-)Body oder `expired` (URL abgelaufen bzw. Datei weg). */
 export type AmazonAdsDownload =
-  { status: 'ok'; body: AsyncIterable<Uint8Array> } | { status: 'expired' };
+  | { status: 'ok'; body: AsyncIterable<Uint8Array>; contentType: string | null }
+  | { status: 'expired' };
 
 export interface DownloadOptions {
   fetch: typeof fetch;
   logger: Logger;
   /** Für den ganzen Download inkl. Body. */
   timeoutMs: number;
+  /** Standard: die Hosts der Ads-API (`AMAZON_ADS_DOWNLOAD_HOST_PATTERNS`). */
+  allowedHosts?: readonly RegExp[];
 }
 
 /**
@@ -62,7 +68,7 @@ export async function downloadFile(
   options: DownloadOptions,
 ): Promise<AmazonAdsDownload> {
   const operation = 'download';
-  if (!isAllowedDownloadUrl(value)) {
+  if (!isAllowedDownloadUrl(value, options.allowedHosts)) {
     throw new AmazonAdsResponseError(
       `${operation}: Download-URL von Amazon ist nicht erlaubt (Host ${safeHost(value)}).`,
       operation,
@@ -94,7 +100,11 @@ export async function downloadFile(
       ...logContext,
       status: response.status,
     });
-    return { status: 'ok', body: response.body as unknown as AsyncIterable<Uint8Array> };
+    return {
+      status: 'ok',
+      body: response.body as unknown as AsyncIterable<Uint8Array>,
+      contentType: response.headers.get('content-type'),
+    };
   }
   if (response.ok) {
     options.logger({
@@ -153,6 +163,24 @@ export async function decodeGzipJson(
   options: DecodeGzipJsonOptions,
 ): Promise<unknown> {
   const operation = options.operation ?? 'download';
+  const bytes = await collectDownload(body, { ...options, gzip: true });
+  try {
+    return parseJsonLossless(bytes.toString('utf8'), { decimals: 'string' });
+  } catch {
+    // Keine Details aus dem Parser: Sie zitieren Teile des Inhalts.
+    throw new AmazonAdsResponseError(`${operation}: Die Datei ist kein gültiges JSON.`, operation);
+  }
+}
+
+/**
+ * Sammelt eine heruntergeladene Datei gestreamt ein, entpackt sie bei `gzip` und bricht ab, sobald der
+ * (entpackte) Inhalt `maxBytes` überschreitet.
+ */
+export async function collectDownload(
+  body: AsyncIterable<Uint8Array>,
+  options: DecodeGzipJsonOptions & { gzip: boolean },
+): Promise<Buffer> {
+  const operation = options.operation ?? 'download';
   const chunks: Buffer[] = [];
   let size = 0;
   const collect = new Writable({
@@ -168,7 +196,9 @@ export async function decodeGzipJson(
   });
 
   try {
-    await pipeline(Readable.from(body), createGunzip(), collect);
+    await (options.gzip
+      ? pipeline(Readable.from(body), createGunzip(), collect)
+      : pipeline(Readable.from(body), collect));
   } catch (error) {
     // Nur Fehler von zlib (Codes `Z_…`) betreffen die Datei; Fehler des Bodys (Netzwerk) bleiben erhalten.
     if (!isZlibError(error)) throw error;
@@ -178,12 +208,7 @@ export async function decodeGzipJson(
     );
   }
 
-  try {
-    return parseJsonLossless(Buffer.concat(chunks, size).toString('utf8'), { decimals: 'string' });
-  } catch {
-    // Keine Details aus dem Parser: Sie zitieren Teile des Inhalts.
-    throw new AmazonAdsResponseError(`${operation}: Die Datei ist kein gültiges JSON.`, operation);
-  }
+  return Buffer.concat(chunks, size);
 }
 
 function isZlibError(error: unknown): boolean {

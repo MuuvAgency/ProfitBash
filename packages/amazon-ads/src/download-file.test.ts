@@ -4,7 +4,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { RefreshTokenStore } from './access-token';
 import { createAmazonAdsClient } from './client';
-import { decodeGzipJson, isAllowedDownloadUrl } from './download';
+import { decodeGzipJson, downloadFile, isAllowedDownloadUrl } from './download';
 import { AmazonAdsHttpError, AmazonAdsNetworkError, AmazonAdsResponseError } from './errors';
 import type { LogEntry } from './logger';
 
@@ -150,5 +150,29 @@ describe('downloadFile', () => {
     );
     const { client } = setup();
     await expect(client.downloadFile(REPORT_URL)).rejects.toBeInstanceOf(AmazonAdsNetworkError);
+  });
+});
+
+describe('downloadFile mit eigenen Hosts', () => {
+  const SP_URL = 'https://tortuga-prod-eu.s3-eu-west-1.amazonaws.com/doc?X-Amz-Signature=SECRET-SIG';
+  const options = {
+    fetch: ((input, init) => globalThis.fetch(input, init)) as typeof fetch,
+    logger: () => {},
+    timeoutMs: 1000,
+  };
+
+  it('erlaubt nur die übergebenen Hosts und nennt den Content-Type der Datei', async () => {
+    server.use(
+      http.get('https://tortuga-prod-eu.s3-eu-west-1.amazonaws.com/doc', () =>
+        HttpResponse.text('a\tb', { headers: { 'Content-Type': 'text/plain;charset=Cp1252' } }),
+      ),
+    );
+    await expect(downloadFile(SP_URL, options)).rejects.toBeInstanceOf(AmazonAdsResponseError);
+
+    const result = await downloadFile(SP_URL, {
+      ...options,
+      allowedHosts: [/^tortuga-prod-eu\.s3-eu-west-1\.amazonaws\.com$/],
+    });
+    expect(result).toMatchObject({ status: 'ok', contentType: 'text/plain;charset=Cp1252' });
   });
 });
