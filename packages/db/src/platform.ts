@@ -304,3 +304,46 @@ export async function revokePlatformStaff(
     });
   });
 }
+
+export interface PlatformMember {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  superadmin: boolean;
+}
+
+/** Mitglieder einer Organisation für „Als Nutzer ansehen“ (6.5), nach Name. */
+export async function listPlatformOrganizationMembers(
+  db: Db,
+  orgId: string,
+): Promise<PlatformMember[]> {
+  const rows = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      email: users.email,
+      role: members.role,
+      platformRole: users.role,
+    })
+    .from(members)
+    .innerJoin(users, eq(users.id, members.userId))
+    .where(eq(members.organizationId, orgId))
+    .orderBy(asc(users.name), asc(users.id));
+  return rows.map(({ platformRole, ...row }) => ({
+    ...row,
+    superadmin: platformRole === SUPERADMIN,
+  }));
+}
+
+/** Ziel einer Impersonation: `null`, wenn es den Nutzer nicht gibt. */
+export async function findImpersonationTarget(
+  db: Db,
+  userId: string,
+): Promise<{ id: string; email: string; superadmin: boolean } | null> {
+  const [user] = await db
+    .select({ id: users.id, email: users.email, role: users.role })
+    .from(users)
+    .where(eq(users.id, userId));
+  return user ? { id: user.id, email: user.email, superadmin: user.role === SUPERADMIN } : null;
+}

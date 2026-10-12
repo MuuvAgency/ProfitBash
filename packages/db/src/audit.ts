@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Db } from './client';
 import { auditEvents, users } from './schema';
 
@@ -16,12 +17,32 @@ export interface AuditEventInput {
   target: { type: string; id: string; [key: string]: unknown };
 }
 
+const impersonator = new AsyncLocalStorage<string>();
+
+/**
+ * Führt `run` als Impersonation aus (`phase-6.md` 6.5, F4): Jedes Audit-Event darin nennt `impersonatorId` (den
+ * Superadmin) als Handelnden und den Nutzer, als der er handelt, im `target` (`impersonatedUserId`). Gesetzt wird
+ * das an genau zwei Stellen aus der Session: `requireSession` (API) und die better-auth-Hooks.
+ */
+export function runAsImpersonator<T>(impersonatorId: string, run: () => T): T {
+  return impersonator.run(impersonatorId, run);
+}
+
 /**
  * Schreibt ein Audit-Event. Jede schreibende Aktion erzeugt eines, möglichst in derselben
- * Transaktion wie die Änderung selbst.
+ * Transaktion wie die Änderung selbst. Während einer Impersonation siehe `runAsImpersonator`.
  */
 export async function recordAuditEvent(db: DbOrTx, event: AuditEventInput): Promise<void> {
-  await db.insert(auditEvents).values(event);
+  const impersonatorId = impersonator.getStore();
+  await db.insert(auditEvents).values(
+    impersonatorId !== undefined && event.actorUserId !== null
+      ? {
+          ...event,
+          actorUserId: impersonatorId,
+          target: { ...event.target, impersonatedUserId: event.actorUserId },
+        }
+      : event,
+  );
 }
 
 export interface AuditActor {

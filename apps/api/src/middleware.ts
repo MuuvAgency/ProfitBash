@@ -1,4 +1,4 @@
-import { listEnabledFeatures, listMemberships, schema } from '@profitbash/db';
+import { listEnabledFeatures, listMemberships, runAsImpersonator, schema } from '@profitbash/db';
 import {
   hasOrgRole,
   isPlatformRole,
@@ -73,12 +73,24 @@ function isOpenForCustomerOrgs(path: string): boolean {
   return CUSTOMER_ORG_PATHS.includes(path) || path.startsWith('/api/settings/');
 }
 
+/** Beginnt (`POST`, Superadmin) und beendet (`DELETE`) eine Impersonation (`phase-6.md` 6.5). */
+export const IMPERSONATION_PATH = '/api/platform/impersonation';
+
+/**
+ * Während einer Impersonation gesperrt: Über den fremden Nutzer ließe sich sonst ein Passwort-Link ziehen, ein
+ * Konto anlegen oder die eigene Spur verwischen (Mitglieder, Kundenzugang, Plattform-Admin).
+ */
+const IMPERSONATION_BLOCKED =
+  /^\/api\/(members|platform)(\/|$)|^\/api\/clients\/[^/]+\/access(\/|$)/;
+
 /**
  * Verlangt eine gültige Session und setzt `c.var.auth`: Nutzer, Mitgliedschaften und die aktive
  * Organisation. Die aktive Org kommt aus der Session, sofern der Nutzer dort (noch) Mitglied ist,
  * sonst die älteste Mitgliedschaft; dieser Fallback wird in die Session zurückgeschrieben, damit
  * better-auth-Endpunkte dieselbe Org sehen. Rollen werden bei jeder Anfrage frisch gelesen. Ist die aktive
  * Organisation eine Kunden-Org, sind nur die dafür freigegebenen Pfade erreichbar (`isOpenForCustomerOrgs`).
+ * In einer Impersonation (`sessions.impersonated_by`) läuft die Anfrage in `runAsImpersonator`: Jedes Audit-Event
+ * nennt den Superadmin; einige Bereiche sind gesperrt (`IMPERSONATION_BLOCKED`), Beenden geht immer.
  *
  * Verlängert better-auth die Session dabei, wird der neue Cookie an den Browser weitergereicht.
  */
@@ -107,7 +119,21 @@ export function requireSession({
         .where(eq(sessions.id, result.session.id));
     }
 
-    if (activeOrganization?.type === 'client' && !isOpenForCustomerOrgs(c.req.path)) {
+    const impersonatedBy = result.session.impersonatedBy ?? null;
+    const endsImpersonation =
+      impersonatedBy !== null && c.req.method === 'DELETE' && c.req.path === IMPERSONATION_PATH;
+    if (impersonatedBy !== null && !endsImpersonation && IMPERSONATION_BLOCKED.test(c.req.path)) {
+      throw new ApiError(
+        403,
+        'IMPERSONATION_FORBIDDEN',
+        'Während „Als Nutzer ansehen“ nicht möglich.',
+      );
+    }
+    if (
+      activeOrganization?.type === 'client' &&
+      !endsImpersonation &&
+      !isOpenForCustomerOrgs(c.req.path)
+    ) {
       throw new ApiError(403, 'CUSTOMER_ORG_FORBIDDEN', 'Für Kundenzugänge nicht freigegeben.');
     }
 
@@ -119,11 +145,12 @@ export function requireSession({
         role: toPlatformRole(result.user.role),
       },
       sessionId: result.session.id,
+      impersonatedBy,
       memberships,
       activeOrganization,
       orgRole: activeOrganization?.role ?? null,
     });
-    await next();
+    await (impersonatedBy === null ? next() : runAsImpersonator(impersonatedBy, next));
   };
 }
 
