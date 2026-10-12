@@ -65,10 +65,10 @@ Geprüft in 6.6 (2026-10-12); hinter jedem Punkt der Beleg.
       *Beleg:* `platform.test.ts` (`LAST_SUPERADMIN`), `routes/impersonation.test.ts` (`IMPERSONATION_SUPERADMIN`).
 - [x] Jede neue Datenansicht hat Loading-, Empty- und Error-Zustand; Texte über i18n; Formularfelder mit Label.
       *Beleg:* `AuditLogPage`, `ClientAccessDialog`, `PlatformPage` samt Tests.
-- [ ] Browser-Pane geprüft wie in Phase 2–5 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole), mit echten Bedienelementen;
+- [x] Browser-Pane geprüft wie in Phase 2–5 (1440 px, Tablet, Handy, Hell/Dunkel, Konsole), mit echten Bedienelementen;
       angelegte Testdaten über die Oberfläche wieder entfernt oder genau benannt.
-      *Stand:* je Aufgabe geprüft und notiert (Handy, Tablet, Hell/Dunkel, Konsole, echte Bedienelemente, Reste
-      benannt). **Offen: 1440 px** – die Browser-Pane war in allen Sessions schmaler (siehe „Offen nach Phase 6“).
+      *Beleg:* je Aufgabe geprüft und notiert (Handy, Tablet, Hell/Dunkel, Konsole, echte Bedienelemente, Reste
+      benannt). 1440 px nachgeholt am 2026-10-12 (siehe „Offen nach Phase 6“), ohne den Banner.
 - [x] `pnpm test`, `typecheck`, `lint`, `build`, beide Smoke-Tests und CI grün.
       *Beleg:* vor jedem PR gelaufen (zuletzt 3354 Tests), CI der PRs dieser Phase grün (zuletzt 110; 111 mit Auto-Merge).
 
@@ -401,8 +401,10 @@ Plattform-Rolle `superadmin`.
 - **Staff** nur für Mitglieder einer Agentur-Org (6.4).
 
 **Nicht gebaut oder nicht geprüft:**
-- **1440 px** in der Browser-Pane (Definition of Done): in keiner Session möglich, die Pane war schmaler. Nachholen
-  in einem breiten Fenster: `/admin/audit`, `/admin/platform/*`, Kundenzugang-Dialog, Banner.
+- **1440 px, nachgeholt (2026-10-12):** `resize_window` auf 1440×900 emuliert die Breite auch in einer schmalen Pane
+  (verkleinert dargestellt). Geprüft im Dunkel-Modus, nur gelesen: `/admin/audit`, `/admin/platform/orgs`,
+  `/entitlements`, `/staff` (mit Protokoll) und der Kundenzugang-Dialog; kein waagerechtes Scrollen, Konsole leer.
+  **Nicht geprüft:** der Impersonation-Banner bei 1440 px (hätte neue Audit-Events in der Dev-DB erzeugt).
 - **Impersonation ohne Ende-Ereignis:** nur noch bei Ablauf nach einer Stunde (kein Job dafür; der Beginn nennt den
   Zeitpunkt, die Dauer ist begrenzt). Nach dem Ablauf muss sich der Superadmin neu anmelden.
   **Nachgezogen (2026-10-12):** Abmelden während der Impersonation schreibt `platform.impersonation_stop`
