@@ -17,6 +17,7 @@ import {
 } from '@profitbash/db';
 import {
   AUDIT_EVENT_PAGE_SIZE,
+  auditEventListQuerySchema,
   auditEventListSchema,
   errorResponseSchema,
   idParamSchema,
@@ -155,7 +156,8 @@ const auditRoute = createRoute({
   method: 'get',
   path: '/platform/audit-events',
   tags,
-  summary: `Plattformweite Ereignisse (ohne Organisation), die letzten ${AUDIT_EVENT_PAGE_SIZE}`,
+  summary: `Plattformweite Ereignisse (ohne Organisation), je Seite ${AUDIT_EVENT_PAGE_SIZE}`,
+  request: { query: auditEventListQuerySchema.pick({ cursor: true }) },
   responses: {
     200: { description: 'Neueste zuerst.', content: json(auditEventListSchema) },
     ...errors,
@@ -357,8 +359,8 @@ export function registerPlatformRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps) 
   });
 
   app.openapi({ ...auditRoute, middleware }, async (c) => {
-    // shortcut: nur die neuesten Ereignisse ohne Blättern; mit vielen Staff-Wechseln Cursor wie in /audit-events.
     const { events, nextCursor } = await listAuditEvents(db, {
+      ...c.req.valid('query'),
       orgId: null,
       area: 'platform',
       limit: AUDIT_EVENT_PAGE_SIZE,

@@ -5394,10 +5394,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Plattformweite Ereignisse (ohne Organisation), die letzten 50 */
+        /** Plattformweite Ereignisse (ohne Organisation), je Seite 50 */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    cursor?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
