@@ -442,6 +442,9 @@ export const de = {
     /** Handelnder ohne Nutzer (Seed, Job) oder gelöschter Nutzer. */
     system: 'System',
     details: 'Details',
+    /** Aktion eines Plattform-Admins über „Als Nutzer ansehen“. */
+    impersonatedAs: 'als {name}',
+    impersonatedAsUnknown: 'als anderer Nutzer',
     filter: {
       area: 'Bereich',
       actor: 'Nutzer',

@@ -77,6 +77,29 @@ describe('Seite „Audit-Log“', () => {
     expect(document.querySelector('h1')?.textContent).toContain('Audit-Log');
   });
 
+  it('kennzeichnet Aktionen aus einer Impersonation mit dem Nutzer, als der gehandelt wurde', async () => {
+    const BEN = '00000000-0000-4000-8000-0000000000b2';
+    await mountPage('/admin/audit', {
+      'GET /api/audit-events': json({
+        events: [
+          event(5, { target: { type: 'tag', id: 't1', impersonatedUserId: ANNA.id } }),
+          event(4, { target: { type: 'tag', id: 't2', impersonatedUserId: BEN } }),
+          event(3),
+        ],
+        nextCursor: null,
+      }),
+    });
+    await vi.waitFor(() => expect(rows()).toHaveLength(3));
+    // Name, wenn der Nutzer selbst im Log vorkommt; sonst ein allgemeiner Hinweis (die ID steht in den Details).
+    expect(rows()[0]!.querySelector('[data-audit-impersonated]')?.textContent).toContain(
+      'als Anna',
+    );
+    expect(rows()[1]!.querySelector('[data-audit-impersonated]')?.textContent).toContain(
+      'als anderer Nutzer',
+    );
+    expect(rows()[2]!.querySelector('[data-audit-impersonated]')).toBeNull();
+  });
+
   it('lädt ältere Ereignisse über den Cursor nach', async () => {
     const { requests } = await mountPage();
     await vi.waitFor(() => expect(rows()).toHaveLength(2));

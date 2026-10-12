@@ -123,6 +123,17 @@ const actorOptions = computed(() =>
   })),
 );
 
+/**
+ * Aktion aus einer Impersonation (6.5): Handelnder ist der Superadmin, das `target` nennt den Nutzer. Dessen Name
+ * ist nur bekannt, wenn er selbst im Log vorkommt.
+ */
+function impersonatedAs(target: AuditEvent['target']): string | null {
+  const userId = target.impersonatedUserId;
+  if (typeof userId !== 'string') return null;
+  const user = filterOptions.data.value?.actors.find((actor) => actor.id === userId);
+  return user ? t('audit.impersonatedAs', { name: user.name }) : t('audit.impersonatedAsUnknown');
+}
+
 /** Kurzbeschreibung des Objekts, soweit es einen Namen hat; alles Weitere steht in den Details. */
 function targetSummary(target: AuditEvent['target']): string {
   for (const key of ['name', 'email', 'fileName']) {
@@ -249,6 +260,13 @@ function targetSummary(target: AuditEvent['target']): string {
               {{ label('action', event.action) }}
               <span v-if="targetSummary(event.target)" class="text-ink-secondary">
                 · {{ targetSummary(event.target) }}
+              </span>
+              <span
+                v-if="impersonatedAs(event.target)"
+                data-audit-impersonated
+                class="text-ink-secondary"
+              >
+                · {{ impersonatedAs(event.target) }}
               </span>
             </span>
             <details>
