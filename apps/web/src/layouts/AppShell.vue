@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n';
 import BrandMark from '../components/brand/BrandMark.vue';
 import InlineError from '../components/common/InlineError.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
+import ImpersonationBanner from '../components/shell/ImpersonationBanner.vue';
 import QuickTools from '../components/shell/QuickTools.vue';
 import SidebarPanel from '../components/shell/SidebarPanel.vue';
 import { errorMessageKey } from '../i18n';
@@ -118,6 +119,7 @@ async function retry() {
       class="min-w-0 flex-1 px-margin-mobile py-space-lg sm:px-margin lg:px-space-xl lg:py-space-xl"
     >
       <div class="mx-auto flex w-full max-w-360 flex-col gap-space-lg">
+        <ImpersonationBanner />
         <p
           v-if="noOrganization"
           role="status"

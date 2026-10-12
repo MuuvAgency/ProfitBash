@@ -129,4 +129,39 @@ describe('AppShell', () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain('Noch kein Amazon-Konto verbunden'));
     expect(wrapper.text()).not.toContain('Folgt in Kürze');
   });
+
+  it('zeigt während einer Impersonation einen Banner; „Beenden“ stellt den Superadmin wieder her', async () => {
+    let impersonating = true;
+    const { requests } = stubFetch({
+      'GET /api/me': () =>
+        json(
+          impersonating
+            ? { ...meFixture({ orgRole: 'editor' }), impersonatedBy: { id: 'root', name: 'Ada' } }
+            : meFixture({ platformRole: 'superadmin' }),
+        ),
+      ...noUiState,
+      'DELETE /api/platform/impersonation': () => {
+        impersonating = false;
+        return new Response(null, { status: 204 });
+      },
+      'GET /api/platform/organizations': json({ organizations: [] }),
+    });
+    const { wrapper, router } = await mountWithApp(undefined, { path: '/profit/pnl' });
+    const banner = () => wrapper.find('[data-impersonation-banner]');
+    await vi.waitFor(() => expect(banner().exists()).toBe(true));
+    expect(banner().text()).toContain('Du siehst die App als Dominik');
+    expect(banner().attributes('role')).toBe('status');
+
+    await banner().get('button').trigger('click');
+    await vi.waitFor(() => expect(banner().exists()).toBe(false));
+    expect(requests.some((r) => r.method === 'DELETE')).toBe(true);
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/admin/platform'));
+  });
+
+  it('zeigt ohne Impersonation keinen Banner', async () => {
+    stubFetch({ 'GET /api/me': json(meFixture()), ...noUiState });
+    const { wrapper } = await mountWithApp(undefined, { path: '/profit/pnl' });
+    await vi.waitFor(() => expect(wrapper.find('h1').exists()).toBe(true));
+    expect(wrapper.find('[data-impersonation-banner]').exists()).toBe(false);
+  });
 });

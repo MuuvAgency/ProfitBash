@@ -95,6 +95,25 @@ function submitName() {
   saveName.mutate({ org: dialog.org, name });
 }
 
+// Mitglieder einer Organisation (aufklappbar) und „Als Nutzer ansehen“ (6.5).
+const openOrgId = ref<string | null>(null);
+const orgMembers = useQuery({
+  queryKey: computed(() => ['platform', 'members', openOrgId.value] as const),
+  queryFn: () => api.platform.members(openOrgId.value!),
+  enabled: computed(() => openOrgId.value !== null),
+});
+const impersonateError = ref<string | null>(null);
+const impersonate = useMutation({
+  mutationFn: (userId: string) => api.platform.startImpersonation(userId),
+  onSuccess: async () => {
+    // Ab jetzt gilt die Session des Nutzers: nichts vom Superadmin Geladenes behalten.
+    queryClient.clear();
+    await session.reload();
+    await router.replace('/');
+  },
+  onError: (error) => (impersonateError.value = errorText(error)),
+});
+
 // --- Entitlements --------------------------------------------------------------------------
 
 const featureLabel = (feature: string) => {
@@ -284,6 +303,17 @@ const actionLabel = (action: string) => {
               {{ t('platform.orgs.members', org.memberCount) }}
             </span>
             <Button
+              data-platform-org-members
+              :icon="openOrgId === org.id ? 'pi pi-chevron-up' : 'pi pi-users'"
+              :label="t('platform.orgs.showMembers')"
+              severity="secondary"
+              text
+              size="small"
+              :aria-expanded="openOrgId === org.id"
+              :aria-label="t('platform.orgs.membersOf', { name: org.name })"
+              @click="openOrgId = openOrgId === org.id ? null : org.id"
+            />
+            <Button
               data-platform-org-rename
               icon="pi pi-pencil"
               :label="t('platform.orgs.rename')"
@@ -293,6 +323,68 @@ const actionLabel = (action: string) => {
               :aria-label="t('platform.orgs.renameFor', { name: org.name })"
               @click="openNameDialog(org)"
             />
+            <div v-if="openOrgId === org.id" class="flex basis-full flex-col gap-space-sm">
+              <InlineError
+                v-if="orgMembers.isError.value"
+                :message="t('platform.orgs.membersLoadError')"
+                retryable
+                :retrying="orgMembers.isFetching.value"
+                @retry="orgMembers.refetch()"
+              />
+              <SkeletonBlock v-else-if="!orgMembers.data.value" height="2.5rem" />
+              <p
+                v-else-if="orgMembers.data.value.length === 0"
+                class="text-body-sm text-ink-secondary"
+              >
+                {{ t('platform.orgs.membersEmpty') }}
+              </p>
+              <ul
+                v-else
+                :aria-label="t('platform.orgs.membersOf', { name: org.name })"
+                class="flex flex-col divide-y divide-line"
+              >
+                <li
+                  v-for="member in orgMembers.data.value"
+                  :key="member.userId"
+                  :data-platform-member="member.email"
+                  class="flex flex-wrap items-center gap-x-space-md gap-y-space-xs py-space-sm"
+                >
+                  <div class="flex min-w-0 flex-1 basis-48 flex-col">
+                    <span class="truncate text-body-sm font-medium text-ink">{{
+                      member.name
+                    }}</span>
+                    <span class="break-all font-data text-data-sm text-ink-secondary">{{
+                      member.email
+                    }}</span>
+                  </div>
+                  <span class="text-body-sm text-ink-secondary">
+                    {{
+                      te(`account.role.${member.role}`)
+                        ? t(`account.role.${member.role}`)
+                        : member.role
+                    }}
+                    <template v-if="member.superadmin">
+                      · {{ t('platform.orgs.superadmin') }}
+                    </template>
+                  </span>
+                  <Button
+                    v-if="!member.superadmin"
+                    data-platform-impersonate
+                    icon="pi pi-eye"
+                    :label="t('platform.orgs.impersonate')"
+                    severity="secondary"
+                    text
+                    size="small"
+                    :aria-label="t('platform.orgs.impersonateFor', { name: member.name })"
+                    :loading="
+                      impersonate.isPending.value && impersonate.variables.value === member.userId
+                    "
+                    @click="impersonate.mutate(member.userId)"
+                  />
+                </li>
+              </ul>
+              <InlineError v-if="impersonateError" :message="impersonateError" />
+            </div>
           </li>
         </ul>
 
