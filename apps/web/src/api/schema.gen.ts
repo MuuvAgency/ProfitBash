@@ -772,6 +772,299 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/seller-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SP-API-Connections mit Seller-Konten inkl. ausgeblendeter und entfernter (nur Admin) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Connections, älteste zuerst. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SellerConnectionList"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Seller-Konto über „Token eintragen“ verbinden oder neu verbinden (nur Admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SellerConnectionCreate"];
+                };
+            };
+            responses: {
+                /** @description Neu verbunden. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SellerAccountsSync"];
+                    };
+                };
+                /** @description Angelegt. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SellerAccountsSync"];
+                    };
+                };
+                /** @description Ungültige Eingabe oder von Amazon abgelehnt. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Amazon nicht erreichbar. */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seller-connections/{id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Seller-Konten einer Connection mit Amazon abgleichen (nur Admin) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Abgeglichen. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SellerAccountsSync"];
+                    };
+                };
+                /** @description Ungültige Eingabe oder von Amazon abgelehnt. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Connection braucht ein Neu-Verbinden. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Amazon nicht erreichbar. */
+                502: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/seller-accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Seller-Konto einem Client zuordnen oder ausblenden (nur Admin) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ProfilePatch"];
+                };
+            };
+            responses: {
+                /** @description Geändertes Seller-Konto. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SellerAccount"];
+                    };
+                };
+                /** @description Ungültige Eingabe oder von Amazon abgelehnt. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Keine Admin-Rolle. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht gefunden. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/api/clients": {
         parameters: {
             query?: never;
@@ -8970,6 +9263,54 @@ export interface components {
             /** Format: uuid */
             clientId?: string | null;
             isHidden?: boolean;
+        };
+        SellerConnectionList: {
+            connections: components["schemas"]["SellerConnection"][];
+        };
+        SellerConnection: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            region: "eu" | "na" | "fe";
+            amazonSellerId: string;
+            /** @enum {string} */
+            status: "active" | "reauth_required" | "error";
+            /** Format: date-time */
+            consentedAt: string | null;
+            accounts: components["schemas"]["SellerAccount"][];
+        };
+        SellerAccount: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            connectionId: string;
+            /** Format: uuid */
+            clientId: string | null;
+            amazonSellerId: string;
+            marketplaceId: string;
+            storeName: string;
+            countryCode: string;
+            currencyCode: string;
+            timezone: string;
+            isHidden: boolean;
+            /** Format: date-time */
+            removedAt: string | null;
+            /** Format: date-time */
+            syncedAt: string | null;
+        };
+        SellerAccountsSync: {
+            /** Format: uuid */
+            connectionId: string;
+            accounts: number;
+            skippedMarketplaceIds: string[];
+        };
+        SellerConnectionCreate: {
+            /** @enum {string} */
+            region: "eu" | "na" | "fe";
+            amazonSellerId: string;
+            clientId: string;
+            clientSecret: string;
+            refreshToken: string;
         };
         ClientList: {
             clients: components["schemas"]["Client"][];

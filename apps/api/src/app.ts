@@ -11,6 +11,7 @@ import { registerAmazonOAuthRoutes } from './routes/amazon-oauth';
 import { registerAnalyticsRoutes } from './routes/analytics';
 import { registerClientRoutes } from './routes/clients';
 import { registerConnectionRoutes } from './routes/connections';
+import { registerSellerConnectionRoutes } from './routes/seller-connections';
 import { isFileUpload, registerFileImportRoutes } from './routes/file-imports';
 import { registerAutomationRoutes } from './routes/automations';
 import { registerGoalRoutes } from './routes/goals';
@@ -104,6 +105,7 @@ export function createApp(options: CreateAppOptions) {
   registerSettingsRoutes(app, deps);
   registerAmazonOAuthRoutes(app, deps);
   registerConnectionRoutes(app, deps);
+  registerSellerConnectionRoutes(app, deps);
   registerClientRoutes(app, deps);
   registerJobRunRoutes(app, deps);
   registerAuditEventRoutes(app, deps);

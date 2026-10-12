@@ -64,11 +64,19 @@ export async function findConnection(
   db: DbOrTx,
   organizationId: string,
   connectionId: string,
+  // SP-Connections (Phase 7) haben eigene Routen (`seller-connections.ts`).
+  provider: ConnectionRow['provider'] = 'amazon_ads',
 ): Promise<ConnectionRow | null> {
   const [row] = await db
     .select(connectionColumns)
     .from(connections)
-    .where(and(eq(connections.id, connectionId), eq(connections.organizationId, organizationId)))
+    .where(
+      and(
+        eq(connections.id, connectionId),
+        eq(connections.organizationId, organizationId),
+        eq(connections.provider, provider),
+      ),
+    )
     .limit(1);
   return row ?? null;
 }
@@ -78,9 +86,9 @@ function toConnection(row: ConnectionRow): Connection {
     ...row,
     lastRefreshedAt: toIso(row.lastRefreshedAt),
     consentedAt: toIso(row.consentedAt),
-    // Die 365-Tage-Regel gilt für Amazon-Ads-Tokens; andere Anbieter bringen eigene Regeln mit.
-    refreshTokenExpiresAt:
-      row.provider === 'amazon_ads' ? toIso(refreshTokenExpiresAt(row.consentedAt)) : null,
+    // Alle Abfragen dieser Datei filtern auf Ads; die 365-Tage-Regel gilt für Amazon-Ads-Tokens.
+    provider: 'amazon_ads',
+    refreshTokenExpiresAt: toIso(refreshTokenExpiresAt(row.consentedAt)),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -218,7 +226,12 @@ export function registerConnectionRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps
     const rows = await db
       .select(connectionColumns)
       .from(connections)
-      .where(eq(connections.organizationId, orgOf(c.get('auth'))))
+      .where(
+        and(
+          eq(connections.organizationId, orgOf(c.get('auth'))),
+          eq(connections.provider, 'amazon_ads'),
+        ),
+      )
       .orderBy(asc(connections.createdAt), asc(connections.id));
     return c.json({ connections: rows.map(toConnection) }, 200);
   });

@@ -4,6 +4,7 @@ import type { Keyring } from '@profitbash/shared/crypto';
 import type { JobQueue } from '@profitbash/worker';
 import type { RequestIdVariables } from 'hono/request-id';
 import type { AmazonAdsDeps } from './amazon';
+import type { AmazonSpDeps } from './amazon-sp';
 import type { Auth } from './auth';
 import type { Logger } from './logger';
 import type { NotificationHub } from './notification-hub';
@@ -19,6 +20,8 @@ export interface AppDeps {
   logger: Logger;
   /** Amazon-Client (echt oder Mock, siehe `createAmazonAdsDeps`). */
   amazonAds: AmazonAdsDeps;
+  /** SP-API-Client (echt oder Mock, siehe `createAmazonSpDeps`). */
+  amazonSp: AmazonSpDeps;
   /** Schlüssel für Refresh-Tokens (`ENCRYPTION_*`). */
   keyring: Keyring;
   /** HMAC-Secret für den OAuth-`state` (`OAUTH_STATE_SECRET`). */

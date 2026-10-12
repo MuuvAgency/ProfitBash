@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { createDb } from '@profitbash/db';
 import { parseKeyring } from '@profitbash/shared/crypto';
 import { createAmazonAdsDeps } from './amazon';
+import { createAmazonSpDeps } from './amazon-sp';
 import { createApp } from './app';
 import { createAuth } from './auth';
 import { AMAZON_OAUTH_CALLBACK_PATH } from './env';
@@ -49,6 +50,7 @@ export async function renderOpenApiDocument(): Promise<string> {
         db,
         keyring,
       }),
+      amazonSp: createAmazonSpDeps({ useMock: true, db, keyring }),
       keyring,
       oauthStateSecret: 'openapi-export-ohne-echtes-secret-000000',
       // Das Dokument plant nie etwas ein.

@@ -3,6 +3,7 @@ import { serve } from '@hono/node-server';
 import { createDb } from '@profitbash/db';
 import { healthcheckUrls, startJobQueue, startWorker } from '@profitbash/worker';
 import { createAmazonAdsDeps } from './amazon';
+import { createAmazonSpDeps } from './amazon-sp';
 import { createApp } from './app';
 import { createAuth } from './auth';
 import { loadApiEnv } from './env';
@@ -48,6 +49,12 @@ const app = createApp({
   version: env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12) || 'dev',
   logger: consoleLogger,
   amazonAds,
+  amazonSp: createAmazonSpDeps({
+    useMock: env.AMAZON_SP_USE_MOCK,
+    db,
+    keyring: env.keyring,
+    logger: consoleLogger,
+  }),
   keyring: env.keyring,
   oauthStateSecret: env.OAUTH_STATE_SECRET,
   jobs: background.jobs,
