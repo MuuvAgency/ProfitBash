@@ -1,6 +1,7 @@
 import { parseKeyring } from '@profitbash/shared/crypto';
 import {
   amazonAdsEnvSchema,
+  amazonSpEnvSchema,
   appUrlSchema,
   authSecretSchema,
   databaseDirectUrlSchema,
@@ -30,6 +31,7 @@ export const apiEnvSchema = nodeEnvSchema
   .extend(encryptionEnvSchema.shape)
   .extend(oauthStateSecretSchema.shape)
   .extend(amazonAdsEnvSchema.shape)
+  .extend(amazonSpEnvSchema.shape)
   .extend(healthchecksEnvSchema.shape)
   .extend({
     /** Von Railway gesetzt; hat in Produktion Vorrang vor `API_PORT`. Leer gilt als nicht gesetzt. */

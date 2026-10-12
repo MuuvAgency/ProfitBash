@@ -733,6 +733,200 @@
         },
         "additionalProperties": false
       },
+      "SellerConnectionList": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellerConnection"
+            }
+          }
+        },
+        "required": [
+          "connections"
+        ]
+      },
+      "SellerConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu",
+              "na",
+              "fe"
+            ]
+          },
+          "amazonSellerId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "reauth_required",
+              "error"
+            ]
+          },
+          "consentedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SellerAccount"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "region",
+          "amazonSellerId",
+          "status",
+          "consentedAt",
+          "accounts"
+        ]
+      },
+      "SellerAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "clientId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "amazonSellerId": {
+            "type": "string"
+          },
+          "marketplaceId": {
+            "type": "string"
+          },
+          "storeName": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "isHidden": {
+            "type": "boolean"
+          },
+          "removedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "syncedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "connectionId",
+          "clientId",
+          "amazonSellerId",
+          "marketplaceId",
+          "storeName",
+          "countryCode",
+          "currencyCode",
+          "timezone",
+          "isHidden",
+          "removedAt",
+          "syncedAt"
+        ]
+      },
+      "SellerAccountsSync": {
+        "type": "object",
+        "properties": {
+          "connectionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accounts": {
+            "type": "integer"
+          },
+          "skippedMarketplaceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "connectionId",
+          "accounts",
+          "skippedMarketplaceIds"
+        ]
+      },
+      "SellerConnectionCreate": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu",
+              "na",
+              "fe"
+            ]
+          },
+          "amazonSellerId": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]{10,20}$"
+          },
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "clientSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "refreshToken": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "region",
+          "amazonSellerId",
+          "clientId",
+          "clientSecret",
+          "refreshToken"
+        ],
+        "additionalProperties": false
+      },
       "ClientList": {
         "type": "object",
         "properties": {
@@ -13567,6 +13761,296 @@
           },
           "400": {
             "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seller-connections": {
+      "get": {
+        "tags": [
+          "Seller-Konten"
+        ],
+        "summary": "SP-API-Connections mit Seller-Konten inkl. ausgeblendeter und entfernter (nur Admin)",
+        "responses": {
+          "200": {
+            "description": "Connections, älteste zuerst.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerConnectionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Seller-Konten"
+        ],
+        "summary": "Seller-Konto über „Token eintragen“ verbinden oder neu verbinden (nur Admin)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellerConnectionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Neu verbunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAccountsSync"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Angelegt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAccountsSync"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe oder von Amazon abgelehnt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Amazon nicht erreichbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seller-connections/{id}/sync": {
+      "post": {
+        "tags": [
+          "Seller-Konten"
+        ],
+        "summary": "Seller-Konten einer Connection mit Amazon abgleichen (nur Admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Abgeglichen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAccountsSync"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe oder von Amazon abgelehnt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Keine Admin-Rolle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nicht gefunden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Connection braucht ein Neu-Verbinden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Amazon nicht erreichbar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/seller-accounts/{id}": {
+      "patch": {
+        "tags": [
+          "Seller-Konten"
+        ],
+        "summary": "Seller-Konto einem Client zuordnen oder ausblenden (nur Admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfilePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Geändertes Seller-Konto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe oder von Amazon abgelehnt.",
             "content": {
               "application/json": {
                 "schema": {

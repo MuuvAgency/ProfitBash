@@ -90,6 +90,7 @@ Secrets nur in Railway eintragen, nie ins Repo, nie in Actions-Logs. Werte mit `
 | `OAUTH_STATE_SECRET` | Zufallswert (≥ 32 Zeichen) |
 | `AMAZON_ADS_REDIRECT_URI` | `https://<app>.up.railway.app/api/amazon/oauth/callback` (auch im LWA Security Profile eintragen, 0.0b) |
 | `AMAZON_ADS_USE_MOCK` | `true` bis zur Ads-API-Freigabe, dann `false` |
+| `AMAZON_SP_USE_MOCK` | `true`, bis ein echter SP-API-Zugang geprüft ist (Phase 7), dann `false` oder weglassen. Zugangsdaten der SP-API-App liegen je Connection verschlüsselt in der Datenbank, nicht in der Umgebung |
 | `AMAZON_ADS_CLIENT_ID`, `AMAZON_ADS_CLIENT_SECRET` | aus dem Security Profile (Pflicht ohne Mock) |
 | `AMAZON_ADS_REQUESTS_PER_SECOND` | optional, Anfrage-Budget je Profil (Standard 2, mindestens 0.2); erst nach beobachteten 429-Quoten ändern |
 | `HEALTHCHECKS_TOKEN_REFRESH_URL`, `HEALTHCHECKS_PROFILES_SYNC_URL`, `HEALTHCHECKS_ENTITIES_SYNC_URL`, `HEALTHCHECKS_REPORTS_SYNC_URL`, `HEALTHCHECKS_FX_RATES_SYNC_URL` | optional: Ping-URLs (siehe Healthchecks.io) |

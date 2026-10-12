@@ -104,6 +104,17 @@ export const amazonAdsEnvSchema = z.object({
 });
 
 /** Ohne Mock sind Client-ID und Secret Pflicht. Für `superRefine` des App-Schemas. */
+/**
+ * Amazon SP-API (Phase 7). `AMAZON_SP_USE_MOCK=true` beantwortet alle Aufrufe im Prozess (Entwicklung,
+ * bis ein echter Zugang geprüft ist). Zugangsdaten der App liegen je Connection in der Datenbank.
+ */
+export const amazonSpEnvSchema = z.object({
+  AMAZON_SP_USE_MOCK: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+});
+
 export function refineAmazonAdsCredentials(
   env: z.output<typeof amazonAdsEnvSchema> & { NODE_ENV?: string },
   ctx: z.RefinementCtx,

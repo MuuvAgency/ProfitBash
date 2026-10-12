@@ -311,6 +311,80 @@ export const profilePatchSchema = z
 export type ProfilePatch = z.infer<typeof profilePatchSchema>;
 
 // ---------------------------------------------------------------------------
+// Seller-Konten (Amazon SP-API, Phase 7)
+// ---------------------------------------------------------------------------
+
+export const sellerAccountSchema = z
+  .object({
+    /** Interne ID (`sellerAccountId`). */
+    id: z.uuid(),
+    connectionId: z.uuid(),
+    clientId: z.uuid().nullable(),
+    amazonSellerId: z.string(),
+    marketplaceId: z.string(),
+    storeName: z.string(),
+    countryCode: z.string(),
+    currencyCode: z.string(),
+    timezone: z.string(),
+    isHidden: z.boolean(),
+    removedAt: timestamp.nullable(),
+    syncedAt: timestamp.nullable(),
+  })
+  .meta({ id: 'SellerAccount' });
+export type SellerAccount = z.infer<typeof sellerAccountSchema>;
+
+/** SP-API-Connection samt Seller-Konten (auch ausgeblendete und entfernte). Nie mit Zugangsdaten. */
+export const sellerConnectionSchema = z
+  .object({
+    id: z.uuid(),
+    region: z.enum(CONNECTION_REGIONS),
+    amazonSellerId: z.string(),
+    status: z.enum(CONNECTION_STATUSES),
+    consentedAt: timestamp.nullable(),
+    accounts: z.array(sellerAccountSchema),
+  })
+  .meta({ id: 'SellerConnection' });
+export type SellerConnection = z.infer<typeof sellerConnectionSchema>;
+
+export const sellerConnectionListSchema = z
+  .object({ connections: z.array(sellerConnectionSchema) })
+  .meta({ id: 'SellerConnectionList' });
+
+/**
+ * „Token eintragen“ (`phase-7.md` F1): Zugangsdaten der SP-API-App und der Refresh-Token des Verkäufers.
+ * Dieselbe Seller-ID in derselben Region verbindet die bestehende Connection neu.
+ */
+export const sellerConnectionCreateSchema = z
+  .strictObject({
+    region: z.enum(CONNECTION_REGIONS),
+    /** Händler-Token aus Seller Central; die SP-API nennt ihn nicht selbst. */
+    amazonSellerId: z
+      .string()
+      .trim()
+      .regex(/^[A-Z0-9]{10,20}$/, { message: 'Seller-ID: 10 bis 20 Großbuchstaben und Ziffern' }),
+    clientId: z.string().trim().min(1).max(200),
+    clientSecret: z.string().trim().min(1).max(500),
+    refreshToken: z
+      .string()
+      .trim()
+      .max(2000)
+      .startsWith('Atzr|', { message: 'Refresh-Token beginnt mit Atzr|' }),
+  })
+  .meta({ id: 'SellerConnectionCreate' });
+export type SellerConnectionCreate = z.infer<typeof sellerConnectionCreateSchema>;
+
+export const sellerAccountsSyncSchema = z
+  .object({
+    connectionId: z.uuid(),
+    /** Konten, die Amazon aktuell liefert. */
+    accounts: z.number().int(),
+    /** Marktplätze, die ProfitBash nicht kennt und deshalb nicht anlegt. */
+    skippedMarketplaceIds: z.array(z.string()),
+  })
+  .meta({ id: 'SellerAccountsSync' });
+export type SellerAccountsSync = z.infer<typeof sellerAccountsSyncSchema>;
+
+// ---------------------------------------------------------------------------
 // Clients
 // ---------------------------------------------------------------------------
 

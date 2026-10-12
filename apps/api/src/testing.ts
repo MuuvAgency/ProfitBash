@@ -5,6 +5,7 @@ import { schema } from '@profitbash/db';
 import type { OrgRole, PlatformRole } from '@profitbash/shared';
 import { parseKeyring, type Keyring } from '@profitbash/shared/crypto';
 import { createAmazonAdsDeps } from './amazon';
+import { createAmazonSpDeps } from './amazon-sp';
 import { createApp } from './app';
 import { createAuth, type Auth } from './auth';
 import type { AppDeps } from './context';
@@ -108,6 +109,7 @@ export async function createTestContext(): Promise<TestContext> {
       keyring,
       logger,
     }),
+    amazonSp: createAmazonSpDeps({ useMock: true, db: testDb.db, keyring, logger }),
     keyring,
     oauthStateSecret: TEST_OAUTH_STATE_SECRET,
     jobs,
