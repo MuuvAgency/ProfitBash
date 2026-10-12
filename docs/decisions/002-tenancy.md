@@ -8,7 +8,7 @@
   am 2026-10-09 um die Harvest-Merkliste (`search_term_harvest_marks`) und eigene Tags (`tags`, `tag_assignments`),
   am 2026-10-10 um Benachrichtigungen (`notifications`, `notification_reads`),
   am 2026-10-11 um das Audit-Log, die Freigaben je Client (`member_client_grants`) und die Kunden-Org
-  (`clients.client_organization_id`), am 2026-10-12 um den Plattform-Admin
+  (`clients.client_organization_id`), am 2026-10-12 um den Plattform-Admin und die Impersonation
 - **Beteiligte:** Dominik
 
 ## Kontext
@@ -133,6 +133,11 @@ Daneben filtern heute diese Zugriffe selbst nach Organisation:
   Entitlements und die Plattform-Rolle über alle Organisationen hinweg, ohne Org-Kontext; die Routen
   (`/api/platform/*`) verlangen `requireSuperadmin()`. Profildaten liest er nicht. Audit `platform.*` trägt die
   betroffene Organisation, Staff-Ereignisse keine (plattformweit, nur im Plattform-Admin sichtbar).
+- **Impersonation** (ab Phase 6, 6.5): Ein Superadmin bekommt über `/api/platform/impersonation` eine eigene
+  Session des Nutzers (`sessions.impersonated_by`, höchstens eine Stunde). Der Access-Layer sieht den Nutzer:
+  Es gelten dessen Mitgliedschaften, Freigaben und Grenzen, keine weiteren. Jedes Audit-Event nennt den Superadmin
+  als Handelnden und den Nutzer im `target` (`runAsImpersonator` in `audit.ts`); Mitgliederverwaltung,
+  Kundenzugang und Plattform-Routen sind währenddessen gesperrt.
 - **Auth- und Organisationsdaten:** Mitglieder und Einladungen über better-auth mit eigener Zugriffskontrolle;
   Rollen, Mitgliedschaften und Entitlements über `getOrgRole()`, `listMemberships()` und `listEnabledFeatures()` im
   Access-Layer; dazu der Seed.

@@ -5,7 +5,7 @@
 > „Offen für Phase 6“), `docs/tasks/phase-2.md` (2.4 „Offen für Phase 6“, 2.10 Mitgliederverwaltung), `docs/tasks/phase-5.md`
 > („Offen nach Phase 5“), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b, 6.3c, 6.4.**
+> **Status: verfeinert (2026-10-11), Fragen F1–F7 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 6.1, 6.2, 6.3a, 6.3b, 6.3c, 6.4, 6.5.**
 >
 > **Ausgangslage (Stand Code, 2026-10-11):**
 > - Es gibt genau eine Organisation (Muuv, `type = internal`). `organizations.type` kennt `client`, benutzt wird es nicht.
@@ -314,13 +314,54 @@ Plattform-Rolle `superadmin`.
   - **Bewusst nicht:** Organisation löschen, Typ ändern, Slug ändern, Nutzer sperren (F5); Blättern im Protokoll.
 
 ### 6.5 Impersonation (F4)
-- [ ] `POST /api/platform/impersonation` (Superadmin, Ziel kein Superadmin) und `DELETE` (beenden); Ablauf nach
+- [x] `POST /api/platform/impersonation` (Superadmin, Ziel kein Superadmin) und `DELETE` (beenden); Ablauf nach
       höchstens einer Stunde; Audit für Beginn und Ende.
-- [ ] Volle Rechte des Nutzers (F4): Der Handelnde im Audit kommt an **einer** Stelle aus der Session (Superadmin als
+- [x] Volle Rechte des Nutzers (F4): Der Handelnde im Audit kommt an **einer** Stelle aus der Session (Superadmin als
       `actor_user_id`, Nutzer im `target`), nicht je Aufrufer; Test über eine schreibende Route je Bereich und über die
       better-auth-Hooks. Plattform-Routen und Mitgliederverwaltung sind während einer Impersonation gesperrt (sonst
       ließe sich über den fremden Nutzer die eigene Spur verwischen oder ein Passwort-Link ziehen).
-- [ ] Web: Banner über der Shell mit „Beenden“, Start aus dem Plattform-Admin.
+- [x] Web: Banner über der Shell mit „Beenden“, Start aus dem Plattform-Admin.
+- **Umsetzung (2026-10-12):**
+  - **Session über das Admin-Plugin, serverseitig:** `POST /api/platform/impersonation` (`{ userId }`, hinter
+    `requireSuperadmin()`) ruft `auth.api.impersonateUser`, `DELETE` ruft `auth.api.stopImpersonating`; die
+    HTTP-Endpunkte des Plugins bleiben gesperrt. Das Plugin legt eine eigene Session des Nutzers an
+    (`sessions.impersonated_by` steht im Schema, Ablauf nach einer Stunde, wird nicht verlängert) und merkt sich
+    die Session des Superadmins in einem signierten Cookie; Beenden löscht die Session des Nutzers und stellt
+    die des Superadmins wieder her. Fehlt dieser Cookie oder ist die Session abgelaufen, endet nur die des
+    Nutzers (der Superadmin meldet sich neu an). Unbekannter Nutzer → 404, Superadmin als Ziel → 409
+    `IMPERSONATION_SUPERADMIN` (zusätzlich lehnt das Plugin es ab), ohne Impersonation beenden → 409.
+  - **Handelnder an einer Stelle:** `runAsImpersonator()` in `packages/db/src/audit.ts` (AsyncLocalStorage);
+    darin setzt `recordAuditEvent` den Superadmin als `actor_user_id` und den Nutzer als
+    `target.impersonatedUserId`. Aufgerufen aus der Session in `requireSession` (alle eigenen Routen) und in den
+    Organization-Hooks von better-auth (`auth.ts`). Kein Aufrufer von `recordAuditEvent` wurde geändert. Ereignisse
+    ohne Nutzer (System) bleiben ohne Nutzer.
+  - **Audit:** `platform.impersonation_start` und `.impersonation_stop` (plattformweit, im Protokoll des Reiters
+    „Staff“). Der Beginn wird vor dem Anlegen der Session geschrieben (lieber ein Beginn zu viel als einer zu wenig).
+    Das Audit-Log (6.1) zeigt bei solchen Aktionen „als <Name>“ (bzw. „als anderer Nutzer“, wenn der Nutzer selbst
+    nie im Log vorkommt; die ID steht in den Details).
+  - **Gesperrt während einer Impersonation** (`IMPERSONATION_BLOCKED` in `middleware.ts`, 403
+    `IMPERSONATION_FORBIDDEN`): `/api/members*`, `/api/clients/{id}/access*`, `/api/platform/*` außer dem Beenden.
+    Für einen angesehenen Kunden-Nutzer gelten dessen Grenzen (`CUSTOMER_ORG_PATHS`); Beenden bleibt möglich.
+  - `/api/me` nennt `impersonatedBy` (`{ id, name }` oder `null`). Neu `GET /api/platform/organizations/{id}/members`
+    (Auswahl im Plattform-Admin).
+  - **Web:** Reiter „Orgs“ klappt je Organisation die Mitglieder auf, „Als Nutzer ansehen“ (nicht bei Superadmins);
+    `ImpersonationBanner.vue` über jeder Seite der Shell mit „Beenden“. Start und Ende leeren den Query-Cache und
+    laden `/api/me` neu.
+  - **Tests:** `routes/impersonation.test.ts` (Rechte, Ablauf, Audit über `PUT /api/settings`, `POST /api/clients`
+    und den Hook `organization.update`, Sperren, Beenden, Kunden-Nutzer), `audit.test.ts` (auch in Transaktionen).
+    **Abweichung:** nicht je Bereich eine Route, sondern zwei Routen und ein Hook: Die Umschreibung sitzt in
+    `recordAuditEvent` selbst, der einzigen Stelle, die `audit_events` schreibt.
+  - **Browser-Pane geprüft:** Testmitglied über die Mitgliederverwaltung aufgenommen (`pruefung-6-2@muuv.test`),
+    im Plattform-Admin „Als Nutzer ansehen“: Banner, Account-Menü zeigt den Nutzer, `/api/members` und
+    `/api/platform/organizations` → 403, Handy (375 px, hell) ohne waagerechtes Scrollen; „Beenden“ führt zurück in
+    den Plattform-Admin, das Protokoll zeigt Beginn und Ende; Mitglied über die Oberfläche wieder entfernt. Nicht
+    geprüft: 1440 px, Ablauf nach einer Stunde und eine schreibende Aktion im Browser (per Test abgedeckt).
+  - **Reste in der Dev-DB (2026-10-12):** `member.create`, `member.remove` (Muuv), `platform.impersonation_start`
+    und `.impersonation_stop`, ein gesperrter Passwort-Link für `pruefung-6-2@muuv.test`.
+  - **Bekannte Grenzen:** Läuft die Session ab oder meldet sich der Superadmin während der Impersonation ab, gibt
+    es kein Ende-Ereignis (der Beginn nennt den Zeitpunkt, die Dauer ist auf eine Stunde begrenzt). Der Hook für
+    `/organization/leave` kennt die Impersonation nicht; der Endpunkt ist per HTTP gesperrt.
+  - Review (ponytail): Kennzeichnung im Audit-Log ergänzt (Festlegung „zeigt beides“); sonst keine Befunde.
 
 ### 6.6 Abschluss
 - [ ] Definition of Done prüfen und belegen, ADR 002 und `plan.md` (§3, §4) auf den Stand bringen, „Offen nach Phase 6“.
