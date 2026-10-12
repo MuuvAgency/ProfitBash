@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { auditEvents, users } from './schema';
 
@@ -40,7 +40,8 @@ export interface AuditEventRow {
 }
 
 export interface ListAuditEventsInput {
-  orgId: string;
+  /** `null`: plattformweite Ereignisse ohne Organisation (nur für den Plattform-Admin, 6.4). */
+  orgId: string | null;
   /** Einschließlich. */
   from?: Date | undefined;
   /** Ausschließlich. */
@@ -81,7 +82,10 @@ export async function listAuditEvents(
   db: Db,
   input: ListAuditEventsInput,
 ): Promise<{ events: AuditEventRow[]; nextCursor: string | null }> {
-  const inOrg = eq(auditEvents.organizationId, input.orgId);
+  const inOrg =
+    input.orgId === null
+      ? isNull(auditEvents.organizationId)
+      : eq(auditEvents.organizationId, input.orgId);
   const rows = await db
     .select({
       id: auditEvents.id,
@@ -106,7 +110,7 @@ export async function listAuditEvents(
         // Der Cursor wird in der DB aufgelöst (volle Zeitauflösung) und gilt nur in derselben Organisation;
         // ein unbekannter Cursor liefert nichts.
         input.cursor !== undefined
-          ? sql`(${auditEvents.createdAt}, ${auditEvents.id}) < (select c.created_at, c.id from audit_events c where c.id = ${input.cursor} and c.organization_id = ${input.orgId})`
+          ? sql`(${auditEvents.createdAt}, ${auditEvents.id}) < (select c.created_at, c.id from audit_events c where c.id = ${input.cursor} and c.organization_id is not distinct from ${input.orgId})`
           : undefined,
       ),
     )

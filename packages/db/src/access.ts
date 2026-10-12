@@ -72,7 +72,7 @@ async function getMembership(db: Db, userId: string, orgId: string): Promise<Mem
 }
 
 /** Kunden-Org: nach Typ oder Verknüpfung, damit ein falsch gesetzter Wert allein nichts öffnet. */
-const isCustomerOrg = (orgType: string, linkedClientId: string | null) =>
+export const isCustomerOrg = (orgType: string, linkedClientId: string | null) =>
   orgType === 'client' || linkedClientId !== null;
 
 /** Rolle des Nutzers in der Organisation oder `null`, wenn er kein Mitglied ist. In Kunden-Orgs immer `viewer`. */

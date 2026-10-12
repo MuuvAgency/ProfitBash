@@ -19,6 +19,9 @@ export const FEATURE_KEYS = [
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
+/** Was eine Kunden-Org buchen kann (`phase-6.md` F1): Dashboard und Explorer, nur lesend. */
+export const CUSTOMER_ORG_FEATURES = ['dashboard', 'sp-explorer'] as const satisfies FeatureKey[];
+
 export function isFeatureKey(value: string): value is FeatureKey {
   return (FEATURE_KEYS as readonly string[]).includes(value);
 }

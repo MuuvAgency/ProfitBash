@@ -22,6 +22,7 @@ import { registerMemberRoutes } from './routes/members';
 import { registerMeRoutes } from './routes/me';
 import { registerNotificationRoutes } from './routes/notifications';
 import { registerCampaignSetupRoutes } from './routes/campaign-setup';
+import { registerPlatformRoutes } from './routes/platform';
 import { registerPortfolioRoutes } from './routes/portfolios';
 import { registerProductGroupRoutes } from './routes/product-groups';
 import { registerStructureCatalogRoutes } from './routes/structure-catalog';
@@ -113,6 +114,7 @@ export function createApp(options: CreateAppOptions) {
   registerSearchTermRoutes(app, deps);
   registerAdChangeRoutes(app, deps);
   registerMemberRoutes(app, deps);
+  registerPlatformRoutes(app, deps);
   registerProductGroupRoutes(app, deps);
   registerCampaignSetupRoutes(app, deps);
   registerPortfolioRoutes(app, deps);
