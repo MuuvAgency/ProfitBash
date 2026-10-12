@@ -43,6 +43,7 @@ const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteCompone
   connections: () => import('../pages/ConnectionsPage.vue'),
   members: () => import('../pages/MembersPage.vue'),
   audit: () => import('../pages/AuditLogPage.vue'),
+  platform: () => import('../pages/PlatformPage.vue'),
   sync: () => import('../pages/SyncStatusPage.vue'),
   notifications: () => import('../pages/NotificationsPage.vue'),
 };

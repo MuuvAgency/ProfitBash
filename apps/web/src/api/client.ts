@@ -1,4 +1,5 @@
 import type {
+  AuditEvent,
   AuditEventFilters,
   AuditEventList,
   AuditEventListQuery,
@@ -11,9 +12,12 @@ import type {
   FileProfileCreate,
   JobRun,
   JobRunListQuery,
+  FeatureKey,
   Member,
   MeResponse,
   OrgRole,
+  PlatformOrganization,
+  PlatformStaff,
   Profile,
   ProfilePatch,
   SavedView,
@@ -645,6 +649,38 @@ export function createApi(options: ApiOptions = {}) {
         ),
       renewLink: (id: string) =>
         unwrap(client.POST('/api/members/{id}/password-link', { params: { path: { id } } })),
+    },
+
+    /** Plattform-Admin (6.4, nur Superadmins): Organisationen, Entitlements, Staff. */
+    platform: {
+      organizations: async (): Promise<PlatformOrganization[]> =>
+        (await unwrap(client.GET('/api/platform/organizations'))).organizations,
+      createOrganization: (name: string): Promise<PlatformOrganization> =>
+        unwrap(client.POST('/api/platform/organizations', { body: { name } })),
+      renameOrganization: (id: string, name: string): Promise<PlatformOrganization> =>
+        unwrap(
+          client.PATCH('/api/platform/organizations/{id}', {
+            params: { path: { id } },
+            body: { name },
+          }),
+        ),
+      setEntitlements: (id: string, features: FeatureKey[]): Promise<PlatformOrganization> =>
+        unwrap(
+          client.PUT('/api/platform/organizations/{id}/entitlements', {
+            params: { path: { id } },
+            body: { features },
+          }),
+        ),
+      staff: async (): Promise<PlatformStaff[]> =>
+        (await unwrap(client.GET('/api/platform/staff'))).staff,
+      async grantStaff(email: string): Promise<void> {
+        await unwrap(client.POST('/api/platform/staff', { body: { email } }));
+      },
+      async revokeStaff(id: string): Promise<void> {
+        await unwrap(client.DELETE('/api/platform/staff/{id}', { params: { path: { id } } }));
+      },
+      auditEvents: async (): Promise<AuditEvent[]> =>
+        (await unwrap(client.GET('/api/platform/audit-events'))).events,
     },
 
     /** Kundenzugang am Client (6.3c, nur Org-Admins der Agentur): Nutzer der Kunden-Org, immer nur lesend. */
