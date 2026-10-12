@@ -366,8 +366,9 @@ export const de = {
         clientId: 'Client-ID der App',
         clientSecret: 'Client-Secret der App',
         refreshToken: 'Refresh-Token',
+        /** `{'|'}`: Das Zeichen trennt in vue-i18n sonst Pluralformen. */
         refreshTokenHint:
-          'Beginnt mit „Atzr|“. Entsteht beim Autorisieren der App in Seller Central.',
+          "Beginnt mit „Atzr{'|'}“. Entsteht beim Autorisieren der App in Seller Central.",
         required: 'Bitte fülle alle Felder aus.',
         cancel: 'Abbrechen',
         submit: 'Prüfen und verbinden',

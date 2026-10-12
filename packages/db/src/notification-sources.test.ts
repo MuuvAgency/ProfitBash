@@ -157,4 +157,18 @@ describe('notifyExpiringConsents', () => {
     const [row] = await testDb.db.select().from(notifications);
     expect(row).toMatchObject({ severity: 'error', params: { days: 2 } });
   });
+
+  it('erinnert nicht für SP-Connections (ob und wann deren Freigabe abläuft, ist ungeprüft)', async () => {
+    await testDb.db.delete(notifications);
+    await consent(null);
+    await testDb.db.insert(connections).values({
+      organizationId: ids.org,
+      provider: 'amazon_sp',
+      region: 'eu',
+      externalAccountId: 'A1SELLER',
+      refreshTokenEncrypted: 'verschlüsselt',
+      consentedAt: daysAgo(365 - 20),
+    });
+    expect(await notifyExpiringConsents(testDb.db, { now })).toBe(0);
+  });
 });

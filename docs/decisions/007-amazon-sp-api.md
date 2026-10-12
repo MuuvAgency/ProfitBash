@@ -39,6 +39,14 @@ Mocks.
 - Erlaubte Download-Hosts sind „S3 unter amazonaws.com“, weil die Doku keinen festen Host nennt; beim ersten echten
   Lauf (7.12) eingrenzen.
 
+## Ergänzung 7.2 (2026-10-12)
+
+- Die Connection trägt die Seller-ID als `external_account_id` (der Nutzer gibt sie ein, die SP-API nennt sie nicht).
+  Zugangsdaten der App liegen in `amazon_sp_credentials`, das Secret verschlüsselt mit eigener AAD; die
+  Schlüsselrotation erfasst es.
+- Eingegebene Zugangsdaten werden vor dem Speichern mit einem Aufruf der Marktplatz-Teilnahmen geprüft.
+- Jobs, Listen und Erinnerungen der Ads-API filtern auf `provider = amazon_ads`; SP-Connections bekommen eigene.
+
 ## Offen
 
 - Quelle der Gebühren: Finances-API oder Abrechnungsbericht (7.6).

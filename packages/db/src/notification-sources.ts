@@ -81,7 +81,14 @@ export async function notifyExpiringConsents(db: Db, input: { now: Date }): Prom
       email: connections.externalAccountEmail,
     })
     .from(connections)
-    .where(and(gte(connections.consentedAt, earliest), lte(connections.consentedAt, latest)));
+    .where(
+      and(
+        // Die 365-Tage-Regel ist nur für Ads-Tokens belegt (`phase-7.md`: für die SP-API ungeprüft).
+        eq(connections.provider, 'amazon_ads'),
+        gte(connections.consentedAt, earliest),
+        lte(connections.consentedAt, latest),
+      ),
+    );
   let created = 0;
   for (const row of rows) {
     const expiresAt = refreshTokenExpiresAt(row.consentedAt)!;
