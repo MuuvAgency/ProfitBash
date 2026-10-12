@@ -7,7 +7,7 @@ import {
   type PlatformOrganization,
   type PlatformStaff,
 } from '@profitbash/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
@@ -152,12 +152,15 @@ const staff = useQuery({
   queryFn: () => api.platform.staff(),
   enabled: onStaffTab,
 });
-const events = useQuery({
+const eventPages = useInfiniteQuery({
   queryKey: eventsKey,
-  queryFn: () => api.platform.auditEvents(),
+  queryFn: ({ pageParam }) => api.platform.auditEvents(pageParam),
+  initialPageParam: undefined as string | undefined,
+  getNextPageParam: (last) => last.nextCursor ?? undefined,
   enabled: onStaffTab,
   staleTime: 0,
 });
+const events = computed(() => eventPages.data.value?.pages.flatMap((page) => page.events));
 const refreshStaff = () =>
   Promise.all([
     queryClient.invalidateQueries({ queryKey: staffKey }),
@@ -517,21 +520,21 @@ const actionLabel = (action: string) => {
         >
           <h2 class="text-headline-sm text-ink">{{ t('platform.staff.events') }}</h2>
           <InlineError
-            v-if="events.isError.value && !events.data.value"
+            v-if="eventPages.isError.value && !events"
             :message="t('platform.staff.eventsLoadError')"
             retryable
-            :retrying="events.isFetching.value"
-            @retry="events.refetch()"
+            :retrying="eventPages.isFetching.value"
+            @retry="eventPages.refetch()"
           />
-          <div v-else-if="!events.data.value" class="flex flex-col gap-space-sm" aria-busy="true">
+          <div v-else-if="!events" class="flex flex-col gap-space-sm" aria-busy="true">
             <SkeletonBlock v-for="n in 2" :key="n" height="2rem" />
           </div>
-          <p v-else-if="events.data.value.length === 0" class="text-body-sm text-ink-secondary">
+          <p v-else-if="events.length === 0" class="text-body-sm text-ink-secondary">
             {{ t('platform.staff.eventsEmpty') }}
           </p>
           <ul v-else class="flex flex-col divide-y divide-line">
             <li
-              v-for="event in events.data.value"
+              v-for="event in events"
               :key="event.id"
               class="grid gap-x-space-md gap-y-space-xs py-space-sm md:grid-cols-[13rem_14rem_1fr]"
             >
@@ -549,6 +552,19 @@ const actionLabel = (action: string) => {
               </span>
             </li>
           </ul>
+          <div v-if="eventPages.hasNextPage.value" class="flex justify-center">
+            <Button
+              :label="t('audit.loadMore')"
+              variant="text"
+              size="small"
+              :loading="eventPages.isFetchingNextPage.value"
+              @click="eventPages.fetchNextPage()"
+            />
+          </div>
+          <InlineError
+            v-if="eventPages.isError.value && events"
+            :message="t('platform.staff.eventsLoadError')"
+          />
         </section>
       </template>
     </div>

@@ -1,5 +1,4 @@
 import type {
-  AuditEvent,
   AuditEventFilters,
   AuditEventList,
   AuditEventListQuery,
@@ -680,8 +679,8 @@ export function createApi(options: ApiOptions = {}) {
       async revokeStaff(id: string): Promise<void> {
         await unwrap(client.DELETE('/api/platform/staff/{id}', { params: { path: { id } } }));
       },
-      auditEvents: async (): Promise<AuditEvent[]> =>
-        (await unwrap(client.GET('/api/platform/audit-events'))).events,
+      auditEvents: (cursor?: string): Promise<AuditEventList> =>
+        unwrap(client.GET('/api/platform/audit-events', { params: { query: { cursor } } })),
       members: async (organizationId: string): Promise<PlatformMember[]> =>
         (
           await unwrap(

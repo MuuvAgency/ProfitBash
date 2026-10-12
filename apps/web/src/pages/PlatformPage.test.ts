@@ -216,6 +216,34 @@ describe('Seite „Plattform“', () => {
     expect(written(requests)[0]!.body).toEqual({ features: ['dashboard', 'tags', 'goals'] });
   });
 
+  it('Staff: das Protokoll lädt ältere Ereignisse über den Cursor nach', async () => {
+    const event = (n: number, action: string) => ({
+      id: org(n).id,
+      createdAt: '2026-10-12T08:00:00.000Z',
+      action,
+      actor: null,
+      target: { type: 'user', id: PIA.id, email: PIA.email },
+    });
+    const { requests } = await mountPage('/admin/platform/staff', {
+      'GET /api/platform/audit-events': ({ search }) =>
+        new URLSearchParams(search).has('cursor')
+          ? json({ events: [event(22, 'platform.staff_grant')], nextCursor: null })
+          : json({ events: [event(21, 'platform.staff_revoke')], nextCursor: org(21).id }),
+    });
+    const more = () =>
+      [...q('[data-platform-events]').querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Ältere laden',
+      );
+    await vi.waitFor(() => expect(more()).toBeDefined());
+    more()!.click();
+    await vi.waitFor(() =>
+      expect(q('[data-platform-events]').querySelectorAll('li')).toHaveLength(2),
+    );
+    expect(more()).toBeUndefined();
+    const last = requests.filter((r) => r.path === '/api/platform/audit-events').at(-1)!;
+    expect(new URLSearchParams(last.search).get('cursor')).toBe(org(21).id);
+  });
+
   it('Staff: vergibt die Rolle über die E-Mail, entzieht sie nach Rückfrage und zeigt das Protokoll', async () => {
     const { requests } = await mountPage('/admin/platform/staff', {
       'POST /api/platform/staff': new Response(null, { status: 204 }),

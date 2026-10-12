@@ -408,8 +408,9 @@ Plattform-Rolle `superadmin`.
   **Nachgezogen (2026-10-12):** Abmelden während der Impersonation schreibt `platform.impersonation_stop`
   (`hooks.before` für `/sign-out` in `auth.ts`, Test in `routes/impersonation.test.ts`). Der Cookie mit der eigenen
   Session des Superadmins bleibt dabei bis zum Ablauf im Browser liegen; diese Session wird nicht beendet.
-- **Protokoll im Plattform-Admin** zeigt die letzten 50 plattformweiten Ereignisse ohne Blättern (6.4); die
-  Filterauswahl des Audit-Logs liest alle Ereignisse der Organisation (6.1).
+- **Filterauswahl des Audit-Logs** liest alle Ereignisse der Organisation (6.1).
+  **Nachgezogen (2026-10-12):** Das Protokoll im Plattform-Admin blättert („Ältere laden“, Cursor wie im
+  Audit-Log: `GET /api/platform/audit-events?cursor=`, `PlatformPage.vue` mit `useInfiniteQuery`).
 - **Nutzerverwaltung über Organisationen hinweg** gibt es nicht: Nutzer ohne Mitgliedschaft (z. B. entfernte
   Mitglieder) tauchen im Plattform-Admin nicht auf und lassen sich nicht ansehen oder löschen.
 - **Anmeldung als eingeschränktes Mitglied** im Browser (6.2, per API-Test abgedeckt); „Organisation anlegen“ und die

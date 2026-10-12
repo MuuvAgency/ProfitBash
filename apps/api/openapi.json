@@ -18150,7 +18150,18 @@
         "tags": [
           "Plattform"
         ],
-        "summary": "Plattformweite Ereignisse (ohne Organisation), die letzten 50",
+        "summary": "Plattformweite Ereignisse (ohne Organisation), je Seite 50",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Neueste zuerst.",

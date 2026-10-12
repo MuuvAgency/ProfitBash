@@ -212,5 +212,12 @@ describe('Plattform-Admin', () => {
       actor: { email: ctx.seeded.email },
       target: { type: 'user', id: orgAdminId, email: 'admin2@muuv.test' },
     });
+
+    // Blättern: Der Cursor liefert die Ereignisse davor.
+    const older = await call('GET', `/api/platform/audit-events?cursor=${events[0]!.id}`);
+    expect((await readJson<AuditEventList>(older)).events.map((event) => event.action)).toEqual([
+      'platform.staff_grant',
+    ]);
+    expect((await call('GET', '/api/platform/audit-events?cursor=x')).status).toBe(400);
   });
 });
