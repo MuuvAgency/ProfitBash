@@ -125,10 +125,7 @@ type Operation = keyof typeof RATES;
  * Signierte Dokument-URLs zeigen auf S3. Die Doku nennt keinen festen Host; Downloads senden nie
  * Zugangsdaten, deshalb genügt „S3 unter amazonaws.com“ (beim ersten echten Lauf, 7.12, eingrenzen).
  */
-const DOWNLOAD_HOSTS = [
-  /^[a-z0-9.-]+\.s3[.-][a-z0-9.-]*amazonaws\.com$/,
-  /^[a-z0-9.-]+\.s3\.amazonaws\.com$/,
-];
+const DOWNLOAD_HOSTS = [/^[a-z0-9.-]+\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com$/];
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 const FORCED_REFRESH_INTERVAL_MS = 60_000;
 const USER_AGENT = 'ProfitBash/1.0 (Language=TypeScript)';
@@ -236,7 +233,7 @@ export function createAmazonSpClient(options: AmazonSpClientOptions): AmazonSpCl
   ): Promise<z.output<S>> {
     const url = new URL(req.path, regions[connection.region].apiHost);
     const pacing = pacingFor(req.operation, connection);
-    const send = async () => {
+    const send = async (paced = true) => {
       const accessToken = await (await tokensFor(connection)).getAccessToken(connection);
       return http.send({
         operation: req.operation,
@@ -251,7 +248,7 @@ export function createAmazonSpClient(options: AmazonSpClientOptions): AmazonSpCl
         ...(req.body !== undefined && { body: req.body }),
         schema: req.schema,
         ...(req.meter && { meter: req.meter }),
-        pacing,
+        ...(paced && { pacing }),
       });
     };
 
@@ -272,7 +269,8 @@ export function createAmazonSpClient(options: AmazonSpClientOptions): AmazonSpCl
         (await tokensFor(connection)).invalidate(connection.id);
         if (req.meter) req.meter.retries += 1;
         try {
-          return await send();
+          // Ohne Budget: Der eine Neuversand passt in Amazons Burst und soll nicht eine Minute warten.
+          return await send(false);
         } catch (retryError) {
           throw asRoleMissing(retryError);
         }

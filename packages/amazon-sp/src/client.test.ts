@@ -152,7 +152,7 @@ describe('createAmazonSpClient', () => {
         );
       }),
     );
-    const { client } = setup();
+    const { client, sleeps } = setup();
     const meter = createRequestMeter();
 
     const error = await client.getMarketplaceParticipations(connection, { meter }).catch((e) => e);
@@ -163,6 +163,8 @@ describe('createAmazonSpClient', () => {
     expect(calls).toBe(2);
     expect(forms).toHaveLength(2);
     expect(meter).toMatchObject({ requests: 2, retries: 1 });
+    // Der zweite Versuch wartet nicht auf das Budget der Operation (sonst rund eine Minute).
+    expect(sleeps).toEqual([]);
   });
 
   it('verteilt Anfragen derselben Operation nach der dokumentierten Rate', async () => {
@@ -318,6 +320,13 @@ describe('Reports-API 2021-06-30', () => {
     await expect(
       client.downloadReportDocument(
         { url: 'https://evil.example/doc', compressionAlgorithm: null },
+        { maxBytes: 1024 },
+      ),
+    ).rejects.toBeInstanceOf(AmazonAdsResponseError);
+    // Eine fremde Domain, die nur auf „amazonaws.com“ endet.
+    await expect(
+      client.downloadReportDocument(
+        { url: 'https://bucket.s3.evilamazonaws.com/doc', compressionAlgorithm: null },
         { maxBytes: 1024 },
       ),
     ).rejects.toBeInstanceOf(AmazonAdsResponseError);

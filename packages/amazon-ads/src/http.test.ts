@@ -463,4 +463,20 @@ describe('Zähler und Anfrage-Budget', () => {
       details: 'Access to requested resource is denied.',
     });
   });
+
+  it('behält Code und Meldung der obersten Ebene, auch wenn die Antwort zusätzlich `errors` enthält', async () => {
+    server.use(
+      http.get(URL_, () =>
+        HttpResponse.json(
+          { code: 'BAD_REQUEST', details: 'oben', errors: [{ code: 'INNER', message: 'innen' }] },
+          { status: 400 },
+        ),
+      ),
+    );
+    const { client } = setup();
+    await expect(client.send(get())).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      details: 'oben',
+    });
+  });
 });

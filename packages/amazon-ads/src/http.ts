@@ -302,13 +302,10 @@ function parseErrorBody(text: string): { code: string | null; details: string | 
     return { code: null, details: null };
   }
   if (typeof body !== 'object' || body === null) return { code: null, details: null };
-  const first = Array.isArray((body as { errors?: unknown }).errors)
-    ? (body as { errors: unknown[] }).errors[0]
-    : undefined;
-  const record = (typeof first === 'object' && first !== null ? first : body) as Record<
-    string,
-    unknown
-  >;
+  const top = body as Record<string, unknown>;
+  const first: unknown = Array.isArray(top.errors) ? top.errors[0] : undefined;
+  // Die oberste Ebene hat Vorrang; `errors[0]` zählt nur, wenn dort nichts steht (SP-API).
+  const record = { ...(typeof first === 'object' && first !== null ? first : {}), ...top };
   const pick = (...keys: string[]) => {
     for (const key of keys) {
       const value = record[key];
