@@ -46,6 +46,7 @@ function routes(overrides: Parameters<typeof stubFetch>[0] = {}) {
     [`GET ${PROFILES_PATH}`]: json({ profiles: [nordwindDe, nordwindUk, lindenhofSe] }),
     'GET /api/clients': json({ clients: [nordwind] }),
     'GET /api/profiles/file': json({ profiles: [] }),
+    'GET /api/seller-connections': json({ connections: [] }),
     ...overrides,
   };
 }

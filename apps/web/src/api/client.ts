@@ -9,6 +9,10 @@ import type {
   FileImport,
   FileImportKind,
   FileProfileCreate,
+  SellerAccount,
+  SellerAccountsSync,
+  SellerConnection,
+  SellerConnectionCreate,
   JobRun,
   JobRunListQuery,
   FeatureKey,
@@ -243,6 +247,29 @@ export function createApi(options: ApiOptions = {}) {
 
     createFileProfile: (input: FileProfileCreate): Promise<Profile> =>
       unwrap(client.POST('/api/profiles', { body: input })),
+
+    /** SP-API-Connections mit ihren Seller-Konten (Phase 7), inkl. ausgeblendeter und entfernter. */
+    listSellerConnections: async (): Promise<SellerConnection[]> =>
+      (await unwrap(client.GET('/api/seller-connections'))).connections,
+
+    /** „Token eintragen“: verbindet ein Seller-Konto oder verbindet dieselbe Seller-ID neu. */
+    createSellerConnection: (input: SellerConnectionCreate): Promise<SellerAccountsSync> =>
+      unwrap(client.POST('/api/seller-connections', { body: input })),
+
+    syncSellerConnection: (connectionId: string): Promise<SellerAccountsSync> =>
+      unwrap(
+        client.POST('/api/seller-connections/{id}/sync', {
+          params: { path: { id: connectionId } },
+        }),
+      ),
+
+    updateSellerAccount: (sellerAccountId: string, patch: ProfilePatch): Promise<SellerAccount> =>
+      unwrap(
+        client.PATCH('/api/seller-accounts/{id}', {
+          params: { path: { id: sellerAccountId } },
+          body: patch,
+        }),
+      ),
 
     updateProfile: (profileId: string, patch: ProfilePatch): Promise<Profile> =>
       unwrap(

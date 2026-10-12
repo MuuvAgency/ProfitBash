@@ -16,6 +16,7 @@ import ClientsCard from '../connections/ClientsCard.vue';
 import CreateClientDialog from '../connections/CreateClientDialog.vue';
 import CreateFileProfileDialog from '../connections/CreateFileProfileDialog.vue';
 import FileProfilesCard from '../connections/FileProfilesCard.vue';
+import SellerAccountsCard from '../connections/SellerAccountsCard.vue';
 import { oauthNotice } from '../connections/oauth-notice';
 import {
   useClientsQuery,
@@ -247,6 +248,13 @@ function onClientCreated(client: Client) {
       @create="fileProfileDialogOpen = true"
       @patch="patchProfile"
       @create-client="(profile) => (clientDialogProfile = profile)"
+    />
+
+    <!-- Eigene Abfrage und eigene Zustände: ein Fehler hier lässt die Ads-Connections unberührt. -->
+    <SellerAccountsCard
+      :clients="clients"
+      :clients-ready="clientsQuery.isSuccess.value"
+      :show-removed="showRemoved"
     />
 
     <ClientsCard v-if="clients.length > 0" :clients="clients" />
