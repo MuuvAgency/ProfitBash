@@ -47,6 +47,14 @@ Mocks.
 - Eingegebene Zugangsdaten werden vor dem Speichern mit einem Aufruf der Marktplatz-Teilnahmen geprüft.
 - Jobs, Listen und Erinnerungen der Ads-API filtern auf `provider = amazon_ads`; SP-Connections bekommen eigene.
 
+## Ergänzung 7.3 (2026-10-16)
+
+- Berichts-Aufträge der SP-API liegen in einer eigenen Tabelle `amazon_sp_report_requests` (Zustände wie bei Ads), nicht in
+  einer verallgemeinerten `amazon_ads_report_requests`: kleiner als das Umbauen der Ads-Zustandsmaschine.
+- Bestellpositionen werden nur überschrieben, wenn ihr Änderungszeitpunkt nicht älter ist; so ist die Reihenfolge von
+  Historie (nach Kaufdatum) und rollierendem Fenster (nach Änderungsdatum) gleichgültig.
+- Der Parser liest eine feste Spaltenliste; Adressteile und Produktname werden nie gelesen oder gespeichert.
+
 ## Offen
 
 - Quelle der Gebühren: Finances-API oder Abrechnungsbericht (7.6).
