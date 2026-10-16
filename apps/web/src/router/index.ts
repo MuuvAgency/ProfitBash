@@ -35,6 +35,7 @@ const PlaceholderPage = () => import('../pages/PlaceholderPage.vue');
 const PAGES: Partial<Record<string, RouteComponent | (() => Promise<RouteComponent>)>> = {
   dashboard: () => import('../pages/DashboardPage.vue'),
   explorer: () => import('../pages/ExplorerPage.vue'),
+  sales: () => import('../pages/SalesPage.vue'),
   changes: () => import('../pages/ChangesPage.vue'),
   tags: () => import('../pages/TagsPage.vue'),
   budgets: () => import('../pages/BudgetsPage.vue'),
