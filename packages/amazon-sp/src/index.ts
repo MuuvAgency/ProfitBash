@@ -18,3 +18,4 @@ export {
 } from './mock';
 export { spMarketplaceFor, type AmazonSpMarketplace } from './marketplaces';
 export { AMAZON_SP_REGIONS, type AmazonSpRegionEndpoints } from './regions';
+export { parseOrdersReport, type SpOrderItem } from './orders-report';
