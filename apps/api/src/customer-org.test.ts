@@ -39,6 +39,8 @@ const OPEN_FOR_CUSTOMERS = [
   'POST /api/ads/dashboard',
   'POST /api/ads/explorer/rows',
   'POST /api/ads/timeseries',
+  // Verkaufsanalyse (7.4), mit zweitem Client geprüft in `routes/profit-sales.test.ts`.
+  'POST /api/profit/sales',
 ];
 
 let ctx: TestContext;

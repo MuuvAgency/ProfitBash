@@ -1955,6 +1955,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profit/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verkaufsanalyse: Umsatz, TACoS, organischer Umsatz, Tagesverlauf und Produkte */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SalesQuery"];
+                };
+            };
+            responses: {
+                /** @description Ergebnis. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SalesResponse"];
+                    };
+                };
+                /** @description Ungültige Eingabe. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Nicht angemeldet. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Feature nicht gebucht. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/saved-views": {
         parameters: {
             query?: never;
@@ -9698,6 +9765,82 @@ export interface components {
             profileIds?: string[];
             adProducts?: ("SPONSORED_PRODUCTS" | "SPONSORED_BRANDS" | "SPONSORED_DISPLAY")[];
             tagIds?: string[];
+            period: components["schemas"]["DateRange"];
+            comparison?: components["schemas"]["DateRange"] | null;
+            currency?: "auto" | string;
+            /** @enum {string} */
+            attribution?: "console" | "clicks14d";
+        };
+        SalesResponse: {
+            meta: {
+                currency: string;
+                converted: boolean;
+                missingFxCurrencies: string[];
+                accounts: number;
+                adProfiles: number;
+            };
+            current: components["schemas"]["SalesPeriod"];
+            comparison: components["schemas"]["SalesPeriod"] | null;
+            change: {
+                revenueNet: components["schemas"]["MetricChange"];
+                revenueGross: components["schemas"]["MetricChange"];
+                units: components["schemas"]["MetricChange"];
+                orders: components["schemas"]["MetricChange"];
+                tacos: components["schemas"]["MetricChange"];
+            } | null;
+            days: {
+                /** Format: date */
+                date: string;
+                revenueNet: string;
+                revenueGross: string;
+                units: number;
+            }[];
+            comparisonDays: {
+                /** Format: date */
+                date: string;
+                revenueNet: string;
+                revenueGross: string;
+                units: number;
+            }[];
+            products: components["schemas"]["SalesProduct"][];
+            truncated: boolean;
+        };
+        SalesPeriod: {
+            revenueNet: string;
+            revenueGross: string;
+            units: number;
+            orders: number;
+            unpricedUnits: number;
+            adCost: string | null;
+            adSales: string | null;
+            tacos: string | null;
+            organicNet: string | null;
+            organicGross: string | null;
+        };
+        SalesProduct: {
+            /** Format: uuid */
+            sellerAccountId: string;
+            countryCode: string;
+            currencyCode: string;
+            sku: string;
+            asin: string | null;
+            current: {
+                revenueNet: string;
+                revenueGross: string;
+                units: number;
+                orders: number;
+            };
+            comparison: {
+                revenueNet: string;
+                revenueGross: string;
+                units: number;
+                orders: number;
+            } | null;
+        };
+        SalesQuery: {
+            clientIds?: string[];
+            withoutClient?: boolean;
+            profileIds?: string[];
             period: components["schemas"]["DateRange"];
             comparison?: components["schemas"]["DateRange"] | null;
             currency?: "auto" | string;

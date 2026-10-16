@@ -4,6 +4,7 @@
 //   @profitbash/shared/access-control  better-auth-Zugriffskontrolle
 export * from './analytics';
 export * from './analytics-api';
+export * from './profit-api';
 export * from './api';
 export * from './consent';
 export * from './decimal-compare';

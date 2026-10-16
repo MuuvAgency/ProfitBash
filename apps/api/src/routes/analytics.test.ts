@@ -240,6 +240,8 @@ describe('Rechte', () => {
         );
     await set('sp-explorer', false);
     await set('dashboard', false);
+    // Die Filterleiste öffnet auch `profit` (Verkaufsanalyse, 7.4).
+    await set('profit', false);
     try {
       const rows = await post<ErrorResponse>('/api/ads/explorer/rows', {
         ...query(),
@@ -252,6 +254,7 @@ describe('Rechte', () => {
     } finally {
       await set('sp-explorer', true);
       await set('dashboard', true);
+      await set('profit', true);
     }
   });
 

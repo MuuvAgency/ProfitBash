@@ -11,6 +11,7 @@ import { registerAmazonOAuthRoutes } from './routes/amazon-oauth';
 import { registerAnalyticsRoutes } from './routes/analytics';
 import { registerClientRoutes } from './routes/clients';
 import { registerConnectionRoutes } from './routes/connections';
+import { registerProfitSalesRoutes } from './routes/profit-sales';
 import { registerSellerConnectionRoutes } from './routes/seller-connections';
 import { isFileUpload, registerFileImportRoutes } from './routes/file-imports';
 import { registerAutomationRoutes } from './routes/automations';
@@ -111,6 +112,7 @@ export function createApp(options: CreateAppOptions) {
   registerAuditEventRoutes(app, deps);
   registerFileImportRoutes(app, deps);
   registerAnalyticsRoutes(app, deps);
+  registerProfitSalesRoutes(app, deps);
   registerSavedViewRoutes(app, deps);
   registerTagRoutes(app, deps);
   registerSearchTermRoutes(app, deps);

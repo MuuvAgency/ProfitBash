@@ -166,24 +166,28 @@ export function registerAnalyticsRoutes(app: OpenAPIHono<AppEnv>, deps: AppDeps)
     };
   }
 
-  app.openapi({ ...filterOptionsRoute, middleware: guard(DASHBOARD_OR_EXPLORER) }, async (c) => {
-    const base = visibility(c);
-    const [{ clients, profiles }, currencies, fxRatesThrough] = await Promise.all([
-      listVisibleClientsAndProfiles(db, base),
-      listSelectableCurrencies(db, base),
-      latestFxRateDate(db),
-    ]);
-    return c.json(
-      {
-        clients,
-        profiles,
-        currencies,
-        fxRatesThrough,
-        fxRatesStale: isFxRateStale(fxRatesThrough, new Date()),
-      },
-      200,
-    );
-  });
+  // Die Verkaufsanalyse (`phase-7.md` 7.4) nutzt dieselbe Filterleiste.
+  app.openapi(
+    { ...filterOptionsRoute, middleware: guard([...DASHBOARD_OR_EXPLORER, 'profit']) },
+    async (c) => {
+      const base = visibility(c);
+      const [{ clients, profiles }, currencies, fxRatesThrough] = await Promise.all([
+        listVisibleClientsAndProfiles(db, base),
+        listSelectableCurrencies(db, base),
+        latestFxRateDate(db),
+      ]);
+      return c.json(
+        {
+          clients,
+          profiles,
+          currencies,
+          fxRatesThrough,
+          fxRatesStale: isFxRateStale(fxRatesThrough, new Date()),
+        },
+        200,
+      );
+    },
+  );
 
   app.openapi({ ...explorerRowsRoute, middleware: guard('sp-explorer') }, async (c) => {
     const body = c.req.valid('json');
