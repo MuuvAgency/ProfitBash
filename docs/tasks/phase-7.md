@@ -6,9 +6,9 @@
 > (1.3 Lease und Anfrage-Budget, 1.5 Report-Anfragen, 1.11 Datei-Import), `docs/tasks/phase-6.md` (6.3a/6.3b: Seiten
 > „kundensicher“ machen), `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` (Abschnitt G), `design/DESIGN.md`.
 >
-> **Status: verfeinert (2026-10-12), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 7.1, 7.2 (ohne 7.2b).
-> Nächste Aufgabe: 7.3.** Offen bei Dominik: F1 (Art des Zugangs) und F2 (Rollen prüfen); beides hält 7.1–7.4 nicht auf,
-> weil bis dahin gegen Mocks gebaut wird.
+> **Status: verfeinert (2026-10-12), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 7.1, 7.2 (ohne 7.2b),
+> 7.3. Nächste Aufgabe: 7.4.** Offen bei Dominik (nachgefragt am 2026-10-16, weiter offen): F1 (Art des Zugangs) und F2 (Rollen
+> prüfen); beides hält 7.4–7.9 nicht auf, weil bis dahin gegen Mocks gebaut wird.
 >
 > **Ausgangslage (Stand Code, 2026-10-12):**
 > - `connection_provider` kennt nur `amazon_ads`; `connections` (Region, externes Konto, verschlüsseltes Refresh-Token,
@@ -258,14 +258,55 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
     kann die SP-API nicht bestätigen.
 
 ### 7.3 Bestellungen laden (Sales-Import)
-- [ ] Tabellen: Report-Anfragen (Zustand in der DB wie `amazon_ads_report_requests`; prüfen, ob die Tabelle
+- [x] Tabellen: Report-Anfragen (Zustand in der DB wie `amazon_ads_report_requests`; prüfen, ob die Tabelle
       verallgemeinert oder gespiegelt wird – die kleinere Änderung gewinnt), Bestellpositionen (Bestellnummer, SKU,
       ASIN, Menge, Preis, Steuer, Rabatt, Versanderlös, Status, Kanal FBA/FBM, B2B-Kennzeichen, Zeitpunkte) und
       Tageswerte je Seller-Konto und SKU.
-- [ ] Job je Seller-Konto über `runJob`: täglich das Fenster der zuletzt geänderten Bestellungen laden (rollierend
+- [x] Job je Seller-Konto über `runJob`: täglich das Fenster der zuletzt geänderten Bestellungen laden (rollierend
       30 Tage, Upsert je Bestellposition), Tageswerte neu verdichten; Backfill 12 Monate in Monatsscheiben (F8).
-- [ ] Parser verwirft Spalten mit Käuferdaten (Test); stornierte Bestellungen zählen nicht zum Umsatz.
-- [ ] Sync-Status zeigt Seller-Konten mit letztem Lauf und Fehler.
+- [x] Parser verwirft Spalten mit Käuferdaten (Test); stornierte Bestellungen zählen nicht zum Umsatz.
+- [x] Sync-Status zeigt Seller-Konten mit letztem Lauf und Fehler.
+- [x] Umsetzung (Stand für 7.4 und später):
+  - **Gespiegelt statt verallgemeinert:** eigene Tabelle `amazon_sp_report_requests` (Migration `0051_amazon_sp_orders`,
+    `schema/amazon-sp.ts`) mit dem Status-Enum der Ads-Aufträge. Die Ads-Zustandsmaschine hängt an Profilen,
+    JSON-Downloads, Export-Batches und Datumsbereichen; sie zu verallgemeinern wäre größer gewesen als ein schlanker
+    eigener Ablauf. Wiederverwendet: `isConnectionError`, Backoff, Grenzen und Texthilfen aus
+    `apps/worker/src/amazon-requests/state-machine.ts`, `handleAmazonError`, Lease und `runJob`.
+  - **Tabellen:** `amazon_sp_order_items` (PK Konto + Bestellnummer + SKU; Beträge `numeric` wie geliefert, `null`
+    wenn leer; Kaufzeitpunkt UTC und Kaufdatum in der Zeitzone des Marktplatzes; FK auf das Konto **ohne** Cascade, weil
+    Historie), `amazon_sp_daily_sales` (PK Konto + Tag + SKU; Stück, Bestellungen, `unpriced_units` = Stück ohne
+    Preis, Summen aller Betragsspalten, ohne Stornierte), Spalte `amazon_sp_accounts.orders_history_requested_at`.
+  - **Upsert nach Änderungsdatum:** Eine Position wird nur überschrieben, wenn `last_updated_at` der neuen nicht älter
+    ist. Damit spielt die Reihenfolge der Berichte keine Rolle (kein „überholt“ wie bei Ads). Danach werden die
+    Tageswerte der betroffenen Kaufdaten gelöscht und aus den Positionen neu verdichtet (`importSpOrderItems`).
+  - **Storno:** zählt nicht, wenn `order-status` oder `item-status` `Cancelled` ist. Selbst versandte „Pending“-Positionen
+    zählen als Stück, ihr Umsatz fehlt (`unpriced_units`; 7.4 sagt das an).
+  - **Parser** (`parseOrdersReport` in `@profitbash/amazon-sp`): liest nur eine feste Spaltenliste (nie Adressteile oder den
+    Produktnamen), fasst doppelte Zeilen derselben Bestellung und SKU zusammen, zählt ungültige Zeilen; fehlen
+    Pflichtspalten, scheitert der Import (3 Versuche).
+  - **Job `sp-orders-sync`** (je SP-Connection, Lease wie Ads): plant je Konto (auch ausgeblendete, nicht entfernte)
+    einmal die Historie nach Kaufdatum in **30-Tage-Scheiben** (Amazon erlaubt höchstens 30 Tage; Kalendermonate passen
+    nicht) von 365 bis 30 Tage zurück, und das rollierende Fenster nach Änderungsdatum (30 Tage), sobald das letzte
+    über 20 h alt ist. Danach höchstens 20 fällige Aufträge, 5 Downloads, 5 Min. je Lauf, je Konto die jüngsten Daten
+    zuerst; der Job plant sich zum nächsten Termin neu ein. Ein Bericht je Konto und Marktplatz (`marketplaceIds` mit
+    genau einer ID). `CANCELLED` = leer, `FATAL` = gescheitert, `NOT_FOUND` und zweimal abgelaufene Dokument-URL =
+    neu anfordern (höchstens 3-mal), 4xx (auch `SP_ROLE_MISSING`) = gescheitert. Gescheiterte Berichte beenden den Lauf
+    als Fehler mit dem ersten Grund (Sync-Status).
+  - **Auslöser:** `sp-orders-sync-all` täglich 06:00 Berlin (alle aktiven SP-Connections), `sp-orders-poll-all` alle
+    10 Min. (nur mit fälligen Berichten). `dispatchConnectionJobs` wählt die Connections jetzt nach dem Namen des
+    Auslösers. Aufräumen nach 30 Tagen wie bei Ads (`job-runs-cleanup`).
+  - **Verdrahtung:** `ConnectionJobDeps.amazonSp` (optional, nur dieser Job), `StartWorkerOptions.amazonSp`; der Worker liest
+    `AMAZON_SP_USE_MOCK` und baut den Client wie `createAmazonSpDeps` (Zugangsdaten je Connection aus der DB).
+  - **Sync-Status:** Jobname „Bestellungen (Seller)“, Konto = Seller-ID der Connection, Zähler `planned`, `requested`,
+    `imported`, `rows`, `invalidRows`, `failed`; keine eigene Ansicht je Seller-Konto (reicht bis 7.12).
+  - **Geprüft:** Tests gegen den Mock (Historie und Fenster, Import, 22:30 UTC = nächster Tag in Berlin im Sommer, keine
+    Adressen in der DB, Tageswerte = nicht stornierte Positionen) und Grenzfälle mit Stub-Client; Lauf im Dev-Server
+    gegen den Mock.
+  - **Shortcuts:** Eine endgültig gescheiterte Scheibe der Historie wird nicht nachgeholt (sichtbar im Sync-Status);
+    vorübergehende Fehler beim Holen des Dokuments zählen als Importversuch.
+  - **Offen bis 7.12 (echte Datei):** ob `item-price` in der EU brutto ist und `item-tax` immer gefüllt; Vorzeichen der
+    Rabattspalten (gespeichert wie geliefert); ob Amazon den Bericht im EU-Konto wirklich auf die angefragte
+    Marktplatz-ID beschränkt (sonst landen FR-Bestellungen im DE-Konto; dann über `sales-channel` filtern).
 
 ### 7.4 Echtes TACoS und Verkaufsanalyse (`/profit/sales`)
 - [ ] Leseschicht: Umsatz, Stück, Bestellungen je Tag, Marktplatz, SKU/ASIN; organischer Umsatz und TACoS nach der
@@ -320,11 +361,9 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
 ## Offen vor dem Bau
 
 - **Dominik, vor 7.2b:** Art des Zugangs (F1). **Vor 7.12:** Rollen bestätigen (F2).
-- **Dominik, bei Gelegenheit:** Soll es „Trennen“ für Seller-Connections geben, und was passiert dann mit den Daten
-  (löschen oder behalten und nur den Abruf stoppen)? Empfehlung: nicht löschen, nur stoppen; bis dahin reicht
-  „Ausblenden“ je Konto.
-- **Dominik, vor 7.8:** Gehört das Honorar der Agentur in die OPEX des Clients (und damit in die Kundensicht)?
-  Empfehlung: nein, OPEX enthält nur Kosten des Kunden; ein Honorar kann er selbst als Posten wollen.
+- **„Trennen“ für Seller-Connections: entschieden (Dominik, 2026-10-16): nur den Abruf stoppen, Daten behalten** (wie
+  empfohlen). Noch nicht gebaut; bis dahin reicht „Ausblenden“ je Konto. Passt zum FK ohne Cascade an den Positionen.
+- **Honorar in OPEX: entschieden (Dominik, 2026-10-16): nein** (wie empfohlen). OPEX enthält nur Kosten des Kunden (7.8).
 - **Dominik, vor 7.12:** Die App braucht zusätzlich die Rolle **„Selling Partner Insights“** (Marktplatz-Teilnahmen);
   ohne sie scheitert schon das Verbinden mit `SP_ROLE_MISSING`.
 - **Claude, erledigt am 2026-10-12** (siehe „Stand der SP-API“): Aufruf ohne SigV4, Rate-Limits, Reports-API,
