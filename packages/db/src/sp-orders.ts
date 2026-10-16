@@ -1,6 +1,7 @@
 import {
   and,
   asc,
+  desc,
   eq,
   getTableColumns,
   inArray,
@@ -211,7 +212,12 @@ export async function listDueSpReportRequests(
         lte(amazonSpReportRequests.nextPollAt, input.now),
       ),
     )
-    .orderBy(asc(amazonSpReportRequests.createdAt), asc(amazonSpReportRequests.id))
+    // Innerhalb eines Kontos die jüngsten Daten zuerst (rollierendes Fenster vor der Historie).
+    .orderBy(
+      asc(amazonSpReportRequests.createdAt),
+      desc(amazonSpReportRequests.dataEnd),
+      asc(amazonSpReportRequests.id),
+    )
     .limit(input.limit);
   return rows.map((row) => row.request);
 }

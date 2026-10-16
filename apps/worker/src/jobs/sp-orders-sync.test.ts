@@ -142,6 +142,11 @@ describe('syncSpOrders gegen den Mock', () => {
       planned: 26,
       requested: SP_ORDERS_LIMITS.maxRequests,
     });
+    // Das rollierende Fenster geht vor der Historie.
+    const fr = await requestsOf(ids.fr);
+    for (const request of [...de, ...fr].filter((r) => r.reportType === SP_ORDERS_BY_UPDATE)) {
+      expect(request.status).toBe('requested');
+    }
     const accounts = await testDb.db.select().from(amazonSpAccounts);
     expect(accounts.every((a) => a.ordersHistoryRequestedAt !== null)).toBe(true);
     expect(enqueued).toEqual([expect.objectContaining({ queue: 'sp-orders-sync', job: job() })]);
