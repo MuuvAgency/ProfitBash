@@ -2833,6 +2833,370 @@
           "period"
         ]
       },
+      "SalesResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "type": "object",
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "converted": {
+                "type": "boolean"
+              },
+              "missingFxCurrencies": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "accounts": {
+                "type": "integer"
+              },
+              "adProfiles": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "currency",
+              "converted",
+              "missingFxCurrencies",
+              "accounts",
+              "adProfiles"
+            ]
+          },
+          "current": {
+            "$ref": "#/components/schemas/SalesPeriod"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalesPeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "revenueNet": {
+                    "$ref": "#/components/schemas/MetricChange"
+                  },
+                  "revenueGross": {
+                    "$ref": "#/components/schemas/MetricChange"
+                  },
+                  "units": {
+                    "$ref": "#/components/schemas/MetricChange"
+                  },
+                  "orders": {
+                    "$ref": "#/components/schemas/MetricChange"
+                  },
+                  "tacos": {
+                    "$ref": "#/components/schemas/MetricChange"
+                  }
+                },
+                "required": [
+                  "revenueNet",
+                  "revenueGross",
+                  "units",
+                  "orders",
+                  "tacos"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "revenueNet": {
+                  "type": "string"
+                },
+                "revenueGross": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "date",
+                "revenueNet",
+                "revenueGross",
+                "units"
+              ]
+            }
+          },
+          "comparisonDays": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "revenueNet": {
+                  "type": "string"
+                },
+                "revenueGross": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "date",
+                "revenueNet",
+                "revenueGross",
+                "units"
+              ]
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesProduct"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "meta",
+          "current",
+          "comparison",
+          "change",
+          "days",
+          "comparisonDays",
+          "products",
+          "truncated"
+        ]
+      },
+      "SalesPeriod": {
+        "type": "object",
+        "properties": {
+          "revenueNet": {
+            "type": "string"
+          },
+          "revenueGross": {
+            "type": "string"
+          },
+          "units": {
+            "type": "integer"
+          },
+          "orders": {
+            "type": "integer"
+          },
+          "unpricedUnits": {
+            "type": "integer"
+          },
+          "adCost": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adSales": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tacos": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organicNet": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organicGross": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "revenueNet",
+          "revenueGross",
+          "units",
+          "orders",
+          "unpricedUnits",
+          "adCost",
+          "adSales",
+          "tacos",
+          "organicNet",
+          "organicGross"
+        ]
+      },
+      "SalesProduct": {
+        "type": "object",
+        "properties": {
+          "sellerAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "currencyCode": {
+            "type": "string"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "asin": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current": {
+            "type": "object",
+            "properties": {
+              "revenueNet": {
+                "type": "string"
+              },
+              "revenueGross": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              },
+              "orders": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "revenueNet",
+              "revenueGross",
+              "units",
+              "orders"
+            ]
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "revenueNet": {
+                    "type": "string"
+                  },
+                  "revenueGross": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  },
+                  "orders": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "revenueNet",
+                  "revenueGross",
+                  "units",
+                  "orders"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sellerAccountId",
+          "countryCode",
+          "currencyCode",
+          "sku",
+          "asin",
+          "current",
+          "comparison"
+        ]
+      },
+      "SalesQuery": {
+        "type": "object",
+        "properties": {
+          "clientIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 500
+          },
+          "withoutClient": {
+            "type": "boolean"
+          },
+          "profileIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 1000
+          },
+          "period": {
+            "$ref": "#/components/schemas/DateRange"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^[A-Z]{3}$"
+              }
+            ]
+          },
+          "attribution": {
+            "type": "string",
+            "enum": [
+              "console",
+              "clicks14d"
+            ]
+          }
+        },
+        "required": [
+          "period"
+        ]
+      },
       "SavedViewList": {
         "type": "object",
         "properties": {
@@ -15026,6 +15390,66 @@
           },
           "403": {
             "description": "Feature nicht gebucht oder kein Recht.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profit/sales": {
+      "post": {
+        "tags": [
+          "Profit"
+        ],
+        "summary": "Verkaufsanalyse: Umsatz, TACoS, organischer Umsatz, Tagesverlauf und Produkte",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesQuery"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ungültige Eingabe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nicht angemeldet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Feature nicht gebucht.",
             "content": {
               "application/json": {
                 "schema": {

@@ -67,6 +67,8 @@ const CUSTOMER_ORG_PATHS: readonly string[] = [
   '/api/ads/dashboard',
   '/api/ads/explorer/rows',
   '/api/ads/timeseries',
+  // Verkaufsanalyse (`phase-7.md` F7, 7.4); gebucht wird `profit` für Kunden-Orgs erst mit 7.9.
+  '/api/profit/sales',
 ];
 
 function isOpenForCustomerOrgs(path: string): boolean {
