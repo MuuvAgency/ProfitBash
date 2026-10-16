@@ -17,6 +17,7 @@ import EmptyState from '../components/common/EmptyState.vue';
 import InlineError from '../components/common/InlineError.vue';
 import PageHeader from '../components/common/PageHeader.vue';
 import SkeletonBlock from '../components/common/SkeletonBlock.vue';
+import { salesQuery } from '../profit/sales';
 import { useVatMode, type VatMode } from '../profit/useVatMode';
 import { useSessionStore } from '../stores/session';
 
@@ -40,18 +41,7 @@ const vatLabelId = useId();
 /** Höchstzahl Zeilen der Produkttabelle; alle Produkte zeigt `/profit/products` (7.5). */
 const PRODUCT_ROWS = 100;
 
-const body = computed(() => {
-  const q = filters.query.value;
-  return {
-    ...(q.clientIds && { clientIds: q.clientIds }),
-    ...(q.withoutClient !== undefined && { withoutClient: q.withoutClient }),
-    ...(q.profileIds && { profileIds: q.profileIds }),
-    period: q.period,
-    comparison: q.comparison,
-    currency: q.currency,
-    attribution: q.attribution,
-  };
-});
+const body = computed(() => salesQuery(filters.query.value));
 const sales = useQuery({
   queryKey: computed(() => ['profit', 'sales', body.value] as const),
   queryFn: () => api.profit.sales(body.value),
@@ -61,8 +51,12 @@ const sales = useQuery({
 const data = computed(() => sales.data.value);
 const range = computed(() => resolvePeriod(filters.state.value.period, filters.today.value));
 
-const revenueKey = computed(() => (vat.value === 'net' ? 'revenueNet' : 'revenueGross') as const);
-const organicKey = computed(() => (vat.value === 'net' ? 'organicNet' : 'organicGross') as const);
+const revenueKey = computed<'revenueNet' | 'revenueGross'>(() =>
+  vat.value === 'net' ? 'revenueNet' : 'revenueGross',
+);
+const organicKey = computed<'organicNet' | 'organicGross'>(() =>
+  vat.value === 'net' ? 'organicNet' : 'organicGross',
+);
 const vatOptions = computed(() =>
   (['net', 'gross'] as const).map((value) => ({ value, label: t(`salesPage.vat.${value}`) })),
 );

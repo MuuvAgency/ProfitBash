@@ -152,6 +152,32 @@ const filterOptions = (profiles = true) => ({
   fxRatesStale: false,
 });
 
+/** Verkaufsanalyse (7.4): nur TACoS und organischer Umsatz erscheinen im Dashboard. */
+function salesSummary(adProfiles = 1) {
+  const sums = {
+    revenueNet: '1000',
+    revenueGross: '1190',
+    units: 12,
+    orders: 10,
+    unpricedUnits: 0,
+    adCost: adProfiles ? '50' : null,
+    adSales: adProfiles ? '300' : null,
+    tacos: adProfiles ? '0.05' : null,
+    organicNet: adProfiles ? '700' : null,
+    organicGross: adProfiles ? '890' : null,
+  };
+  return {
+    meta: { currency: 'EUR', converted: false, missingFxCurrencies: [], accounts: 1, adProfiles },
+    current: sums,
+    comparison: null,
+    change: null,
+    days: [],
+    comparisonDays: [],
+    products: [],
+    truncated: false,
+  };
+}
+
 type Route = Response | ((request: RecordedRequest) => Response | Promise<Response>);
 
 function routes(overrides: Record<string, Route> = {}) {
@@ -163,6 +189,8 @@ function routes(overrides: Record<string, Route> = {}) {
     'POST /api/ads/filter-options': json(filterOptions()),
     'POST /api/ads/dashboard': json(dashboard()),
     'POST /api/ads/timeseries': json(series()),
+    'GET /api/settings/ui-state/profit/vat': json({ value: null }),
+    'POST /api/profit/sales': json(salesSummary()),
     ...overrides,
   };
 }
@@ -497,5 +525,36 @@ describe('Gespeicherte Ansichten im Dashboard (F8)', () => {
         attribution: 'clicks14d',
       }),
     );
+  });
+
+  describe('DashboardPage: TACoS (7.4)', () => {
+    const labels = (wrapper: { findAll(selector: string): Array<{ text(): string }> }) =>
+      wrapper.findAll('[data-kpi-label]').map((label) => label.text());
+
+    it('zeigt TACoS und organischen Umsatz, wenn `profit` gebucht ist und Ads-Profile passen', async () => {
+      stubFetch(routes());
+      const { wrapper } = await mountDashboard();
+      await vi.waitFor(() => expect(labels(wrapper)).toContain('TACoS'));
+      expect(labels(wrapper)).toContain('Organischer Umsatz (netto)');
+      const tacos = wrapper.findAll('article').find((tile) => tile.text().includes('TACoS'))!;
+      expect(text(tacos)).toContain('5,0 %');
+    });
+
+    it('ohne passende Ads-Profile bleibt das Dashboard wie bisher', async () => {
+      stubFetch(routes({ 'POST /api/profit/sales': json(salesSummary(0)) }));
+      const { wrapper } = await mountDashboard();
+      await flushPromises();
+      expect(labels(wrapper)).not.toContain('TACoS');
+    });
+
+    it('ohne `profit` keine Anfrage an die Verkaufsanalyse', async () => {
+      const { requests } = stubFetch(
+        routes({ 'GET /api/me': json(meFixture({ features: ['dashboard', 'sp-explorer'] })) }),
+      );
+      const { wrapper } = await mountDashboard();
+      await flushPromises();
+      expect(requests.some((r) => r.path === '/api/profit/sales')).toBe(false);
+      expect(labels(wrapper)).not.toContain('TACoS');
+    });
   });
 });
