@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query';
 import Button from 'primevue/button';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -17,7 +18,11 @@ import DashboardHero from '../dashboard/DashboardHero.vue';
 import DataStatusTile from '../dashboard/DataStatusTile.vue';
 import { metricView } from '../dashboard/format';
 import { useDashboardQueries } from '../dashboard/queries';
+import { api } from '../api';
+import { formatMetricValue } from '../analytics/metrics';
 import { canAccess } from '../navigation/navigation';
+import { salesQuery } from '../profit/sales';
+import { useVatMode } from '../profit/useVatMode';
 import SavedViewsMenu from '../saved-views/SavedViewsMenu.vue';
 import { filtersFromView, viewState } from '../saved-views/view-state';
 import { useIsCustomerOrg, useSessionStore } from '../stores/session';
@@ -53,6 +58,41 @@ const kpis = computed(() => {
     tiles: [view('acos'), view('roas'), view('purchases'), view('clicks')],
     cpc: metricView('cpc', d.total, d.meta, locale.value),
   };
+});
+// TACoS und organischer Umsatz (`phase-7.md` 7.4): nur mit `profit` und Ads-Profilen, die zu Seller-Konten passen.
+const hasProfit = computed(() =>
+  session.me ? canAccess({ feature: 'profit' }, session.me) : false,
+);
+const { mode: vat } = useVatMode();
+const sales = useQuery({
+  queryKey: computed(() => ['profit', 'sales', salesQuery(filters.query.value)] as const),
+  queryFn: () => api.profit.sales(salesQuery(filters.query.value)),
+  enabled: computed(() => enabled.value && hasProfit.value),
+});
+const profitTiles = computed(() => {
+  const d = sales.data.value;
+  if (!d || d.meta.adProfiles === 0) return [];
+  const ctx = { currency: d.meta.currency, locale: locale.value };
+  const vatLabel = t(`salesPage.vat.${vat.value}`);
+  const organic = vat.value === 'net' ? d.current.organicNet : d.current.organicGross;
+  return [
+    {
+      key: 'tacos',
+      label: t('salesPage.kpi.tacos'),
+      metric: 'acos' as const,
+      value: formatMetricValue('acos', d.current.tacos, ctx),
+      change: d.change?.tacos.relative ?? null,
+      hints: [],
+    },
+    {
+      key: 'organic',
+      label: t('salesPage.kpi.organic', { vat: vatLabel }),
+      metric: 'sales' as const,
+      value: formatMetricValue('sales', organic, ctx),
+      change: null,
+      hints: d.meta.converted ? [{ kind: 'approx' as const }] : [],
+    },
+  ];
 });
 /** Neue Auswahl lädt, die Werte der vorigen stehen noch da (`keepPreviousData`). */
 const refreshing = computed(
@@ -140,6 +180,15 @@ const KPI_KEYS = ['acos', 'roas', 'purchases', 'clicks'] as const;
               </span>
             </template>
           </KpiTile>
+          <KpiTile
+            v-for="tile in profitTiles"
+            :key="tile.key"
+            :label="tile.label"
+            :metric="tile.metric"
+            :value="tile.value"
+            :change="tile.change"
+            :hints="tile.hints"
+          />
         </template>
         <template v-else>
           <KpiTile
