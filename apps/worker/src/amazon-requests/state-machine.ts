@@ -796,11 +796,12 @@ function isTooOld(request: AmazonRequest, now: Date): boolean {
   return now.getTime() - since.getTime() > MAX_REQUEST_AGE_MS;
 }
 
-function backoffMinutes(attempts: number): number {
+export function backoffMinutes(attempts: number): number {
   return POLL_BACKOFF_MINUTES[Math.min(attempts, POLL_BACKOFF_MINUTES.length - 1)]!;
 }
 
-const addMinutes = (date: Date, minutes: number) => new Date(date.getTime() + minutes * MINUTE_MS);
+export const addMinutes = (date: Date, minutes: number) =>
+  new Date(date.getTime() + minutes * MINUTE_MS);
 
 function addCounters(target: AmazonRequestCounters, source: AmazonRequestCounters): void {
   for (const [key, value] of Object.entries(source) as Array<
@@ -825,7 +826,7 @@ export function isConnectionError(error: unknown): boolean {
 }
 
 /** 4xx außer 408/425/429: Amazon lehnt die Anfrage selbst ab, eine Wiederholung ändert nichts. */
-function isPermanentHttpError(error: unknown): boolean {
+export function isPermanentHttpError(error: unknown): boolean {
   return (
     error instanceof AmazonAdsHttpError &&
     error.status >= 400 &&
@@ -834,12 +835,12 @@ function isPermanentHttpError(error: unknown): boolean {
   );
 }
 
-function errorMessage(error: unknown): string {
+export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unbekannter Fehler.';
 }
 
 /** Ohne URLs (signierte Download-Links) und gekürzt. */
-function sanitizeReason(reason: string): string {
+export function sanitizeReason(reason: string): string {
   const cleaned = reason.replace(/https?:\/\/\S+/g, '[URL]');
   return cleaned.length > MAX_FAILURE_REASON_LENGTH
     ? `${cleaned.slice(0, MAX_FAILURE_REASON_LENGTH - 2)} …`

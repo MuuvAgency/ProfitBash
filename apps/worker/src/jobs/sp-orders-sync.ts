@@ -15,7 +15,21 @@ import {
   type SpReportRequest,
   type SpReportRequestPatch,
 } from '@profitbash/db';
-import { isConnectionError } from '../amazon-requests/state-machine';
+import {
+  addMinutes,
+  backoffMinutes,
+  errorMessage,
+  IMPORT_RETRY_MINUTES,
+  isConnectionError,
+  isPermanentHttpError,
+  MAX_CONSECUTIVE_ERRORS,
+  MAX_DOWNLOAD_BYTES,
+  MAX_IMPORT_ATTEMPTS,
+  MAX_REQUEST_AGE_MS,
+  MAX_REQUESTS,
+  POLL_BACKOFF_MINUTES,
+  sanitizeReason as sanitize,
+} from '../amazon-requests/state-machine';
 import { JobFailure, type JobCounters, type JobOutcome } from '../run-job';
 import {
   handleAmazonError,
@@ -50,15 +64,7 @@ const HISTORY_MS = 365 * DAY_MS;
 const ROLLING_INTERVAL_MS = 20 * 60 * MINUTE_MS;
 /** Abstand des Fensterendes zu „jetzt“ (Amazon lehnt Zeitpunkte in der Zukunft ab). */
 const END_LAG_MS = 5 * MINUTE_MS;
-const POLL_BACKOFF_MINUTES = [1, 2, 5, 10, 15];
-const IMPORT_RETRY_MINUTES = 5;
-const MAX_IMPORT_ATTEMPTS = 3;
-const MAX_CONSECUTIVE_ERRORS = 10;
-const MAX_REQUESTS = 3;
-const MAX_REQUEST_AGE_MS = 4 * 60 * MINUTE_MS;
-const MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 const MIN_DELAY_SECONDS = 5;
-const MAX_FAILURE_REASON_LENGTH = 500;
 
 type Counters = Record<
   'planned' | 'requested' | 'imported' | 'rows' | 'invalidRows' | 'failed',
@@ -335,13 +341,8 @@ async function requestFailed(
   prefix: string,
 ) {
   if (isConnectionError(error)) throw error;
-  if (
-    error instanceof AmazonAdsHttpError &&
-    error.status >= 400 &&
-    error.status < 500 &&
-    ![408, 425, 429].includes(error.status)
-  ) {
-    const code = error.code ? ` (${error.code})` : '';
+  if (isPermanentHttpError(error)) {
+    const code = error instanceof AmazonAdsHttpError && error.code ? ` (${error.code})` : '';
     return fail(ctx, request, `${prefix}${code}: ${errorMessage(error)}`);
   }
   const errorCount = request.errorCount + 1;
@@ -402,19 +403,3 @@ const imported = (now: Date, rowCount: number, invalidRowCount: number): SpRepor
 
 const update = (ctx: Context, request: SpReportRequest, patch: SpReportRequestPatch) =>
   updateSpReportRequest(ctx.deps.db, request, patch);
-
-const backoffMinutes = (attempts: number) =>
-  POLL_BACKOFF_MINUTES[Math.min(attempts, POLL_BACKOFF_MINUTES.length - 1)]!;
-
-const addMinutes = (date: Date, minutes: number) => new Date(date.getTime() + minutes * MINUTE_MS);
-
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : 'Unbekannter Fehler.';
-
-/** Ohne URLs (signierte Download-Links) und gekürzt. */
-function sanitize(reason: string): string {
-  const cleaned = reason.replace(/https?:\/\/\S+/g, '[URL]');
-  return cleaned.length > MAX_FAILURE_REASON_LENGTH
-    ? `${cleaned.slice(0, MAX_FAILURE_REASON_LENGTH - 2)} …`
-    : cleaned;
-}

@@ -345,6 +345,24 @@ describe('syncSpOrders: Grenzfälle', () => {
     expect(request!.nextPollAt!.getTime()).toBeGreaterThan(clock);
   });
 
+  it('lässt offene Aufträge eines entfernten Kontos scheitern und plant dafür nichts Neues', async () => {
+    const { de, job } = await setup();
+    const client = stub({});
+    await syncSpOrders(deps(client), job, run());
+    await testDb.db
+      .update(amazonSpAccounts)
+      .set({ removedAt: new Date(clock) })
+      .where(eq(amazonSpAccounts.id, de));
+    clock += 2 * 60_000;
+    enqueued.length = 0;
+
+    await syncSpOrders(deps(client), job, run());
+
+    const requests = await requestsOf(de);
+    expect(requests.map((r) => r.status)).toEqual(['failed']);
+    expect(enqueued).toEqual([]);
+  });
+
   it('markiert die Connection bei abgelehntem Refresh-Token zum Neu-Verbinden', async () => {
     const ids = await createSellerConnection('A1REVOKED', 'Atzr|widerrufen');
 
