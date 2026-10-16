@@ -36,7 +36,13 @@ export const salesPeriodSchema = salesBaseSchema
   })
   .meta({ id: 'SalesPeriod' });
 
-export const SALES_CHANGE_KEYS = ['revenueNet', 'revenueGross', 'units', 'orders', 'tacos'] as const;
+export const SALES_CHANGE_KEYS = [
+  'revenueNet',
+  'revenueGross',
+  'units',
+  'orders',
+  'tacos',
+] as const;
 
 const salesDaySchema = z.object({
   date: z.iso.date(),

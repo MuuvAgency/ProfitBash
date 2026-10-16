@@ -104,7 +104,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const text = (wrapper: { text(): string }) => wrapper.text().replace(/ /g, ' ');
+const text = (wrapper: { text(): string }) => wrapper.text().replace(/\u00a0/g, ' ');
 const tile = (wrapper: Awaited<ReturnType<typeof mountSales>>['wrapper'], label: string) =>
   wrapper.findAll('article').find((t) => t.find('[data-kpi-label]').text() === label)!;
 
