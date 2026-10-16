@@ -37,6 +37,8 @@ type Schemas = components['schemas'];
 export type AnalyticsQueryInput = Schemas['AnalyticsQuery'];
 export type FilterOptions = Schemas['FilterOptionsResponse'];
 export type DashboardData = Schemas['DashboardResponse'];
+export type SalesQueryInput = Schemas['SalesQuery'];
+export type SalesData = Schemas['SalesResponse'];
 export type TimeSeriesInput = Schemas['TimeSeriesRequest'];
 export type TimeSeriesData = Schemas['TimeSeriesResponse'];
 export type ExplorerRowsInput = Schemas['ExplorerRowsRequest'];
@@ -581,6 +583,12 @@ export function createApi(options: ApiOptions = {}) {
         unwrap(client.POST('/api/ads/explorer/rows', { body: input })),
       asinSearch: (input: AsinSearchInput): Promise<ExplorerRowsData> =>
         unwrap(client.POST('/api/ads/asin-search', { body: input })),
+    },
+
+    /** Profit (`/api/profit/*`, Feature `profit`, Phase 7). */
+    profit: {
+      sales: (query: SalesQueryInput): Promise<SalesData> =>
+        unwrap(client.POST('/api/profit/sales', { body: query })),
     },
 
     /** Änderungen (`/api/ads/changes/*`, Feature `changes`): Warenkorb je Nutzer, offene Änderungen fürs Grid. */

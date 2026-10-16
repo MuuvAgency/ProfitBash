@@ -962,6 +962,38 @@ export const de = {
       overwrite: 'Ansicht überschreiben',
     },
   },
+  salesPage: {
+    description:
+      'Umsatz, Bestellungen, TACoS und organischer Umsatz der Seller-Konten in der Auswahl.',
+    loadFailed: 'Die Verkaufsdaten konnten nicht geladen werden.',
+    vat: { label: 'Umsatz netto oder brutto', net: 'netto', gross: 'brutto' },
+    kpi: {
+      revenue: 'Umsatz ({vat})',
+      orders: 'Bestellungen',
+      units: 'Stück',
+      tacos: 'TACoS',
+      organic: 'Organischer Umsatz ({vat})',
+    },
+    note: {
+      tacos:
+        'TACoS = Werbekosten ÷ Netto-Umsatz. Organisch = Umsatz − Anzeigen-Umsatz; der Anzeigen-Umsatz zählt am Klicktag, der Umsatz am Kauftag.',
+      noAds:
+        'Kein Ads-Profil desselben Clients und Marktplatzes in der Auswahl: TACoS und organischer Umsatz fehlen.',
+      unpriced:
+        '{count} Stück ohne Preis (selbst versandt, noch offen): ihr Umsatz fehlt noch. | {count} Stück ohne Preis (selbst versandt, noch offen): ihr Umsatz fehlt noch.',
+    },
+    empty: {
+      title: 'Noch keine Verkaufsdaten',
+      text: 'In der Auswahl gibt es kein verbundenes Seller-Konto. Verbunden wird unter „Clients & Connections“.',
+    },
+    chart: { title: 'Tagesverlauf', label: 'Umsatz und Stück je Tag' },
+    products: {
+      title: 'Produkte',
+      sku: 'SKU',
+      empty: 'Im Zeitraum wurde nichts verkauft.',
+      limited: 'Die {shown} umsatzstärksten Produkte; alle stehen unter „Produkte“.',
+    },
+  },
   dashboard: {
     eyebrow: 'Übersicht',
     description: 'Amazon-Ads-Kennzahlen der gewählten Clients und Profile.',

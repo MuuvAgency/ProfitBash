@@ -65,6 +65,7 @@ export function isOpenForCustomers(path: string): boolean {
       '/api/ads/dashboard',
       '/api/ads/explorer/rows',
       '/api/ads/timeseries',
+      '/api/profit/sales',
     ].includes(path) || path.startsWith('/api/settings/')
   );
 }
