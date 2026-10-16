@@ -7,8 +7,8 @@
 > „kundensicher“ machen), `docs/ideas/2026-10-erweiterungen-sqp-kampagnen-tools.md` (Abschnitt G), `design/DESIGN.md`.
 >
 > **Status: verfeinert (2026-10-12), Fragen F1–F8 entschieden (die Nummern gelten nur in dieser Datei). Fertig: 7.1, 7.2 (ohne 7.2b),
-> 7.3. Nächste Aufgabe: 7.4.** Offen bei Dominik (nachgefragt am 2026-10-16, weiter offen): F1 (Art des Zugangs) und F2 (Rollen
-> prüfen); beides hält 7.4–7.9 nicht auf, weil bis dahin gegen Mocks gebaut wird.
+> 7.3, 7.4. Nächste Aufgabe: 7.5.** Offen bei Dominik (nachgefragt am 2026-10-16, weiter offen): F1 (Art des Zugangs) und F2
+> (Rollen prüfen); beides hält 7.5–7.9 nicht auf, weil bis dahin gegen Mocks gebaut wird.
 >
 > **Ausgangslage (Stand Code, 2026-10-12):**
 > - `connection_provider` kennt nur `amazon_ads`; `connections` (Region, externes Konto, verschlüsseltes Refresh-Token,
@@ -309,12 +309,42 @@ bei Amazon `amazonSellerId` + `marketplaceId`), Gegenstück zum Ads-Profil. **Pr
     Marktplatz-ID beschränkt (sonst landen FR-Bestellungen im DE-Konto; dann über `sales-channel` filtern).
 
 ### 7.4 Echtes TACoS und Verkaufsanalyse (`/profit/sales`)
-- [ ] Leseschicht: Umsatz, Stück, Bestellungen je Tag, Marktplatz, SKU/ASIN; organischer Umsatz und TACoS nach der
+- [x] Leseschicht: Umsatz, Stück, Bestellungen je Tag, Marktplatz, SKU/ASIN; organischer Umsatz und TACoS nach der
       Festlegung oben; Umrechnung in die Anzeigewährung wie im Dashboard („≈“).
-- [ ] Dashboard: Kennzahlen TACoS und organischer Umsatz, nur wenn `profit` gebucht ist und der Client ein Seller-Konto
+- [x] Dashboard: Kennzahlen TACoS und organischer Umsatz, nur wenn `profit` gebucht ist und der Client ein Seller-Konto
       auf dem Marktplatz hat; sonst der bisherige Stand.
-- [ ] Seite Verkaufsanalyse: Zeitraum und Vergleich, Chart, Tabelle je Produkt, Umschaltung netto/brutto (F6).
-- [ ] Kundensicht (F7): Endpunkte freigeben, Tests mit zweitem Client.
+- [x] Seite Verkaufsanalyse: Zeitraum und Vergleich, Chart, Tabelle je Produkt, Umschaltung netto/brutto (F6).
+- [x] Kundensicht (F7): Endpunkte freigeben, Tests mit zweitem Client.
+- [x] Umsetzung (Stand für 7.5 und später):
+  - **Festlegung Umsatz (Claude, 2026-10-16; Dominik kann widersprechen):** Umsatz = `item-price` − Aktionsrabatt (Betrag,
+    Vorzeichen egal), **ohne** Versand und Geschenkverpackung (wie „Umsatz bestellter Produkte“). Brutto/netto: Außer in
+    **US und CA** enthalten Amazon-Preise die Steuer (netto = Preis − `item-tax`); dort kommt sie dazu (brutto = Preis +
+    `item-tax`). Als `shortcut:` im Code (`TAX_EXCLUSIVE_COUNTRIES`), mit echten Dateien in 7.12 prüfen.
+  - **Leseschicht** `querySales` (`packages/db/src/sp-sales.ts`): sichtbare Konten über `visibleSellerAccountsScope` plus
+    Client-Filter; mit `profileIds` nur Konten, deren Client und Marktplatz zu einem gewählten Profil passen. Umrechnung
+    über `fxSql` aus `ads-analytics` (exportiert), Summen auf 12 Nachkommastellen. Eine Abfrage mit `grouping sets`
+    (gesamt, je Tag, je Konto und SKU); **Bestellungen gesamt** zählt Bestellnummern ohne Doppel aus den Positionen
+    (je Tag/SKU wäre eine Bestellung mit zwei SKUs doppelt). Produkte höchstens 10 000 (`truncated`).
+  - **Werbung:** Profile desselben Clients und Marktplatzes (`amazon_ads_profiles.marketplace_id`), sichtbar über den
+    Access-Layer, Summen über `queryDashboard` in derselben Anzeigewährung. Kein passendes Profil → `ads: null`, TACoS
+    und organischer Umsatz fehlen (Hinweis auf der Seite, keine Kacheln im Dashboard).
+  - **Engine** `salesMetrics`: TACoS = Werbekosten ÷ Netto-Umsatz (immer netto), organisch = Umsatz − Anzeigen-Umsatz,
+    nie unter 0, je für netto und brutto.
+  - **API** `POST /api/profit/sales` (Feature `profit`, nur lesen), Antwort mit beiden Umsätzen; die Oberfläche wählt.
+    Für Kunden-Logins in `CUSTOMER_ORG_PATHS`, Test mit zweitem Client (`routes/profit-sales.test.ts`); gebucht wird
+    `profit` für Kunden-Orgs erst in 7.9. `POST /api/ads/filter-options` öffnet jetzt auch `profit` (die Seite nutzt
+    die Filterleiste des Dashboards).
+  - **Oberfläche:** `SalesPage.vue` mit Filterleiste, fünf KPI-Kacheln (Umsatz, Bestellungen, Stück, TACoS, organisch),
+    Hinweisen (TACoS-Definition, Stück ohne Preis, kein Ads-Profil), Tagesverlauf (Umsatz und Stück) und den 100
+    umsatzstärksten Produkten (alle: `/profit/products`, 7.5). Netto/brutto über `useVatMode` (UI-State `profit/vat`,
+    Standard netto), gilt auch im Dashboard. Die Farbe der Veränderung folgt den Ads-Kennzahlen (TACoS wie ACoS).
+  - **Geprüft:** Tests in Engine, DB (Rechenregeln, Vergleich, Sichtbarkeit), API und Web; im Browser gegen den Mock
+    (1440 px, Tablet hell, Handy dunkel, kein seitliches Scrollen; Umschalter mit echtem Bedienelement, bleibt nach
+    Neuladen; Dashboard zeigt TACoS). **Rest in der Dev-DB:** die Mock-Seller-Konten DE und FR hängen am Client
+    „Waldkauz (Demo)“ (für die Prüfung zugeordnet).
+  - **Nicht gebaut:** organischer Umsatz je Tag im Chart (nur Summen; der Zeitbezug von Klick- und Kauftag macht
+    Tageswerte wenig aussagekräftig), Vergleichsreihe im Chart, Spalten Vergleich je Produkt.
+  - **Offen bis 7.12:** ob Amazon-Anzeigen-Umsatz in der EU brutto ist (organisch mischt sonst brutto und netto).
 
 ### 7.5 Bestellungen (`/profit/orders`) und Produkte (`/profit/products`)
 - [ ] Bestellliste mit Cursor (nie alles laden), Filter Zeitraum, Marktplatz, Status, Kanal; Detail mit Positionen.
