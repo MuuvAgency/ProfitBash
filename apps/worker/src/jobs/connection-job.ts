@@ -5,6 +5,7 @@ import {
   type ConnectionRef,
   type RequestMeter,
 } from '@profitbash/amazon-ads';
+import type { AmazonSpClient } from '@profitbash/amazon-sp';
 import {
   ConnectionReauthRequiredError,
   findJobConnection,
@@ -67,6 +68,8 @@ export interface ConnectionJobDeps {
   db: Db;
   logger: Logger;
   amazonAds: AmazonAdsClient;
+  /** SP-API (Phase 7); nur der Job `sp-orders-sync` braucht sie. */
+  amazonSp?: AmazonSpClient;
   /** Plant denselben Job später erneut ein (pg-boss `startAfter`); `false`, wenn schon einer wartet. */
   scheduleRetry(retry: ScheduledRetry): Promise<boolean>;
   /**

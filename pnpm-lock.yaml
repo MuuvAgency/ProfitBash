@@ -351,6 +351,9 @@ importers:
       '@profitbash/amazon-ads':
         specifier: workspace:*
         version: link:../../packages/amazon-ads
+      '@profitbash/amazon-sp':
+        specifier: workspace:*
+        version: link:../../packages/amazon-sp
       '@profitbash/db':
         specifier: workspace:*
         version: link:../../packages/db

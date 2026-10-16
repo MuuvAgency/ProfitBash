@@ -1,3 +1,4 @@
+import { createMockAmazonSpClient } from '@profitbash/amazon-sp';
 import { randomUUID } from 'node:crypto';
 import { createMockAmazonAdsClient } from '@profitbash/amazon-ads';
 import { acquireConnectionLease, createConnectionTokenStore, schema } from '@profitbash/db';
@@ -74,6 +75,9 @@ describe('startWorker', () => {
         // Ohne Budget-Pause: Der Standard (2/s je Profil) machte die Kette im Test langsam.
         rateLimit: { requestsPerSecond: 100 },
       }),
+      amazonSp: createMockAmazonSpClient({
+        store: createConnectionTokenStore({ db: testDb.db, keyring: testKeyring }),
+      }),
       logger: (entry) => logs.push(entry),
       pollingIntervalSeconds: 0.5,
       // Kein Aufruf der echten EZB: ein Kurs, damit der Lauf beim Start etwas schreibt.
@@ -85,7 +89,7 @@ describe('startWorker', () => {
     await worker.stop();
   });
 
-  it('richtet die Zeitpläne ein (Refresh stündlich, Profile 05:00, Entities, Reports und Kurse 06:00 Berlin, Benachrichtigungen 07:00, Poll alle 10 Min.)', async () => {
+  it('richtet die Zeitpläne ein (Refresh stündlich, Profile 05:00, Entities, Reports, SP-Bestellungen und Kurse 06:00 Berlin, Benachrichtigungen 07:00, Poll alle 10 Min.)', async () => {
     const rows = await testDb.db.execute<{ name: string; cron: string; timezone: string }>(
       sql`select name, cron, timezone from pgboss.schedule order by name`,
     );
@@ -100,6 +104,8 @@ describe('startWorker', () => {
       { name: 'notifications-check', cron: '0 7 * * *', timezone: 'Europe/Berlin' },
       { name: 'profiles-sync-all', cron: '0 5 * * *', timezone: 'Europe/Berlin' },
       { name: 'reports-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
+      { name: 'sp-orders-poll-all', cron: '*/10 * * * *', timezone: 'UTC' },
+      { name: 'sp-orders-sync-all', cron: '0 6 * * *', timezone: 'Europe/Berlin' },
       { name: 'token-refresh-all', cron: '0 * * * *', timezone: 'UTC' },
     ]);
   });

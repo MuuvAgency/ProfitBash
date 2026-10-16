@@ -1,6 +1,7 @@
 import {
   deleteExpiredOAuthNonces,
   deleteFinishedAmazonRequestsBefore,
+  deleteFinishedSpReportRequestsBefore,
   deleteJobRunsStartedBefore,
   failAbandonedJobRuns,
   type Db,
@@ -31,10 +32,10 @@ export async function cleanupJobRuns(deps: { db: Db; now?: () => Date }): Promis
     error: 'Abgebrochen: Der Worker wurde beendet, bevor der Lauf fertig war.',
   });
   const deletedOAuthNonces = await deleteExpiredOAuthNonces(deps.db, now);
-  const deletedAmazonRequests = await deleteFinishedAmazonRequestsBefore(
-    deps.db,
-    new Date(now.getTime() - AMAZON_REQUESTS_RETENTION_DAYS * DAY_MS),
-  );
+  const requestsBefore = new Date(now.getTime() - AMAZON_REQUESTS_RETENTION_DAYS * DAY_MS);
+  const deletedAmazonRequests =
+    (await deleteFinishedAmazonRequestsBefore(deps.db, requestsBefore)) +
+    (await deleteFinishedSpReportRequestsBefore(deps.db, requestsBefore));
   return {
     counters: { deletedJobRuns, abandonedJobRuns, deletedOAuthNonces, deletedAmazonRequests },
   };

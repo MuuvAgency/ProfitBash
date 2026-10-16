@@ -1,6 +1,7 @@
 import { parseKeyring } from '@profitbash/shared/crypto';
 import {
   amazonAdsEnvSchema,
+  amazonSpEnvSchema,
   appUrlSchema,
   databaseDirectUrlSchema,
   databaseUrlSchema,
@@ -27,6 +28,7 @@ export const workerEnvSchema = nodeEnvSchema
   .extend(databaseDirectUrlSchema.shape)
   .extend(encryptionEnvSchema.shape)
   .extend(amazonAdsEnvSchema.shape)
+  .extend(amazonSpEnvSchema.shape)
   .extend(healthchecksEnvSchema.shape)
   .superRefine((env, ctx) => {
     refineKeyring(env, ctx);

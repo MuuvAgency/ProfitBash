@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@profitbash/amazon-ads": "workspace:*",
+    "@profitbash/amazon-sp": "workspace:*",
     "@profitbash/db": "workspace:*",
     "@profitbash/ecb": "workspace:*",
     "@profitbash/engine": "workspace:*",

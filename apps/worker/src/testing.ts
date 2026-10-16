@@ -20,7 +20,7 @@ export async function createOrganization(db: Db, slug: string): Promise<string> 
   return org.id;
 }
 
-/** Legt eine Amazon-Ads-Connection mit verschlüsseltem Refresh-Token an. */
+/** Legt eine Connection (Standard: Amazon Ads) mit verschlüsseltem Refresh-Token an. */
 export async function createConnection(
   db: Db,
   input: {
@@ -28,11 +28,12 @@ export async function createConnection(
     externalAccountId: string;
     status?: 'active' | 'reauth_required' | 'error';
     refreshToken?: string;
+    provider?: 'amazon_ads' | 'amazon_sp';
   },
 ): Promise<string> {
   const naturalKey = {
     organizationId: input.organizationId,
-    provider: 'amazon_ads' as const,
+    provider: input.provider ?? 'amazon_ads',
     region: 'eu' as const,
     externalAccountId: input.externalAccountId,
   };

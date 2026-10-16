@@ -19,7 +19,8 @@ const COUNTER_ORDER = [
   'profiles',
   // Datei-Import (1.11c): Dateien, davon importiert (`imported`) bzw. nicht importiert.
   'files',
-  // Amazon-Aufträge (1.7): anfordern, abholen, importieren.
+  // Amazon-Aufträge (1.7): planen (SP-Bestellungen, 7.3), anfordern, abholen, importieren.
+  'planned',
   'requested',
   'reused',
   'imported',

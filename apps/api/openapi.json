@@ -14308,6 +14308,7 @@
                 "reports-sync",
                 "amazon-requests-poll",
                 "ad-changes-submit",
+                "sp-orders-sync",
                 "file-import",
                 "automation-run",
                 "fx-rates-sync"
