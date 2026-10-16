@@ -247,7 +247,7 @@ async function executeLarge<T extends Record<string, unknown>>(db: Db, query: SQ
   });
 }
 
-const uuidArray = (values: readonly string[]) => sql`${sql.param([...values])}::uuid[]`;
+export const uuidArray = (values: readonly string[]) => sql`${sql.param([...values])}::uuid[]`;
 const textArray = (values: readonly string[]) => sql`${sql.param([...values])}::text[]`;
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ function anyRange({ period, comparison }: Periods): SQL {
  * Umrechnungsfaktor je Tag und Währung in die Anzeigewährung: Kurs(Ziel) ÷ Kurs(Quelle) mit dem letzten Kurs
  * an oder vor dem Tag, `null`, wenn einer fehlt. 30 Nachkommastellen, damit Summen erst bei der Anzeige runden.
  */
-function fxSql(selectionQuery: SQL, target: string, { period, comparison }: Periods): SQL {
+export function fxSql(selectionQuery: SQL, target: string, { period, comparison }: Periods): SQL {
   const from = comparison
     ? sql`least(${period.from}::date, ${comparison.from}::date)`
     : sql`${period.from}::date`;
