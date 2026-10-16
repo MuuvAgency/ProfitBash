@@ -1277,7 +1277,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll" | "ad-changes-submit" | "file-import" | "automation-run" | "fx-rates-sync";
+                    job?: "token-refresh" | "profiles-sync" | "entities-sync" | "reports-sync" | "amazon-requests-poll" | "ad-changes-submit" | "sp-orders-sync" | "file-import" | "automation-run" | "fx-rates-sync";
                     status?: "running" | "success" | "failed";
                 };
                 header?: never;

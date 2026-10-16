@@ -1,5 +1,6 @@
 import { createAmazonAdsClientFromConfig } from '@profitbash/amazon-ads';
-import { createConnectionTokenStore, createDb } from '@profitbash/db';
+import { createAmazonSpClient, createMockAmazonSpClient } from '@profitbash/amazon-sp';
+import { createConnectionTokenStore, createDb, getSpCredentials } from '@profitbash/db';
 import { AMAZON_ADS_MOCK_CONSENT_PATH, consoleLogger } from '@profitbash/shared';
 import { loadEnv, workerModeSchema } from '@profitbash/shared/env';
 import { healthcheckUrls, loadWorkerEnv } from './env';
@@ -30,11 +31,18 @@ const amazonAds = createAmazonAdsClientFromConfig({
   store: createConnectionTokenStore({ db, keyring: env.keyring }),
   logger,
 });
+// Wie `createAmazonSpDeps` in der API: Zugangsdaten der App je Connection aus der Datenbank.
+const amazonSp = (env.AMAZON_SP_USE_MOCK ? createMockAmazonSpClient : createAmazonSpClient)({
+  store: createConnectionTokenStore({ db, keyring: env.keyring }),
+  credentialsFor: (connection) => getSpCredentials(db, env.keyring, connection),
+  logger,
+});
 
 const worker = await startWorker({
   connectionString: env.DATABASE_URL_DIRECT,
   db,
   amazonAds,
+  amazonSp,
   logger,
   healthchecks: healthcheckUrls(env),
 });

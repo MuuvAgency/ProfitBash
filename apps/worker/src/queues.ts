@@ -14,7 +14,7 @@ export const CONNECTION_QUEUES: readonly ConnectionQueue[] = CONNECTION_JOB_NAME
 /**
  * Cron-Auslöser, die für jede aktive Connection einen Job der Ziel-Queue einplanen
  * (`amazon-requests-poll-all` nur für Connections mit fälligen Aufträgen, `ad-changes-submit-all` nur für
- * Connections mit offenen Übermittlungen, siehe `jobs/dispatch.ts`).
+ * Connections mit offenen Übermittlungen, `sp-orders-*` nur für SP-Connections, siehe `jobs/dispatch.ts`).
  */
 export const DISPATCH_QUEUES = {
   'token-refresh-all': 'token-refresh',
@@ -23,6 +23,9 @@ export const DISPATCH_QUEUES = {
   'reports-sync-all': 'reports-sync',
   'amazon-requests-poll-all': 'amazon-requests-poll',
   'ad-changes-submit-all': 'ad-changes-submit',
+  // Bestellungen der SP-API (7.3): täglich alle aktiven SP-Connections, alle 10 Min. die mit fälligen Berichten.
+  'sp-orders-sync-all': 'sp-orders-sync',
+  'sp-orders-poll-all': 'sp-orders-sync',
 } as const satisfies Record<string, ConnectionQueue>;
 
 export const CLEANUP_QUEUE = 'job-runs-cleanup';
@@ -61,6 +64,9 @@ export const SCHEDULES = [
   { queue: 'amazon-requests-poll-all', cron: '*/10 * * * *' },
   // Holt offene Übermittlungen nach Absturz oder Deploy nach (3.3); sonst plant die API den Job direkt ein.
   { queue: 'ad-changes-submit-all', cron: '*/10 * * * *' },
+  // Nach den Ads-Reports; Amazon braucht für die Bestellberichte Minuten bis Stunden.
+  { queue: 'sp-orders-sync-all', cron: '0 6 * * *', tz: 'Europe/Berlin' },
+  { queue: 'sp-orders-poll-all', cron: '*/10 * * * *' },
   { queue: CLEANUP_QUEUE, cron: '30 3 * * *', tz: 'Europe/Berlin' },
   { queue: FX_RATES_QUEUE, cron: '0 6 * * *', tz: 'Europe/Berlin' },
   { queue: FILE_IMPORT_SWEEP_QUEUE, cron: '*/10 * * * *' },

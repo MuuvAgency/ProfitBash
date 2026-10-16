@@ -20,6 +20,12 @@ const auth = createAuth({
   trustedOrigins: [new URL(env.APP_URL).origin],
 });
 const amazonAds = createAmazonAdsDeps({ env, db, keyring: env.keyring, logger: consoleLogger });
+const amazonSp = createAmazonSpDeps({
+  useMock: env.AMAZON_SP_USE_MOCK,
+  db,
+  keyring: env.keyring,
+  logger: consoleLogger,
+});
 
 // inline: Der Worker läuft in diesem Prozess (ein Railway-Service) und teilt sich den Amazon-Client.
 // separate: Die API plant Jobs nur ein, ausgeführt werden sie im eigenen Worker-Prozess.
@@ -29,6 +35,7 @@ const background =
         connectionString: env.DATABASE_URL_DIRECT,
         db,
         amazonAds: amazonAds.client,
+        amazonSp: amazonSp.client,
         logger: consoleLogger,
         healthchecks: healthcheckUrls(env),
       })
@@ -49,12 +56,7 @@ const app = createApp({
   version: env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12) || 'dev',
   logger: consoleLogger,
   amazonAds,
-  amazonSp: createAmazonSpDeps({
-    useMock: env.AMAZON_SP_USE_MOCK,
-    db,
-    keyring: env.keyring,
-    logger: consoleLogger,
-  }),
+  amazonSp,
   keyring: env.keyring,
   oauthStateSecret: env.OAUTH_STATE_SECRET,
   jobs: background.jobs,

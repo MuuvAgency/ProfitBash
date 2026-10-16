@@ -1,4 +1,5 @@
 import type { AmazonAdsClient } from '@profitbash/amazon-ads';
+import type { AmazonSpClient } from '@profitbash/amazon-sp';
 import { latestFxRateDate, listProfilesWithOpenFileImports, type Db } from '@profitbash/db';
 import type { EcbRate, FetchEcbRatesOptions } from '@profitbash/ecb';
 import type { Logger } from '@profitbash/shared';
@@ -27,6 +28,7 @@ import { checkNotifications } from './jobs/notifications-check';
 import { syncConnectionProfiles } from './jobs/profiles-sync';
 import { syncConnectionReports } from './jobs/reports-sync';
 import { runConnectionJob, type ConnectionJobDefinition } from './jobs/run-connection-job';
+import { syncSpOrders } from './jobs/sp-orders-sync';
 import { refreshConnectionToken } from './jobs/token-refresh';
 import {
   CLEANUP_QUEUE,
@@ -58,6 +60,7 @@ const CONNECTION_JOBS: Record<ConnectionQueue, ConnectionJobDefinition> = {
   'reports-sync': { run: syncConnectionReports, lease: true },
   'amazon-requests-poll': { run: pollAmazonRequests, lease: true },
   'ad-changes-submit': { run: submitConnectionAdChanges, lease: true },
+  'sp-orders-sync': { run: syncSpOrders, lease: true },
 };
 
 /** Daten eines Kursabrufs: leer (Zeitplan, Start) oder Nummer des Wiederholungsversuchs. */
@@ -71,6 +74,8 @@ export interface StartWorkerOptions {
   connectionString: string;
   db: Db;
   amazonAds: AmazonAdsClient;
+  /** SP-API (Phase 7, `sp-orders-sync`). */
+  amazonSp: AmazonSpClient;
   logger: Logger;
   healthchecks?: JobRunnerDeps['healthchecks'];
   fetch?: typeof fetch;
@@ -105,6 +110,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
     db,
     logger,
     amazonAds: options.amazonAds,
+    amazonSp: options.amazonSp,
     scheduleRetry: ({ queue, job, startAfterSeconds }) =>
       jobs.enqueueConnectionJob(queue, job, { startAfterSeconds }),
     enqueue: (queue, job, enqueueOptions) => jobs.enqueueConnectionJob(queue, job, enqueueOptions),
@@ -148,7 +154,7 @@ export async function startWorker(options: StartWorkerOptions): Promise<Worker> 
       await runJob(target, { organizationId: null, scope: null }, () =>
         dispatchConnectionJobs(
           { db, enqueue: (name, job) => jobs.enqueueConnectionJob(name, job) },
-          target,
+          queue,
         ),
       );
     });

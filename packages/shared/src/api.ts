@@ -448,6 +448,8 @@ export const CONNECTION_JOB_NAMES = [
   'amazon-requests-poll',
   // Übermittlungen von Änderungen über die API (`phase-3.md` 3.3).
   'ad-changes-submit',
+  // Bestellungen der SP-API: Berichte planen, abholen, importieren (`phase-7.md` 7.3).
+  'sp-orders-sync',
 ] as const;
 export type ConnectionJobName = (typeof CONNECTION_JOB_NAMES)[number];
 
