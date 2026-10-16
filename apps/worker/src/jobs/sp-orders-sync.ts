@@ -30,7 +30,7 @@ import {
   POLL_BACKOFF_MINUTES,
   sanitizeReason as sanitize,
 } from '../amazon-requests/state-machine';
-import { JobFailure, type JobCounters, type JobOutcome } from '../run-job';
+import { JobFailure, type JobOutcome } from '../run-job';
 import {
   handleAmazonError,
   loadConnection,
