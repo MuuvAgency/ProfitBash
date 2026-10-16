@@ -97,3 +97,29 @@ export function change(
     relative: base.isZero() ? null : formatDecimal(difference.div(base)),
   };
 }
+
+/**
+ * Kennzahlen aus Verkäufen und Werbung (`phase-7.md` 7.4): TACoS = Werbekosten ÷ Netto-Umsatz (immer netto, F6),
+ * organischer Umsatz = Umsatz − den Anzeigen zugeschriebener Umsatz, nie unter 0 (der Anzeigen-Umsatz zählt am
+ * Klicktag, der Umsatz am Kauftag). `null` ohne Werbedaten.
+ */
+export function salesMetrics(input: {
+  revenueNet: DecimalString;
+  revenueGross: DecimalString;
+  adCost: DecimalString | null;
+  adSales: DecimalString | null;
+}): {
+  tacos: DecimalString | null;
+  organicNet: DecimalString | null;
+  organicGross: DecimalString | null;
+} {
+  const organic = (revenue: DecimalString) =>
+    input.adSales === null
+      ? null
+      : formatDecimal(Dec.max(0, parseDecimal(revenue).minus(parseDecimal(input.adSales))));
+  return {
+    tacos: ratio(input.adCost, input.revenueNet),
+    organicNet: organic(input.revenueNet),
+    organicGross: organic(input.revenueGross),
+  };
+}

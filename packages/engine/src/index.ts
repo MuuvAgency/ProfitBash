@@ -2,6 +2,7 @@ export { Dec, DECIMAL_PRECISION, formatDecimal, parseDecimal, type DecimalString
 export {
   change,
   deriveMetrics,
+  salesMetrics,
   share,
   sumDecimals,
   sumWithGaps,

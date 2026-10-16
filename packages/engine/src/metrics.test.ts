@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   change,
   deriveMetrics,
+  salesMetrics,
   share,
   sumDecimals,
   sumWithGaps,
@@ -141,5 +142,28 @@ describe('share', () => {
     expect(share('5', '0')).toBeNull();
     expect(share(null, '10')).toBeNull();
     expect(share('5', null)).toBeNull();
+  });
+});
+
+describe('salesMetrics (phase-7 7.4)', () => {
+  it('TACoS = Werbekosten ÷ Netto-Umsatz, organisch = Umsatz − Anzeigen-Umsatz', () => {
+    expect(
+      salesMetrics({ revenueNet: '1000', revenueGross: '1190', adCost: '50', adSales: '300' }),
+    ).toEqual({ tacos: '0.05', organicNet: '700', organicGross: '890' });
+  });
+
+  it('zeigt organischen Umsatz nie unter 0 (Anzeigen-Umsatz zählt am Klicktag)', () => {
+    expect(
+      salesMetrics({ revenueNet: '100', revenueGross: '119', adCost: '10', adSales: '150' }),
+    ).toMatchObject({ organicNet: '0', organicGross: '0' });
+  });
+
+  it('liefert null ohne Werbedaten oder ohne Umsatz', () => {
+    expect(
+      salesMetrics({ revenueNet: '100', revenueGross: '119', adCost: null, adSales: null }),
+    ).toEqual({ tacos: null, organicNet: null, organicGross: null });
+    expect(
+      salesMetrics({ revenueNet: '0', revenueGross: '0', adCost: '5', adSales: '0' }).tacos,
+    ).toBe(null);
   });
 });
