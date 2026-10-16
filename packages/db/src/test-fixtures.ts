@@ -19,12 +19,13 @@ export async function createTestConnection(
   db: Db,
   organizationId: string,
   externalAccountId: string,
+  provider: 'amazon_ads' | 'amazon_sp' = 'amazon_ads',
 ): Promise<string> {
   const [row] = await db
     .insert(connections)
     .values({
       organizationId,
-      provider: 'amazon_ads',
+      provider,
       region: 'eu',
       externalAccountId,
       refreshTokenEncrypted: 'verschlüsselt',
